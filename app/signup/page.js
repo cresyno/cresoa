@@ -126,18 +126,4 @@ export default function SignUpPage() {
       </div>
     </main>
   )
-              }          <button
-            type="submit"
-            style={{
-              width: '100%', padding: '0.8rem', borderRadius: '8px',
-              border: 'none', background: '#1E3A5F', color: '#fff',
-              fontSize: '1rem', fontWeight: '600'
-            }}
-          >
-            Create account
-          </button>
-        </form>
-      </div>
-    </main>
-  )
-}
+    }
