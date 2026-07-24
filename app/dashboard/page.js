@@ -8,6 +8,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [business, setBusiness] = useState(null)
   const [customers, setCustomers] = useState([])
+  const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -35,6 +36,14 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false })
 
         setCustomers(customerData || [])
+
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select('*, customers(name)')
+          .eq('business_id', businessData.id)
+          .order('created_at', { ascending: false })
+
+        setOrders(orderData || [])
       }
 
       setLoading(false)
@@ -76,18 +85,69 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.6rem' }}>
         <a
           href="/dashboard/customers/new"
           style={{
             display: 'inline-block', background: '#1E3A5F', color: '#fff',
-            padding: '0.6rem 1.2rem', borderRadius: '8px', fontSize: '0.9rem',
+            padding: '0.6rem 1rem', borderRadius: '8px', fontSize: '0.85rem',
             fontWeight: '600', textDecoration: 'none'
           }}
         >
           + Add customer
         </a>
+        <a
+          href="/dashboard/orders/new"
+          style={{
+            display: 'inline-block', background: '#C79A2B', color: '#1E3A5F',
+            padding: '0.6rem 1rem', borderRadius: '8px', fontSize: '0.85rem',
+            fontWeight: '600', textDecoration: 'none'
+          }}
+        >
+          + New order
+        </a>
       </div>
+
+      <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', marginBottom: '0.8rem' }}>
+        Orders
+      </h2>
+
+      {orders.length === 0 ? (
+        <div
+          style={{
+            background: '#fff', borderRadius: '12px', padding: '1.5rem',
+            border: '1px solid #e4d8c2', textAlign: 'center', color: '#2B2620', marginBottom: '2rem'
+          }}
+        >
+          <p>No orders yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '2rem' }}>
+          {orders.map((o) => {
+            const balance = o.price - o.amount_paid
+            return (
+              <div
+                key={o.id}
+                style={{
+                  background: '#fff', borderRadius: '10px', padding: '1rem',
+                  border: '1px solid #e4d8c2'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <p style={{ margin: 0, color: '#1E3A5F', fontWeight: '600' }}>{o.title}</p>
+                  <span style={{ fontSize: '0.75rem', color: '#6B6255' }}>{o.current_status}</span>
+                </div>
+                <p style={{ margin: '0.2rem 0 0', color: '#6B6255', fontSize: '0.85rem' }}>
+                  {o.customers?.name}
+                </p>
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: balance > 0 ? '#AE4A34' : '#4C7A5E' }}>
+                  {balance > 0 ? `Balance: ₦${balance.toLocaleString()}` : 'Paid in full'}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', marginBottom: '0.8rem' }}>
         Customers
@@ -122,21 +182,6 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
-
-      <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', margin: '2rem 0 0.8rem' }}>
-        Orders
-      </h2>
-      <div
-        style={{
-          background: '#fff', borderRadius: '12px', padding: '1.5rem',
-          border: '1px solid #e4d8c2', textAlign: 'center', color: '#2B2620'
-        }}
-      >
-        <p>No orders yet.</p>
-        <p style={{ fontSize: '0.85rem', color: '#6B6255' }}>
-          Order creation coming in the next step.
-        </p>
-      </div>
     </main>
   )
             }
