@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,7 +28,7 @@ export default function LoginPage() {
     }
 
     setMessage('Logged in successfully!')
-    setLoading(false)
+    router.push('/dashboard')
   }
 
   return (
@@ -93,4 +95,4 @@ export default function LoginPage() {
       </div>
     </main>
   )
-    }
+  }
