@@ -1,15 +1,48 @@
 'use client'
 
 import { useState } from 'react'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function SignUpPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    alert('Form looks good! (Not connected to the database yet)')
+    setLoading(true)
+    setMessage('')
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    })
+
+    if (error) {
+      setMessage('Error: ' + error.message)
+      setLoading(false)
+      return
+    }
+
+    const userId = data.user.id
+
+    const { error: businessError } = await supabase
+      .from('businesses')
+      .insert({
+        owner_id: userId,
+        name: name,
+        business_type: 'fashion',
+      })
+
+    if (businessError) {
+      setMessage('Account created, but business setup failed: ' + businessError.message)
+    } else {
+      setMessage('Account created successfully! You can now log in.')
+    }
+
+    setLoading(false)
   }
 
   return (
@@ -73,6 +106,27 @@ export default function SignUpPage() {
           </div>
 
           <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%', padding: '0.8rem', borderRadius: '8px',
+              border: 'none', background: '#1E3A5F', color: '#fff',
+              fontSize: '1rem', fontWeight: '600'
+            }}
+          >
+            {loading ? 'Creating account...' : 'Create account'}
+          </button>
+
+          {message && (
+            <p style={{ marginTop: '1rem', color: '#2B2620', fontSize: '0.9rem' }}>
+              {message}
+            </p>
+          )}
+        </form>
+      </div>
+    </main>
+  )
+              }          <button
             type="submit"
             style={{
               width: '100%', padding: '0.8rem', borderRadius: '8px',
