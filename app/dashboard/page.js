@@ -56,7 +56,7 @@ export default function DashboardPage() {
 
       const { data: allOrders } = await supabase
         .from('orders')
-        .select('*, customers(name)')
+        .select('*, customers(name, phone)')
         .eq('business_id', businessData.id)
         .order('created_at', { ascending: false })
 
@@ -98,7 +98,33 @@ export default function DashboardPage() {
   const copyTrackingLink = (order) => {
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
     navigator.clipboard.writeText(link)
-    alert('Tracking link copied! Paste it to your customer on WhatsApp.')
+    alert('Tracking link copied!')
+  }
+
+  const formatPhoneForWhatsApp = (phone) => {
+    if (!phone) return ''
+    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
+  }
+
+  const sendLinkViaWhatsApp = (order) => {
+    const phone = formatPhoneForWhatsApp(order.customers?.phone)
+    if (!phone) {
+      alert('This customer has no phone number saved.')
+      return
+    }
+    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
+    const message = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link — you can check your order status anytime: ${link}`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
+  }
+
+  const sendStatusUpdateViaWhatsApp = (order) => {
+    const phone = formatPhoneForWhatsApp(order.customers?.phone)
+    if (!phone) {
+      alert('This customer has no phone number saved.')
+      return
+    }
+    const message = `Hi ${order.customers?.name}, this is ${business?.name}. Just to update you — your order "${order.title}" is now at the "${order.current_status}" stage. Thank you for your patience!`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   const renderOrderCard = (o) => {
@@ -117,12 +143,29 @@ export default function DashboardPage() {
         <p style={{ margin: '0.3rem 0 0.6rem', fontSize: '0.85rem', color: balance > 0 ? '#AE4A34' : '#4C7A5E' }}>
           {balance > 0 ? `Balance: ₦${balance.toLocaleString()}` : 'Paid in full'}
         </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.5rem' }}>
+          <button
+            onClick={() => copyTrackingLink(o)}
+            style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.78rem', fontWeight: '600' }}
+          >
+            Copy link
+          </button>
+          <button
+            onClick={() => sendLinkViaWhatsApp(o)}
+            style={{ padding: '0.5rem', borderRadius: '6px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.78rem', fontWeight: '600' }}
+          >
+            Send link
+          </button>
+        </div>
+
         <button
-          onClick={() => copyTrackingLink(o)}
-          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.5rem' }}
+          onClick={() => sendStatusUpdateViaWhatsApp(o)}
+          style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #4C7A5E', background: '#fff', color: '#4C7A5E', fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.5rem' }}
         >
-          Copy tracking link
+          Send status update
         </button>
+
         <button
           onClick={() => advanceStatus(o)}
           disabled={isLastStage}
@@ -218,4 +261,4 @@ export default function DashboardPage() {
       )}
     </main>
   )
-      }
+          }
