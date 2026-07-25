@@ -4,13 +4,27 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 
+const MEASUREMENT_FIELDS = [
+  { key: 'bust', label: 'Bust/Chest (inches)' },
+  { key: 'waist', label: 'Waist (inches)' },
+  { key: 'hip', label: 'Hip (inches)' },
+  { key: 'shoulder', label: 'Shoulder (inches)' },
+  { key: 'sleeve_length', label: 'Sleeve length (inches)' },
+  { key: 'full_length', label: 'Full length (inches)' },
+]
+
 export default function NewCustomerPage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [notes, setNotes] = useState('')
+  const [measurements, setMeasurements] = useState({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  const updateMeasurement = (key, value) => {
+    setMeasurements({ ...measurements, [key]: value })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -18,7 +32,6 @@ export default function NewCustomerPage() {
     setMessage('')
 
     const { data: { user } } = await supabase.auth.getUser()
-
     if (!user) {
       router.push('/login')
       return
@@ -37,6 +50,7 @@ export default function NewCustomerPage() {
         name: name,
         phone: phone,
         notes: notes,
+        measurements: measurements,
       })
 
     if (error) {
@@ -65,10 +79,7 @@ export default function NewCustomerPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              style={{
-                width: '100%', padding: '0.7rem', borderRadius: '8px',
-                border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-              }}
+              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -80,14 +91,30 @@ export default function NewCustomerPage() {
               type="text"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              style={{
-                width: '100%', padding: '0.7rem', borderRadius: '8px',
-                border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-              }}
+              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
             />
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.5rem 0 0.8rem' }}>
+            Measurements (optional)
+          </h2>
+
+          {MEASUREMENT_FIELDS.map((f) => (
+            <div key={f.key} style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>
+                {f.label}
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={measurements[f.key] || ''}
+                onChange={(e) => updateMeasurement(f.key, e.target.value)}
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '0.95rem', boxSizing: 'border-box' }}
+              />
+            </div>
+          ))}
+
+          <div style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
             <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
               Notes (optional)
             </label>
@@ -95,32 +122,21 @@ export default function NewCustomerPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              style={{
-                width: '100%', padding: '0.7rem', borderRadius: '8px',
-                border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-              }}
+              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            style={{
-              width: '100%', padding: '0.8rem', borderRadius: '8px',
-              border: 'none', background: '#1E3A5F', color: '#fff',
-              fontSize: '1rem', fontWeight: '600'
-            }}
+            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '1rem', fontWeight: '600' }}
           >
             {loading ? 'Saving...' : 'Save customer'}
           </button>
 
-          {message && (
-            <p style={{ marginTop: '1rem', color: '#AE4A34', fontSize: '0.9rem' }}>
-              {message}
-            </p>
-          )}
+          {message && <p style={{ marginTop: '1rem', color: '#AE4A34', fontSize: '0.9rem' }}>{message}</p>}
         </form>
       </div>
     </main>
   )
-  }
+}
