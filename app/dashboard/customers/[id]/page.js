@@ -22,6 +22,8 @@ export default function CustomerDetailPage({ params }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [orderCount, setOrderCount] = useState(0)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -41,6 +43,13 @@ export default function CustomerDetailPage({ params }) {
       setPhone(data.phone || '')
       setNotes(data.notes || '')
       setMeasurements(data.measurements || {})
+
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('customer_id', params.id)
+
+      setOrderCount(count || 0)
       setLoading(false)
     }
 
@@ -51,10 +60,21 @@ export default function CustomerDetailPage({ params }) {
     setMeasurements({ ...measurements, [key]: value })
   }
 
+  const handlePhoneChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 11)
+    setPhone(digitsOnly)
+  }
+
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
     setMessage('')
+
+    if (phone.length !== 11) {
+      setMessage('Phone number must be exactly 11 digits.')
+      setSaving(false)
+      return
+    }
 
     const { error } = await supabase
       .from('customers')
@@ -71,8 +91,37 @@ export default function CustomerDetailPage({ params }) {
     setSaving(false)
   }
 
+  const handleDelete = async () => {
+    if (orderCount > 0) {
+      alert(`${name} has ${orderCount} order(s). Delete those orders first before deleting this customer.`)
+      return
+    }
+
+    const confirmed = window.confirm(`Do you want to delete "${name}"? This can't be undone.`)
+    if (!confirmed) return
+
+    setDeleting(true)
+    await supabase.from('customers').delete().eq('id', params.id)
+    router.push('/dashboard/customers')
+  }
+
   if (loading) {
-    return <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}><p style={{ color: '#2B2620' }}>Loading...</p></main>
+    return (
+      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          .cresoa-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e4d8c2;
+            border-top: 4px solid #1E3A5F;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+          }
+        `}</style>
+        <div className="cresoa-spinner"></div>
+        <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Loading customer...</p>
+      </main>
+    )
   }
 
   return (
@@ -105,14 +154,18 @@ export default function CustomerDetailPage({ params }) {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              Phone
+              Phone number
             </label>
             <input
-              type="text"
+              type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={handlePhoneChange}
+              required
               style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
             />
+            <p style={{ fontSize: '0.78rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.3rem' }}>
+              {phone.length}/11 digits
+            </p>
           </div>
 
           <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.5rem 0 0.8rem' }}>
@@ -156,7 +209,20 @@ export default function CustomerDetailPage({ params }) {
 
           {message && <p style={{ marginTop: '1rem', color: message === 'Saved!' ? '#4C7A5E' : '#AE4A34', fontSize: '0.9rem' }}>{message}</p>}
         </form>
+
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #AE4A34', background: '#fff', color: '#AE4A34', fontSize: '0.9rem', fontWeight: '600', marginTop: '1rem' }}
+        >
+          {deleting ? 'Deleting...' : 'Delete customer'}
+        </button>
+        {orderCount > 0 && (
+          <p style={{ fontSize: '0.78rem', color: '#6B6255', marginTop: '0.5rem', textAlign: 'center' }}>
+            This customer has {orderCount} order(s) — delete those first.
+          </p>
+        )}
       </div>
     </main>
   )
-          }
+                   }
