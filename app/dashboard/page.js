@@ -22,11 +22,26 @@ export default function DashboardPage() {
       return
     }
 
-    const { data: businessData } = await supabase
+    let { data: businessData } = await supabase
       .from('businesses')
       .select('*')
       .eq('owner_id', user.id)
       .single()
+
+    if (!businessData) {
+      const businessName = user.user_metadata?.business_name || 'My Business'
+      const { data: newBusiness } = await supabase
+        .from('businesses')
+        .insert({
+          owner_id: user.id,
+          name: businessName,
+          business_type: 'fashion',
+        })
+        .select()
+        .single()
+
+      businessData = newBusiness
+    }
 
     setBusiness(businessData)
 
@@ -203,4 +218,4 @@ export default function DashboardPage() {
       )}
     </main>
   )
-    }
+      }
