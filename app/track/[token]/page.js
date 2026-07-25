@@ -10,6 +10,7 @@ export default function TrackingPage({ params }) {
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [debugInfo, setDebugInfo] = useState('')
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -21,6 +22,7 @@ export default function TrackingPage({ params }) {
 
       if (error || !orderData) {
         setNotFound(true)
+        setDebugInfo(error ? JSON.stringify(error) : 'No error, but no data returned')
         setLoading(false)
         return
       }
@@ -44,6 +46,9 @@ export default function TrackingPage({ params }) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
         <p style={{ color: '#2B2620' }}>This tracking link could not be found.</p>
+        <p style={{ color: '#AE4A34', fontSize: '0.75rem', marginTop: '1rem', wordBreak: 'break-all' }}>
+          Debug: {debugInfo}
+        </p>
       </main>
     )
   }
@@ -128,4 +133,4 @@ export default function TrackingPage({ params }) {
       </div>
     </main>
   )
-}
+              }
