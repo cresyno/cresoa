@@ -7,27 +7,29 @@ const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
 export default function TrackingPage({ params }) {
   const [order, setOrder] = useState(null)
-  const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [debugInfo, setDebugInfo] = useState('')
 
   useEffect(() => {
     const loadOrder = async () => {
-      const { data: orderData, error } = await supabase
-        .from('orders')
-        .select('*, customers(name), businesses(name)')
-        .eq('tracking_token', params.token)
-        .single()
+      const { data, error } = await supabase
+        .rpc('get_tracking_order', { p_token: params.token })
 
-      if (error || !orderData) {
+      if (error || !data || data.length === 0) {
         setNotFound(true)
-        setDebugInfo(error ? JSON.stringify(error) : 'No error, but no data returned')
         setLoading(false)
         return
       }
 
-      setOrder(orderData)
+      const row = data[0]
+      setOrder({
+        title: row.title,
+        price: row.price,
+        amount_paid: row.amount_paid,
+        current_status: row.current_status,
+        customers: { name: row.customer_name },
+        businesses: { name: row.business_name },
+      })
       setLoading(false)
     }
 
@@ -46,9 +48,6 @@ export default function TrackingPage({ params }) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
         <p style={{ color: '#2B2620' }}>This tracking link could not be found.</p>
-        <p style={{ color: '#AE4A34', fontSize: '0.75rem', marginTop: '1rem', wordBreak: 'break-all' }}>
-          Debug: {debugInfo}
-        </p>
       </main>
     )
   }
@@ -133,4 +132,4 @@ export default function TrackingPage({ params }) {
       </div>
     </main>
   )
-              }
+          }
