@@ -3,12 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-
-const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+import OrderCard from '../../../components/OrderCard'
 
 export default function AllOrdersPage() {
   const router = useRouter()
-  const [business, setBusiness] = useState(null)
   const [orders, setOrders] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -26,8 +24,6 @@ export default function AllOrdersPage() {
       .eq('owner_id', user.id)
       .single()
 
-    setBusiness(businessData)
-
     const { data: orderData } = await supabase
       .from('orders')
       .select('*, customers(name, phone)')
@@ -42,45 +38,6 @@ export default function AllOrdersPage() {
   useEffect(() => {
     load()
   }, [router])
-
-  const advanceStatus = async (order) => {
-    const currentIndex = STAGES.indexOf(order.current_status)
-    if (currentIndex === -1 || currentIndex === STAGES.length - 1) return
-    await supabase.from('orders').update({ current_status: STAGES[currentIndex + 1] }).eq('id', order.id)
-    load()
-  }
-
-  const copyTrackingLink = (order) => {
-    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
-    navigator.clipboard.writeText(link)
-    alert('Tracking link copied!')
-  }
-
-  const formatPhoneForWhatsApp = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
-  }
-
-  const sendLinkViaWhatsApp = (order) => {
-    const phone = formatPhoneForWhatsApp(order.customers?.phone)
-    if (!phone) {
-      alert('This customer has no phone number saved.')
-      return
-    }
-    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
-    const message = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link — you can check your order status anytime: ${link}`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
-  }
-
-  const sendStatusUpdateViaWhatsApp = (order) => {
-    const phone = formatPhoneForWhatsApp(order.customers?.phone)
-    if (!phone) {
-      alert('This customer has no phone number saved.')
-      return
-    }
-    const message = `Hi ${order.customers?.name}, this is ${business?.name}. Just to update you — your order "${order.title}" is now at the "${order.current_status}" stage. Thank you for your patience!`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
-  }
 
   const filtered = orders.filter((o) =>
     o.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -133,42 +90,9 @@ export default function AllOrdersPage() {
             <p>No orders found.</p>
           </div>
         ) : (
-          filtered.map((o) => {
-            const balance = o.price - o.amount_paid
-            const isLastStage = o.current_status === STAGES[STAGES.length - 1]
-            return (
-              <div key={o.id} style={{ background: '#fff', borderRadius: '10px', padding: '1rem', border: '1px solid #e4d8c2', marginBottom: '0.6rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <p style={{ margin: 0, color: '#1E3A5F', fontWeight: '600' }}>{o.title}</p>
-                  <span style={{ fontSize: '0.75rem', color: '#6B6255' }}>{o.current_status}</span>
-                </div>
-                <p style={{ margin: '0.2rem 0 0', color: '#6B6255', fontSize: '0.85rem' }}>{o.customers?.name}</p>
-                <p style={{ margin: '0.3rem 0 0.6rem', fontSize: '0.85rem', color: balance > 0 ? '#AE4A34' : '#4C7A5E' }}>
-                  {balance > 0 ? `Balance: ₦${balance.toLocaleString()}` : 'Paid in full'}
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.5rem' }}>
-                  <button onClick={() => copyTrackingLink(o)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.78rem', fontWeight: '600' }}>
-                    Copy link
-                  </button>
-                  <button onClick={() => sendLinkViaWhatsApp(o)} style={{ padding: '0.5rem', borderRadius: '6px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.78rem', fontWeight: '600' }}>
-                    Send link
-                  </button>
-                </div>
-                <button onClick={() => sendStatusUpdateViaWhatsApp(o)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #4C7A5E', background: '#fff', color: '#4C7A5E', fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  Send status update
-                </button>
-                <button
-                  onClick={() => advanceStatus(o)}
-                  disabled={isLastStage}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: 'none', fontSize: '0.85rem', fontWeight: '600', background: isLastStage ? '#e4d8c2' : '#1E3A5F', color: isLastStage ? '#6B6255' : '#fff' }}
-                >
-                  {isLastStage ? 'Delivered' : `Mark as "${STAGES[STAGES.indexOf(o.current_status) + 1]}"`}
-                </button>
-              </div>
-            )
-          })
+          filtered.map((o) => <OrderCard key={o.id} order={o} />)
         )}
       </div>
     </main>
   )
-          }
+}
