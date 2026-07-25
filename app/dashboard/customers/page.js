@@ -83,18 +83,31 @@ export default function AllCustomersPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {filtered.map((c) => (
-              <a
+              <div
                 key={c.id}
-                href={`/dashboard/customers/${c.id}`}
-                style={{ display: 'block', background: '#fff', borderRadius: '10px', padding: '1rem', border: '1px solid #e4d8c2', textDecoration: 'none' }}
+                style={{ background: '#fff', borderRadius: '10px', padding: '1rem', border: '1px solid #e4d8c2' }}
               >
                 <p style={{ margin: 0, color: '#1E3A5F', fontWeight: '600' }}>{c.name}</p>
-                {c.phone && <p style={{ margin: '0.2rem 0 0', color: '#6B6255', fontSize: '0.85rem' }}>{c.phone}</p>}
-              </a>
+                {c.phone && <p style={{ margin: '0.2rem 0 0.6rem', color: '#6B6255', fontSize: '0.85rem' }}>{c.phone}</p>}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                  <a
+                    href={`/dashboard/customers/${c.id}/orders`}
+                    style={{ flex: 1, textAlign: 'center', padding: '0.5rem', borderRadius: '6px', border: '1px solid #1E3A5F', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600', textDecoration: 'none' }}
+                  >
+                    View orders
+                  </a>
+                  <a
+                    href={`/dashboard/customers/${c.id}`}
+                    style={{ flex: 1, textAlign: 'center', padding: '0.5rem', borderRadius: '6px', background: '#1E3A5F', color: '#fff', fontSize: '0.8rem', fontWeight: '600', textDecoration: 'none' }}
+                  >
+                    Edit customer
+                  </a>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </div>
     </main>
   )
-                                                                                                         }
+                  }
