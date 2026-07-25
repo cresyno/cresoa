@@ -35,9 +35,12 @@ export default function SignUpPage() {
 
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { business_name: name },
+      },
     })
 
     if (error) {
@@ -45,24 +48,6 @@ export default function SignUpPage() {
       setLoading(false)
       return
     }
-
-    const userId = data.user.id
-
-    const { error: businessError } = await supabase
-      .from('businesses')
-      .insert({
-        owner_id: userId,
-        name: name,
-        business_type: 'fashion',
-      })
-
-    if (businessError) {
-      setMessage('Account created, but business setup failed: ' + businessError.message)
-      setLoading(false)
-      return
-    }
-
-    await supabase.auth.signOut()
 
     setMessage('Account created! Check your email to verify, then log in.')
     setTimeout(() => {
