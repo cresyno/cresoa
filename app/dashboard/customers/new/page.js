@@ -22,14 +22,25 @@ export default function NewCustomerPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
+  const handlePhoneChange = (e) => {
+    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 11)
+    setPhone(digitsOnly)
+  }
+
   const updateMeasurement = (key, value) => {
     setMeasurements({ ...measurements, [key]: value })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
     setMessage('')
+
+    if (phone.length !== 11) {
+      setMessage('Phone number must be exactly 11 digits.')
+      return
+    }
+
+    setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -85,14 +96,19 @@ export default function NewCustomerPage() {
 
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              Phone (optional)
+              Phone number
             </label>
             <input
-              type="text"
+              type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={handlePhoneChange}
+              required
+              placeholder="e.g. 08012345678"
               style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
             />
+            <p style={{ fontSize: '0.78rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.3rem' }}>
+              {phone.length}/11 digits
+            </p>
           </div>
 
           <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.5rem 0 0.8rem' }}>
@@ -139,4 +155,4 @@ export default function NewCustomerPage() {
       </div>
     </main>
   )
-}
+                }
