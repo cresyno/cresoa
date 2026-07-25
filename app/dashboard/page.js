@@ -73,6 +73,12 @@ export default function DashboardPage() {
     loadDashboard()
   }
 
+  const copyTrackingLink = (order) => {
+    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
+    navigator.clipboard.writeText(link)
+    alert('Tracking link copied! Paste it to your customer on WhatsApp.')
+  }
+
   if (loading) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
@@ -161,6 +167,16 @@ export default function DashboardPage() {
                   {balance > 0 ? `Balance: ₦${balance.toLocaleString()}` : 'Paid in full'}
                 </p>
                 <button
+                  onClick={() => copyTrackingLink(o)}
+                  style={{
+                    width: '100%', padding: '0.5rem', borderRadius: '6px',
+                    border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F',
+                    fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.5rem'
+                  }}
+                >
+                  Copy tracking link
+                </button>
+                <button
                   onClick={() => advanceStatus(o)}
                   disabled={isLastStage}
                   style={{
@@ -213,4 +229,4 @@ export default function DashboardPage() {
       )}
     </main>
   )
-              }
+            }
