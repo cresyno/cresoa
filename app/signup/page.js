@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
 export default function SignUpPage() {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,11 +40,16 @@ export default function SignUpPage() {
 
     if (businessError) {
       setMessage('Account created, but business setup failed: ' + businessError.message)
-    } else {
-      setMessage('Account created successfully! You can now log in.')
+      setLoading(false)
+      return
     }
 
-    setLoading(false)
+    await supabase.auth.signOut()
+
+    setMessage('Account created! Redirecting you to log in...')
+    setTimeout(() => {
+      router.push('/login')
+    }, 1200)
   }
 
   return (
@@ -126,4 +133,4 @@ export default function SignUpPage() {
       </div>
     </main>
   )
-    }
+              }
