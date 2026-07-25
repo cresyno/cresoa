@@ -56,6 +56,15 @@ export default function NewOrderPage() {
       return
     }
 
+    const priceNum = Number(price) || 0
+    const paidNum = Number(amountPaid) || 0
+
+    if (paidNum > priceNum) {
+      setMessage('Amount paid cannot be more than the total price.')
+      setLoading(false)
+      return
+    }
+
     const { error } = await supabase
       .from('orders')
       .insert({
@@ -63,8 +72,8 @@ export default function NewOrderPage() {
         customer_id: customerId,
         title: title,
         description: description,
-        price: Number(price) || 0,
-        amount_paid: Number(amountPaid) || 0,
+        price: priceNum,
+        amount_paid: paidNum,
         due_date: dueDate || null,
         current_status: 'Order placed',
       })
@@ -99,10 +108,7 @@ export default function NewOrderPage() {
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
                 required
-                style={{
-                  width: '100%', padding: '0.7rem', borderRadius: '8px',
-                  border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-                }}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
               >
                 <option value="">Select a customer</option>
                 {customers.map((c) => (
@@ -121,10 +127,7 @@ export default function NewOrderPage() {
                 onChange={(e) => setTitle(e.target.value)}
                 required
                 placeholder="e.g. Ankara gown"
-                style={{
-                  width: '100%', padding: '0.7rem', borderRadius: '8px',
-                  border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-                }}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -136,10 +139,7 @@ export default function NewOrderPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                style={{
-                  width: '100%', padding: '0.7rem', borderRadius: '8px',
-                  border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-                }}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -152,10 +152,7 @@ export default function NewOrderPage() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
-                style={{
-                  width: '100%', padding: '0.7rem', borderRadius: '8px',
-                  border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-                }}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -167,11 +164,13 @@ export default function NewOrderPage() {
                 type="number"
                 value={amountPaid}
                 onChange={(e) => setAmountPaid(e.target.value)}
-                style={{
-                  width: '100%', padding: '0.7rem', borderRadius: '8px',
-                  border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-                }}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
               />
+              {Number(amountPaid) > Number(price) && price && (
+                <p style={{ fontSize: '0.78rem', color: '#AE4A34', marginTop: '0.3rem' }}>
+                  Deposit cannot exceed the total price.
+                </p>
+              )}
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
@@ -182,33 +181,22 @@ export default function NewOrderPage() {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                style={{
-                  width: '100%', padding: '0.7rem', borderRadius: '8px',
-                  border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-                }}
+                style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              style={{
-                width: '100%', padding: '0.8rem', borderRadius: '8px',
-                border: 'none', background: '#1E3A5F', color: '#fff',
-                fontSize: '1rem', fontWeight: '600'
-              }}
+              style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '1rem', fontWeight: '600' }}
             >
               {loading ? 'Saving...' : 'Create order'}
             </button>
 
-            {message && (
-              <p style={{ marginTop: '1rem', color: '#AE4A34', fontSize: '0.9rem' }}>
-                {message}
-              </p>
-            )}
+            {message && <p style={{ marginTop: '1rem', color: '#AE4A34', fontSize: '0.9rem' }}>{message}</p>}
           </form>
         )}
       </div>
     </main>
   )
-        }
+            }
