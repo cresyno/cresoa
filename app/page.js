@@ -1,4 +1,4 @@
-export default function HomePage() {
+    export default function HomePage() {
   return (
     <main
       style={{
@@ -27,12 +27,13 @@ export default function HomePage() {
         <div className="cresoa-logo" style={{ margin: '0 auto 1.5rem' }}>
           <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
             <rect width="64" height="64" rx="16" fill="#1E3A5F" />
+            <line x1="44" y1="18" x2="20" y2="42" stroke="#C79A2B" strokeWidth="3" strokeLinecap="round" />
+            <circle cx="44" cy="18" r="4.5" fill="none" stroke="#C79A2B" strokeWidth="2.5" />
             <path
-              d="M20 22 L32 34 L44 22 M20 42 L32 30 L44 42"
+              d="M20 42 C 13 38, 11 29, 18 24"
               stroke="#C79A2B"
-              strokeWidth="3.5"
+              strokeWidth="2.5"
               strokeLinecap="round"
-              strokeLinejoin="round"
               fill="none"
             />
           </svg>
@@ -74,4 +75,4 @@ export default function HomePage() {
       </div>
     </main>
   )
-                }
+      }
