@@ -27,6 +27,10 @@ export default function OrderDetailPage({ params }) {
   const [paymentNote, setPaymentNote] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
 
+  const [internalNotes, setInternalNotes] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [notesMessage, setNotesMessage] = useState('')
+
   const load = async () => {
     const { data: orderData } = await supabase
       .from('orders')
@@ -39,6 +43,7 @@ export default function OrderDetailPage({ params }) {
       setTitle(orderData.title)
       setPrice(orderData.price)
       setDueDate(orderData.due_date || '')
+      setInternalNotes(orderData.internal_notes || '')
 
       const { data: businessData } = await supabase
         .from('businesses')
@@ -130,6 +135,23 @@ export default function OrderDetailPage({ params }) {
     setMessage('Saved!')
     setSaving(false)
     load()
+  }
+
+  const handleSaveNotes = async () => {
+    setNotesMessage('')
+    setSavingNotes(true)
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ internal_notes: internalNotes })
+      .eq('id', order.id)
+
+    if (error) {
+      setNotesMessage('Error saving notes.')
+    } else {
+      setNotesMessage('Notes saved!')
+    }
+    setSavingNotes(false)
   }
 
   const handleRecordPayment = async (e) => {
@@ -330,6 +352,30 @@ export default function OrderDetailPage({ params }) {
           Send status update
         </button>
 
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
+          <p style={{ margin: '0 0 0.6rem', fontWeight: '600', color: '#1E3A5F', fontSize: '0.95rem' }}>Internal notes</p>
+          <p style={{ margin: '0 0 0.6rem', fontSize: '0.75rem', color: '#6B6255' }}>Only you see this — not shared with the customer.</p>
+          <textarea
+            value={internalNotes}
+            onChange={(e) => setInternalNotes(e.target.value)}
+            rows={3}
+            placeholder="e.g. Customer said pick up Friday. Don't forget the extra button."
+            style={inputStyle}
+          />
+          <button
+            onClick={handleSaveNotes}
+            disabled={savingNotes}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.6rem' }}
+          >
+            {savingNotes ? 'Saving...' : 'Save notes'}
+          </button>
+          {notesMessage && (
+            <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: notesMessage.startsWith('Error') ? '#AE4A34' : '#4C7A5E' }}>
+              {notesMessage}
+            </p>
+          )}
+        </div>
+
         <button
           onClick={() => setEditing(!editing)}
           style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: editing ? '#1E3A5F' : '#fff', color: editing ? '#fff' : '#1E3A5F', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem' }}
@@ -375,4 +421,4 @@ export default function OrderDetailPage({ params }) {
       </div>
     </main>
   )
-  }
+            }
