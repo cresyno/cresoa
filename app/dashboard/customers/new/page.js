@@ -150,6 +150,8 @@ export default function NewCustomerPage() {
             <label style={labelStyle}>Phone number</label>
             <input
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={phone}
               onChange={handlePhoneChange}
               required
