@@ -45,12 +45,10 @@ export default function DashboardPage() {
       businessData = newBusiness
     }
 
-    if (businessData && businessData.is_active === false) {
-      setDeactivated(true)
-      setLoading(false)
+    if (businessData && !businessData.onboarding_completed) {
+      router.push('/onboarding')
       return
     }
-
     setBusiness(businessData)
 
     if (businessData) {
