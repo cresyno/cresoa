@@ -2,6 +2,7 @@ import { showToast } from '../lib/toast'
 
 export default function OrderCard({ order }) {
   const balance = order.price - order.amount_paid
+  const isPaid = balance <= 0
 
   const getDueInfo = () => {
     if (!order.due_date) return null
@@ -32,7 +33,16 @@ export default function OrderCard({ order }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.2rem' }}>
-        <p style={{ margin: 0, color: '#6B6255', fontSize: '0.85rem' }}>{order.customers?.name}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span
+            title={isPaid ? 'Paid in full' : 'Balance owing'}
+            style={{
+              width: '8px', height: '8px', borderRadius: '50%',
+              background: isPaid ? '#4C7A5E' : '#AE4A34', display: 'inline-block'
+            }}
+          />
+          <p style={{ margin: 0, color: '#6B6255', fontSize: '0.85rem' }}>{order.customers?.name}</p>
+        </div>
         {order.customers?.phone && (
           <a
             href={`tel:${order.customers.phone}`}
@@ -69,4 +79,4 @@ export default function OrderCard({ order }) {
       </div>
     </div>
   )
-  }
+}
