@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
+import { showToast } from '../../../../lib/toast'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
@@ -87,7 +88,7 @@ export default function OrderDetailPage({ params }) {
   const copyTrackingLink = () => {
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
     navigator.clipboard.writeText(link)
-    alert('Tracking link copied!')
+    showToast('Tracking link copied!', '#1E3A5F')
   }
 
   const formatPhoneForWhatsApp = (phone) => {
@@ -186,6 +187,7 @@ export default function OrderDetailPage({ params }) {
     setPaymentNote('')
     setShowPaymentForm(false)
     setRecordingPayment(false)
+    showToast('Payment recorded!', '#4C7A5E')
     load()
   }
 
@@ -421,4 +423,4 @@ export default function OrderDetailPage({ params }) {
       </div>
     </main>
   )
-            }
+        }
