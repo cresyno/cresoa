@@ -9,6 +9,7 @@ export default function AllOrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState([])
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
@@ -39,10 +40,33 @@ export default function AllOrdersPage() {
     load()
   }, [router])
 
-  const filtered = orders.filter((o) =>
-    o.title.toLowerCase().includes(search.toLowerCase()) ||
-    (o.customers?.name || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const isDueThisWeek = (dueDate) => {
+    if (!dueDate) return false
+    const due = new Date(dueDate)
+    const now = new Date()
+    const weekFromNow = new Date()
+    weekFromNow.setDate(now.getDate() + 7)
+    return due >= now && due <= weekFromNow
+  }
+
+  const filtered = orders
+    .filter((o) =>
+      o.title.toLowerCase().includes(search.toLowerCase()) ||
+      (o.customers?.name || '').toLowerCase().includes(search.toLowerCase())
+    )
+    .filter((o) => {
+      if (filter === 'owing') return o.price - o.amount_paid > 0
+      if (filter === 'due_soon') return isDueThisWeek(o.due_date)
+      if (filter === 'delivered') return o.current_status === 'Delivered'
+      return true
+    })
+
+  const filterButtonStyle = (key) => ({
+    padding: '0.4rem 0.7rem', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '600',
+    border: filter === key ? 'none' : '1px solid #1E3A5F',
+    background: filter === key ? '#1E3A5F' : '#fff',
+    color: filter === key ? '#fff' : '#1E3A5F',
+  })
 
   if (loading) {
     return (
@@ -82,8 +106,15 @@ export default function AllOrdersPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by item or customer..."
-          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', marginBottom: '1.2rem', boxSizing: 'border-box' }}
+          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', marginBottom: '1rem', boxSizing: 'border-box' }}
         />
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.2rem', flexWrap: 'wrap' }}>
+          <button onClick={() => setFilter('all')} style={filterButtonStyle('all')}>All</button>
+          <button onClick={() => setFilter('owing')} style={filterButtonStyle('owing')}>Owing</button>
+          <button onClick={() => setFilter('due_soon')} style={filterButtonStyle('due_soon')}>Due this week</button>
+          <button onClick={() => setFilter('delivered')} style={filterButtonStyle('delivered')}>Delivered</button>
+        </div>
 
         {filtered.length === 0 ? (
           <div style={{ background: '#fff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e4d8c2', textAlign: 'center', color: '#2B2620' }}>
