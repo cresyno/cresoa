@@ -191,7 +191,7 @@ export default function NewOrderPage() {
                 onChange={(e) => setAmountPaid(e.target.value)}
                 style={inputStyle}
               />
-                {Number(amountPaid) > Number(price) && price && (
+              {Number(amountPaid) > Number(price) && price && (
                 <p style={{ fontSize: '0.78rem', color: '#AE4A34', marginTop: '0.3rem' }}>
                   Deposit cannot exceed the total price.
                 </p>
@@ -200,7 +200,6 @@ export default function NewOrderPage() {
                 <p style={{ fontSize: '0.85rem', color: '#1E3A5F', fontWeight: '600', marginTop: '0.5rem' }}>
                   Balance: ₦{Math.max(0, Number(price) - Number(amountPaid || 0)).toLocaleString()}
                 </p>
-              )}
               )}
             </div>
 
@@ -228,4 +227,4 @@ export default function NewOrderPage() {
       </div>
     </main>
   )
-    }
+}
