@@ -180,7 +180,12 @@ export default function ProfilePage() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem' }}>
           <LetterLogo name={business?.name} size={48} />
-          <h1 style={{ color: '#1E3A5F', fontSize: '1.4rem', margin: 0 }}>Profile & settings</h1>
+          <div>
+            <h1 style={{ color: '#1E3A5F', fontSize: '1.4rem', margin: 0 }}>Profile & settings</h1>
+            {business?.business_type && (
+              <p style={{ color: '#6B6255', fontSize: '0.8rem', margin: '0.1rem 0 0' }}>{business.business_type}</p>
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleSaveInfo} style={cardStyle}>
