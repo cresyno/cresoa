@@ -213,7 +213,18 @@ export default function DashboardPage() {
           )}
         </div>
       )}
-
+<div style={{ marginBottom: '1.5rem' }}>
+        <input
+          type="text"
+          placeholder="Search customers or orders..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+              router.push(`/dashboard/orders?search=${encodeURIComponent(e.target.value.trim())}`)
+            }
+          }}
+          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '0.95rem', boxSizing: 'border-box', background: '#fff' }}
+        />
+      </div>
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
         <a href="/dashboard/customers/new" style={{ display: 'inline-block', background: '#1E3A5F', color: '#fff', padding: '0.6rem 1rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none' }}>
           + Add customer
