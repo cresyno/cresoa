@@ -158,6 +158,8 @@ export default function CustomerDetailPage({ params }) {
             </label>
             <input
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={phone}
               onChange={handlePhoneChange}
               required
