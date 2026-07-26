@@ -76,7 +76,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '0.6rem' }}>
             <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.85rem' }}>
               Password
             </label>
@@ -90,6 +90,12 @@ export default function LoginPage() {
                 border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
               }}
             />
+          </div>
+
+          <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
+            <a href="/forgot-password" style={{ color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>
+              Forgot password?
+            </a>
           </div>
 
           <button
@@ -117,4 +123,4 @@ export default function LoginPage() {
       </div>
     </main>
   )
-                    }
+      }
