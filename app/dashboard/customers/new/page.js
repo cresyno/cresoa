@@ -21,31 +21,61 @@ export default function NewCustomerPage() {
   const [measurements, setMeasurements] = useState({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [duplicateWarning, setDuplicateWarning] = useState(null)
+  const [businessId, setBusinessId] = useState(null)
 
-  const handlePhoneChange = (e) => {
+  const handlePhoneChange = async (e) => {
     const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 11)
     setPhone(digitsOnly)
+    setDuplicateWarning(null)
+
+    if (digitsOnly.length === 11) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', user.id)
+        .single()
+
+      setBusinessId(business.id)
+
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('name')
+        .eq('business_id', business.id)
+        .eq('phone', digitsOnly)
+        .maybeSingle()
+
+      if (existing) {
+        setDuplicateWarning(`${existing.name} already has this phone number saved.`)
+      }
+    }
   }
 
   const updateMeasurement = (key, value) => {
     setMeasurements({ ...measurements, [key]: value })
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setMessage('')
+  const resetForm = () => {
+    setName('')
+    setPhone('')
+    setNotes('')
+    setMeasurements({})
+    setDuplicateWarning(null)
+  }
 
+  const saveCustomer = async () => {
     if (phone.length !== 11) {
       setMessage('Phone number must be exactly 11 digits.')
-      return
+      return null
     }
-
-    setLoading(true)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       router.push('/login')
-      return
+      return null
     }
 
     const { data: business } = await supabase
@@ -66,12 +96,39 @@ export default function NewCustomerPage() {
 
     if (error) {
       setMessage('Error: ' + error.message)
-      setLoading(false)
-      return
+      return null
     }
 
-    router.push('/dashboard')
+    return true
   }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    setLoading(true)
+    const success = await saveCustomer()
+    setLoading(false)
+    if (success) {
+      router.push('/dashboard')
+    }
+  }
+
+  const handleSaveAndAddAnother = async () => {
+    setMessage('')
+    setLoading(true)
+    const success = await saveCustomer()
+    setLoading(false)
+    if (success) {
+      resetForm()
+      setMessage('Saved! Add the next customer.')
+    }
+  }
+
+  const inputStyle = {
+    width: '100%', padding: '0.7rem', borderRadius: '8px',
+    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
+  }
+  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
@@ -80,35 +137,30 @@ export default function NewCustomerPage() {
           Add customer
         </h1>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', border: '1px solid #e4d8c2' }}>
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              Customer name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
-            />
+            <label style={labelStyle}>Customer name</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={inputStyle} />
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              Phone number
-            </label>
+            <label style={labelStyle}>Phone number</label>
             <input
               type="tel"
               value={phone}
               onChange={handlePhoneChange}
               required
               placeholder="e.g. 08012345678"
-              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
+              style={inputStyle}
             />
             <p style={{ fontSize: '0.78rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.3rem' }}>
               {phone.length}/11 digits
             </p>
+            {duplicateWarning && (
+              <p style={{ fontSize: '0.78rem', color: '#AE4A34', marginTop: '0.3rem' }}>
+                ⚠ {duplicateWarning}
+              </p>
+            )}
           </div>
 
           <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.5rem 0 0.8rem' }}>
@@ -131,28 +183,39 @@ export default function NewCustomerPage() {
           ))}
 
           <div style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
-            <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              Notes (optional)
-            </label>
+            <label style={labelStyle}>Notes (optional)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box' }}
+              style={inputStyle}
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '1rem', fontWeight: '600' }}
+            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '1rem', fontWeight: '600', marginBottom: '0.6rem' }}
           >
             {loading ? 'Saving...' : 'Save customer'}
           </button>
 
-          {message && <p style={{ marginTop: '1rem', color: '#AE4A34', fontSize: '0.9rem' }}>{message}</p>}
+          <button
+            type="button"
+            onClick={handleSaveAndAddAnother}
+            disabled={loading}
+            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.95rem', fontWeight: '600' }}
+          >
+            Save & add another
+          </button>
+
+          {message && (
+            <p style={{ marginTop: '1rem', color: message.startsWith('Error') || message.startsWith('Phone') ? '#AE4A34' : '#4C7A5E', fontSize: '0.9rem' }}>
+              {message}
+            </p>
+          )}
         </form>
       </div>
     </main>
   )
-                }
+                      }
