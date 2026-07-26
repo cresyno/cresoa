@@ -138,10 +138,17 @@ export default function DashboardPage() {
   const previewOrders = soloOrders.slice(0, 3)
 
   const allGroupOrders = groups.flatMap((g) => g.orders)
-  const totalOrders = soloOrders.length + allGroupOrders.length
-  const totalBalanceOwed = [...soloOrders, ...allGroupOrders].reduce(
+  const allActiveOrders = [...soloOrders, ...allGroupOrders]
+  const totalOrders = allActiveOrders.length
+  const totalBalanceOwed = allActiveOrders.reduce(
     (sum, o) => sum + Math.max(0, o.price - o.amount_paid), 0
   )
+
+  const todayStr = new Date().toISOString().split('T')[0]
+  const dueTodayCount = allActiveOrders.filter(
+    (o) => o.due_date === todayStr && o.current_status !== 'Delivered'
+  ).length
+  const readyCount = allActiveOrders.filter((o) => o.current_status === 'Ready').length
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
@@ -166,7 +173,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
         <div style={{ background: '#fff', borderRadius: '10px', padding: '0.8rem 0.5rem', border: '1px solid #e4d8c2', textAlign: 'center' }}>
           <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.2rem', fontWeight: '700' }}>{customers.length}</p>
           <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Customers</p>
@@ -175,13 +182,33 @@ export default function DashboardPage() {
           <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.2rem', fontWeight: '700' }}>{totalOrders}</p>
           <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Orders</p>
         </div>
-        <div style={{ background: '#fff', borderRadius: '10px', padding: '0.8rem 0.5rem', border: '1px solid #e4d8c2', textAlign: 'center' }}>
+        <a
+          href="/dashboard/orders?filter=owing"
+          style={{ background: '#fff', borderRadius: '10px', padding: '0.8rem 0.5rem', border: '1px solid #e4d8c2', textAlign: 'center', textDecoration: 'none' }}
+        >
           <p style={{ margin: 0, color: totalBalanceOwed > 0 ? '#AE4A34' : '#4C7A5E', fontSize: '1rem', fontWeight: '700' }}>
             ₦{totalBalanceOwed.toLocaleString()}
           </p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Owed</p>
-        </div>
+          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Owed →</p>
+        </a>
       </div>
+
+      {(dueTodayCount > 0 || readyCount > 0) && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          {dueTodayCount > 0 && (
+            <div style={{ flex: 1, background: '#F1DBD3', borderRadius: '10px', padding: '0.7rem', textAlign: 'center' }}>
+              <p style={{ margin: 0, color: '#AE4A34', fontWeight: '700', fontSize: '0.95rem' }}>{dueTodayCount}</p>
+              <p style={{ margin: '0.1rem 0 0', color: '#AE4A34', fontSize: '0.72rem' }}>Due today</p>
+            </div>
+          )}
+          {readyCount > 0 && (
+            <div style={{ flex: 1, background: '#F6E9C8', borderRadius: '10px', padding: '0.7rem', textAlign: 'center' }}>
+              <p style={{ margin: 0, color: '#C79A2B', fontWeight: '700', fontSize: '0.95rem' }}>{readyCount}</p>
+              <p style={{ margin: '0.1rem 0 0', color: '#C79A2B', fontSize: '0.72rem' }}>Ready for pickup</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
         <a href="/dashboard/customers/new" style={{ display: 'inline-block', background: '#1E3A5F', color: '#fff', padding: '0.6rem 1rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none' }}>
@@ -271,4 +298,4 @@ export default function DashboardPage() {
       )}
     </main>
   )
-        }
+    }
