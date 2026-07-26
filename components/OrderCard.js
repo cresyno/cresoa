@@ -1,3 +1,5 @@
+import { showToast } from '../lib/toast'
+
 export default function OrderCard({ order }) {
   const balance = order.price - order.amount_paid
 
@@ -15,6 +17,12 @@ export default function OrderCard({ order }) {
   }
 
   const dueInfo = getDueInfo()
+
+  const copyLink = () => {
+    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
+    navigator.clipboard.writeText(link)
+    showToast('Tracking link copied!', '#1E3A5F')
+  }
 
   return (
     <div style={{ background: '#fff', borderRadius: '10px', padding: '1rem', border: '1px solid #e4d8c2', marginBottom: '0.6rem' }}>
