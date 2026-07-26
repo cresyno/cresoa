@@ -11,16 +11,21 @@ export default function OrderDetailPage({ params }) {
   const searchParams = useSearchParams()
   const [order, setOrder] = useState(null)
   const [business, setBusiness] = useState(null)
+  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
 
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
-  const [amountPaid, setAmountPaid] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [deleting, setDeleting] = useState(false)
+
+  const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentNote, setPaymentNote] = useState('')
+  const [recordingPayment, setRecordingPayment] = useState(false)
 
   const load = async () => {
     const { data: orderData } = await supabase
@@ -33,7 +38,6 @@ export default function OrderDetailPage({ params }) {
     if (orderData) {
       setTitle(orderData.title)
       setPrice(orderData.price)
-      setAmountPaid(orderData.amount_paid)
       setDueDate(orderData.due_date || '')
 
       const { data: businessData } = await supabase
@@ -42,6 +46,13 @@ export default function OrderDetailPage({ params }) {
         .eq('id', orderData.business_id)
         .single()
       setBusiness(businessData)
+
+      const { data: paymentData } = await supabase
+        .from('payment_records')
+        .select('*')
+        .eq('order_id', params.id)
+        .order('created_at', { ascending: false })
+      setPayments(paymentData || [])
     }
 
     setLoading(false)
@@ -103,20 +114,11 @@ export default function OrderDetailPage({ params }) {
   const handleSave = async (e) => {
     e.preventDefault()
     setMessage('')
-
-    const priceNum = Number(price) || 0
-    const paidNum = Number(amountPaid) || 0
-
-    if (paidNum > priceNum) {
-      setMessage('Amount paid cannot be more than the total price.')
-      return
-    }
-
     setSaving(true)
 
     const { error } = await supabase
       .from('orders')
-      .update({ title, price: priceNum, amount_paid: paidNum, due_date: dueDate || null })
+      .update({ title, price: Number(price) || 0, due_date: dueDate || null })
       .eq('id', order.id)
 
     if (error) {
@@ -127,6 +129,41 @@ export default function OrderDetailPage({ params }) {
 
     setMessage('Saved!')
     setSaving(false)
+    load()
+  }
+
+  const handleRecordPayment = async (e) => {
+    e.preventDefault()
+    const amount = Number(paymentAmount)
+
+    if (!amount || amount <= 0) {
+      alert('Enter a valid payment amount.')
+      return
+    }
+
+    const newTotal = order.amount_paid + amount
+    if (newTotal > order.price) {
+      alert(`This payment would bring the total paid above the order price (₦${order.price.toLocaleString()}).`)
+      return
+    }
+
+    setRecordingPayment(true)
+
+    await supabase.from('payment_records').insert({
+      order_id: order.id,
+      amount: amount,
+      note: paymentNote || null,
+    })
+
+    await supabase
+      .from('orders')
+      .update({ amount_paid: newTotal })
+      .eq('id', order.id)
+
+    setPaymentAmount('')
+    setPaymentNote('')
+    setShowPaymentForm(false)
+    setRecordingPayment(false)
     load()
   }
 
@@ -174,6 +211,8 @@ export default function OrderDetailPage({ params }) {
     border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
   }
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
+
+  const formatDate = (d) => new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
@@ -234,12 +273,49 @@ export default function OrderDetailPage({ params }) {
             <span style={{ color: '#6B6255' }}>Paid</span>
             <span style={{ color: '#2B2620' }}>₦{order.amount_paid.toLocaleString()}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', marginBottom: '1rem' }}>
             <span style={{ color: '#2B2620' }}>Balance</span>
             <span style={{ color: balance > 0 ? '#AE4A34' : '#4C7A5E' }}>
               {balance > 0 ? `₦${balance.toLocaleString()}` : 'Paid in full'}
             </span>
           </div>
+
+          {balance > 0 && (
+            <button
+              onClick={() => setShowPaymentForm(!showPaymentForm)}
+              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.9rem', fontWeight: '600' }}
+            >
+              {showPaymentForm ? 'Cancel' : '+ Record Payment'}
+            </button>
+          )}
+
+          {showPaymentForm && (
+            <form onSubmit={handleRecordPayment} style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e4d8c2' }}>
+              <div style={{ marginBottom: '0.7rem' }}>
+                <label style={labelStyle}>Amount received (₦)</label>
+                <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={labelStyle}>Note (optional)</label>
+                <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment" style={inputStyle} />
+              </div>
+              <button type="submit" disabled={recordingPayment} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.9rem', fontWeight: '600' }}>
+                {recordingPayment ? 'Saving...' : 'Save payment'}
+              </button>
+            </form>
+          )}
+
+          {payments.length > 0 && (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e4d8c2' }}>
+              <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1E3A5F', margin: '0 0 0.6rem' }}>Payment history</p>
+              {payments.map((p) => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.4rem' }}>
+                  <span style={{ color: '#6B6255' }}>{formatDate(p.created_at)}{p.note ? ` — ${p.note}` : ''}</span>
+                  <span style={{ color: '#4C7A5E', fontWeight: '600' }}>₦{p.amount.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
@@ -270,12 +346,8 @@ export default function OrderDetailPage({ params }) {
             <div style={{ marginBottom: '0.8rem' }}>
               <label style={labelStyle}>Total price (₦)</label>
               <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} required style={inputStyle} />
-            </div>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={labelStyle}>Amount paid (₦)</label>
-              <input type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} style={inputStyle} />
               <p style={{ fontSize: '0.78rem', color: '#6B6255', marginTop: '0.3rem' }}>
-                Update this if the customer paid in cash.
+                To record a payment, use "+ Record Payment" above instead of editing amount paid directly.
               </p>
             </div>
             <div style={{ marginBottom: '1rem' }}>
@@ -303,4 +375,4 @@ export default function OrderDetailPage({ params }) {
       </div>
     </main>
   )
-      }
+  }
