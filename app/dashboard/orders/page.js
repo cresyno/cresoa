@@ -10,6 +10,13 @@ export default function AllOrdersPage() {
   const [orders, setOrders] = useState([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlFilter = params.get('filter')
+    if (urlFilter) setFilter(urlFilter)
+  }, [])
+
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
