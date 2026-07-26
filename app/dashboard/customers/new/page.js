@@ -13,6 +13,12 @@ const MEASUREMENT_FIELDS = [
   { key: 'full_length', label: 'Full length (inches)' },
 ]
 
+const PRESETS = {
+  male: { bust: '38', waist: '32', hip: '38', shoulder: '17', sleeve_length: '24', full_length: '42' },
+  female: { bust: '36', waist: '28', hip: '38', shoulder: '15', sleeve_length: '22', full_length: '40' },
+  child: { bust: '26', waist: '22', hip: '26', shoulder: '11', sleeve_length: '16', full_length: '28' },
+}
+
 export default function NewCustomerPage() {
   const router = useRouter()
   const [name, setName] = useState('')
@@ -22,7 +28,6 @@ export default function NewCustomerPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [duplicateWarning, setDuplicateWarning] = useState(null)
-  const [businessId, setBusinessId] = useState(null)
 
   const handlePhoneChange = async (e) => {
     const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 11)
@@ -38,8 +43,6 @@ export default function NewCustomerPage() {
         .select('id')
         .eq('owner_id', user.id)
         .single()
-
-      setBusinessId(business.id)
 
       const { data: existing } = await supabase
         .from('customers')
@@ -167,6 +170,15 @@ export default function NewCustomerPage() {
             Measurements (optional)
           </h2>
 
+          <p style={{ fontSize: '0.78rem', color: '#6B6255', marginBottom: '0.6rem' }}>
+            Quick-fill a starting point, then adjust:
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <button type="button" onClick={() => setMeasurements(PRESETS.male)} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>Male</button>
+            <button type="button" onClick={() => setMeasurements(PRESETS.female)} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>Female</button>
+            <button type="button" onClick={() => setMeasurements(PRESETS.child)} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>Child</button>
+          </div>
+
           {MEASUREMENT_FIELDS.map((f) => (
             <div key={f.key} style={{ marginBottom: '0.8rem' }}>
               <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>
@@ -218,4 +230,4 @@ export default function NewCustomerPage() {
       </div>
     </main>
   )
-                      }
+  }
