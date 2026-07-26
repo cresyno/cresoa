@@ -222,9 +222,16 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      {groups.length > 0 && (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+        <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', margin: 0 }}>Group Orders</h2>
+      </div>
+      {groups.length === 0 ? (
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.5rem', border: '1px dashed #AE4A34', textAlign: 'center', marginBottom: '1.5rem' }}>
+          <p style={{ color: '#2B2620', margin: '0 0 0.6rem' }}>No group orders yet.</p>
+          <a href="/dashboard/groups/new" style={{ color: '#AE4A34', fontWeight: '600', fontSize: '0.9rem' }}>+ New group order</a>
+        </div>
+      ) : (
         <>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', marginBottom: '0.8rem' }}>Group Orders</h2>
           {groups.map((g) => {
             const isExpanded = expandedGroups.includes(g.id)
             const combinedBalance = g.orders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
