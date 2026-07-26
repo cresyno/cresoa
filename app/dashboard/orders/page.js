@@ -9,6 +9,12 @@ export default function AllOrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState([])
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlSearch = params.get('search')
+    if (urlSearch) setSearch(urlSearch)
+  }, [])
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
