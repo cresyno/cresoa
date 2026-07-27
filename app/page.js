@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<'order' | 'measurements' | 'payment'>('order');
+  const [activeTab, setActiveTab] = useState('order');
 
   const features = [
     { icon: '📏', title: 'Customer & measurements', desc: 'Save every customer with their measurements once — reuse them for every future order.' },
