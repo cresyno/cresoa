@@ -15,6 +15,8 @@ const MEASUREMENT_FIELDS = [
 
 export default function CustomerDetailPage({ params }) {
   const router = useRouter()
+  const [stats, setStats] = useState(null)
+  const [lastOrderId, setLastOrderId] = useState(null)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [notes, setNotes] = useState('')
