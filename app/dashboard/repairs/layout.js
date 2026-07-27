@@ -14,9 +14,9 @@ export default function RepairsLayout({ children }) {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard/repairs', icon: '📊' },
     { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: '🔧' },
-    { name: 'Customers', path: '/dashboard/repairs/customers', icon: '👤' },
+    { name: 'Customers', path: '/dashboard/customers', icon: '👤' },
     { name: 'Parts', path: '/dashboard/repairs/parts', icon: '📦' },
-    { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: '🔔' },
+    { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
   ]
 
   useEffect(() => {
@@ -26,17 +26,14 @@ export default function RepairsLayout({ children }) {
         router.push('/login')
         return
       }
-
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('name, sector')
+        .select('name')
         .eq('owner_id', user.id)
         .single()
-
       setBusiness(businessData)
       setLoading(false)
     }
-
     load()
   }, [router])
 
@@ -49,7 +46,7 @@ export default function RepairsLayout({ children }) {
     if (path === '/dashboard/repairs') {
       return pathname === '/dashboard/repairs'
     }
-    return pathname.startsWith(path)
+    return pathname?.startsWith(path)
   }
 
   if (loading) {
@@ -74,10 +71,10 @@ export default function RepairsLayout({ children }) {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F5EFE2' }}>
       <style>{`
         .sidebar {
-          width: 240px;
+          width: 220px;
           min-height: 100vh;
           background: linear-gradient(180deg, #1E3A5F 0%, #0F1E30 100%);
-          padding: 1.5rem 1rem;
+          padding: 1.2rem 0.8rem;
           flex-shrink: 0;
           position: sticky;
           top: 0;
@@ -87,38 +84,36 @@ export default function RepairsLayout({ children }) {
         .sidebar .brand {
           display: flex;
           align-items: center;
-          gap: 0.7rem;
-          padding-bottom: 1.5rem;
+          gap: 0.6rem;
+          padding-bottom: 1.2rem;
           border-bottom: 1px solid rgba(255,255,255,0.08);
-          margin-bottom: 1.5rem;
+          margin-bottom: 1.2rem;
         }
         .sidebar .brand .name {
           color: #fff;
-          font-size: 1.1rem;
+          font-size: 1rem;
           font-weight: 700;
           font-family: 'Fraunces', serif;
         }
         .sidebar .brand .sub {
           color: #A0B4C9;
-          font-size: 0.6rem;
+          font-size: 0.55rem;
           opacity: 0.7;
-          margin-top: -0.1rem;
         }
         .sidebar .nav {
-          flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 0.2rem;
+          gap: 0.15rem;
         }
         .sidebar .nav a {
           display: flex;
           align-items: center;
-          gap: 0.7rem;
-          padding: 0.6rem 0.8rem;
-          border-radius: 8px;
+          gap: 0.6rem;
+          padding: 0.5rem 0.7rem;
+          border-radius: 6px;
           color: #C8D4E3;
           text-decoration: none;
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           font-weight: 500;
           transition: background 0.15s ease;
         }
@@ -132,25 +127,25 @@ export default function RepairsLayout({ children }) {
           font-weight: 600;
         }
         .sidebar .nav a .icon {
-          font-size: 1.1rem;
-          width: 24px;
+          font-size: 1rem;
+          width: 22px;
           text-align: center;
         }
         .sidebar .bottom {
           border-top: 1px solid rgba(255,255,255,0.08);
-          padding-top: 1rem;
+          padding-top: 0.8rem;
           margin-top: 0.5rem;
         }
         .sidebar .bottom .logout-btn {
           display: flex;
           align-items: center;
-          gap: 0.7rem;
-          padding: 0.6rem 0.8rem;
-          border-radius: 8px;
+          gap: 0.6rem;
+          padding: 0.5rem 0.7rem;
+          border-radius: 6px;
           background: none;
           border: none;
           color: #AE4A34;
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           font-weight: 500;
           cursor: pointer;
           width: 100%;
@@ -158,6 +153,21 @@ export default function RepairsLayout({ children }) {
         }
         .sidebar .bottom .logout-btn:hover {
           background: rgba(174,74,52,0.15);
+        }
+        .sidebar .bottom a {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          padding: 0.5rem 0.7rem;
+          border-radius: 6px;
+          color: #C8D4E3;
+          text-decoration: none;
+          font-size: 0.8rem;
+          font-weight: 500;
+        }
+        .sidebar .bottom a:hover {
+          background: rgba(255,255,255,0.06);
+          color: #fff;
         }
         .main-content {
           flex: 1;
@@ -168,26 +178,23 @@ export default function RepairsLayout({ children }) {
           display: inline-block;
           background: rgba(199,154,43,0.15);
           color: #C79A2B;
-          padding: 0.05rem 0.5rem;
-          border-radius: 10px;
-          font-size: 0.55rem;
+          padding: 0.05rem 0.4rem;
+          border-radius: 8px;
+          font-size: 0.5rem;
           font-weight: 600;
           margin-left: 0.3rem;
         }
         @media (max-width: 768px) {
-          .sidebar {
-            width: 200px;
-            padding: 1rem 0.8rem;
-          }
-          .sidebar .brand .sub {
-            font-size: 0.5rem;
-          }
+          .sidebar { width: 180px; padding: 0.8rem 0.5rem; }
+          .sidebar .nav a { font-size: 0.7rem; padding: 0.4rem 0.5rem; }
+          .sidebar .nav a .icon { font-size: 0.8rem; width: 18px; }
         }
       `}</style>
 
+      {/* ===== SIDEBAR ===== */}
       <div className="sidebar">
         <div className="brand">
-          <LetterLogo name={business?.name} size={36} />
+          <LetterLogo name={business?.name} size={32} />
           <div>
             <div className="name">Cresoa</div>
             <div className="sub">
@@ -211,33 +218,15 @@ export default function RepairsLayout({ children }) {
         </div>
 
         <div className="bottom">
-          <a
-            href="/dashboard/profile"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.7rem',
-              padding: '0.6rem 0.8rem',
-              borderRadius: '8px',
-              color: '#C8D4E3',
-              textDecoration: 'none',
-              fontSize: '0.85rem',
-              fontWeight: '500',
-            }}
-          >
-            <span className="icon">⚙️</span>
-            Profile & Settings
-          </a>
-          <button className="logout-btn" onClick={handleLogout}>
-            <span className="icon">🚪</span>
-            Logout
-          </button>
+          <a href="/dashboard/profile">⚙️ Profile</a>
+          <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
         </div>
       </div>
 
+      {/* ===== MAIN CONTENT ===== */}
       <div className="main-content">
         {children}
       </div>
     </div>
   )
-            }
+        }
