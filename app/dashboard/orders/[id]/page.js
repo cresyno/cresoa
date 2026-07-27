@@ -377,6 +377,7 @@ const formatPhoneReminder = (phone) => {
             </p>
           )}
         </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
