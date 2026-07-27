@@ -359,7 +359,7 @@ const formatPhoneReminder = (phone) => {
                   <span style={{ color: '#6B6255' }}>{formatDate(p.created_at)}{p.note ? ` — ${p.note}` : ''}</span>
                   <span style={{ color: '#4C7A5E', fontWeight: '600' }}>₦{p.amount.toLocaleString()}</span>
                 </div>
-              ))}
+              )}
             </div>
           )}
 
