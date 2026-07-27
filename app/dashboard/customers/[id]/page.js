@@ -159,6 +159,42 @@ export default function CustomerDetailPage({ params }) {
           Edit customer
         </h1>
 
+        {stats && (
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '1.2rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
+            <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.8rem' }}>Customer value</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.85rem' }}>
+              <div>
+                <p style={{ margin: 0, color: '#6B6255' }}>Total Spent</p>
+                <p style={{ margin: 0, fontWeight: '700', color: '#1E3A5F' }}>₦{stats.totalSpent.toLocaleString()}</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, color: '#6B6255' }}>Total Paid</p>
+                <p style={{ margin: 0, fontWeight: '700', color: '#4C7A5E' }}>₦{stats.totalPaid.toLocaleString()}</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, color: '#6B6255' }}>Orders</p>
+                <p style={{ margin: 0, fontWeight: '700', color: '#1E3A5F' }}>{stats.count}</p>
+              </div>
+              <div>
+                <p style={{ margin: 0, color: '#6B6255' }}>Avg Order</p>
+                <p style={{ margin: 0, fontWeight: '700', color: '#1E3A5F' }}>₦{Math.round(stats.avg).toLocaleString()}</p>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: '#6B6255', marginTop: '0.6rem', marginBottom: 0 }}>
+              Last order: {new Date(stats.lastDate).toLocaleDateString('en-NG')}
+            </p>
+          </div>
+        )}
+
+        {lastOrderId && (
+          <button
+            onClick={() => router.push(`/dashboard/orders/new?duplicate=${lastOrderId}`)}
+            style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #C79A2B', background: '#fff', color: '#C79A2B', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1.2rem' }}
+          >
+            Duplicate last order
+          </button>
+        )}
+
         <form onSubmit={handleSave}>
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
