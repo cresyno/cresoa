@@ -1,10 +1,11 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 
-export default function NewOrderPage() {
+function NewOrderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -439,8 +440,7 @@ export default function NewOrderPage() {
           </button>
         </div>
       )}
-
-      {/* ===== FORM ===== */}
+               {/* ===== FORM ===== */}
       <form onSubmit={handleSubmit} className="form-card">
         {/* Customer */}
         <div className="form-group">
@@ -587,3 +587,22 @@ export default function NewOrderPage() {
     </main>
   )
 }
+
+// ===== PAGE EXPORT WITH SUSPENSE BOUNDARY =====
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh',
+        background: '#F5EFE2',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <p style={{ color: '#6B6255' }}>Loading...</p>
+      </div>
+    }>
+      <NewOrderContent />
+    </Suspense>
+  )
+              }
