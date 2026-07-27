@@ -190,7 +190,30 @@ export default function OrderDetailPage({ params }) {
     showToast('Payment recorded!', '#4C7A5E')
     load()
   }
+const formatPhoneReminder = (phone) => {
+    if (!phone) return ''
+    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
+  }
 
+  const sendReminder = async () => {
+    const phone = formatPhoneReminder(order.customers?.phone)
+    if (!phone) {
+      alert('This customer has no phone number saved.')
+      return
+    }
+    const bal = order.price - order.amount_paid
+    const msg = `Hi ${order.customers?.name}, this is a reminder for your balance of ₦${bal.toLocaleString()} for ${order.title}. Thank you - ${business?.name}`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+    await supabase.from('orders').update({ last_reminder_sent_at: new Date().toISOString() }).eq('id', order.id)
+    showToast('Reminder sent!', '#4C7A5E')
+    load()
+  }
+
+  const duplicateOrder = () => {
+    router.push(`/dashboard/orders/new?duplicate=${order.id}`)
+  }
+
+  const handleDelete = async () => {
   const handleDelete = async () => {
     const confirmed = window.confirm(`Do you want to delete "${order.title}"? This can't be undone.`)
     if (!confirmed) return
