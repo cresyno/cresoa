@@ -18,19 +18,22 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
 
-  // Check if payment was just made (callback)
+  // ✅ FIX: Detect reference or trxref from Paystack callback
   useEffect(() => {
-    const status = searchParams?.get('status')
     const reference = searchParams?.get('reference')
-    if (status === 'success' && reference) {
+    const trxref = searchParams?.get('trxref')
+    const ref = reference || trxref
+
+    if (ref) {
       const verifyPayment = async () => {
         setVerifying(true)
         try {
-          const res = await fetch(`/api/paystack/verify?reference=${reference}`)
+          const res = await fetch(`/api/paystack/verify?reference=${ref}`)
           const data = await res.json()
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
             loadBusiness()
+            // Remove query params from URL
             router.replace('/dashboard/subscription')
           } else {
             showToast('❌ Payment verification failed. Please contact support.', '#AE4A34')
@@ -72,7 +75,10 @@ export default function SubscriptionPage() {
     setProcessing(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setProcessing(false)
+      return
+    }
 
     try {
       const response = await fetch('/api/paystack/initiate', {
@@ -342,4 +348,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-        }
+}
