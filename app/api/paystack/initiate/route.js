@@ -49,7 +49,7 @@ export async function POST(request) {
           platform: 'cresoa',
         },
         // ✅ Remove ?status=success
-        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription`,
+        callback_url: `${NEXT_PUBLIC_APP_URL}/dashboard/subscription`,
       }),
     })
 
