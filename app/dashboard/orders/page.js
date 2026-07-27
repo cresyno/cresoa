@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabaseClient'
 
-export const dynamic = 'force-dynamic'
-
-export default function AllOrdersPage() {
+function OrdersContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [orders, setOrders] = useState([])
@@ -668,6 +667,9 @@ export default function AllOrdersPage() {
           )
         })}
       </div>
+    </main>
+  )
+      }
       {/* ===== ORDERS LIST ===== */}
       {filteredOrders.length === 0 ? (
         <div className="empty-state">
@@ -806,5 +808,24 @@ export default function AllOrdersPage() {
         </div>
       )}
     </main>
+  )
+}
+
+// ===== PAGE EXPORT WITH SUSPENSE BOUNDARY =====
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: '100vh',
+        background: '#F5EFE2',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <p style={{ color: '#6B6255' }}>Loading orders...</p>
+      </div>
+    }>
+      <OrdersContent />
+    </Suspense>
   )
                     }
