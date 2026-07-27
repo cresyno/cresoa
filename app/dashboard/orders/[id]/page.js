@@ -214,7 +214,6 @@ const formatPhoneReminder = (phone) => {
   }
 
   const handleDelete = async () => {
-  const handleDelete = async () => {
     const confirmed = window.confirm(`Do you want to delete "${order.title}"? This can't be undone.`)
     if (!confirmed) return
 
