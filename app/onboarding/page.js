@@ -1,8 +1,11 @@
+// app/onboarding/page.js
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
+import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 
 const SECTOR_INFO = {
   'Fashion & Custom Wear': {
@@ -97,6 +100,9 @@ export default function OnboardingPage() {
           name: businessName || 'My Business',
           sector: sector,
           business_type: isActive ? 'Fashion Designer' : sector,
+          plan: 'free',
+          trial_starts_at: new Date().toISOString(),
+          trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
         })
         .select()
         .single()
@@ -157,6 +163,9 @@ export default function OnboardingPage() {
           location: location.trim(),
           sector: selectedSector || 'Fashion & Custom Wear',
           onboarding_completed: true,
+          plan: 'free',
+          trial_starts_at: new Date().toISOString(),
+          trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
         })
         .select()
         .single()
@@ -469,4 +478,4 @@ export default function OnboardingPage() {
       </div>
     </main>
   )
-      }
+                   }
