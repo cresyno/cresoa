@@ -52,11 +52,10 @@ export async function GET(request) {
       )
     }
 
-    // ✅ LOGGING — check what we received
+    // ✅ LOG THE METADATA TO DEBUG
     console.log('🔵 METADATA:', JSON.stringify(metadata, null, 2))
-    console.log('🔵 BUSINESS ID FROM METADATA:', metadata.business_id)
 
-    // ✅ First, check if the business exists
+    // ✅ Check if business exists
     const { data: existingBusiness, error: checkError } = await supabase
       .from('businesses')
       .select('id, plan')
@@ -131,4 +130,4 @@ export async function GET(request) {
       { status: 500 }
     )
   }
-          }
+        }
