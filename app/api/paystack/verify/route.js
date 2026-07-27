@@ -6,16 +6,11 @@ import { supabase } from '../../../../lib/supabaseClient'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
-  console.log('🔵 Verify API called')
-  
   try {
     const { searchParams } = new URL(request.url)
     const reference = searchParams.get('reference')
-    
-    console.log('📝 Reference:', reference)
 
     if (!reference) {
-      console.log('❌ No reference provided')
       return NextResponse.json(
         { error: 'Missing transaction reference' },
         { status: 400 }
@@ -23,18 +18,14 @@ export async function GET(request) {
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
-    console.log('🔑 Secret key exists:', !!secretKey)
-    
     if (!secretKey) {
-      console.log('❌ PAYSTACK_SECRET_KEY not set')
       return NextResponse.json(
         { error: 'Paystack not configured' },
         { status: 500 }
       )
     }
 
-    // ✅ Verify with Paystack
-    console.log('🔄 Verifying with Paystack...')
+    // Verify with Paystack
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
@@ -44,10 +35,8 @@ export async function GET(request) {
     })
 
     const data = await response.json()
-    console.log('📦 Paystack response status:', data.status)
 
     if (!data.status) {
-      console.log('❌ Paystack verification failed:', data.message)
       return NextResponse.json(
         { error: data.message || 'Verification failed' },
         { status: 400 }
@@ -55,21 +44,37 @@ export async function GET(request) {
     }
 
     const { metadata, status, amount, reference: txRef } = data.data
-    console.log('📊 Transaction status:', status)
-    console.log('📊 Plan from metadata:', metadata?.plan)
-    console.log('📊 Business ID:', metadata?.business_id)
 
     if (status !== 'success') {
-      console.log('❌ Transaction not successful')
       return NextResponse.json(
         { error: 'Transaction not successful' },
         { status: 400 }
       )
     }
 
+    // ✅ LOGGING — check what we received
+    console.log('🔵 METADATA:', JSON.stringify(metadata, null, 2))
+    console.log('🔵 BUSINESS ID FROM METADATA:', metadata.business_id)
+
+    // ✅ First, check if the business exists
+    const { data: existingBusiness, error: checkError } = await supabase
+      .from('businesses')
+      .select('id, plan')
+      .eq('id', metadata.business_id)
+      .single()
+
+    if (checkError || !existingBusiness) {
+      console.error('❌ Business not found:', checkError)
+      return NextResponse.json(
+        { error: 'Business not found' },
+        { status: 404 }
+      )
+    }
+
+    console.log('🔵 Existing business:', existingBusiness)
+
     // ✅ Update business plan
-    console.log('🔄 Updating business plan...')
-    const { error: updateError } = await supabase
+    const { data: updatedBusiness, error: updateError } = await supabase
       .from('businesses')
       .update({
         plan: metadata.plan,
@@ -78,15 +83,17 @@ export async function GET(request) {
         last_payment_date: new Date(),
       })
       .eq('id', metadata.business_id)
+      .select()
 
     if (updateError) {
-      console.log('❌ Supabase update error:', updateError)
+      console.error('❌ Update error:', updateError)
       return NextResponse.json(
         { error: 'Database update failed: ' + updateError.message },
         { status: 500 }
       )
     }
-    console.log('✅ Business plan updated successfully')
+
+    console.log('✅ Updated business:', updatedBusiness)
 
     // ✅ Update subscription history
     await supabase
@@ -110,12 +117,11 @@ export async function GET(request) {
         reference: txRef,
       })
 
-    console.log('✅ All done — plan upgraded successfully')
-    
     return NextResponse.json({
       status: 'success',
       plan: metadata.plan,
       message: 'Subscription activated successfully',
+      business: updatedBusiness,
     })
 
   } catch (error) {
@@ -125,4 +131,4 @@ export async function GET(request) {
       { status: 500 }
     )
   }
-}
+          }
