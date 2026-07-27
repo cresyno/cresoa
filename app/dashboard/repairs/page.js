@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
 
-const REPAIR_STAGES = ['Diagnosing', 'Awaiting Parts', 'Repairing', 'Ready', 'Completed', 'Delivered']
-
 export default function RepairsDashboardPage() {
   const router = useRouter()
   const [business, setBusiness] = useState(null)
@@ -14,10 +12,10 @@ export default function RepairsDashboardPage() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
-    totalJobs: 0,
-    activeJobs: 0,
+    total: 0,
+    active: 0,
     awaitingParts: 0,
-    readyForPickup: 0,
+    ready: 0,
   })
 
   const loadDashboard = async () => {
@@ -40,16 +38,15 @@ export default function RepairsDashboardPage() {
 
     setBusiness(businessData)
 
-    // Load jobs (orders with repair data)
+    // Load repair jobs
     const { data: jobData } = await supabase
       .from('orders')
       .select('*, customers(name, phone)')
       .eq('business_id', businessData.id)
+      .not('device_type', 'is', null)
       .order('created_at', { ascending: false })
 
-    // Filter only repair jobs (has device_type or sector is Repairs)
-    const repairJobs = (jobData || []).filter(j => j.device_type || j.title?.toLowerCase().includes('repair'))
-    setJobs(repairJobs)
+    setJobs(jobData || [])
 
     // Load customers
     const { data: customerData } = await supabase
@@ -61,17 +58,18 @@ export default function RepairsDashboardPage() {
     setCustomers(customerData || [])
 
     // Calculate stats
-    const active = repairJobs.filter(j => j.current_status !== 'Completed' && j.current_status !== 'Delivered')
-    const awaiting = repairJobs.filter(j => j.current_status === 'Awaiting Parts')
-    const ready = repairJobs.filter(j => j.current_status === 'Ready')
+    const total = jobData?.length || 0
+    const active = jobData?.filter(j => 
+      j.current_status !== 'Completed' && j.current_status !== 'Delivered'
+    ).length || 0
+    const awaitingParts = jobData?.filter(j => 
+      j.current_status === 'Awaiting Parts'
+    ).length || 0
+    const ready = jobData?.filter(j => 
+      j.current_status === 'Ready'
+    ).length || 0
 
-    setStats({
-      totalJobs: repairJobs.length,
-      activeJobs: active.length,
-      awaitingParts: awaiting.length,
-      readyForPickup: ready.length,
-    })
-
+    setStats({ total, active, awaitingParts, ready })
     setLoading(false)
   }
 
@@ -121,53 +119,103 @@ export default function RepairsDashboardPage() {
     )
   }
 
-  const previewJobs = jobs.slice(0, 5)
-  const previewCustomers = customers.slice(0, 5)
+  const previewJobs = jobs.slice(0, 3)
+  const previewCustomers = customers.slice(0, 3)
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
+        /* ===== STATS GRID ===== */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.6rem;
+          margin-bottom: 1.5rem;
+        }
         .stat-card {
           background: #fff;
-          border-radius: 10px;
-          padding: 0.7rem 0.5rem;
+          border-radius: 12px;
+          padding: 0.8rem 0.6rem;
           border: 1px solid #E8E0D5;
           text-align: center;
-          flex: 1;
-          min-width: 60px;
         }
-        .stat-card .value {
-          font-size: 1.3rem;
+        .stat-card .number {
+          font-size: 1.4rem;
           font-weight: 700;
           margin: 0;
         }
-        .stat-card .value.red { color: #AE4A34; }
-        .stat-card .value.green { color: #4C7A5E; }
-        .stat-card .value.navy { color: #1E3A5F; }
-        .stat-card .value.gold { color: #C79A2B; }
+        .stat-card .number.navy { color: #1E3A5F; }
+        .stat-card .number.gold { color: #C79A2B; }
+        .stat-card .number.red { color: #AE4A34; }
+        .stat-card .number.green { color: #4C7A5E; }
         .stat-card .label {
           color: #6B6255;
           font-size: 0.65rem;
           margin: 0.1rem 0 0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
+
+        /* ===== QUICK ACTIONS ===== */
+        .quick-actions {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          margin-bottom: 1.8rem;
+        }
+        .action-btn {
+          padding: 0.6rem 1rem;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .action-btn:active { transform: scale(0.97); }
+
+        /* ===== SECTION HEADER ===== */
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.6rem;
+        }
+        .section-header h2 {
+          color: #1E3A5F;
+          font-size: 1rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .section-header a {
+          color: #6B6255;
+          font-size: 0.8rem;
+          font-weight: 500;
+          text-decoration: none;
+        }
+        .section-header a:hover { text-decoration: underline; }
+
+        /* ===== JOB CARD ===== */
         .job-card {
           background: #fff;
-          border-radius: 12px;
-          padding: 0.8rem 1rem;
+          border-radius: 10px;
+          padding: 0.7rem 0.9rem;
           border: 1px solid #E8E0D5;
-          margin-bottom: 0.7rem;
-          transition: border-color 0.15s ease;
+          margin-bottom: 0.6rem;
           cursor: pointer;
+          transition: border-color 0.15s ease;
         }
-        .job-card:hover {
-          border-color: #C79A2B;
-        }
+        .job-card:hover { border-color: #C79A2B; }
         .job-card .row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           flex-wrap: wrap;
-          gap: 0.4rem;
+          gap: 0.3rem;
         }
         .job-card .info {
           flex: 1;
@@ -184,7 +232,7 @@ export default function RepairsDashboardPage() {
           flex-wrap: wrap;
         }
         .job-card .info .meta {
-          font-size: 0.75rem;
+          font-size: 0.72rem;
           color: #6B6255;
           margin: 0.1rem 0 0;
           display: flex;
@@ -198,31 +246,32 @@ export default function RepairsDashboardPage() {
           color: #AE4A34;
           white-space: nowrap;
         }
-        .job-card .balance.paid {
-          color: #4C7A5E;
-        }
-        .order-status-badge {
+        .job-card .balance.paid { color: #4C7A5E; }
+
+        .status-badge {
           display: inline-block;
-          padding: 0.15rem 0.6rem;
-          border-radius: 20px;
-          font-size: 0.65rem;
+          padding: 0.12rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.6rem;
           font-weight: 600;
-          letter-spacing: 0.3px;
           text-transform: uppercase;
+          letter-spacing: 0.3px;
         }
+
+        /* ===== CUSTOMER ROW ===== */
         .customer-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0.7rem 1rem;
+          padding: 0.6rem 0.9rem;
           background: #fff;
           border-radius: 8px;
           border: 1px solid #E8E0D5;
           text-decoration: none;
+          margin-bottom: 0.5rem;
+          transition: border-color 0.15s ease;
         }
-        .customer-row:hover {
-          border-color: #C79A2B;
-        }
+        .customer-row:hover { border-color: #C79A2B; }
         .customer-row .name {
           color: #1E3A5F;
           font-weight: 600;
@@ -234,144 +283,70 @@ export default function RepairsDashboardPage() {
           font-size: 0.8rem;
           margin: 0;
         }
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.7rem;
-          flex-wrap: wrap;
-          gap: 0.4rem;
-        }
-        .section-header h2 {
-          color: #1E3A5F;
-          font-size: 1rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .section-header a {
-          color: #6B6255;
-          font-size: 0.8rem;
-          font-weight: 500;
-          text-decoration: none;
-        }
-        .section-header a:hover {
-          text-decoration: underline;
-        }
+
+        /* ===== EMPTY STATE ===== */
         .empty-state {
           background: #fff;
-          border-radius: 12px;
+          border-radius: 10px;
           padding: 1.5rem;
           border: 1px solid #E8E0D5;
           text-align: center;
           color: #6B6255;
-          font-size: 0.9rem;
-          margin-bottom: 1.5rem;
+          font-size: 0.85rem;
         }
-        .quick-actions {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-          margin-bottom: 1.5rem;
-        }
-        .action-btn {
-          padding: 0.6rem 1rem;
-          border-radius: 8px;
-          font-size: 0.8rem;
-          font-weight: 600;
-          text-decoration: none;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.1s ease;
-        }
-        .action-btn:active {
-          transform: scale(0.97);
-        }
-        .stats-row {
-          display: flex;
-          gap: 0.4rem;
-          margin-bottom: 1.2rem;
-          flex-wrap: wrap;
-        }
-        .header-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 1.2rem;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-        }
-        .header-brand {
-          display: flex;
-          align-items: center;
-          gap: 0.7rem;
-        }
-        .header-brand .greeting {
-          color: #2B2620;
-          font-size: 0.8rem;
-          margin: 0;
-        }
-        .header-brand .business-name {
-          color: #1E3A5F;
-          font-size: 1.2rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .repair-badge {
-          background: #F6E9C8;
-          color: #1E3A5F;
-          padding: 0.1rem 0.5rem;
-          border-radius: 10px;
-          font-size: 0.6rem;
-          font-weight: 600;
-        }
-        @media (max-width: 420px) {
-          .job-card .row {
-            flex-direction: column;
-            align-items: stretch;
+        .empty-state .icon { font-size: 2rem; margin-bottom: 0.3rem; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 480px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.4rem;
           }
-          .header-top {
-            flex-direction: column;
-          }
-          .header-brand .business-name {
-            font-size: 1rem;
-          }
+          .stat-card { padding: 0.6rem 0.4rem; }
+          .stat-card .number { font-size: 1.1rem; }
+          .job-card .row { flex-direction: column; align-items: stretch; }
+          .job-card .balance { text-align: right; }
         }
       `}</style>
 
       {/* ===== HEADER ===== */}
-      <div className="header-top">
-        <div className="header-brand">
-          <LetterLogo name={business?.name} size={40} />
-          <div>
-            <p className="greeting">Welcome back,</p>
-            <p className="business-name">
-              {business ? business.name : 'Your business'}
-              <span className="repair-badge">🔧 Repairs</span>
-            </p>
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '1.2rem' }}>
+        <LetterLogo name={business?.name} size={40} />
+        <div>
+          <p style={{ color: '#2B2620', fontSize: '0.8rem', margin: 0 }}>Welcome back,</p>
+          <p style={{ color: '#1E3A5F', fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>
+            {business ? business.name : 'Your business'}
+            <span style={{
+              display: 'inline-block',
+              background: 'rgba(199,154,43,0.15)',
+              color: '#C79A2B',
+              padding: '0.05rem 0.5rem',
+              borderRadius: '10px',
+              fontSize: '0.55rem',
+              fontWeight: '600',
+              marginLeft: '0.4rem',
+            }}>🔧 Repairs</span>
+          </p>
         </div>
       </div>
 
       {/* ===== STATS ===== */}
-      <div className="stats-row">
+      <div className="stats-grid">
         <div className="stat-card">
-          <p className="value navy">{stats.totalJobs}</p>
-          <p className="label">📋 Total Jobs</p>
+          <p className="number navy">{stats.total}</p>
+          <p className="label">Total Jobs</p>
         </div>
         <div className="stat-card">
-          <p className="value gold">{stats.activeJobs}</p>
-          <p className="label">🔧 Active</p>
+          <p className="number gold">{stats.active}</p>
+          <p className="label">Active</p>
         </div>
         <div className="stat-card">
-          <p className="value red">{stats.awaitingParts}</p>
-          <p className="label">⏳ Awaiting Parts</p>
+          <p className="number red">{stats.awaitingParts}</p>
+          <p className="label">Awaiting Parts</p>
         </div>
         <div className="stat-card">
-          <p className="value green">{stats.readyForPickup}</p>
-          <p className="label">✅ Ready for Pickup</p>
+          <p className="number green">{stats.ready}</p>
+          <p className="label">Ready for Pickup</p>
         </div>
       </div>
 
@@ -397,27 +372,30 @@ export default function RepairsDashboardPage() {
 
         {jobs.length === 0 ? (
           <div className="empty-state">
-            <p style={{ margin: '0 0 0.4rem' }}>No repair jobs yet.</p>
+            <div className="icon">🔧</div>
+            <p>No repair jobs yet.</p>
             <a href="/dashboard/repairs/jobs/new" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>
-              + Create your first repair job
+              Create your first repair job →
             </a>
           </div>
         ) : (
           previewJobs.map((job) => {
             const status = getStatusInfo(job.current_status)
+            const device = getDeviceDisplay(job)
             const balance = job.price - job.amount_paid
+
             return (
               <div
                 key={job.id}
                 className="job-card"
-                onClick={() => router.push(`/dashboard/orders/${job.id}`)}
+                onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
               >
                 <div className="row">
                   <div className="info">
                     <p className="name">
-                      {getDeviceDisplay(job)}
+                      {device}
                       <span
-                        className="order-status-badge"
+                        className="status-badge"
                         style={{ background: status.bg, color: status.color }}
                       >
                         {status.label}
@@ -429,12 +407,6 @@ export default function RepairsDashboardPage() {
                         <>
                           <span>·</span>
                           <span>Due {formatDate(job.due_date)}</span>
-                        </>
-                      )}
-                      {job.device_condition && (
-                        <>
-                          <span>·</span>
-                          <span>Condition: {job.device_condition}</span>
                         </>
                       )}
                     </p>
@@ -458,7 +430,11 @@ export default function RepairsDashboardPage() {
 
         {customers.length === 0 ? (
           <div className="empty-state">
-            <p>No customers yet. Add your first customer to start tracking repairs.</p>
+            <div className="icon">👤</div>
+            <p>No customers yet.</p>
+            <a href="/dashboard/customers/new" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>
+              Add your first customer →
+            </a>
           </div>
         ) : (
           previewCustomers.map((c) => (
@@ -474,4 +450,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-          }
+        }
