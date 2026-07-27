@@ -614,40 +614,15 @@ export default function DashboardPage() {
                             <div className="order-actions">
                               <a href={`/dashboard/orders/${o.id}`}>View</a>
                               <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
-                    </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )}
+              </div>
+            )
+          })
         )}
       </div>
-
-      {/* CUSTOMERS */}
-      <div>
-        <div className="section-header">
-          <h2>Recent Customers</h2>
-          <a href="/dashboard/customers">View all →</a>
-        </div>
-
-        {previewCustomers.length === 0 ? (
-          <div className="empty-state">
-            <p>No customers yet. Add your first customer to start tracking orders.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {previewCustomers.map((c) => (
-              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row">
-                <div>
-                  <p className="name">{c.name}</p>
-                  {c.phone && <p className="phone">{c.phone}</p>}
-                </div>
-                <span style={{ color: '#C79A2B', fontSize: '0.8rem' }}>→</span>
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-    </main>
-  )
-}
