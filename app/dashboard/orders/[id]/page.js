@@ -583,3 +583,186 @@ export default function OrderDetailPage({ params }) {
           </button>
         </div>
       </div>
+      {/* ===== STATS ===== */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <p className="value navy">₦{order.price.toLocaleString()}</p>
+          <p className="label">Total</p>
+        </div>
+        <div className="stat-card">
+          <p className="value green">₦{order.amount_paid.toLocaleString()}</p>
+          <p className="label">Paid</p>
+        </div>
+        <div className="stat-card">
+          <p className={`value ${balance > 0 ? 'red' : 'green'}`}>
+            {balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid'}
+          </p>
+          <p className="label">Balance</p>
+        </div>
+        <div className="stat-card">
+          <p className="value navy">{order.due_date ? formatDate(order.due_date) : '—'}</p>
+          <p className="label">Due Date</p>
+        </div>
+      </div>
+
+      {/* ===== STATUS TIMELINE ===== */}
+      <div className="card">
+        <div className="status-timeline">
+          {STAGES.map((stage, i) => {
+            const isActive = i === currentIndex
+            const isDone = i < currentIndex
+            return (
+              <div key={stage} className="status-dot">
+                <div className={`dot ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`} />
+                <span className={`label ${isActive ? 'active' : ''}`}>{stage}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            onClick={undoStatus}
+            disabled={isFirstStage}
+            style={{ opacity: isFirstStage ? 0.4 : 1 }}
+          >
+            ← Undo
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={advanceStatus}
+            disabled={isLastStage}
+            style={{ opacity: isLastStage ? 0.4 : 1 }}
+          >
+            {isLastStage ? '✓ Delivered' : `→ ${STAGES[currentIndex + 1]}`}
+          </button>
+        </div>
+      </div>
+
+      {/* ===== ACTIONS ===== */}
+      <div className="action-row">
+        <button className="btn btn-gold" onClick={copyTrackingLink}>🔗 Copy Link</button>
+        <button className="btn btn-green" onClick={sendLinkViaWhatsApp}>📱 Send Link</button>
+        <button className="btn btn-primary" onClick={sendStatusUpdate}>📤 Status Update</button>
+        {balance > 0 && (
+          <button className="btn btn-red" onClick={sendReminder}>🔔 Reminder</button>
+        )}
+      </div>
+
+      {/* ===== EDIT SECTION ===== */}
+      {editing && (
+        <form onSubmit={handleSave} className="card">
+          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.8rem' }}>✏️ Edit Order</h2>
+          <div style={{ marginBottom: '0.8rem' }}>
+            <label style={labelStyle}>Item / Garment</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} required />
+          </div>
+          <div style={{ marginBottom: '0.8rem' }}>
+            <label style={labelStyle}>Total Price (₦)</label>
+            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} required />
+          </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={labelStyle}>Due Date</label>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
+          </div>
+          <button type="submit" className="btn btn-gold btn-block" disabled={saving}>
+            {saving ? 'Saving...' : '💾 Save changes'}
+          </button>
+          {message && (
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
+              {message}
+            </p>
+          )}
+        </form>
+      )}
+
+      {/* ===== PAYMENTS ===== */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: 0 }}>💰 Payments</h2>
+          {balance > 0 && (
+            <button className="btn btn-green" onClick={() => setShowPaymentForm(!showPaymentForm)}>
+              {showPaymentForm ? '✕ Cancel' : '+ Record Payment'}
+            </button>
+          )}
+        </div>
+
+        {showPaymentForm && (
+          <form onSubmit={handleRecordPayment} style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid #E8E0D5' }}>
+            <div style={{ marginBottom: '0.6rem' }}>
+              <label style={labelStyle}>Amount (₦)</label>
+              <input
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                style={inputStyle}
+                required
+                autoFocus
+              />
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={labelStyle}>Note (optional)</label>
+              <input
+                type="text"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                placeholder="e.g. Cash payment"
+                style={inputStyle}
+              />
+            </div>
+            <button type="submit" className="btn btn-green btn-block" disabled={recordingPayment}>
+              {recordingPayment ? 'Recording...' : '💰 Record payment'}
+            </button>
+          </form>
+        )}
+
+        {payments.length === 0 ? (
+          <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>No payments recorded yet.</p>
+        ) : (
+          <div style={{ marginTop: '0.5rem' }}>
+            {payments.map((p) => (
+              <div key={p.id} className="payment-row">
+                <span style={{ color: '#6B6255' }}>
+                  {formatDate(p.created_at)} {p.note && `— ${p.note}`}
+                </span>
+                <span style={{ fontWeight: '600', color: '#4C7A5E' }}>₦{p.amount.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ===== NOTES ===== */}
+      <div className="card">
+        <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.3rem' }}>📝 Internal Notes</h2>
+        <p style={{ color: '#6B6255', fontSize: '0.75rem', margin: '0 0 0.6rem' }}>Only you see these — not shared with the customer.</p>
+        <textarea
+          value={internalNotes}
+          onChange={(e) => setInternalNotes(e.target.value)}
+          rows={3}
+          placeholder="e.g. Customer said pick up Friday. Don't forget the extra button."
+          style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
+        />
+        <button className="btn btn-primary btn-block" onClick={handleSaveNotes} disabled={savingNotes}>
+          {savingNotes ? 'Saving...' : '💾 Save notes'}
+        </button>
+        {notesMessage && (
+          <p style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: notesMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
+            {notesMessage}
+          </p>
+        )}
+      </div>
+
+      {/* ===== DANGER ZONE ===== */}
+      <button
+        className="btn btn-red btn-block"
+        onClick={handleDelete}
+        disabled={deleting}
+        style={{ marginTop: '0.5rem' }}
+      >
+        {deleting ? 'Deleting...' : '🗑️ Delete order'}
+      </button>
+    </main>
+  )
+        }
