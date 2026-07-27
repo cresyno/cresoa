@@ -18,34 +18,61 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
 
+  // ✅ NEW: Ensure business exists – if not, create one automatically
+  const ensureBusiness = async (user) => {
+    // Try to fetch existing business
+    const { data: existing, error } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('owner_id', user.id)
+      .single()
+
+    if (existing) {
+      return existing
+    }
+
+    // No business found – create one now
+    console.log('🔵 No business found for user, creating one...')
+    const newBusiness = {
+      owner_id: user.id,
+      name: user.user_metadata?.business_name || 'My Business',
+      phone: '',
+      location: '',
+      sector: 'Fashion & Custom Wear',
+      business_type: 'Fashion Designer',
+      onboarding_completed: true,
+      plan: 'free',
+      plan_status: 'active',
+      trial_starts_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      is_active: true,
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('businesses')
+      .insert(newBusiness)
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('❌ Failed to create business:', insertError)
+      return null
+    }
+
+    console.log('✅ Business created:', inserted)
+    return inserted
+  }
+
   const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        console.error('❌ No user logged in')
         router.push('/login')
         return null
       }
 
-      console.log('🔵 User ID:', user.id)
-
-      const { data: businessData, error } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (error) {
-        console.error('❌ Error loading business:', error)
-        return null
-      }
-
-      if (!businessData) {
-        console.error('❌ No business record found for user:', user.id)
-        return null
-      }
-
-      console.log('✅ Business loaded:', businessData)
+      // ✅ Use the ensure function
+      const businessData = await ensureBusiness(user)
       setBusiness(businessData)
       setSelectedPlan(businessData?.plan || 'free')
       return businessData
@@ -67,12 +94,8 @@ export default function SubscriptionPage() {
       const verifyPayment = async () => {
         setVerifying(true)
         try {
-          console.log('🔄 Verifying payment with reference:', reference)
-
           const res = await fetch(`/api/paystack/verify?reference=${reference}`)
           const data = await res.json()
-
-          console.log('📦 Verify response:', data)
 
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
@@ -98,7 +121,6 @@ export default function SubscriptionPage() {
     setProcessing(true)
 
     try {
-      // ✅ Always fetch fresh business data to avoid stale state
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setMessage('Please log in first.')
@@ -106,31 +128,21 @@ export default function SubscriptionPage() {
         return
       }
 
-      console.log('🔵 Fetching fresh business for user:', user.id)
-
-      const { data: freshBusiness, error } = await supabase
-        .from('businesses')
-        .select('id, plan')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (error || !freshBusiness) {
-        console.error('❌ Business not found:', error)
-        setMessage('Could not find your business account. Please complete onboarding first.')
+      // ✅ Ensure business exists before upgrade
+      let currentBusiness = await ensureBusiness(user)
+      if (!currentBusiness) {
+        setMessage('Could not create or find your business. Please contact support.')
         setProcessing(false)
         return
       }
 
-      console.log('✅ Fresh business loaded:', freshBusiness)
-
-      // Update state
-      setBusiness(freshBusiness)
+      setBusiness(currentBusiness)
 
       const response = await fetch('/api/paystack/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessId: freshBusiness.id,
+          businessId: currentBusiness.id,
           planId: planId,
           email: user.email,
         }),
@@ -395,4 +407,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-                 }
+            }
