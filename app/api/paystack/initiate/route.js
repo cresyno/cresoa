@@ -8,10 +8,9 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
   try {
-    // 1. Parse request body
     const { businessId, planId, email } = await request.json()
 
-    // 2. Validate required fields
+    // 1. Validate required fields
     if (!businessId || !planId || !email) {
       return NextResponse.json(
         { error: 'Missing required fields: businessId, planId, email' },
@@ -19,7 +18,7 @@ export async function POST(request) {
       )
     }
 
-    // 3. Validate plan exists
+    // 2. Validate plan exists
     const plan = PLANS[planId]
     if (!plan) {
       return NextResponse.json(
@@ -28,7 +27,7 @@ export async function POST(request) {
       )
     }
 
-    // 4. Check Paystack secret key
+    // 3. Check Paystack secret key
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
       console.error('PAYSTACK_SECRET_KEY is not set')
@@ -38,7 +37,7 @@ export async function POST(request) {
       )
     }
 
-    // 5. Verify the business exists
+    // 4. Verify the business exists
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id, plan')
@@ -53,7 +52,7 @@ export async function POST(request) {
       )
     }
 
-    // 6. Get the app URL
+    // 5. Get the app URL
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!appUrl) {
       console.error('NEXT_PUBLIC_APP_URL is not set')
@@ -63,16 +62,41 @@ export async function POST(request) {
       )
     }
 
+    // 6. 🔥 FIRST: Store pending transaction in subscription_history
+    const { data: historyRecord, error: insertError } = await supabase
+      .from('subscription_history')
+      .insert({
+        business_id: businessId,
+        old_plan: business.plan || 'free',
+        new_plan: planId,
+        status: 'pending',
+        amount_paid: plan.price,
+        notes: `Payment initiated for ${plan.name} plan`,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('Failed to create subscription history:', insertError)
+      return NextResponse.json(
+        { error: 'Failed to initialize payment record' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ Created pending record:', historyRecord.id)
+
     // 7. Call Paystack to initialize transaction
     const payload = {
       email,
-      amount: plan.price * 100, // Paystack uses kobo
+      amount: plan.price * 100,
       currency: 'NGN',
       metadata: {
         business_id: businessId,
         plan: planId,
         plan_name: plan.name,
         platform: 'cresoa',
+        history_id: historyRecord.id, // 🔥 Store the history ID for reference
       },
       callback_url: `${appUrl}/dashboard/subscription`,
     }
@@ -97,31 +121,27 @@ export async function POST(request) {
 
     if (!data.status) {
       console.error('Paystack initiation error:', data.message)
+
+      // 🔥 Clean up: delete the pending record if Paystack failed
+      await supabase
+        .from('subscription_history')
+        .delete()
+        .eq('id', historyRecord.id)
+
       return NextResponse.json(
         { error: data.message || 'Payment initiation failed' },
         { status: 400 }
       )
     }
 
-    // 8. Store pending transaction in subscription_history
-    const { error: insertError } = await supabase
+    // 8. Update the history record with the transaction reference
+    await supabase
       .from('subscription_history')
-      .insert({
-        business_id: businessId,
-        old_plan: business.plan || 'free',
-        new_plan: planId,
-        status: 'pending',
-        amount_paid: plan.price,
+      .update({
         paystack_transaction_ref: data.data.reference,
-        notes: `Payment initiated for ${plan.name} plan`,
       })
+      .eq('id', historyRecord.id)
 
-    if (insertError) {
-      console.error('Failed to record transaction:', insertError)
-      // We still return the Paystack URL, but log the error
-    }
-
-    // 9. Return success with authorization URL
     return NextResponse.json({
       status: 'success',
       authorization_url: data.data.authorization_url,
@@ -135,4 +155,4 @@ export async function POST(request) {
       { status: 500 }
     )
   }
-}
+            }
