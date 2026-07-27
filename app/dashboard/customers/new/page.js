@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabaseClient'
+import { supabase } from '../../../lib/supabaseClient'
 
 const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust/Chest (inches)' },
@@ -13,223 +13,312 @@ const MEASUREMENT_FIELDS = [
   { key: 'full_length', label: 'Full length (inches)' },
 ]
 
-const PRESETS = {
-  male: { bust: '38', waist: '32', hip: '38', shoulder: '17', sleeve_length: '24', full_length: '42' },
-  female: { bust: '36', waist: '28', hip: '38', shoulder: '15', sleeve_length: '22', full_length: '40' },
-  child: { bust: '26', waist: '22', hip: '26', shoulder: '11', sleeve_length: '16', full_length: '28' },
-}
-
 export default function NewCustomerPage() {
   const router = useRouter()
+  const [businessId, setBusinessId] = useState(null)
+  const [sector, setSector] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [notes, setNotes] = useState('')
   const [measurements, setMeasurements] = useState({})
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [duplicateWarning, setDuplicateWarning] = useState(null)
+  const [saveAndAdd, setSaveAndAdd] = useState(false)
 
-  const handlePhoneChange = async (e) => {
-    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 11)
-    setPhone(digitsOnly)
-    setDuplicateWarning(null)
-
-    if (digitsOnly.length === 11) {
+  useEffect(() => {
+    const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
       const { data: business } = await supabase
         .from('businesses')
-        .select('id')
+        .select('id, sector')
         .eq('owner_id', user.id)
         .single()
 
-      const { data: existing } = await supabase
-        .from('customers')
-        .select('name')
-        .eq('business_id', business.id)
-        .eq('phone', digitsOnly)
-        .maybeSingle()
-
-      if (existing) {
-        setDuplicateWarning(`${existing.name} already has this phone number saved.`)
+      if (!business) {
+        router.push('/onboarding')
+        return
       }
+
+      setBusinessId(business.id)
+      setSector(business.sector)
+      setLoading(false)
     }
-  }
+
+    load()
+  }, [router])
 
   const updateMeasurement = (key, value) => {
     setMeasurements({ ...measurements, [key]: value })
   }
 
-  const resetForm = () => {
-    setName('')
-    setPhone('')
-    setNotes('')
-    setMeasurements({})
-    setDuplicateWarning(null)
-  }
-
-  const saveCustomer = async () => {
-    if (phone.length !== 11) {
-      setMessage('Phone number must be exactly 11 digits.')
-      return null
-    }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return null
-    }
-
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('owner_id', user.id)
-      .single()
-
-    const { error } = await supabase
-      .from('customers')
-      .insert({
-        business_id: business.id,
-        name: name,
-        phone: phone,
-        notes: notes,
-        measurements: measurements,
-      })
-
-    if (error) {
-      setMessage('Error: ' + error.message)
-      return null
-    }
-
-    return true
+  const handlePhoneChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
+    setPhone(digits)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setMessage('')
-    setLoading(true)
-    const success = await saveCustomer()
-    setLoading(false)
-    if (success) {
-      router.push('/dashboard')
+    setSaving(true)
+
+    const phoneDigits = phone.replace(/\D/g, '')
+    if (!name.trim() || phoneDigits.length !== 11) {
+      setMessage('Please provide a name and a valid 11-digit phone number.')
+      setSaving(false)
+      return
+    }
+
+    const measurementData = sector === 'Fashion & Custom Wear' ? measurements : {}
+
+    const { data: customer, error } = await supabase
+      .from('customers')
+      .insert({
+        business_id: businessId,
+        name: name.trim(),
+        phone: phoneDigits,
+        notes: notes.trim(),
+        measurements: measurementData,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      setMessage('Error: ' + error.message)
+      setSaving(false)
+      return
+    }
+
+    setMessage('✅ Customer created!')
+    setSaving(false)
+
+    if (saveAndAdd) {
+      setName('')
+      setPhone('')
+      setNotes('')
+      setMeasurements({})
+      setMessage('')
+    } else {
+      setTimeout(() => {
+        router.push(`/dashboard/customers/${customer.id}`)
+      }, 600)
     }
   }
 
-  const handleSaveAndAddAnother = async () => {
-    setMessage('')
-    setLoading(true)
-    const success = await saveCustomer()
-    setLoading(false)
-    if (success) {
-      resetForm()
-      setMessage('Saved! Add the next customer.')
-    }
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e4d8c2;
+            border-top: 4px solid #1E3A5F;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+          }
+        `}</style>
+        <div className="spinner"></div>
+      </div>
+    )
   }
 
-  const inputStyle = {
-    width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
-  }
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
+  const isFashion = sector === 'Fashion & Custom Wear'
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
-      <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-        <h1 style={{ color: '#1E3A5F', fontSize: '1.5rem', marginBottom: '1.5rem' }}>
-          Add customer
-        </h1>
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+      <style>{`
+        .form-card {
+          background: #fff;
+          border-radius: 14px;
+          padding: 1.5rem;
+          border: 1px solid #E8E0D5;
+          max-width: 480px;
+          margin: 0 auto;
+        }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label {
+          display: block;
+          color: #2B2620;
+          margin-bottom: 0.3rem;
+          font-size: 0.85rem;
+          font-weight: 500;
+        }
+        .form-input {
+          width: 100%;
+          padding: 0.7rem;
+          borderRadius: 8px;
+          border: 1px solid #E8E0D5;
+          font-size: 0.95rem;
+          background: #fff;
+          box-sizing: border-box;
+          color: #2B2620;
+          transition: border-color 0.2s ease;
+        }
+        .form-input:focus { outline: none; border-color: #C79A2B; }
+        .btn-primary {
+          width: 100%;
+          padding: 0.85rem;
+          border-radius: 8px;
+          border: none;
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+          color: #1E3A5F;
+          font-size: 1rem;
+          font-weight: 700;
+          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-secondary {
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          border: 1px solid #1E3A5F;
+          background: #fff;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.1s ease;
+        }
+        .btn-secondary:hover { background: #F5EFE2; }
+        .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .back-link {
+          background: none;
+          border: none;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+          padding: 0;
+          margin-bottom: 1rem;
+          cursor: pointer;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .header-row {
+          display: flex;
+          align-items: center;
+          gap: 0.8rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+        }
+        .header-row h1 {
+          color: #1E3A5F;
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .measurement-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.6rem;
+        }
+        .measurement-grid .form-group { margin-bottom: 0.6rem; }
+        .measurement-grid .form-group input { padding: 0.5rem; }
+        .action-row {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          margin-top: 0.5rem;
+        }
+        .action-row .btn-primary { flex: 1; }
+        .action-row .btn-secondary { flex: 1; }
+        @media (max-width: 420px) {
+          .form-card { padding: 1rem; }
+          .measurement-grid { grid-template-columns: 1fr; }
+          .action-row { flex-direction: column; }
+        }
+      `}</style>
 
-        <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', border: '1px solid #e4d8c2' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Customer name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required style={inputStyle} />
+      <button className="back-link" onClick={() => router.push('/dashboard/customers')}>
+        ← Back to customers
+      </button>
+
+      <div className="header-row">
+        <h1>Add customer</h1>
+        {!isFashion && <span style={{ fontSize: '0.7rem', background: '#F6E9C8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#1E3A5F' }}>🔧 Repairs</span>}
+      </div>
+
+      <form onSubmit={handleSubmit} className="form-card">
+        <div className="form-group">
+          <label>Customer name</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="form-input" />
+        </div>
+
+        <div className="form-group">
+          <label>Phone number</label>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={handlePhoneChange}
+            required
+            placeholder="e.g. 08012345678"
+            className="form-input"
+          />
+          <div style={{ fontSize: '0.75rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.2rem' }}>
+            {phone.length}/11 digits {phone.length === 11 && '✓ valid'}
           </div>
+        </div>
 
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Phone number</label>
-            <input
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={phone}
-              onChange={handlePhoneChange}
-              required
-              placeholder="e.g. 08012345678"
-              style={inputStyle}
-            />
-            <p style={{ fontSize: '0.78rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.3rem' }}>
-              {phone.length}/11 digits
-            </p>
-            {duplicateWarning && (
-              <p style={{ fontSize: '0.78rem', color: '#AE4A34', marginTop: '0.3rem' }}>
-                ⚠ {duplicateWarning}
-              </p>
-            )}
-          </div>
+        <div className="form-group">
+          <label>Notes <span style={{ fontWeight: '400', color: '#6B6255' }}>(optional)</span></label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="e.g. Customer preferences, special instructions..."
+            className="form-input"
+            style={{ fontFamily: 'inherit', resize: 'vertical' }}
+          />
+        </div>
 
-          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.5rem 0 0.8rem' }}>
-            Measurements (optional)
-          </h2>
-
-          <p style={{ fontSize: '0.78rem', color: '#6B6255', marginBottom: '0.6rem' }}>
-            Quick-fill a starting point, then adjust:
-          </p>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            <button type="button" onClick={() => setMeasurements(PRESETS.male)} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>Male</button>
-            <button type="button" onClick={() => setMeasurements(PRESETS.female)} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>Female</button>
-            <button type="button" onClick={() => setMeasurements(PRESETS.child)} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600' }}>Child</button>
-          </div>
-
-          {MEASUREMENT_FIELDS.map((f) => (
-            <div key={f.key} style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>
-                {f.label}
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={measurements[f.key] || ''}
-                onChange={(e) => updateMeasurement(f.key, e.target.value)}
-                style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #ccc', fontSize: '0.95rem', boxSizing: 'border-box' }}
-              />
+        {isFashion && (
+          <>
+            <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.2rem 0 0.6rem' }}>📏 Measurements</h2>
+            <div className="measurement-grid">
+              {MEASUREMENT_FIELDS.map((f) => (
+                <div key={f.key} className="form-group">
+                  <label style={{ fontSize: '0.75rem' }}>{f.label}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={measurements[f.key] || ''}
+                    onChange={(e) => updateMeasurement(f.key, e.target.value)}
+                    className="form-input"
+                    style={{ padding: '0.5rem' }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </>
+        )}
 
-          <div style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
-            <label style={labelStyle}>Notes (optional)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              style={inputStyle}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '1rem', fontWeight: '600', marginBottom: '0.6rem' }}
-          >
-            {loading ? 'Saving...' : 'Save customer'}
+        <div className="action-row">
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? 'Saving...' : '💾 Save customer'}
           </button>
-
           <button
             type="button"
-            onClick={handleSaveAndAddAnother}
-            disabled={loading}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.95rem', fontWeight: '600' }}
+            className="btn-secondary"
+            onClick={() => setSaveAndAdd(!saveAndAdd)}
+            style={{ background: saveAndAdd ? '#1E3A5F' : '#fff', color: saveAndAdd ? '#fff' : '#1E3A5F' }}
           >
-            Save & add another
+            {saveAndAdd ? '✓ Save & add another' : 'Save & add another'}
           </button>
+        </div>
 
-          {message && (
-            <p style={{ marginTop: '1rem', color: message.startsWith('Error') || message.startsWith('Phone') ? '#AE4A34' : '#4C7A5E', fontSize: '0.9rem' }}>
-              {message}
-            </p>
-          )}
-        </form>
-      </div>
+        {message && (
+          <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34', textAlign: 'center' }}>
+            {message}
+          </p>
+        )}
+      </form>
     </main>
   )
-  }
+                                    }
