@@ -20,25 +20,27 @@ export default function SubscriptionPage() {
 
   // ✅ FIX: Detect reference or trxref from Paystack callback
   useEffect(() => {
-    const reference = searchParams?.get('reference')
-    const trxref = searchParams?.get('trxref')
-    const ref = reference || trxref
+    const reference = searchParams?.get('reference') || searchParams?.get('trxref')
 
-    if (ref) {
+    if (reference) {
       const verifyPayment = async () => {
         setVerifying(true)
         try {
-          const res = await fetch(`/api/paystack/verify?reference=${ref}`)
+          console.log('🔄 Verifying payment with reference:', reference)
+          const res = await fetch(`/api/paystack/verify?reference=${reference}`)
           const data = await res.json()
+          console.log('📦 Verify response:', data)
+
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
-            loadBusiness()
+            await loadBusiness()
             // Remove query params from URL
             router.replace('/dashboard/subscription')
           } else {
-            showToast('❌ Payment verification failed. Please contact support.', '#AE4A34')
+            showToast('❌ Payment verification failed: ' + (data.error || 'Unknown error'), '#AE4A34')
           }
         } catch (error) {
+          console.error('❌ Verification error:', error)
           showToast('❌ An error occurred during verification.', '#AE4A34')
         } finally {
           setVerifying(false)
@@ -348,4 +350,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-}
+    }
