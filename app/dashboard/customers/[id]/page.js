@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { showToast } from '../../../lib/toast'
+import { showToast } from '../../../../lib/toast'
 
 const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust/Chest (inches)' },
@@ -400,4 +400,4 @@ export default function CustomerDetailPage({ params }) {
       </div>
     </main>
   )
-    }
+                 }
