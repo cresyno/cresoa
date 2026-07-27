@@ -1,9 +1,12 @@
+// app/dashboard/orders/page.js
+
 'use client'
 
-import { Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabaseClient'
+import UpgradeBanner from '../../../components/UpgradeBanner'
+import { getPlanLimits } from '../../../lib/planLimits'
 
 function OrdersContent() {
   const router = useRouter()
@@ -13,15 +16,7 @@ function OrdersContent() {
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [business, setBusiness] = useState(null)
-
-  // Settle Modal
-  const [showSettleModal, setShowSettleModal] = useState(false)
-  const [settleOrder, setSettleOrder] = useState(null)
-  const [settleAmount, setSettleAmount] = useState('')
-  const [settleNote, setSettleNote] = useState('')
-  const [settleLoading, setSettleLoading] = useState(false)
-
-  // Stats
+  const [plan, setPlan] = useState('free')
   const [orderCounts, setOrderCounts] = useState({
     total: 0,
     overdue: 0,
@@ -39,11 +34,12 @@ function OrdersContent() {
 
     const { data: businessData } = await supabase
       .from('businesses')
-      .select('*')
+      .select('id, plan')
       .eq('owner_id', user.id)
       .single()
 
     setBusiness(businessData)
+    setPlan(businessData?.plan || 'free')
 
     if (!businessData) return
 
@@ -102,7 +98,6 @@ function OrdersContent() {
     load()
   }, [searchParams])
 
-  // Get Status Info
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
@@ -115,10 +110,7 @@ function OrdersContent() {
   }
 
   const getOrderName = (order) => {
-    if (order.item_name && order.item_name.trim()) return order.item_name
-    if (order.name && order.name.trim()) return order.name
-    if (order.title && order.title.trim()) return order.title
-    if (order.customers?.name) return `${order.customers.name}'s order`
+    if (order.title) return order.title
     return 'Order'
   }
 
@@ -131,30 +123,12 @@ function OrdersContent() {
     return due < today
   }
 
-  const getDueDisplay = (dueDate) => {
-    if (!dueDate) return <span style={{ color: '#C8C0B5', fontSize: '0.7rem' }}>No deadline</span>
-    if (isOverdue(dueDate)) {
-      return (
-        <span style={{
-          color: '#AE4A34',
-          fontWeight: '700',
-          textTransform: 'uppercase',
-          animation: 'pulseGlow 1.5s ease-in-out infinite'
-        }}>
-          ⚠️ OVERDUE
-        </span>
-      )
-    }
-    return <span style={{ color: '#6B6255' }}>Due {new Date(dueDate).toLocaleDateString('en-GB')}</span>
-  }
-
   const isDueToday = (dueDate) => {
     if (!dueDate) return false
     const today = new Date().toISOString().split('T')[0]
     return dueDate === today
   }
 
-  // Filter logic
   const filteredOrders = orders
     .filter((o) =>
       o.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -173,7 +147,6 @@ function OrdersContent() {
       return true
     })
 
-  // Advance status
   const advanceStatus = async (order) => {
     const stages = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
     const currentIndex = stages.indexOf(order.current_status)
@@ -187,50 +160,9 @@ function OrdersContent() {
     load()
   }
 
-  // Settle handlers
-  const openSettleModal = (order) => {
-    setSettleOrder(order)
-    setSettleAmount('')
-    setSettleNote('')
-    setShowSettleModal(true)
-  }
-
-  const handleSettleSubmit = async (e) => {
-    e.preventDefault()
-    setSettleLoading(true)
-
-    const amount = Number(settleAmount)
-    if (!amount || amount <= 0) {
-      setSettleLoading(false)
-      return
-    }
-
-    const newTotal = settleOrder.amount_paid + amount
-    if (newTotal > settleOrder.price) {
-      setSettleLoading(false)
-      return
-    }
-
-    await supabase.from('payment_records').insert({
-      order_id: settleOrder.id,
-      amount: amount,
-      note: settleNote || 'Payment recorded from orders page',
-    })
-
-    await supabase
-      .from('orders')
-      .update({ amount_paid: newTotal })
-      .eq('id', settleOrder.id)
-
-    setShowSettleModal(false)
-    setSettleLoading(false)
-    load()
-  }
-
-  const formatPhone = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
-  }
+  const limits = getPlanLimits(plan)
+  const orderCount = orders.length
+  const showUpgradeBanner = orderCount >= limits.orders - 2 && plan === 'free'
 
   if (loading) {
     return (
@@ -244,17 +176,6 @@ function OrdersContent() {
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
           }
-          @keyframes shimmer {
-            0% { background-position: -200px 0; }
-            100% { background-position: calc(200px + 100%) 0; }
-          }
-          .skeleton {
-            background: #E8E0D5;
-            border-radius: 8px;
-            background-image: linear-gradient(90deg, #E8E0D5 0px, #F5EFE2 40px, #E8E0D5 80px);
-            background-size: 200px 100%;
-            animation: shimmer 1.2s ease-in-out infinite;
-          }
         `}</style>
         <div className="cresoa-spinner"></div>
         <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Loading orders...</p>
@@ -265,23 +186,6 @@ function OrdersContent() {
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
-        @keyframes pulseGlow {
-          0%, 100% { opacity: 1; text-shadow: 0 0 4px rgba(174, 74, 52, 0.2); }
-          50% { opacity: 0.8; text-shadow: 0 0 12px rgba(174, 74, 52, 0.5); }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .order-status-badge {
-          display: inline-block;
-          padding: 0.15rem 0.6rem;
-          border-radius: 20px;
-          font-size: 0.65rem;
-          font-weight: 600;
-          letter-spacing: 0.3px;
-          text-transform: uppercase;
-        }
         .stat-card {
           background: #fff;
           border-radius: 10px;
@@ -304,14 +208,6 @@ function OrdersContent() {
           font-size: 0.6rem;
           margin: 0.1rem 0 0;
         }
-        .stat-card .badge-count {
-          font-size: 0.55rem;
-          background: #F1DBD3;
-          color: #AE4A34;
-          padding: 0.05rem 0.4rem;
-          border-radius: 8px;
-          margin-left: 0.2rem;
-        }
         .filter-chip {
           padding: 0.3rem 0.7rem;
           border-radius: 20px;
@@ -324,9 +220,7 @@ function OrdersContent() {
           transition: all 0.15s ease;
           white-space: nowrap;
         }
-        .filter-chip:hover {
-          border-color: #C79A2B;
-        }
+        .filter-chip:hover { border-color: #C79A2B; }
         .filter-chip.active {
           background: #1E3A5F;
           border-color: #1E3A5F;
@@ -337,9 +231,7 @@ function OrdersContent() {
           opacity: 0.7;
           margin-left: 0.2rem;
         }
-        .filter-chip.active .count {
-          opacity: 0.8;
-        }
+        .filter-chip.active .count { opacity: 0.8; }
         .order-card {
           background: #fff;
           border-radius: 12px;
@@ -348,9 +240,7 @@ function OrdersContent() {
           margin-bottom: 0.7rem;
           transition: border-color 0.15s ease;
         }
-        .order-card:hover {
-          border-color: #D6D0C5;
-        }
+        .order-card:hover { border-color: #D6D0C5; }
         .order-card .row {
           display: flex;
           align-items: center;
@@ -388,9 +278,7 @@ function OrdersContent() {
           margin-right: 0.5rem;
           white-space: nowrap;
         }
-        .order-card .balance.paid {
-          color: #4C7A5E;
-        }
+        .order-card .balance.paid { color: #4C7A5E; }
         .order-actions {
           display: flex;
           gap: 0.3rem;
@@ -413,9 +301,7 @@ function OrdersContent() {
           gap: 0.15rem;
           min-height: 28px;
         }
-        .order-actions .btn:hover {
-          background: #F5EFE2;
-        }
+        .order-actions .btn:hover { background: #F5EFE2; }
         .order-actions .btn-view {
           background: #F5EFE2;
           border-color: #D6D0C5;
@@ -430,29 +316,20 @@ function OrdersContent() {
           border-color: #4C7A5E;
           color: #fff;
         }
-        .order-actions .btn-settle:hover {
-          background: #3A5F4A;
-        }
+        .order-actions .btn-settle:hover { background: #3A5F4A; }
         .order-actions .btn-edit {
           background: #1E3A5F;
           border-color: #1E3A5F;
           color: #fff;
         }
-        .order-actions .btn-edit:hover {
-          background: #0F1E30;
-        }
+        .order-actions .btn-edit:hover { background: #0F1E30; }
         .order-actions .btn-advance {
           background: #C79A2B;
           border-color: #C79A2B;
           color: #1E3A5F;
         }
-        .order-actions .btn-advance:hover {
-          background: #B4881E;
-        }
-        .order-actions .btn-advance:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
+        .order-actions .btn-advance:hover { background: #B4881E; }
+        .order-actions .btn-advance:disabled { opacity: 0.5; cursor: not-allowed; }
         .search-bar {
           width: 100%;
           padding: 0.6rem 0.9rem;
@@ -464,10 +341,7 @@ function OrdersContent() {
           color: #2B2620;
           transition: border-color 0.2s ease;
         }
-        .search-bar:focus {
-          outline: none;
-          border-color: #C79A2B;
-        }
+        .search-bar:focus { outline: none; border-color: #C79A2B; }
         .empty-state {
           background: #fff;
           border-radius: 12px;
@@ -477,10 +351,7 @@ function OrdersContent() {
           color: #6B6255;
           font-size: 0.9rem;
         }
-        .empty-state .icon {
-          font-size: 2.5rem;
-          margin-bottom: 0.5rem;
-        }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
         .settle-modal {
           position: fixed;
           top: 0;
@@ -513,10 +384,7 @@ function OrdersContent() {
           box-sizing: border-box;
           color: #2B2620;
         }
-        .quick-input:focus {
-          outline: none;
-          border-color: #C79A2B;
-        }
+        .quick-input:focus { outline: none; border-color: #C79A2B; }
         .stats-row {
           display: flex;
           gap: 0.4rem;
@@ -541,9 +409,7 @@ function OrdersContent() {
           margin-bottom: 1rem;
           cursor: pointer;
         }
-        .back-link:hover {
-          text-decoration: underline;
-        }
+        .back-link:hover { text-decoration: underline; }
         .header-row {
           display: flex;
           align-items: center;
@@ -571,32 +437,34 @@ function OrdersContent() {
           font-weight: 600;
         }
         @media (max-width: 420px) {
-          .order-card .row {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .order-actions {
-            justify-content: flex-start;
-            margin-top: 0.3rem;
-          }
-          .order-card .balance {
-            margin-right: 0;
-          }
+          .order-card .row { flex-direction: column; align-items: stretch; }
+          .order-actions { justify-content: flex-start; margin-top: 0.3rem; }
+          .order-card .balance { margin-right: 0; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
-      {/* ===== BACK BUTTON ===== */}
       <button className="back-link" onClick={() => router.push('/dashboard')}>
         ← Back to dashboard
       </button>
 
-      {/* ===== HEADER ===== */}
       <div className="header-row">
         <h1>All Orders</h1>
         <span className="order-count-badge">{orders.length}</span>
       </div>
 
-      {/* ===== STATS ===== */}
+      {showUpgradeBanner && (
+        <UpgradeBanner
+          resource="orders"
+          currentCount={orderCount}
+          limit={limits.orders}
+          plan={plan}
+        />
+      )}
+
       <div className="stats-row">
         <div className="stat-card">
           <p className="value navy">{orderCounts.total}</p>
@@ -620,7 +488,6 @@ function OrdersContent() {
         </div>
       </div>
 
-      {/* ===== SEARCH ===== */}
       <input
         type="text"
         className="search-bar"
@@ -630,7 +497,6 @@ function OrdersContent() {
         style={{ marginBottom: '0.8rem' }}
       />
 
-      {/* ===== FILTER CHIPS ===== */}
       <div className="filters-row">
         {['all', 'owing', 'overdue', 'due_today', 'ready', 'delivered', 'cutting', 'sewing', 'placed'].map((f) => {
           const labels = {
@@ -668,11 +534,10 @@ function OrdersContent() {
         })}
       </div>
 
-      {/* ===== ORDERS LIST ===== */}
       {filteredOrders.length === 0 ? (
         <div className="empty-state">
           <div className="icon">📭</div>
-          <p style={{ margin: 0 }}>
+          <p>
             {search || filter !== 'all' ? (
               <>No orders match your search or filter.</>
             ) : (
@@ -684,7 +549,6 @@ function OrdersContent() {
         filteredOrders.map((o) => {
           const status = getStatusInfo(o.current_status)
           const orderName = getOrderName(o)
-          const dueDisplay = getDueDisplay(o.due_date)
           const phone = o.customers?.phone
           const balance = o.price - o.amount_paid
           const stages = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
@@ -707,7 +571,7 @@ function OrdersContent() {
                   <p className="meta">
                     <span>{o.customers?.name || 'No customer'}</span>
                     <span>·</span>
-                    {dueDisplay}
+                    {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
                   </p>
                 </div>
 
@@ -717,28 +581,15 @@ function OrdersContent() {
                   </span>
                   <div className="order-actions">
                     <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️</a>
-                    {phone && (
-                      <a href={`tel:${phone}`} className="btn btn-call">📞</a>
-                    )}
-                    {balance > 0 && (
-                      <button className="btn btn-settle" onClick={() => openSettleModal(o)}>
-                        💰
-                      </button>
-                    )}
+                    {phone && <a href={`tel:${phone}`} className="btn btn-call">📞</a>}
+                    {balance > 0 && <button className="btn btn-settle" onClick={() => alert('Settle payment')}>💰</button>}
                     <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️</a>
                     {!isLastStage && (
-                      <button
-                        className="btn btn-advance"
-                        onClick={() => advanceStatus(o)}
-                      >
+                      <button className="btn btn-advance" onClick={() => advanceStatus(o)}>
                         → {stages[currentIndex + 1]}
                       </button>
                     )}
-                    {isLastStage && (
-                      <button className="btn" disabled style={{ opacity: 0.4 }}>
-                        ✓ Done
-                      </button>
-                    )}
+                    {isLastStage && <button className="btn" disabled style={{ opacity: 0.4 }}>✓ Done</button>}
                   </div>
                 </div>
               </div>
@@ -746,84 +597,18 @@ function OrdersContent() {
           )
         })
       )}
-
-      {/* ===== SETTLE MODAL ===== */}
-      {showSettleModal && settleOrder && (
-        <div className="settle-modal" onClick={() => setShowSettleModal(false)}>
-          <div className="settle-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-              <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', margin: 0 }}>💰 Record Payment</h2>
-              <button
-                onClick={() => setShowSettleModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.3rem', color: '#6B6255', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-            <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0 0 1.2rem' }}>
-              {settleOrder.customers?.name || 'Customer'} · Balance: ₦{(settleOrder.price - settleOrder.amount_paid).toLocaleString()}
-            </p>
-
-            <form onSubmit={handleSettleSubmit}>
-              <div style={{ marginBottom: '0.8rem' }}>
-                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Amount paid (₦)</label>
-                <input
-                  className="quick-input"
-                  type="number"
-                  value={settleAmount}
-                  onChange={(e) => setSettleAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div style={{ marginBottom: '1.2rem' }}>
-                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Note (optional)</label>
-                <input
-                  className="quick-input"
-                  type="text"
-                  value={settleNote}
-                  onChange={(e) => setSettleNote(e.target.value)}
-                  placeholder="e.g. Cash payment"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={settleLoading}
-                style={{
-                  width: '100%', padding: '0.8rem', borderRadius: '8px',
-                  border: 'none', background: '#4C7A5E',
-                  color: '#fff', fontSize: '1rem', fontWeight: '700',
-                  transition: 'transform 0.1s ease',
-                }}
-              >
-                {settleLoading ? 'Recording...' : '💰 Record payment'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </main>
   )
 }
 
-// ===== PAGE EXPORT WITH SUSPENSE BOUNDARY =====
 export default function Page() {
   return (
     <Suspense fallback={
-      <div style={{
-        minHeight: '100vh',
-        background: '#F5EFE2',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#6B6255' }}>Loading orders...</p>
       </div>
     }>
       <OrdersContent />
     </Suspense>
   )
-}
+    }
