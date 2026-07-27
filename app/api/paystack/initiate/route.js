@@ -40,7 +40,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         email,
-        amount: plan.price * 100, // Paystack uses kobo
+        amount: plan.price * 100,
         currency: 'NGN',
         metadata: {
           business_id: businessId,
@@ -48,7 +48,8 @@ export async function POST(request) {
           plan_name: plan.name,
           platform: 'cresoa',
         },
-        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription?status=success`,
+        // ✅ Remove ?status=success
+        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription`,
       }),
     })
 
@@ -62,7 +63,7 @@ export async function POST(request) {
       )
     }
 
-    // Store transaction reference in database
+    // Store transaction reference
     await supabase
       .from('subscription_history')
       .insert({
@@ -88,4 +89,4 @@ export async function POST(request) {
       { status: 500 }
     )
   }
-        }
+}
