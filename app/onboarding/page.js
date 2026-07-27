@@ -47,6 +47,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false)
   const [profileMessage, setProfileMessage] = useState('')
   const [showWelcome, setShowWelcome] = useState(false)
+  const [userId, setUserId] = useState(null)
 
   useEffect(() => {
     const load = async () => {
@@ -56,6 +57,9 @@ export default function OnboardingPage() {
         return
       }
 
+      setUserId(user.id)
+
+      // Check if business exists
       const { data: business } = await supabase
         .from('businesses')
         .select('id, onboarding_completed, name, phone')
@@ -67,12 +71,12 @@ export default function OnboardingPage() {
         return
       }
 
-      setBusinessId(business?.id)
-      setBusinessName(business?.name || '')
-      // Auto-fill phone if exists
-      if (business?.phone) {
-        setPhone(business.phone)
-        setWhatsapp(business.phone) // default WhatsApp to same
+      // If business exists but not completed
+      if (business) {
+        setBusinessId(business.id)
+        setBusinessName(business.name || '')
+        setPhone(business.phone || '')
+        setWhatsapp(business.phone || '')
       }
 
       const { data: catData } = await supabase
@@ -81,8 +85,6 @@ export default function OnboardingPage() {
 
       setCategories(catData || [])
       setLoading(false)
-
-      // Show welcome animation after load
       setTimeout(() => setShowWelcome(true), 300)
     }
 
@@ -93,6 +95,40 @@ export default function OnboardingPage() {
     setSaving(true)
     setSelectedSector(sector)
 
+    // If business doesn't exist yet, create it
+    if (!businessId) {
+      const { data: userData } = await supabase.auth.getUser()
+      const businessNameFromUser = userData.user?.user_metadata?.business_name || 'My Business'
+
+      const { data: newBusiness, error } = await supabase
+        .from('businesses')
+        .insert({
+          owner_id: userId,
+          name: businessNameFromUser,
+          sector: sector,
+          business_type: isActive ? 'Fashion Designer' : sector,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        setSaving(false)
+        return
+      }
+
+      setBusinessId(newBusiness.id)
+      setBusinessName(newBusiness.name || '')
+
+      if (isActive) {
+        setStep('profile')
+      } else {
+        setWaitlisted(true)
+      }
+      setSaving(false)
+      return
+    }
+
+    // Business exists, update it
     await supabase
       .from('businesses')
       .update({
@@ -122,6 +158,33 @@ export default function OnboardingPage() {
 
     setSaving(true)
 
+    // If business doesn't exist yet, create it first
+    if (!businessId) {
+      const { data: newBusiness, error } = await supabase
+        .from('businesses')
+        .insert({
+          owner_id: userId,
+          name: businessName.trim(),
+          phone: phoneDigits,
+          whatsapp: whatsapp ? whatsapp.replace(/\D/g, '') : phoneDigits,
+          location: location.trim(),
+          sector: selectedSector || 'Fashion & Custom Wear',
+          onboarding_completed: true,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        setProfileMessage('Error: ' + error.message)
+        setSaving(false)
+        return
+      }
+
+      router.push('/dashboard')
+      return
+    }
+
+    // Business exists, update it
     const { error } = await supabase
       .from('businesses')
       .update({
@@ -145,7 +208,6 @@ export default function OnboardingPage() {
   const handlePhoneChange = (e) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
     setPhone(digits)
-    // Auto-fill WhatsApp if empty or same as old phone
     if (!whatsapp || whatsapp === phone) {
       setWhatsapp(digits)
     }
@@ -162,7 +224,6 @@ export default function OnboardingPage() {
   }
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
 
-  // Welcome animation styles
   const welcomeStyles = `
     @keyframes fadeSlideUp {
       from { opacity: 0; transform: translateY(16px); }
@@ -259,12 +320,6 @@ export default function OnboardingPage() {
     .step-line.done {
       background: #4C7A5E;
     }
-    .welcome-text {
-      font-size: 1rem;
-      color: #6B6255;
-      margin: 0.5rem 0 0;
-      text-align: center;
-    }
   `
 
   if (loading) {
@@ -315,7 +370,6 @@ export default function OnboardingPage() {
       <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
         <style>{welcomeStyles}</style>
         <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-          {/* Step Indicator */}
           <div className="step-indicator">
             <span className="step-dot done"></span>
             <span className="step-line done"></span>
@@ -415,7 +469,6 @@ export default function OnboardingPage() {
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
       <style>{welcomeStyles}</style>
       <div style={{ maxWidth: '400px', margin: '0 auto' }}>
-        {/* Step Indicator */}
         <div className="step-indicator">
           <span className="step-dot active"></span>
           <span className="step-line"></span>
