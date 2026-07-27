@@ -52,7 +52,7 @@ export async function GET(request) {
       )
     }
 
-    // 2. 🔥 FIX: Look up business_id from subscription_history using the reference
+    // 2. 🔥 Look up business_id from subscription_history
     const { data: history, error: historyError } = await supabase
       .from('subscription_history')
       .select('business_id, new_plan, amount_paid')
