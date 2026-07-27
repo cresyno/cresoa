@@ -351,7 +351,7 @@ const formatPhoneReminder = (phone) => {
             </form>
           )}
 
-          {payments.length > 0 && (
+{{payments.length > 0 && (
             <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e4d8c2' }}>
               <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1E3A5F', margin: '0 0 0.6rem' }}>Payment history</p>
               {payments.map((p) => (
@@ -362,6 +362,21 @@ const formatPhoneReminder = (phone) => {
               ))}
             </div>
           )}
+
+          {balance > 0 && (
+            <button
+              onClick={sendReminder}
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#AE4A34', color: '#fff', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.8rem' }}
+            >
+              Send reminder
+            </button>
+          )}
+          {order.last_reminder_sent_at && (
+            <p style={{ fontSize: '0.72rem', color: '#6B6255', marginTop: '0.4rem', textAlign: 'center' }}>
+              Last reminded: {new Date(order.last_reminder_sent_at).toLocaleDateString('en-NG')}
+            </p>
+          )}
+        </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
