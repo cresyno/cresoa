@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabaseClient'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -23,10 +25,12 @@ export async function GET(request) {
       )
     }
 
-    // Verify with Paystack
+    // ✅ Correct: Verify with Paystack
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${secretKey}`,
+        'Content-Type': 'application/json',
       },
     })
 
@@ -49,7 +53,7 @@ export async function GET(request) {
     }
 
     // Update business plan
-    const { data: business } = await supabase
+    await supabase
       .from('businesses')
       .update({
         plan: metadata.plan,
@@ -58,8 +62,6 @@ export async function GET(request) {
         last_payment_date: new Date(),
       })
       .eq('id', metadata.business_id)
-      .select()
-      .single()
 
     // Update subscription history
     await supabase
