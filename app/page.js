@@ -1,104 +1,358 @@
 export default function HomePage() {
   const features = [
-    { icon: '📏', title: 'Customer & measurements', desc: 'Save every customer’s measurements once — reuse them for every future order, no re-measuring.' },
-    { icon: '🧵', title: 'Order tracking', desc: 'Move orders through real stages: Order placed → Cutting → Sewing → Ready → Delivered. Know where every job stands.' },
-    { icon: '💰', title: 'Payments & balances', desc: 'Record deposits, track outstanding balances, and see who owes what — no more guessing.' },
-    { icon: '🔗', title: 'Customer tracking link', desc: 'Give each customer a private link to check their own order status. No more "is it ready?" messages.' },
-    { icon: '👗', title: 'Aso‑Ebi & group orders', desc: 'Manage group orders effortlessly — one coordinator, many members, one shared deadline.' },
-  ]
+    {
+      title: 'Customer measurements',
+      desc: 'Save every customer\'s measurements once. Reuse them for every future order—no need to measure twice.',
+    },
+    {
+      title: 'Order production stages',
+      desc: 'Know exactly where every job stands. Move orders from Cutting → Sewing → Ready → Delivered.',
+    },
+    {
+      title: 'Payments & balances',
+      desc: 'Record deposits and track outstanding balances. No more guessing who paid what.',
+    },
+    {
+      title: 'Customer tracking links',
+      desc: 'Share a private link with each customer so they can check their own order status anytime.',
+    },
+    {
+      title: 'Group & Aso-Ebi orders',
+      desc: 'Manage group orders with one shared deadline. Keep everyone on the same page without the chaos.',
+    },
+  ];
 
   const steps = [
-    'Create your free business account',
+    'Create your free account in under 2 minutes',
     'Add your customers and their measurements',
-    'Create orders and track them through production',
-    'Share a tracking link with each customer via WhatsApp',
-  ]
+    'Create orders and track each production stage',
+    'Share tracking links with customers via WhatsApp',
+  ];
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2' }}>
       <style>{`
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(12px); }
+          from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .fade { animation: fadeUp 0.6s ease-out both; }
+        .fade { animation: fadeUp 0.7s ease-out both; }
+        .container {
+          max-width: 480px;
+          margin: 0 auto;
+          padding: 0 1.5rem;
+        }
       `}</style>
 
-      <div style={{ background: 'linear-gradient(160deg, #1E3A5F 0%, #16293F 100%)', padding: '3rem 1.5rem 3.5rem', borderRadius: '0 0 32px 32px' }}>
-        <div className="fade" style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ margin: '0 auto 1.2rem', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', borderRadius: '16px', display: 'inline-block' }}>
-            <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+      {/* ===== HERO ===== */}
+      <div
+        style={{
+          background: 'linear-gradient(150deg, #1E3A5F 0%, #0F1E30 100%)',
+          padding: '2.8rem 0 3.5rem',
+          borderRadius: '0 0 32px 32px',
+        }}
+      >
+        <div className="container fade">
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '2.5rem' }}>
+            <svg width="36" height="36" viewBox="0 0 64 64" fill="none">
               <rect width="64" height="64" rx="16" fill="#1E3A5F" />
               <line x1="44" y1="18" x2="20" y2="42" stroke="#C79A2B" strokeWidth="3" strokeLinecap="round" />
               <circle cx="44" cy="18" r="4.5" fill="none" stroke="#C79A2B" strokeWidth="2.5" />
               <path d="M20 42 C 13 38, 11 29, 18 24" stroke="#C79A2B" strokeWidth="2.5" strokeLinecap="round" fill="none" />
             </svg>
+            <span style={{ color: '#fff', fontSize: '1.4rem', fontWeight: '700', letterSpacing: '-0.5px' }}>Cresoa</span>
           </div>
-          <h1 style={{ color: '#fff', fontSize: '2.2rem', margin: '0 0 0.3rem' }}>Cresoa</h1>
-          <p style={{ color: '#E4D8C2', fontSize: '1.1rem', lineHeight: '1.6', margin: '0 0 1.7rem', fontWeight: '500' }}>
-            The simple business system for Nigerian <br style={{ display: 'block' }} /> fashion designers and tailors
+
+          {/* Positioning Tagline */}
+          <p
+            style={{
+              color: '#C79A2B',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              margin: '0 0 0.5rem',
+            }}
+          >
+            The simple operating system for Nigerian fashion businesses
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-            <a href="/signup" style={{ background: 'linear-gradient(135deg, #C79A2B, #B4881E)', color: '#1E3A5F', padding: '0.9rem', borderRadius: '10px', fontSize: '0.95rem', fontWeight: '700', textDecoration: 'none', display: 'block', boxShadow: '0 6px 16px rgba(199,154,43,0.35)' }}>
-              Start free – no credit card
+
+          {/* Headline */}
+          <h1
+            style={{
+              color: '#fff',
+              fontSize: '2.1rem',
+              lineHeight: '1.2',
+              margin: '0 0 0.75rem',
+              fontWeight: '800',
+              letterSpacing: '-0.5px',
+            }}
+          >
+            Your fashion business. <br style={{ display: 'block' }} />
+            Finally, all in one place.
+          </h1>
+
+          {/* Sub-headline */}
+          <p
+            style={{
+              color: '#C8D4E3',
+              fontSize: '1rem',
+              lineHeight: '1.6',
+              margin: '0 0 2rem',
+              fontWeight: '400',
+            }}
+          >
+            Stop losing measurements, forgetting orders, and chasing payment balances across notebooks and WhatsApp chats.
+          </p>
+
+          {/* CTAs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.8rem' }}>
+            <a
+              href="/signup"
+              style={{
+                background: '#C79A2B',
+                color: '#1E3A5F',
+                padding: '0.95rem',
+                borderRadius: '10px',
+                fontSize: '1rem',
+                fontWeight: '700',
+                textDecoration: 'none',
+                display: 'block',
+                textAlign: 'center',
+                boxShadow: '0 4px 14px rgba(199,154,43,0.3)',
+              }}
+            >
+              Start free — no credit card
             </a>
-            <a href="/login" style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', padding: '0.85rem', borderRadius: '10px', fontSize: '0.95rem', fontWeight: '600', textDecoration: 'none', display: 'block', border: '1px solid rgba(255,255,255,0.25)' }}>
+            <a
+              href="/login"
+              style={{
+                background: 'transparent',
+                color: '#fff',
+                padding: '0.85rem',
+                borderRadius: '10px',
+                fontSize: '0.95rem',
+                fontWeight: '500',
+                textDecoration: 'none',
+                display: 'block',
+                textAlign: 'center',
+                border: '1px solid rgba(255,255,255,0.2)',
+              }}
+            >
               Log in
             </a>
           </div>
+
+          {/* Honest context (replaces fake social proof) */}
+          <p
+            style={{
+              color: '#A0B4C9',
+              fontSize: '0.8rem',
+              textAlign: 'center',
+              margin: 0,
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              paddingTop: '1.2rem',
+            }}
+          >
+            Built for the way Nigerian fashion businesses actually work.
+          </p>
         </div>
       </div>
 
-      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '2rem 1.5rem 3rem' }}>
-        <div className="fade" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(30,58,95,0.08)', marginBottom: '1.3rem' }}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1.15rem', margin: '0 0 0.8rem' }}>Stop juggling notebooks and WhatsApp</h2>
-          <p style={{ color: '#2B2620', fontSize: '0.92rem', lineHeight: '1.6', margin: 0 }}>
-            Lost measurements, missed payments, and endless <em>"is my order ready?"</em> messages — that’s not business, that’s stress.
-            Cresoa helps you keep everything in one place so you can focus on what you do best: creating beautiful fashion.
+      {/* ===== MAIN CONTENT ===== */}
+      <div className="container" style={{ paddingTop: '2.5rem', paddingBottom: '3rem' }}>
+
+        {/* ===== FEATURES ===== */}
+        <div style={{ marginBottom: '2.5rem' }}>
+          <h2
+            style={{
+              color: '#1E3A5F',
+              fontSize: '1.3rem',
+              margin: '0 0 0.3rem',
+              fontWeight: '700',
+              letterSpacing: '-0.3px',
+            }}
+          >
+            What Cresoa helps you do
+          </h2>
+          <p
+            style={{
+              color: '#6B6255',
+              fontSize: '0.9rem',
+              margin: '0 0 1.5rem',
+            }}
+          >
+            No more scattered tools. Just one place for everything.
           </p>
+
+          {/* Clean, border-based feature list — no emojis, no heavy shadows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {features.map((f) => (
+              <div
+                key={f.title}
+                className="fade"
+                style={{
+                  background: '#fff',
+                  padding: '1rem 1.2rem',
+                  borderRadius: '12px',
+                  border: '1px solid #E8E0D5',
+                  boxShadow: '0 2px 6px rgba(30,58,95,0.04)',
+                }}
+              >
+                <h3
+                  style={{
+                    margin: '0 0 0.2rem',
+                    color: '#1E3A5F',
+                    fontSize: '0.9rem',
+                    fontWeight: '700',
+                  }}
+                >
+                  {f.title}
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    color: '#6B6255',
+                    fontSize: '0.85rem',
+                    lineHeight: '1.5',
+                  }}
+                >
+                  {f.desc}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="fade" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(30,58,95,0.08)', marginBottom: '1.3rem' }}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1.15rem', margin: '0 0 1rem' }}>What you can do with Cresoa</h2>
-          {features.map((f) => (
-            <div key={f.title} style={{ display: 'flex', gap: '0.9rem', marginBottom: '1.1rem', alignItems: 'flex-start' }}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#F6E9C8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                {f.icon}
-              </div>
-              <div>
-                <p style={{ margin: '0 0 0.2rem', color: '#1E3A5F', fontWeight: '600', fontSize: '0.95rem' }}>{f.title}</p>
-                <p style={{ margin: 0, color: '#6B6255', fontSize: '0.85rem', lineHeight: '1.5' }}>{f.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* ===== HOW IT WORKS ===== */}
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            border: '1px solid #E8E0D5',
+            boxShadow: '0 2px 6px rgba(30,58,95,0.04)',
+            marginBottom: '2.5rem',
+          }}
+        >
+          <h2
+            style={{
+              color: '#1E3A5F',
+              fontSize: '1.1rem',
+              margin: '0 0 1.2rem',
+              fontWeight: '700',
+            }}
+          >
+            Get started in four steps
+          </h2>
 
-        <div className="fade" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(30,58,95,0.08)', marginBottom: '1.3rem' }}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1.15rem', margin: '0 0 1rem' }}>Get started in 4 simple steps</h2>
           {steps.map((step, i) => (
-            <div key={step} style={{ display: 'flex', gap: '0.8rem', marginBottom: '0.9rem', alignItems: 'flex-start' }}>
-              <span style={{ background: 'linear-gradient(135deg, #C79A2B, #B4881E)', color: '#1E3A5F', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: '700', flexShrink: 0, boxShadow: '0 2px 6px rgba(199,154,43,0.4)' }}>
+            <div
+              key={step}
+              style={{
+                display: 'flex',
+                gap: '0.9rem',
+                marginBottom: i < steps.length - 1 ? '1.1rem' : '0',
+                alignItems: 'flex-start',
+              }}
+            >
+              <span
+                style={{
+                  background: '#1E3A5F',
+                  color: '#fff',
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  flexShrink: 0,
+                  marginTop: '1px',
+                }}
+              >
                 {i + 1}
               </span>
-              <p style={{ margin: 0, color: '#2B2620', fontSize: '0.88rem', paddingTop: '0.15rem' }}>{step}</p>
+              <p
+                style={{
+                  margin: 0,
+                  color: '#2B2620',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.5',
+                  paddingTop: '1px',
+                }}
+              >
+                {step}
+              </p>
             </div>
           ))}
         </div>
 
-        <div className="fade" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 6px 20px rgba(30,58,95,0.08)', marginBottom: '1.3rem', textAlign: 'center' }}>
-          <p style={{ margin: 0, color: '#6B6255', fontSize: '0.85rem' }}>
-            ✨ Built for Nigerian fashion businesses — <strong style={{ color: '#1E3A5F' }}>start free today</strong>
+        {/* ===== FINAL CTA (Solid Navy) ===== */}
+        <div
+          style={{
+            background: '#1E3A5F',
+            borderRadius: '16px',
+            padding: '2rem 1.5rem',
+            textAlign: 'center',
+            boxShadow: '0 6px 24px rgba(30,58,95,0.2)',
+          }}
+        >
+          <h2
+            style={{
+              color: '#fff',
+              fontSize: '1.3rem',
+              margin: '0 0 0.4rem',
+              fontWeight: '700',
+              lineHeight: '1.3',
+            }}
+          >
+            Run your business the <br style={{ display: 'block' }} />
+            simple way.
+          </h2>
+          <p
+            style={{
+              color: '#C8D4E3',
+              fontSize: '0.9rem',
+              margin: '0 0 1.5rem',
+              opacity: 0.9,
+            }}
+          >
+            Join fashion designers who have left their notebooks behind.
           </p>
-          <a href="/signup" style={{ display: 'inline-block', marginTop: '0.8rem', background: '#1E3A5F', color: '#fff', padding: '0.7rem 2rem', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '600', textDecoration: 'none', boxShadow: '0 4px 12px rgba(30,58,95,0.25)' }}>
-            Create your account
+          <a
+            href="/signup"
+            style={{
+              background: '#C79A2B',
+              color: '#1E3A5F',
+              padding: '0.9rem',
+              borderRadius: '10px',
+              fontSize: '1rem',
+              fontWeight: '700',
+              textDecoration: 'none',
+              display: 'block',
+              boxShadow: '0 4px 14px rgba(199,154,43,0.3)',
+            }}
+          >
+            Create your free account
           </a>
         </div>
 
-        <p style={{ textAlign: 'center', color: '#6B6255', fontSize: '0.75rem', marginTop: '1.5rem' }}>
-          Built in Nigeria, for Nigerian businesses. <br />
-          <span style={{ opacity: 0.7 }}>Support for repairs and custom products coming soon.</span>
+        {/* Footer */}
+        <p
+          style={{
+            textAlign: 'center',
+            color: '#6B6255',
+            fontSize: '0.7rem',
+            marginTop: '1.5rem',
+            opacity: 0.6,
+          }}
+        >
+          Built in Nigeria, for Nigerian fashion businesses.
         </p>
       </div>
     </main>
-  )
-  }
+  );
+        }
