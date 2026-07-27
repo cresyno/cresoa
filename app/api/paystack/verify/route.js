@@ -25,7 +25,7 @@ export async function GET(request) {
       )
     }
 
-    // Verify with Paystack
+    // 1. Verify with Paystack
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
@@ -52,27 +52,48 @@ export async function GET(request) {
       )
     }
 
-    // ✅ LOG THE METADATA TO DEBUG
-    console.log('🔵 METADATA:', JSON.stringify(metadata, null, 2))
+    // 2. LOG EVERYTHING
+    console.log('🔵 ===== PAYSTACK VERIFICATION =====')
+    console.log('🔵 Reference:', txRef)
+    console.log('🔵 Metadata:', JSON.stringify(metadata, null, 2))
+    console.log('🔵 Business ID from metadata:', metadata.business_id)
+    console.log('🔵 Plan:', metadata.plan)
 
-    // ✅ Check if business exists
+    // 3. Check if business exists
+    const businessId = metadata.business_id
+
+    if (!businessId) {
+      console.error('❌ No business_id in metadata')
+      return NextResponse.json(
+        { error: 'No business ID in payment metadata' },
+        { status: 400 }
+      )
+    }
+
     const { data: existingBusiness, error: checkError } = await supabase
       .from('businesses')
-      .select('id, plan')
-      .eq('id', metadata.business_id)
+      .select('id, plan, owner_id')
+      .eq('id', businessId)
       .single()
 
     if (checkError || !existingBusiness) {
-      console.error('❌ Business not found:', checkError)
+      console.error('❌ Business not found for ID:', businessId)
+      console.error('❌ Supabase error:', checkError)
+      
+      // Try to find by owner_id (as fallback) – but we don't have owner_id in metadata
+      // Instead, return a clear error
       return NextResponse.json(
-        { error: 'Business not found' },
+        { 
+          error: `Business not found for ID: ${businessId}`,
+          debug: { businessId, metadata }
+        },
         { status: 404 }
       )
     }
 
-    console.log('🔵 Existing business:', existingBusiness)
+    console.log('✅ Found business:', existingBusiness)
 
-    // ✅ Update business plan
+    // 4. Update business plan
     const { data: updatedBusiness, error: updateError } = await supabase
       .from('businesses')
       .update({
@@ -81,7 +102,7 @@ export async function GET(request) {
         subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         last_payment_date: new Date(),
       })
-      .eq('id', metadata.business_id)
+      .eq('id', businessId)
       .select()
 
     if (updateError) {
@@ -92,9 +113,9 @@ export async function GET(request) {
       )
     }
 
-    console.log('✅ Updated business:', updatedBusiness)
+    console.log('✅ Business updated:', updatedBusiness)
 
-    // ✅ Update subscription history
+    // 5. Update subscription history
     await supabase
       .from('subscription_history')
       .update({
@@ -105,16 +126,19 @@ export async function GET(request) {
       })
       .eq('paystack_transaction_ref', txRef)
 
-    // ✅ Record payment
+    // 6. Record payment
     await supabase
       .from('payment_records')
       .insert({
-        business_id: metadata.business_id,
+        business_id: businessId,
         amount: amount / 100,
         type: 'subscription',
         note: `Subscription to ${metadata.plan_name} plan`,
         reference: txRef,
       })
+
+    console.log('✅ All done – plan upgraded')
+    console.log('🔵 ===== END =====')
 
     return NextResponse.json({
       status: 'success',
@@ -130,4 +154,4 @@ export async function GET(request) {
       { status: 500 }
     )
   }
-        }
+}
