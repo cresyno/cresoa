@@ -52,52 +52,47 @@ export async function GET(request) {
       )
     }
 
-    // 2. LOG EVERYTHING
-    console.log('🔵 ===== PAYSTACK VERIFICATION =====')
-    console.log('🔵 Reference:', txRef)
-    console.log('🔵 Metadata:', JSON.stringify(metadata, null, 2))
-    console.log('🔵 Business ID from metadata:', metadata.business_id)
-    console.log('🔵 Plan:', metadata.plan)
-
-    // 3. Check if business exists
-    const businessId = metadata.business_id
-
-    if (!businessId) {
-      console.error('❌ No business_id in metadata')
-      return NextResponse.json(
-        { error: 'No business ID in payment metadata' },
-        { status: 400 }
-      )
-    }
-
-    const { data: existingBusiness, error: checkError } = await supabase
-      .from('businesses')
-      .select('id, plan, owner_id')
-      .eq('id', businessId)
+    // 2. 🔥 FIX: Look up business_id from subscription_history using the reference
+    const { data: history, error: historyError } = await supabase
+      .from('subscription_history')
+      .select('business_id, new_plan, amount_paid')
+      .eq('paystack_transaction_ref', txRef)
+      .eq('status', 'pending')
       .single()
 
-    if (checkError || !existingBusiness) {
-      console.error('❌ Business not found for ID:', businessId)
-      console.error('❌ Supabase error:', checkError)
-      
-      // Try to find by owner_id (as fallback) – but we don't have owner_id in metadata
-      // Instead, return a clear error
+    if (historyError || !history) {
+      console.error('❌ No pending transaction found for reference:', txRef)
       return NextResponse.json(
-        { 
-          error: `Business not found for ID: ${businessId}`,
-          debug: { businessId, metadata }
-        },
+        { error: 'No pending transaction found for this reference' },
         { status: 404 }
       )
     }
 
-    console.log('✅ Found business:', existingBusiness)
+    const businessId = history.business_id
+    const planId = history.new_plan
+
+    console.log('✅ Found business ID from history:', businessId)
+
+    // 3. Check if business exists
+    const { data: existingBusiness, error: checkError } = await supabase
+      .from('businesses')
+      .select('id, plan')
+      .eq('id', businessId)
+      .single()
+
+    if (checkError || !existingBusiness) {
+      console.error('❌ Business not found:', businessId)
+      return NextResponse.json(
+        { error: 'Business not found' },
+        { status: 404 }
+      )
+    }
 
     // 4. Update business plan
     const { data: updatedBusiness, error: updateError } = await supabase
       .from('businesses')
       .update({
-        plan: metadata.plan,
+        plan: planId,
         plan_status: 'active',
         subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         last_payment_date: new Date(),
@@ -113,15 +108,13 @@ export async function GET(request) {
       )
     }
 
-    console.log('✅ Business updated:', updatedBusiness)
-
-    // 5. Update subscription history
+    // 5. Update subscription history status
     await supabase
       .from('subscription_history')
       .update({
         status: 'success',
         old_plan: 'free',
-        new_plan: metadata.plan,
+        new_plan: planId,
         amount_paid: amount / 100,
       })
       .eq('paystack_transaction_ref', txRef)
@@ -133,16 +126,15 @@ export async function GET(request) {
         business_id: businessId,
         amount: amount / 100,
         type: 'subscription',
-        note: `Subscription to ${metadata.plan_name} plan`,
+        note: `Subscription to ${metadata.plan_name || planId} plan`,
         reference: txRef,
       })
 
-    console.log('✅ All done – plan upgraded')
-    console.log('🔵 ===== END =====')
+    console.log('✅ Plan upgraded successfully for business:', businessId)
 
     return NextResponse.json({
       status: 'success',
-      plan: metadata.plan,
+      plan: planId,
       message: 'Subscription activated successfully',
       business: updatedBusiness,
     })
