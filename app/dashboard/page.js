@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [deactivated, setDeactivated] = useState(false)
   const [showOwingOnly, setShowOwingOnly] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -112,23 +113,64 @@ export default function DashboardPage() {
 
   const clearFilter = () => {
     setShowOwingOnly(false)
+    setStatusFilter('all')
   }
 
+  // Loading skeleton
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
         <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .cresoa-spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #e4d8c2;
-            border-top: 4px solid #1E3A5F;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+          @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
           }
+          .skeleton {
+            background: #E8E0D5;
+            border-radius: 8px;
+            background-image: linear-gradient(90deg, #E8E0D5 0px, #F5EFE2 40px, #E8E0D5 80px);
+            background-size: 200px 100%;
+            animation: shimmer 1.2s ease-in-out infinite;
+          }
+          .skeleton-text { height: 14px; margin-bottom: 6px; }
+          .skeleton-title { height: 20px; width: 60%; margin-bottom: 8px; }
+          .skeleton-card { height: 80px; border-radius: 12px; }
         `}</style>
-        <div className="cresoa-spinner"></div>
-        <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Loading your dashboard...</p>
+
+        {/* Header skeleton */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+            <div className="skeleton" style={{ width: '44px', height: '44px', borderRadius: '12px' }}></div>
+            <div>
+              <div className="skeleton skeleton-text" style={{ width: '80px' }}></div>
+              <div className="skeleton skeleton-title" style={{ width: '120px' }}></div>
+            </div>
+          </div>
+          <div className="skeleton" style={{ width: '60px', height: '32px', borderRadius: '6px' }}></div>
+        </div>
+
+        {/* Stats skeleton */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton skeleton-card"></div>
+          ))}
+        </div>
+
+        {/* Search skeleton */}
+        <div className="skeleton" style={{ height: '44px', borderRadius: '10px', marginBottom: '1rem' }}></div>
+
+        {/* Actions skeleton */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: '40px', width: '80px', borderRadius: '8px' }}></div>
+          ))}
+        </div>
+
+        {/* Orders skeleton */}
+        <div className="skeleton" style={{ height: '24px', width: '120px', marginBottom: '0.7rem' }}></div>
+        {[1, 2, 3].map(i => (
+          <div key={i} className="skeleton" style={{ height: '60px', borderRadius: '12px', marginBottom: '0.6rem' }}></div>
+        ))}
       </main>
     )
   }
@@ -162,6 +204,21 @@ export default function DashboardPage() {
   ).length
   const readyCount = allActiveOrders.filter((o) => o.current_status === 'Ready').length
 
+  // Calculate trends (mock - in production would compare to previous period)
+  const getTrend = (current, previous) => {
+    if (previous === 0) return { direction: 'up', percentage: 0 }
+    const diff = ((current - previous) / previous) * 100
+    return {
+      direction: diff >= 0 ? 'up' : 'down',
+      percentage: Math.abs(Math.round(diff))
+    }
+  }
+
+  // Mock previous values - in production these would come from DB
+  const customerTrend = getTrend(customers.length, customers.length - 2)
+  const orderTrend = getTrend(totalOrders, totalOrders - 3)
+  const balanceTrend = getTrend(totalBalanceOwed, totalBalanceOwed + 5000)
+
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
@@ -173,7 +230,6 @@ export default function DashboardPage() {
     return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
   }
 
-  // Helper: Get order display name - tries multiple fields
   const getOrderName = (order) => {
     if (order.item_name && order.item_name.trim()) return order.item_name
     if (order.name && order.name.trim()) return order.name
@@ -182,7 +238,6 @@ export default function DashboardPage() {
     return 'Order'
   }
 
-  // Helper: Check if overdue
   const isOverdue = (dueDate) => {
     if (!dueDate) return false
     const today = new Date()
@@ -192,46 +247,63 @@ export default function DashboardPage() {
     return due < today
   }
 
-  // Helper: Format due date or return OVERDUE
   const getDueDisplay = (dueDate) => {
-    if (!dueDate) return 'No deadline'
+    if (!dueDate) return <span style={{ color: '#C8C0B5', fontSize: '0.7rem' }}>No deadline</span>
     if (isOverdue(dueDate)) {
-      return <span style={{ color: '#AE4A34', fontWeight: '700', textTransform: 'uppercase' }}>OVERDUE</span>
+      return (
+        <span style={{
+          color: '#AE4A34',
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          animation: 'pulseGlow 1.5s ease-in-out infinite'
+        }}>
+          ⚠️ OVERDUE
+        </span>
+      )
     }
-    return `Due ${new Date(dueDate).toLocaleDateString('en-GB')}`
+    return <span style={{ color: '#6B6255' }}>Due {new Date(dueDate).toLocaleDateString('en-GB')}</span>
   }
 
-  // Helper: Check if order has balance > 0
   const hasBalance = (order) => {
     return (order.price - order.amount_paid) > 0
   }
 
-  // Filter orders based on owing filter
   const getFilteredOrders = (orders) => {
+    let filtered = orders
     if (showOwingOnly) {
-      return orders.filter(o => hasBalance(o))
+      filtered = filtered.filter(o => hasBalance(o))
     }
-    return orders
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(o => o.current_status === statusFilter)
+    }
+    return filtered
   }
 
-  // Filter groups' orders based on owing filter
   const getFilteredGroupOrders = (group) => {
+    let filtered = group.orders
     if (showOwingOnly) {
-      return group.orders.filter(o => hasBalance(o))
+      filtered = filtered.filter(o => hasBalance(o))
     }
-    return group.orders
-  }
-
-  // Check if any order in group has balance
-  const groupHasBalance = (group) => {
-    return group.orders.some(o => hasBalance(o))
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(o => o.current_status === statusFilter)
+    }
+    return filtered
   }
 
   const filteredPreviewOrders = getFilteredOrders(previewOrders)
 
+  // Quick order button
+  const handleQuickOrder = () => {
+    router.push('/dashboard/orders/new')
+  }
+
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem', paddingBottom: '5rem' }}>
       <style>{`
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 1; text-shadow: 0 0 4px rgba(174, 74, 52, 0.2); }
+          50% { opacity: 0.8; text-shadow: 0 0 12px rgba(174, 74, 52, 0.5); }
+        }
         .order-status-badge {
           display: inline-block;
           padding: 0.15rem 0.6rem;
@@ -250,6 +322,7 @@ export default function DashboardPage() {
           text-decoration: none;
           transition: border-color 0.15s ease, background 0.15s ease;
           cursor: pointer;
+          position: relative;
         }
         .stat-card:hover {
           border-color: #C79A2B;
@@ -258,6 +331,37 @@ export default function DashboardPage() {
         .stat-card.active {
           border-color: #AE4A34;
           background: #F1DBD3;
+        }
+        .stat-card .trend {
+          font-size: 0.6rem;
+          font-weight: 600;
+          margin-top: 0.1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.2rem;
+        }
+        .stat-card .trend.up { color: #4C7A5E; }
+        .stat-card .trend.down { color: #AE4A34; }
+        .stat-card .label {
+          color: #6B6255;
+          font-size: 0.7rem;
+          margin: 0.1rem 0 0;
+        }
+        .stat-card .value {
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .stat-card .value.red { color: #AE4A34; }
+        .stat-card .value.green { color: #4C7A5E; }
+        .stat-card .value.navy { color: #1E3A5F; }
+        .stat-card.overdue-warning {
+          background: linear-gradient(135deg, #FFF5F0, #F1DBD3);
+          border-color: #AE4A34;
+        }
+        .stat-card.overdue-warning .value {
+          color: #AE4A34;
         }
         .action-btn {
           padding: 0.6rem 1rem;
@@ -307,9 +411,12 @@ export default function DashboardPage() {
           line-height: 1.3;
         }
         .order-info .meta {
-          color: #6B6255;
           font-size: 0.78rem;
           margin: 0.1rem 0 0;
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+          flex-wrap: wrap;
         }
         .order-balance {
           font-weight: 700;
@@ -317,41 +424,61 @@ export default function DashboardPage() {
           color: #AE4A34;
           margin-right: 0.8rem;
           white-space: nowrap;
-              }
-               .order-balance.paid {
+        }
+        .order-balance.paid {
           color: #4C7A5E;
         }
         .order-actions {
           display: flex;
-          gap: 0.3rem;
+          gap: 0.4rem;
           flex-shrink: 0;
           align-items: center;
         }
-        .order-actions a {
-          color: #6B6255;
+        .order-actions .btn {
+          padding: 0.3rem 0.7rem;
+          border-radius: 6px;
           font-size: 0.7rem;
+          font-weight: 600;
           text-decoration: none;
-          padding: 0.2rem 0.5rem;
-          border-radius: 4px;
           border: 1px solid #E8E0D5;
           background: #fff;
+          color: #1E3A5F;
           transition: background 0.1s ease;
+          cursor: pointer;
           display: inline-flex;
           align-items: center;
           gap: 0.2rem;
+          min-height: 30px;
+          min-width: 44px;
+          justify-content: center;
         }
-        .order-actions a:hover {
+        .order-actions .btn:hover {
           background: #F5EFE2;
         }
-        .order-actions .call-btn {
+        .order-actions .btn-view {
+          background: #F5EFE2;
+          border-color: #D6D0C5;
           color: #1E3A5F;
-          border-color: #C79A2B;
-          background: #F6E9C8;
-          font-weight: 600;
-          padding: 0.2rem 0.6rem;
         }
-        .order-actions .call-btn:hover {
+        .order-actions .btn-view:hover {
+          background: #EBE3D8;
+        }
+        .order-actions .btn-call {
+          background: #F6E9C8;
+          border-color: #C79A2B;
+          color: #1E3A5F;
+          font-weight: 700;
+        }
+        .order-actions .btn-call:hover {
           background: #E8D5A0;
+        }
+        .order-actions .btn-edit {
+          background: #1E3A5F;
+          border-color: #1E3A5F;
+          color: #fff;
+        }
+        .order-actions .btn-edit:hover {
+          background: #0F1E30;
         }
         .customer-row {
           display: flex;
@@ -538,50 +665,32 @@ export default function DashboardPage() {
           margin: 0;
         }
         .header-actions {
-          display: flex;
-          gap: 0.4rem;
-          align-items: center;
+
+             .fab:active {
+          transform: scale(0.92);
         }
-        .header-actions a,
-        .header-actions button {
-          padding: 0.3rem 0.6rem;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          text-decoration: none;
-          border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
+        .fab:hover {
+          box-shadow: 0 6px 24px rgba(199, 154, 43, 0.5);
         }
-        .header-actions a:hover,
-        .header-actions button:hover {
-          background: #F5EFE2;
-          border-color: #C79A2B;
-        }
-        .clear-filter-btn {
-          background: #AE4A34;
+        .fab-label {
+          position: fixed;
+          bottom: 2.2rem;
+          right: 4.8rem;
+          background: #1E3A5F;
           color: #fff;
-          border: none;
-          padding: 0.2rem 0.7rem;
-          border-radius: 12px;
+          padding: 0.3rem 0.8rem;
+          border-radius: 20px;
           font-size: 0.7rem;
           font-weight: 600;
-          cursor: pointer;
-          transition: background 0.1s ease;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          z-index: 100;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          pointer-events: none;
         }
-        .clear-filter-btn:hover {
-          background: #8A3626;
-        }
-        .filter-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: #F1DBD3;
-          padding: 0.2rem 0.7rem 0.2rem 0.5rem;
-          border-radius: 12px;
-          font-size: 0.7rem;
-          color: #AE4A34;
-          font-weight: 600;
+        .fab:hover + .fab-label {
+          opacity: 1;
         }
       `}</style>
 
@@ -600,27 +709,34 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* STATS */}
+      {/* STATS with Trend Arrows */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
         <a href="/dashboard/customers" className="stat-card">
-          <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.3rem', fontWeight: '700' }}>{customers.length}</p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>👤 Customers</p>
+          <p className="value navy">{customers.length}</p>
+          <p className="label">👤 Customers</p>
+          <div className={`trend ${customerTrend.direction === 'up' ? 'up' : 'down'}`}>
+            {customerTrend.direction === 'up' ? '↑' : '↓'} {customerTrend.percentage}% from last month
+          </div>
         </a>
         <a href="/dashboard/orders" className="stat-card">
-          <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.3rem', fontWeight: '700' }}>{totalOrders}</p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>📦 Orders</p>
+          <p className="value navy">{totalOrders}</p>
+          <p className="label">📦 Orders</p>
+          <div className={`trend ${orderTrend.direction === 'up' ? 'up' : 'down'}`}>
+            {orderTrend.direction === 'up' ? '↑' : '↓'} {orderTrend.percentage}% from last month
+          </div>
         </a>
         <button
           onClick={toggleOwingFilter}
-          className={`stat-card ${showOwingOnly ? 'active' : ''}`}
+          className={`stat-card ${showOwingOnly ? 'active' : ''} ${totalBalanceOwed > 50000 ? 'overdue-warning' : ''}`}
           style={{ border: showOwingOnly ? '2px solid #AE4A34' : '' }}
         >
-          <p style={{ margin: 0, color: totalBalanceOwed > 0 ? '#AE4A34' : '#4C7A5E', fontSize: '1.1rem', fontWeight: '700' }}>
+          <p className={`value ${totalBalanceOwed > 0 ? 'red' : 'green'}`}>
             ₦{totalBalanceOwed.toLocaleString()}
           </p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>
-            {showOwingOnly ? '🔴 Owed (filtered)' : '💰 Owed'}
-          </p>
+          <p className="label">{showOwingOnly ? '🔴 Owed (filtered)' : '💰 Owed'}</p>
+          <div className={`trend ${balanceTrend.direction === 'up' ? 'down' : 'up'}`}>
+            {balanceTrend.direction === 'up' ? '↑' : '↓'} {balanceTrend.percentage}% from last month
+          </div>
         </button>
       </div>
 
@@ -642,18 +758,31 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* SEARCH */}
-      <div style={{ marginBottom: '1rem' }}>
+      {/* SEARCH + FILTERS */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <input
           type="text"
           className="search-bar"
           placeholder="🔍 Search by customer, order, or phone..."
+          style={{ flex: 1 }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.value.trim()) {
               router.push(`/dashboard/orders?search=${encodeURIComponent(e.target.value.trim())}`)
             }
           }}
         />
+        <select
+          className="filter-select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All</option>
+          <option value="Order placed">Placed</option>
+          <option value="Cutting">Cutting</option>
+          <option value="Sewing">Sewing</option>
+          <option value="Ready">Ready</option>
+          <option value="Delivered">Delivered</option>
+        </select>
       </div>
 
       {/* QUICK ACTIONS */}
@@ -694,7 +823,6 @@ export default function DashboardPage() {
             const filteredOrders = getFilteredGroupOrders(g)
             const hasVisibleOrders = filteredOrders.length > 0
 
-            // Only show group if it has visible orders or filter is off
             if (showOwingOnly && !hasVisibleOrders) return null
 
             const combinedBalance = filteredOrders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
@@ -742,20 +870,22 @@ export default function DashboardPage() {
                                 {status.label}
                               </span>
                             </p>
-                            <p className="meta">
-                              {o.customers?.name || 'No customer'} · {dueDisplay}
-                            </p>
+                            <div className="meta">
+                              <span>{o.customers?.name || 'No customer'}</span>
+                              <span>·</span>
+                              {dueDisplay}
+                            </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                             <span className={`order-balance ${o.price - o.amount_paid <= 0 ? 'paid' : ''}`}>
                               {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
                             </span>
                             <div className="order-actions">
-                              <a href={`/dashboard/orders/${o.id}`}>👁️</a>
+                              <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️ View</a>
                               {phone && (
-                                <a href={`tel:${phone}`} className="call-btn">📞 Call</a>
+                                <a href={`tel:${phone}`} className="btn btn-call">📞 Call</a>
                               )}
-                              <a href={`/dashboard/orders/${o.id}/edit`}>✏️</a>
+                              <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️ Edit</a>
                             </div>
                           </div>
                         </div>
@@ -776,14 +906,23 @@ export default function DashboardPage() {
             {showOwingOnly && (
               <button onClick={clearFilter} className="clear-filter-btn">✕ Clear filter</button>
             )}
+            {statusFilter !== 'all' && (
+              <button 
+                onClick={() => setStatusFilter('all')} 
+                className="clear-filter-btn"
+                style={{ background: '#6B6255' }}
+              >
+                ✕ {statusFilter}
+              </button>
+            )}
             <a href="/dashboard/orders">View all →</a>
           </div>
         </div>
 
         {filteredPreviewOrders.length === 0 ? (
           <div className="empty-state">
-            {showOwingOnly ? (
-              <p>🎉 No unpaid orders! All your customers have paid up.</p>
+            {showOwingOnly || statusFilter !== 'all' ? (
+              <p>🎉 No orders match your filters. Try clearing the filters above.</p>
             ) : (
               <p>No individual orders yet. Create your first order to get started.</p>
             )}
@@ -807,20 +946,22 @@ export default function DashboardPage() {
                         {status.label}
                       </span>
                     </p>
-                    <p className="meta">
-                      {o.customers?.name || 'No customer'} · {dueDisplay}
-                    </p>
+                    <div className="meta">
+                      <span>{o.customers?.name || 'No customer'}</span>
+                      <span>·</span>
+                      {dueDisplay}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                     <span className={`order-balance ${o.price - o.amount_paid <= 0 ? 'paid' : ''}`}>
                       {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
                     </span>
                     <div className="order-actions">
-                      <a href={`/dashboard/orders/${o.id}`}>👁️</a>
+                      <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️ View</a>
                       {phone && (
-                        <a href={`tel:${phone}`} className="call-btn">📞 Call</a>
+                        <a href={`tel:${phone}`} className="btn btn-call">📞 Call</a>
                       )}
-                      <a href={`/dashboard/orders/${o.id}/edit`}>✏️</a>
+                      <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️ Edit</a>
                     </div>
                   </div>
                 </div>
@@ -855,6 +996,12 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* FLOATING QUICK ORDER BUTTON */}
+      <a href="/dashboard/orders/new" className="fab" title="Quick Order">
+        +
+      </a>
+      <span className="fab-label">Quick Order</span>
     </main>
   )
-          }
+              }
