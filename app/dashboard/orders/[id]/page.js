@@ -3,34 +3,39 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { showToast } from '../../../../lib/toast'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
 export default function OrderDetailPage({ params }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const [order, setOrder] = useState(null)
   const [business, setBusiness] = useState(null)
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
 
+  // Edit form
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-  const [deleting, setDeleting] = useState(false)
 
+  // Payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
 
+  // Notes
   const [internalNotes, setInternalNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesMessage, setNotesMessage] = useState('')
+
+  // Delete
+  const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
     const { data: orderData } = await supabase
@@ -41,8 +46,8 @@ export default function OrderDetailPage({ params }) {
 
     setOrder(orderData)
     if (orderData) {
-      setTitle(orderData.title)
-      setPrice(orderData.price)
+      setTitle(orderData.title || '')
+      setPrice(orderData.price?.toString() || '')
       setDueDate(orderData.due_date || '')
       setInternalNotes(orderData.internal_notes || '')
 
@@ -66,12 +71,41 @@ export default function OrderDetailPage({ params }) {
 
   useEffect(() => {
     load()
-    if (searchParams.get('edit') === 'true') {
+    if (searchParams?.get('edit') === 'true') {
       setEditing(true)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id])
 
+  // Status helpers
+  const getStatusInfo = (status) => {
+    const map = {
+      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
+      'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
+      'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
+      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
+    }
+    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
+  }
+
+  const getOrderName = (order) => {
+    if (order?.title) return order.title
+    if (order?.item_name) return order.item_name
+    if (order?.name) return order.name
+    return 'Order'
+  }
+
+  const formatPhone = (phone) => {
+    if (!phone) return ''
+    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
+  }
+
+  const formatDate = (d) => {
+    if (!d) return ''
+    return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  // Actions
   const advanceStatus = async () => {
     const currentIndex = STAGES.indexOf(order.current_status)
     if (currentIndex === -1 || currentIndex === STAGES.length - 1) return
@@ -89,35 +123,49 @@ export default function OrderDetailPage({ params }) {
   const copyTrackingLink = () => {
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
     navigator.clipboard.writeText(link)
-    showToast('Tracking link copied!', '#1E3A5F')
-  }
-
-  const formatPhoneForWhatsApp = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
+    alert('Tracking link copied!')
   }
 
   const sendLinkViaWhatsApp = () => {
-    const phone = formatPhoneForWhatsApp(order.customers?.phone)
+    const phone = formatPhone(order.customers?.phone)
     if (!phone) {
       alert('This customer has no phone number saved.')
       return
     }
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
-    const message = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link — you can check your order status anytime: ${link}`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
+    const msg = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link — you can check your order status anytime: ${link}`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
-  const sendStatusUpdateViaWhatsApp = () => {
-    const phone = formatPhoneForWhatsApp(order.customers?.phone)
+  const sendStatusUpdate = () => {
+    const phone = formatPhone(order.customers?.phone)
     if (!phone) {
       alert('This customer has no phone number saved.')
       return
     }
-    const message = `Hi ${order.customers?.name}, this is ${business?.name}. Just to update you — your order "${order.title}" is now at the "${order.current_status}" stage. Thank you for your patience.`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
+    const status = getStatusInfo(order.current_status)
+    const msg = `Hi ${order.customers?.name}, this is ${business?.name}. Your order "${order.title}" is now at the "${status.label}" stage. Thank you for your patience.`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
+  const sendReminder = async () => {
+    const phone = formatPhone(order.customers?.phone)
+    if (!phone) {
+      alert('This customer has no phone number saved.')
+      return
+    }
+    const bal = order.price - order.amount_paid
+    const msg = `Hi ${order.customers?.name}, this is a reminder for your balance of ₦${bal.toLocaleString()} for "${order.title}". Thank you - ${business?.name}`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+    await supabase.from('orders').update({ last_reminder_sent_at: new Date().toISOString() }).eq('id', order.id)
+    load()
+  }
+
+  const duplicateOrder = () => {
+    router.push(`/dashboard/orders/new?duplicate=${order.id}`)
+  }
+
+  // Edit handlers
   const handleSave = async (e) => {
     e.preventDefault()
     setMessage('')
@@ -125,7 +173,11 @@ export default function OrderDetailPage({ params }) {
 
     const { error } = await supabase
       .from('orders')
-      .update({ title, price: Number(price) || 0, due_date: dueDate || null })
+      .update({
+        title: title.trim(),
+        price: Number(price) || 0,
+        due_date: dueDate || null,
+      })
       .eq('id', order.id)
 
     if (error) {
@@ -134,7 +186,7 @@ export default function OrderDetailPage({ params }) {
       return
     }
 
-    setMessage('Saved!')
+    setMessage('✅ Saved!')
     setSaving(false)
     load()
   }
@@ -151,11 +203,12 @@ export default function OrderDetailPage({ params }) {
     if (error) {
       setNotesMessage('Error saving notes.')
     } else {
-      setNotesMessage('Notes saved!')
+      setNotesMessage('✅ Notes saved!')
     }
     setSavingNotes(false)
   }
 
+  // Payment handlers
   const handleRecordPayment = async (e) => {
     e.preventDefault()
     const amount = Number(paymentAmount)
@@ -188,31 +241,7 @@ export default function OrderDetailPage({ params }) {
     setPaymentNote('')
     setShowPaymentForm(false)
     setRecordingPayment(false)
-    showToast('Payment recorded!', '#4C7A5E')
     load()
-  }
-
-  const formatPhoneReminder = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
-  }
-
-  const sendReminder = async () => {
-    const phone = formatPhoneReminder(order.customers?.phone)
-    if (!phone) {
-      alert('This customer has no phone number saved.')
-      return
-    }
-    const bal = order.price - order.amount_paid
-    const msg = `Hi ${order.customers?.name}, this is a reminder for your balance of ₦${bal.toLocaleString()} for ${order.title}. Thank you - ${business?.name}`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
-    await supabase.from('orders').update({ last_reminder_sent_at: new Date().toISOString() }).eq('id', order.id)
-    showToast('Reminder sent!', '#4C7A5E')
-    load()
-  }
-
-  const duplicateOrder = () => {
-    router.push(`/dashboard/orders/new?duplicate=${order.id}`)
   }
 
   const handleDelete = async () => {
@@ -247,224 +276,310 @@ export default function OrderDetailPage({ params }) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
         <p style={{ color: '#2B2620' }}>Order not found.</p>
+        <button className="back-link" onClick={() => router.push('/dashboard')}>
+          ← Back to dashboard
+        </button>
       </main>
     )
   }
 
+  const status = getStatusInfo(order.current_status)
   const balance = order.price - order.amount_paid
   const currentIndex = STAGES.indexOf(order.current_status)
   const isLastStage = currentIndex === STAGES.length - 1
+  const isFirstStage = currentIndex === 0
+
   const inputStyle = {
     width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
+    border: '1px solid #E8E0D5', fontSize: '1rem', boxSizing: 'border-box',
+    background: '#fff', color: '#2B2620',
+    transition: 'border-color 0.2s ease',
   }
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
-
-  const formatDate = (d) => new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
-      <div style={{ maxWidth: '420px', margin: '0 auto' }}>
-        <button
-          onClick={() => router.back()}
-          style={{ background: 'none', border: 'none', color: '#1E3A5F', fontSize: '0.85rem', padding: 0, marginBottom: '1rem' }}
-        >
-          ← Back
-        </button>
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+      <style>{`
+        .card {
+          background: #fff;
+          border-radius: 12px;
+          padding: 1.2rem;
+          border: 1px solid #E8E0D5;
+          margin-bottom: 1rem;
+        }
+        .stat-card {
+          background: #fff;
+          border-radius: 10px;
+          padding: 0.6rem 0.4rem;
+          border: 1px solid #E8E0D5;
+          text-align: center;
+          flex: 1;
+          min-width: 60px;
+        }
+        .stat-card .value {
+          font-size: 1.1rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .stat-card .value.red { color: #AE4A34; }
+        .stat-card .value.green { color: #4C7A5E; }
+        .stat-card .value.navy { color: #1E3A5F; }
+        .stat-card .label {
+          color: #6B6255;
+          font-size: 0.6rem;
+          margin: 0.1rem 0 0;
+        }
+        .status-timeline {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 1rem;
+          position: relative;
+        }
+        .status-timeline::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 10%;
+          right: 10%;
+          height: 2px;
+          background: #E8E0D5;
+          transform: translateY(-50%);
+        }
+        .status-dot {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.2rem;
+          position: relative;
+          z-index: 1;
+          flex: 1;
+        }
+        .status-dot .dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          border: 2px solid #E8E0D5;
+          background: #fff;
+          transition: all 0.3s ease;
+        }
+        .status-dot .dot.active {
+          width: 16px;
+          height: 16px;
+          border-color: #C79A2B;
+          background: #C79A2B;
+        }
+        .status-dot .dot.done {
+          border-color: #4C7A5E;
+          background: #4C7A5E;
+        }
+        .status-dot .label {
+          font-size: 0.55rem;
+          color: #6B6255;
+          text-align: center;
+          max-width: 40px;
+        }
+        .status-dot .label.active {
+          color: #1E3A5F;
+          font-weight: 600;
+        }
+        .btn {
+          padding: 0.4rem 0.8rem;
+          border-radius: 6px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-decoration: none;
+          border: 1px solid #E8E0D5;
+          background: #fff;
+          color: #1E3A5F;
+          cursor: pointer;
+          transition: background 0.1s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
+        }
+        .btn:hover {
+          background: #F5EFE2;
+        }
+        .btn-primary {
+          background: #1E3A5F;
+          border-color: #1E3A5F;
+          color: #fff;
+        }
+        .btn-primary:hover {
+          background: #0F1E30;
+        }
+        .btn-primary:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        .btn-gold {
+          background: #C79A2B;
+          border-color: #C79A2B;
+          color: #1E3A5F;
+        }
+        .btn-gold:hover {
+          background: #B4881E;
+        }
+        .btn-green {
+          background: #4C7A5E;
+          border-color: #4C7A5E;
+          color: #fff;
+        }
+        .btn-green:hover {
+          background: #3A5F4A;
+        }
+        .btn-red {
+          background: #AE4A34;
+          border-color: #AE4A34;
+          color: #fff;
+        }
+        .btn-red:hover {
+          background: #8A3626;
+        }
+        .btn-sm {
+          padding: 0.2rem 0.5rem;
+          font-size: 0.6rem;
+        }
+        .btn-block {
+          width: 100%;
+          justify-content: center;
+        }
+        .back-link {
+          background: none;
+          border: none;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+          padding: 0;
+          margin-bottom: 1rem;
+          cursor: pointer;
+        }
+        .back-link:hover {
+          text-decoration: underline;
+        }
+        .header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
+        }
+        .header-row .name-section {
+          flex: 1;
+        }
+        .header-row .name-section h1 {
+          color: #1E3A5F;
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .header-row .name-section .customer {
+          color: #6B6255;
+          font-size: 0.9rem;
+          margin: 0.1rem 0 0;
+        }
+        .header-actions {
+          display: flex;
+          gap: 0.3rem;
+          flex-wrap: wrap;
+        }
+        .stats-row {
+          display: flex;
+          gap: 0.4rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+        }
+        .action-row {
+          display: flex;
+          gap: 0.4rem;
+          flex-wrap: wrap;
+          margin-bottom: 1rem;
+        }
+        .payment-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 0.3rem 0;
+          border-bottom: 1px solid #F0EDE8;
+          font-size: 0.8rem;
+        }
+        .payment-row:last-child {
+          border-bottom: none;
+        }
+        .order-status-badge {
+          display: inline-block;
+          padding: 0.2rem 0.7rem;
+          border-radius: 20px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+        }
+        @media (max-width: 420px) {
+          .header-row {
+            flex-direction: column;
+          }
+          .header-actions {
+            width: 100%;
+          }
+          .header-actions .btn {
+            flex: 1;
+            justify-content: center;
+          }
+          .action-row .btn {
+            flex: 1;
+            justify-content: center;
+          }
+          .status-timeline {
+            flex-wrap: wrap;
+            gap: 0.2rem;
+          }
+          .status-dot .label {
+            font-size: 0.5rem;
+            max-width: 30px;
+          }
+        }
+      `}</style>
 
-        <h1 style={{ color: '#1E3A5F', fontSize: '1.4rem', marginBottom: '0.2rem' }}>{order.title}</h1>
-        <p style={{ color: '#6B6255', fontSize: '0.9rem', marginBottom: '1.5rem' }}>For {order.customers?.name}</p>
+      {/* ===== BACK BUTTON ===== */}
+      <button className="back-link" onClick={() => router.back()}>
+        ← Back
+      </button>
 
-        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            {STAGES.map((stage, i) => (
-              <div key={stage} style={{ textAlign: 'center', flex: 1 }}>
-                <div
-                  style={{
-                    width: i === currentIndex ? '18px' : '11px',
-                    height: i === currentIndex ? '18px' : '11px',
-                    borderRadius: '50%',
-                    background: i <= currentIndex ? '#C79A2B' : '#fff',
-                    border: `2px solid ${i <= currentIndex ? '#C79A2B' : '#e4d8c2'}`,
-                    margin: '0 auto 0.3rem'
-                  }}
-                />
-                <p style={{ fontSize: '0.6rem', color: i <= currentIndex ? '#2B2620' : '#6B6255', margin: 0 }}>{stage}</p>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <button
-              onClick={undoStatus}
-              disabled={currentIndex === 0}
-              style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #6B6255', background: '#fff', color: currentIndex === 0 ? '#c9c2b3' : '#6B6255', fontSize: '0.85rem', fontWeight: 600 }}
-            >
-              ← Undo stage
-            </button>
-            <button
-              onClick={advanceStatus}
-              disabled={isLastStage}
-              style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', fontSize: '0.85rem', fontWeight: 600, background: isLastStage ? '#e4d8c2' : '#1E3A5F', color: isLastStage ? '#6B6255' : '#fff' }}
-            >
-              {isLastStage ? 'Delivered' : 'Advance →'}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-            <span style={{ color: '#6B6255' }}>Total</span>
-            <span style={{ color: '#2B2620' }}>₦{order.price.toLocaleString()}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-            <span style={{ color: '#6B6255' }}>Paid</span>
-            <span style={{ color: '#2B2620' }}>₦{order.amount_paid.toLocaleString()}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', marginBottom: '1rem' }}>
-            <span style={{ color: '#2B2620' }}>Balance</span>
-            <span style={{ color: balance > 0 ? '#AE4A34' : '#4C7A5E' }}>
-              {balance > 0 ? `₦${balance.toLocaleString()}` : 'Paid in full'}
+      {/* ===== HEADER ===== */}
+      <div className="header-row">
+        <div className="name-section">
+          <h1>
+            {getOrderName(order)}
+            <span className="order-status-badge" style={{ background: status.bg, color: status.color }}>
+              {status.label}
             </span>
-          </div>
-
-          {balance > 0 && (
-            <button
-              onClick={() => setShowPaymentForm(!showPaymentForm)}
-              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}
-            >
-              {showPaymentForm ? 'Cancel' : '+ Record Payment'}
-            </button>
-          )}
-
-          {showPaymentForm && (
-            <form onSubmit={handleRecordPayment} style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e4d8c2' }}>
-              <div style={{ marginBottom: '0.7rem' }}>
-                <label style={labelStyle}>Amount received (₦)</label>
-                <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required style={inputStyle} />
-              </div>
-              <div style={{ marginBottom: '0.8rem' }}>
-                <label style={labelStyle}>Note (optional)</label>
-                <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment" style={inputStyle} />
-              </div>
-              <button type="submit" disabled={recordingPayment} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>
-                {recordingPayment ? 'Saving...' : 'Save payment'}
-              </button>
-            </form>
-          )}
-
-          {payments.length > 0 && (
-            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e4d8c2' }}>
-              <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1E3A5F', margin: '0 0 0.6rem' }}>Payment history</p>
-              {payments.map((p) => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.4rem' }}>
-                  <span style={{ color: '#6B6255' }}>{formatDate(p.created_at)}{p.note ? ` — ${p.note}` : ''}</span>
-                  <span style={{ color: '#4C7A5E', fontWeight: '600' }}>₦{p.amount.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {balance > 0 && (
-            <button
-              onClick={sendReminder}
-              style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#AE4A34', color: '#fff', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.8rem' }}
-            >
-              Send reminder
-            </button>
-          )}
-          {order.last_reminder_sent_at && (
-            <p style={{ fontSize: '0.72rem', color: '#6B6255', marginTop: '0.4rem', textAlign: 'center' }}>
-              Last reminded: {new Date(order.last_reminder_sent_at).toLocaleDateString('en-NG')}
-            </p>
-          )}
+          </h1>
+          <p className="customer">
+            👤 {order.customers?.name || 'No customer'}
+            {order.customers?.phone && ` · 📱 ${order.customers.phone}`}
+          </p>
         </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
-          <button onClick={copyTrackingLink} style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: 600 }}>
-            Copy link
-          </button>
-          <button onClick={sendLinkViaWhatsApp} style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>
-            Send link
+        <div className="header-actions">
+          {order.customers?.phone && (
+            <>
+              <a href={`tel:${order.customers.phone}`} className="btn btn-gold">📞 Call</a>
+              <a
+                href={`https://wa.me/${formatPhone(order.customers.phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-green"
+              >
+                💬 WhatsApp
+              </a>
+            </>
+          )}
+          <button className="btn btn-primary" onClick={duplicateOrder}>📋 Duplicate</button>
+          <button className="btn" onClick={() => setEditing(!editing)}>
+            {editing ? '✕ Close' : '✏️ Edit'}
           </button>
         </div>
-        <button onClick={sendStatusUpdateViaWhatsApp} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #4C7A5E', background: '#fff', color: '#4C7A5E', fontSize: '0.85rem', fontWeight: 600, marginBottom: '1.2rem' }}>
-          Send status update
-        </button>
-
-        <div style={{ background: '#fff', borderRadius: '12px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
-          <p style={{ margin: '0 0 0.6rem', fontWeight: '600', color: '#1E3A5F', fontSize: '0.95rem' }}>Internal notes</p>
-          <p style={{ margin: '0 0 0.6rem', fontSize: '0.75rem', color: '#6B6255' }}>Only you see this — not shared with the customer.</p>
-          <textarea
-            value={internalNotes}
-            onChange={(e) => setInternalNotes(e.target.value)}
-            rows={3}
-            placeholder="e.g. Customer said pick up Friday. Don't forget the extra button."
-            style={inputStyle}
-          />
-          <button
-            onClick={handleSaveNotes}
-            disabled={savingNotes}
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.6rem' }}
-          >
-            {savingNotes ? 'Saving...' : 'Save notes'}
-          </button>
-          {notesMessage && (
-            <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: notesMessage.startsWith('Error') ? '#AE4A34' : '#4C7A5E' }}>
-              {notesMessage}
-            </p>
-          )}
-        </div>
-
-        <button
-          onClick={duplicateOrder}
-          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #C79A2B', background: '#fff', color: '#C79A2B', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem' }}
-        >
-          Duplicate this order
-        </button>
-
-        <button
-          onClick={() => setEditing(!editing)}
-          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: editing ? '#1E3A5F' : '#fff', color: editing ? '#fff' : '#1E3A5F', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem' }}
-        >
-          {editing ? 'Close edit' : 'Edit order details'}
-        </button>
-        {editing && (
-          <form onSubmit={handleSave} style={{ background: '#fff', borderRadius: '12px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={labelStyle}>Garment / style</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required style={inputStyle} />
-            </div>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={labelStyle}>Total price (₦)</label>
-              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} required style={inputStyle} />
-              <p style={{ fontSize: '0.78rem', color: '#6B6255', marginTop: '0.3rem' }}>
-                To record a payment, use "+ Record Payment" above instead of editing amount paid directly.
-              </p>
-            </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Due date</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
-            </div>
-            <button type="submit" disabled={saving} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.95rem', fontWeight: 600 }}>
-              {saving ? 'Saving...' : 'Save changes'}
-            </button>
-            {message && (
-              <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: message === 'Saved!' ? '#4C7A5E' : '#AE4A34' }}>
-                {message}
-              </p>
-            )}
-          </form>
-        )}
-
-        <button
-          onClick={handleDelete}
-          disabled={deleting}
-          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #AE4A34', background: '#fff', color: '#AE4A34', fontSize: '0.9rem', fontWeight: 600 }}
-        >
-          {deleting ? 'Deleting...' : 'Delete order'}
-        </button>
       </div>
-    </main>
-  )
-}
