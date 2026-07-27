@@ -19,13 +19,14 @@ export async function GET(request) {
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
+      console.error('PAYSTACK_SECRET_KEY not set')
       return NextResponse.json(
         { error: 'Paystack not configured' },
         { status: 500 }
       )
     }
 
-    // ✅ Correct: Verify with Paystack
+    // ✅ Correct Paystack verification endpoint
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
@@ -37,6 +38,7 @@ export async function GET(request) {
     const data = await response.json()
 
     if (!data.status) {
+      console.error('Paystack verification error:', data.message)
       return NextResponse.json(
         { error: data.message || 'Verification failed' },
         { status: 400 }
@@ -52,8 +54,8 @@ export async function GET(request) {
       )
     }
 
-    // Update business plan
-    await supabase
+    // ✅ Update business plan
+    const { error: updateError } = await supabase
       .from('businesses')
       .update({
         plan: metadata.plan,
@@ -63,7 +65,15 @@ export async function GET(request) {
       })
       .eq('id', metadata.business_id)
 
-    // Update subscription history
+    if (updateError) {
+      console.error('Supabase update error:', updateError)
+      return NextResponse.json(
+        { error: 'Database update failed' },
+        { status: 500 }
+      )
+    }
+
+    // ✅ Update subscription history
     await supabase
       .from('subscription_history')
       .update({
@@ -74,7 +84,7 @@ export async function GET(request) {
       })
       .eq('paystack_transaction_ref', txRef)
 
-    // Record payment
+    // ✅ Record payment
     await supabase
       .from('payment_records')
       .insert({
@@ -98,4 +108,4 @@ export async function GET(request) {
       { status: 500 }
     )
   }
-        }
+}
