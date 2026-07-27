@@ -6,11 +6,16 @@ import { supabase } from '../../../../lib/supabaseClient'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
+  console.log('🔵 Verify API called')
+  
   try {
     const { searchParams } = new URL(request.url)
     const reference = searchParams.get('reference')
+    
+    console.log('📝 Reference:', reference)
 
     if (!reference) {
+      console.log('❌ No reference provided')
       return NextResponse.json(
         { error: 'Missing transaction reference' },
         { status: 400 }
@@ -18,15 +23,18 @@ export async function GET(request) {
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
+    console.log('🔑 Secret key exists:', !!secretKey)
+    
     if (!secretKey) {
-      console.error('PAYSTACK_SECRET_KEY not set')
+      console.log('❌ PAYSTACK_SECRET_KEY not set')
       return NextResponse.json(
         { error: 'Paystack not configured' },
         { status: 500 }
       )
     }
 
-    // ✅ Correct Paystack verification endpoint
+    // ✅ Verify with Paystack
+    console.log('🔄 Verifying with Paystack...')
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
@@ -36,9 +44,10 @@ export async function GET(request) {
     })
 
     const data = await response.json()
+    console.log('📦 Paystack response status:', data.status)
 
     if (!data.status) {
-      console.error('Paystack verification error:', data.message)
+      console.log('❌ Paystack verification failed:', data.message)
       return NextResponse.json(
         { error: data.message || 'Verification failed' },
         { status: 400 }
@@ -46,8 +55,12 @@ export async function GET(request) {
     }
 
     const { metadata, status, amount, reference: txRef } = data.data
+    console.log('📊 Transaction status:', status)
+    console.log('📊 Plan from metadata:', metadata?.plan)
+    console.log('📊 Business ID:', metadata?.business_id)
 
     if (status !== 'success') {
+      console.log('❌ Transaction not successful')
       return NextResponse.json(
         { error: 'Transaction not successful' },
         { status: 400 }
@@ -55,6 +68,7 @@ export async function GET(request) {
     }
 
     // ✅ Update business plan
+    console.log('🔄 Updating business plan...')
     const { error: updateError } = await supabase
       .from('businesses')
       .update({
@@ -66,12 +80,13 @@ export async function GET(request) {
       .eq('id', metadata.business_id)
 
     if (updateError) {
-      console.error('Supabase update error:', updateError)
+      console.log('❌ Supabase update error:', updateError)
       return NextResponse.json(
-        { error: 'Database update failed' },
+        { error: 'Database update failed: ' + updateError.message },
         { status: 500 }
       )
     }
+    console.log('✅ Business plan updated successfully')
 
     // ✅ Update subscription history
     await supabase
@@ -95,6 +110,8 @@ export async function GET(request) {
         reference: txRef,
       })
 
+    console.log('✅ All done — plan upgraded successfully')
+    
     return NextResponse.json({
       status: 'success',
       plan: metadata.plan,
@@ -102,9 +119,9 @@ export async function GET(request) {
     })
 
   } catch (error) {
-    console.error('Paystack verification error:', error)
+    console.error('❌ Paystack verification error:', error)
     return NextResponse.json(
-      { error: 'Verification failed' },
+      { error: 'Verification failed: ' + error.message },
       { status: 500 }
     )
   }
