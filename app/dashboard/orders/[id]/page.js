@@ -417,12 +417,18 @@ export default function OrderDetailPage({ params }) {
         </div>
 
         <button
+          onClick={duplicateOrder}
+          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #C79A2B', background: '#fff', color: '#C79A2B', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem' }}
+        >
+          Duplicate this order
+        </button>
+
+        <button
           onClick={() => setEditing(!editing)}
-          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: editing ? '#1E3A5F' : '#fff', color: editing ? '#fff' : '#1E3A5F', fontSize: '0.9rem', fontWeight: 600, marginBottom: '1rem' }}
+          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: editing ? '#1E3A5F' : '#fff', color: editing ? '#fff' : '#1E3A5F', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem' }}
         >
           {editing ? 'Close edit' : 'Edit order details'}
         </button>
-
         {editing && (
           <form onSubmit={handleSave} style={{ background: '#fff', borderRadius: '12px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }}>
             <div style={{ marginBottom: '0.8rem' }}>
