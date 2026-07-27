@@ -159,7 +159,7 @@ export default function CustomerDetailPage({ params }) {
   }
 
   const handlePhoneChange = (e) => {
-    const digits = e.target.value.replace(/\D/g', '').slice(0, 11)
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
     setPhone(digits)
   }
 
@@ -762,4 +762,4 @@ export default function CustomerDetailPage({ params }) {
       </div>
     </main>
   )
-                  }
+}
