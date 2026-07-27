@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { showToast } from '../../../lib/toast'
+import { supabase } from '../../../../lib/supabaseClient'
+import { showToast } from '../../../../lib/toast'
 
 export default function PartsPage() {
   const router = useRouter()
@@ -346,4 +346,4 @@ export default function PartsPage() {
       )}
     </main>
   )
-            }
+    }
