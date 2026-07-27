@@ -69,6 +69,7 @@ export default function OrderDetailPage({ params }) {
     if (searchParams.get('edit') === 'true') {
       setEditing(true)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id])
 
   const advanceStatus = async () => {
@@ -113,7 +114,7 @@ export default function OrderDetailPage({ params }) {
       alert('This customer has no phone number saved.')
       return
     }
-    const message = `Hi ${order.customers?.name}, this is ${business?.name}. Just to update you — your order "${order.title}" is now at the "${order.current_status}" stage. Thank you for your patience!`
+    const message = `Hi ${order.customers?.name}, this is ${business?.name}. Just to update you — your order "${order.title}" is now at the "${order.current_status}" stage. Thank you for your patience.`
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
@@ -190,7 +191,8 @@ export default function OrderDetailPage({ params }) {
     showToast('Payment recorded!', '#4C7A5E')
     load()
   }
-const formatPhoneReminder = (phone) => {
+
+  const formatPhoneReminder = (phone) => {
     if (!phone) return ''
     return phone.startsWith('0') ? '234' + phone.slice(1) : phone
   }
@@ -296,14 +298,14 @@ const formatPhoneReminder = (phone) => {
             <button
               onClick={undoStatus}
               disabled={currentIndex === 0}
-              style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #6B6255', background: '#fff', color: currentIndex === 0 ? '#c9c2b3' : '#6B6255', fontSize: '0.85rem', fontWeight: '600' }}
+              style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #6B6255', background: '#fff', color: currentIndex === 0 ? '#c9c2b3' : '#6B6255', fontSize: '0.85rem', fontWeight: 600 }}
             >
               ← Undo stage
             </button>
             <button
               onClick={advanceStatus}
               disabled={isLastStage}
-              style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', fontSize: '0.85rem', fontWeight: '600', background: isLastStage ? '#e4d8c2' : '#1E3A5F', color: isLastStage ? '#6B6255' : '#fff' }}
+              style={{ padding: '0.6rem', borderRadius: '6px', border: 'none', fontSize: '0.85rem', fontWeight: 600, background: isLastStage ? '#e4d8c2' : '#1E3A5F', color: isLastStage ? '#6B6255' : '#fff' }}
             >
               {isLastStage ? 'Delivered' : 'Advance →'}
             </button>
@@ -329,7 +331,7 @@ const formatPhoneReminder = (phone) => {
           {balance > 0 && (
             <button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
-              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.9rem', fontWeight: '600' }}
+              style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}
             >
               {showPaymentForm ? 'Cancel' : '+ Record Payment'}
             </button>
@@ -345,13 +347,13 @@ const formatPhoneReminder = (phone) => {
                 <label style={labelStyle}>Note (optional)</label>
                 <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment" style={inputStyle} />
               </div>
-              <button type="submit" disabled={recordingPayment} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.9rem', fontWeight: '600' }}>
+              <button type="submit" disabled={recordingPayment} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>
                 {recordingPayment ? 'Saving...' : 'Save payment'}
               </button>
             </form>
           )}
 
-{{payments.length > 0 && (
+          {payments.length > 0 && (
             <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e4d8c2' }}>
               <p style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1E3A5F', margin: '0 0 0.6rem' }}>Payment history</p>
               {payments.map((p) => (
@@ -359,14 +361,14 @@ const formatPhoneReminder = (phone) => {
                   <span style={{ color: '#6B6255' }}>{formatDate(p.created_at)}{p.note ? ` — ${p.note}` : ''}</span>
                   <span style={{ color: '#4C7A5E', fontWeight: '600' }}>₦{p.amount.toLocaleString()}</span>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
           {balance > 0 && (
             <button
               onClick={sendReminder}
-              style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#AE4A34', color: '#fff', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.8rem' }}
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#AE4A34', color: '#fff', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.8rem' }}
             >
               Send reminder
             </button>
@@ -377,18 +379,16 @@ const formatPhoneReminder = (phone) => {
             </p>
           )}
         </div>
-          )}
-        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
-          <button onClick={copyTrackingLink} style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: '600' }}>
+          <button onClick={copyTrackingLink} style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: 600 }}>
             Copy link
           </button>
-          <button onClick={sendLinkViaWhatsApp} style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.85rem', fontWeight: '600' }}>
+          <button onClick={sendLinkViaWhatsApp} style={{ padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#4C7A5E', color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>
             Send link
           </button>
         </div>
-        <button onClick={sendStatusUpdateViaWhatsApp} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #4C7A5E', background: '#fff', color: '#4C7A5E', fontSize: '0.85rem', fontWeight: '600', marginBottom: '1.2rem' }}>
+        <button onClick={sendStatusUpdateViaWhatsApp} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #4C7A5E', background: '#fff', color: '#4C7A5E', fontSize: '0.85rem', fontWeight: 600, marginBottom: '1.2rem' }}>
           Send status update
         </button>
 
@@ -405,7 +405,7 @@ const formatPhoneReminder = (phone) => {
           <button
             onClick={handleSaveNotes}
             disabled={savingNotes}
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: '600', marginTop: '0.6rem' }}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: '#fff', color: '#1E3A5F', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.6rem' }}
           >
             {savingNotes ? 'Saving...' : 'Save notes'}
           </button>
@@ -418,7 +418,7 @@ const formatPhoneReminder = (phone) => {
 
         <button
           onClick={() => setEditing(!editing)}
-          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: editing ? '#1E3A5F' : '#fff', color: editing ? '#fff' : '#1E3A5F', fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem' }}
+          style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: '1px solid #1E3A5F', background: editing ? '#1E3A5F' : '#fff', color: editing ? '#fff' : '#1E3A5F', fontSize: '0.9rem', fontWeight: 600, marginBottom: '1rem' }}
         >
           {editing ? 'Close edit' : 'Edit order details'}
         </button>
@@ -440,7 +440,7 @@ const formatPhoneReminder = (phone) => {
               <label style={labelStyle}>Due date</label>
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
             </div>
-            <button type="submit" disabled={saving} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.95rem', fontWeight: '600' }}>
+            <button type="submit" disabled={saving} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.95rem', fontWeight: 600 }}>
               {saving ? 'Saving...' : 'Save changes'}
             </button>
             {message && (
@@ -454,11 +454,11 @@ const formatPhoneReminder = (phone) => {
         <button
           onClick={handleDelete}
           disabled={deleting}
-          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #AE4A34', background: '#fff', color: '#AE4A34', fontSize: '0.9rem', fontWeight: '600' }}
+          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #AE4A34', background: '#fff', color: '#AE4A34', fontSize: '0.9rem', fontWeight: 600 }}
         >
           {deleting ? 'Deleting...' : 'Delete order'}
         </button>
       </div>
     </main>
   )
-        }
+}
