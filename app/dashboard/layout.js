@@ -1,9 +1,12 @@
+// app/dashboard/layout.js
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import LetterLogo from '../../components/LetterLogo'
+import { getPlan, FREE_TRIAL_DAYS } from '../../lib/planLimits'
 
 export default function DashboardLayout({ children }) {
   const router = useRouter()
@@ -12,7 +15,6 @@ export default function DashboardLayout({ children }) {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Navigation items (shared across all industries)
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
     { name: 'Orders', path: '/dashboard/orders', icon: '📋' },
@@ -21,7 +23,6 @@ export default function DashboardLayout({ children }) {
     { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
   ]
 
-  // Repair-specific nav items (only shown when on repairs path)
   const repairNavItems = [
     { name: 'Dashboard', path: '/dashboard/repairs', icon: '📊' },
     { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: '🔧' },
@@ -30,7 +31,6 @@ export default function DashboardLayout({ children }) {
     { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
   ]
 
-  // Determine which nav items to show
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
@@ -44,9 +44,52 @@ export default function DashboardLayout({ children }) {
 
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('name, sector')
+        .select('*')
         .eq('owner_id', user.id)
         .single()
+
+      if (!businessData) {
+        router.push('/onboarding')
+        return
+      }
+
+      // ----- SUBSCRIPTION & TRIAL CHECK -----
+
+      // 1. Initialize trial if not set
+      if (!businessData.trial_ends_at) {
+        const trialEndsAt = new Date()
+        trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
+        await supabase
+          .from('businesses')
+          .update({
+            trial_ends_at: trialEndsAt.toISOString(),
+            trial_starts_at: new Date().toISOString(),
+          })
+          .eq('id', businessData.id)
+        businessData.trial_ends_at = trialEndsAt.toISOString()
+      }
+
+      // 2. Check if trial expired
+      const now = new Date()
+      const trialEnd = new Date(businessData.trial_ends_at)
+      if (trialEnd < now && businessData.plan === 'free') {
+        // Trial expired — keep free
+        // Optionally show a banner
+      }
+
+      // 3. Check subscription expiry for paid plans
+      if (businessData.plan !== 'free' && businessData.plan !== 'beta') {
+        const expiresAt = new Date(businessData.subscription_expires_at)
+        if (expiresAt < now) {
+          // Subscription expired → downgrade to free
+          await supabase
+            .from('businesses')
+            .update({ plan: 'free', plan_status: 'expired' })
+            .eq('id', businessData.id)
+          businessData.plan = 'free'
+          businessData.plan_status = 'expired'
+        }
+      }
 
       setBusiness(businessData)
       setLoading(false)
@@ -67,9 +110,13 @@ export default function DashboardLayout({ children }) {
     return pathname?.startsWith(path)
   }
 
-  // Close sidebar on mobile when navigating
-  const handleNavClick = () => {
-    setSidebarOpen(false)
+  const handleNavClick = () => setSidebarOpen(false)
+
+  const getIndustryBadge = () => {
+    if (isRepairs) return '🔧 Repairs'
+    if (business?.sector === 'Fashion & Custom Wear') return '👗 Fashion'
+    if (business?.sector === 'Custom Products & Services') return '🛠️ Manufacturing'
+    return ''
   }
 
   if (loading) {
@@ -90,18 +137,9 @@ export default function DashboardLayout({ children }) {
     )
   }
 
-  // Get industry badge
-  const getIndustryBadge = () => {
-    if (isRepairs) return '🔧 Repairs'
-    if (business?.sector === 'Fashion & Custom Wear') return '👗 Fashion'
-    if (business?.sector === 'Custom Products & Services') return '🛠️ Manufacturing'
-    return ''
-  }
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F5EFE2' }}>
       <style>{`
-        /* ===== HAMBURGER ===== */
         .hamburger {
           position: fixed;
           top: 1rem;
@@ -118,8 +156,6 @@ export default function DashboardLayout({ children }) {
           box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
         .hamburger:hover { background: #0F1E30; }
-
-        /* ===== OVERLAY ===== */
         .overlay {
           display: none;
           position: fixed;
@@ -131,8 +167,6 @@ export default function DashboardLayout({ children }) {
           z-index: 999;
         }
         .overlay.open { display: block; }
-
-        /* ===== SIDEBAR ===== */
         .sidebar {
           width: 220px;
           min-height: 100vh;
@@ -173,6 +207,17 @@ export default function DashboardLayout({ children }) {
           font-size: 0.5rem;
           font-weight: 600;
           margin-left: 0.3rem;
+        }
+        .sidebar .plan-badge {
+          display: inline-block;
+          background: #4C7A5E;
+          color: #fff;
+          padding: 0.05rem 0.4rem;
+          border-radius: 8px;
+          font-size: 0.5rem;
+          font-weight: 600;
+          margin-left: 0.3rem;
+          text-transform: uppercase;
         }
         .sidebar .nav {
           display: flex;
@@ -249,15 +294,11 @@ export default function DashboardLayout({ children }) {
           min-width: 0;
           padding: 0;
         }
-
-        /* ===== DESKTOP ===== */
         @media (min-width: 769px) {
           .hamburger { display: none !important; }
           .sidebar { transform: translateX(0) !important; }
           .overlay { display: none !important; }
         }
-
-        /* ===== MOBILE ===== */
         @media (max-width: 768px) {
           .hamburger { display: block; }
           .sidebar {
@@ -276,15 +317,12 @@ export default function DashboardLayout({ children }) {
         }
       `}</style>
 
-      {/* ===== HAMBURGER ===== */}
       <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
         {sidebarOpen ? '✕' : '☰'}
       </button>
 
-      {/* ===== OVERLAY ===== */}
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
-      {/* ===== SIDEBAR ===== */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
           <LetterLogo name={business?.name} size={32} />
@@ -293,6 +331,8 @@ export default function DashboardLayout({ children }) {
             <div className="sub">
               {business?.name || 'Your business'}
               <span className="badge">{getIndustryBadge()}</span>
+              <br />
+              <span className="plan-badge">{business?.plan || 'Free'}</span>
             </div>
           </div>
         </div>
@@ -312,15 +352,15 @@ export default function DashboardLayout({ children }) {
         </div>
 
         <div className="bottom">
+          <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
           <a href="/dashboard/profile" onClick={handleNavClick}>⚙️ Profile</a>
           <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
         </div>
       </div>
 
-      {/* ===== MAIN CONTENT ===== */}
       <div className="main-content">
         {children}
       </div>
     </div>
   )
-  }
+}
