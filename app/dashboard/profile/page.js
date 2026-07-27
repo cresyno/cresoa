@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
+import { showToast } from '../../../lib/toast'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -15,7 +16,6 @@ export default function ProfilePage() {
   const [whatsapp, setWhatsapp] = useState('')
   const [location, setLocation] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
-  const [infoMessage, setInfoMessage] = useState('')
 
   const [newEmail, setNewEmail] = useState('')
   const [savingEmail, setSavingEmail] = useState(false)
@@ -62,7 +62,6 @@ export default function ProfilePage() {
   const handleSaveInfo = async (e) => {
     e.preventDefault()
     setSavingInfo(true)
-    setInfoMessage('')
 
     const { error } = await supabase
       .from('businesses')
@@ -70,9 +69,9 @@ export default function ProfilePage() {
       .eq('id', business.id)
 
     if (error) {
-      setInfoMessage('Error: ' + error.message)
+      showToast('Error saving info', '#AE4A34')
     } else {
-      setInfoMessage('Business info updated!')
+      showToast('Business info updated!', '#4C7A5E')
       setBusiness({ ...business, name, phone, whatsapp, location })
     }
     setSavingInfo(false)
@@ -117,7 +116,7 @@ export default function ProfilePage() {
     if (error) {
       setPasswordMessage('Error: ' + error.message)
     } else {
-      setPasswordMessage('Password updated!')
+      showToast('Password updated!', '#4C7A5E')
       setNewPassword('')
       setConfirmNewPassword('')
     }
@@ -197,11 +196,11 @@ export default function ProfilePage() {
           </div>
           <div style={{ marginBottom: '0.8rem' }}>
             <label style={labelStyle}>Phone</label>
-            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
+            <input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} style={inputStyle} />
           </div>
           <div style={{ marginBottom: '0.8rem' }}>
             <label style={labelStyle}>WhatsApp number</label>
-            <input type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} style={inputStyle} />
+            <input type="tel" inputMode="numeric" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, '').slice(0, 11))} style={inputStyle} />
           </div>
           <div style={{ marginBottom: '1rem' }}>
             <label style={labelStyle}>Location</label>
@@ -211,11 +210,6 @@ export default function ProfilePage() {
           <button type="submit" disabled={savingInfo} style={buttonStyle}>
             {savingInfo ? 'Saving...' : 'Save business info'}
           </button>
-          {infoMessage && (
-            <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: infoMessage.startsWith('Error') ? '#AE4A34' : '#4C7A5E' }}>
-              {infoMessage}
-            </p>
-          )}
         </form>
 
         <form onSubmit={handleChangeEmail} style={cardStyle}>
@@ -269,7 +263,7 @@ export default function ProfilePage() {
             {savingPassword ? 'Updating...' : 'Update password'}
           </button>
           {passwordMessage && (
-            <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: passwordMessage === 'Password updated!' ? '#4C7A5E' : '#AE4A34' }}>
+            <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: '#AE4A34' }}>
               {passwordMessage}
             </p>
           )}
@@ -291,4 +285,4 @@ export default function ProfilePage() {
       </div>
     </main>
   )
-            }
+}
