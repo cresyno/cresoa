@@ -11,7 +11,6 @@ const SECTOR_INFO = {
     benefit: 'The perfect fit for your fashion business',
     description: 'Customers, measurements, orders, payments & production—all in one place.',
     examples: 'Tailors · Fashion Designers · Uniform Makers',
-    emoji: '✂️',
   },
   'Repairs & Technical Services': {
     icon: '🔧',
@@ -19,7 +18,6 @@ const SECTOR_INFO = {
     benefit: 'Track repairs without losing track of devices',
     description: 'Devices, repair jobs, customer updates & payments—never lose a job again.',
     examples: 'Phone Repair · Laptop Repair · Electronics',
-    emoji: '⚡',
   },
   'Custom Products & Services': {
     icon: '🛠️',
@@ -27,7 +25,6 @@ const SECTOR_INFO = {
     benefit: 'Manage custom jobs from order to delivery',
     description: 'Custom orders, deadlines, payments & delivery from one workspace.',
     examples: 'Furniture · Shoemaking · Aluminium & Glass · Welding',
-    emoji: '🔨',
   },
 }
 
@@ -39,6 +36,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState('sector')
   const [waitlisted, setWaitlisted] = useState(false)
   const [selectedSector, setSelectedSector] = useState(null)
+  const [userId, setUserId] = useState(null)
 
   const [businessName, setBusinessName] = useState('')
   const [phone, setPhone] = useState('')
@@ -46,8 +44,6 @@ export default function OnboardingPage() {
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
   const [profileMessage, setProfileMessage] = useState('')
-  const [showWelcome, setShowWelcome] = useState(false)
-  const [userId, setUserId] = useState(null)
 
   useEffect(() => {
     const load = async () => {
@@ -56,13 +52,11 @@ export default function OnboardingPage() {
         router.push('/login')
         return
       }
-
       setUserId(user.id)
 
-      // Check if business exists
       const { data: business } = await supabase
         .from('businesses')
-        .select('id, onboarding_completed, name, phone')
+        .select('id, onboarding_completed, name, phone, sector')
         .eq('owner_id', user.id)
         .single()
 
@@ -71,23 +65,23 @@ export default function OnboardingPage() {
         return
       }
 
-      // If business exists but not completed
       if (business) {
         setBusinessId(business.id)
         setBusinessName(business.name || '')
         setPhone(business.phone || '')
         setWhatsapp(business.phone || '')
+        if (business.sector) {
+          setSelectedSector(business.sector)
+          setStep('profile')
+        }
       }
 
       const { data: catData } = await supabase
         .from('business_categories')
         .select('*')
-
       setCategories(catData || [])
       setLoading(false)
-      setTimeout(() => setShowWelcome(true), 300)
     }
-
     load()
   }, [router])
 
@@ -95,16 +89,12 @@ export default function OnboardingPage() {
     setSaving(true)
     setSelectedSector(sector)
 
-    // If business doesn't exist yet, create it
     if (!businessId) {
-      const { data: userData } = await supabase.auth.getUser()
-      const businessNameFromUser = userData.user?.user_metadata?.business_name || 'My Business'
-
       const { data: newBusiness, error } = await supabase
         .from('businesses')
         .insert({
           owner_id: userId,
-          name: businessNameFromUser,
+          name: businessName || 'My Business',
           sector: sector,
           business_type: isActive ? 'Fashion Designer' : sector,
         })
@@ -112,10 +102,10 @@ export default function OnboardingPage() {
         .single()
 
       if (error) {
+        console.error('Error creating business:', error)
         setSaving(false)
         return
       }
-
       setBusinessId(newBusiness.id)
       setBusinessName(newBusiness.name || '')
 
@@ -128,7 +118,6 @@ export default function OnboardingPage() {
       return
     }
 
-    // Business exists, update it
     await supabase
       .from('businesses')
       .update({
@@ -138,7 +127,6 @@ export default function OnboardingPage() {
       .eq('id', businessId)
 
     setSaving(false)
-
     if (isActive) {
       setStep('profile')
     } else {
@@ -158,7 +146,6 @@ export default function OnboardingPage() {
 
     setSaving(true)
 
-    // If business doesn't exist yet, create it first
     if (!businessId) {
       const { data: newBusiness, error } = await supabase
         .from('businesses')
@@ -179,19 +166,18 @@ export default function OnboardingPage() {
         setSaving(false)
         return
       }
-
+      setBusinessId(newBusiness.id)
       router.push('/dashboard')
       return
     }
 
-    // Business exists, update it
     const { error } = await supabase
       .from('businesses')
       .update({
-        name: businessName,
+        name: businessName.trim(),
         phone: phoneDigits,
         whatsapp: whatsapp ? whatsapp.replace(/\D/g, '') : phoneDigits,
-        location: location,
+        location: location.trim(),
         onboarding_completed: true,
       })
       .eq('id', businessId)
@@ -220,22 +206,19 @@ export default function OnboardingPage() {
 
   const inputStyle = {
     width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
+    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box',
   }
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
+  const labelStyle = {
+    display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem',
+  }
 
   const welcomeStyles = `
     @keyframes fadeSlideUp {
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    @keyframes scaleIn {
-      from { transform: scale(0.8); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
     .animate-in { animation: fadeSlideUp 0.6s ease-out both; }
     .animate-in-delay { animation: fadeSlideUp 0.6s ease-out 0.15s both; }
-    .animate-scale { animation: scaleIn 0.5s ease-out both; }
     .sector-card {
       transition: all 0.2s ease;
       background: #fff;
@@ -253,14 +236,8 @@ export default function OnboardingPage() {
       box-shadow: 0 4px 16px rgba(199,154,43,0.15);
       transform: translateY(-2px);
     }
-    .sector-card:active {
-      transform: scale(0.98);
-    }
-    .sector-card .icon {
-      font-size: 1.8rem;
-      display: block;
-      margin-bottom: 0.4rem;
-    }
+    .sector-card:active { transform: scale(0.98); }
+    .sector-card .icon { font-size: 1.8rem; display: block; margin-bottom: 0.4rem; }
     .sector-card .badge {
       display: inline-block;
       padding: 0.1rem 0.6rem;
@@ -279,16 +256,8 @@ export default function OnboardingPage() {
       color: #1E3A5F;
       margin: 0.2rem 0 0.3rem;
     }
-    .sector-card .desc {
-      font-size: 0.82rem;
-      color: #6B6255;
-      margin: 0 0 0.3rem;
-    }
-    .sector-card .examples {
-      font-size: 0.72rem;
-      color: #A89888;
-      margin: 0;
-    }
+    .sector-card .desc { font-size: 0.82rem; color: #6B6255; margin: 0 0 0.3rem; }
+    .sector-card .examples { font-size: 0.72rem; color: #A89888; margin: 0; }
     .step-indicator {
       display: flex;
       align-items: center;
@@ -297,29 +266,15 @@ export default function OnboardingPage() {
       justify-content: center;
     }
     .step-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #E8E0D5;
+      width: 8px; height: 8px; border-radius: 50%; background: #E8E0D5;
       transition: background 0.3s ease;
     }
-    .step-dot.active {
-      background: #C79A2B;
-      width: 12px;
-      height: 12px;
-    }
-    .step-dot.done {
-      background: #4C7A5E;
-    }
+    .step-dot.active { background: #C79A2B; width: 12px; height: 12px; }
+    .step-dot.done { background: #4C7A5E; }
     .step-line {
-      width: 24px;
-      height: 2px;
-      background: #E8E0D5;
-      flex-shrink: 0;
+      width: 24px; height: 2px; background: #E8E0D5; flex-shrink: 0;
     }
-    .step-line.done {
-      background: #4C7A5E;
-    }
+    .step-line.done { background: #4C7A5E; }
   `
 
   if (loading) {
@@ -375,20 +330,17 @@ export default function OnboardingPage() {
             <span className="step-line done"></span>
             <span className="step-dot active"></span>
           </div>
-
           <h1 className="animate-in" style={{ color: '#1E3A5F', fontSize: '1.4rem', marginBottom: '0.3rem' }}>
             Complete your workspace
           </h1>
           <p className="animate-in-delay" style={{ color: '#6B6255', fontSize: '0.9rem', marginBottom: '1.2rem' }}>
             {selectedSector ? `Almost there, ${selectedSector} business owner!` : 'Just a few details before your dashboard is ready.'}
           </p>
-
           <form onSubmit={handleSaveProfile} className="animate-in-delay" style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', border: '1px solid #e4d8c2', boxShadow: '0 4px 12px rgba(30,58,95,0.06)' }}>
             <div style={{ marginBottom: '1rem' }}>
               <label style={labelStyle}>Business name</label>
               <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} required style={inputStyle} />
             </div>
-
             <div style={{ marginBottom: '1rem' }}>
               <label style={labelStyle}>Phone number</label>
               <input
@@ -409,7 +361,6 @@ export default function OnboardingPage() {
                 )}
               </div>
             </div>
-
             <div style={{ marginBottom: '1rem' }}>
               <label style={labelStyle}>WhatsApp number <span style={{ fontWeight: '400', color: '#6B6255' }}>(optional)</span></label>
               <input
@@ -424,7 +375,6 @@ export default function OnboardingPage() {
                 {whatsapp ? `✓ WhatsApp number set` : 'We\'ll use your phone number if left blank.'}
               </p>
             </div>
-
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={labelStyle}>Location</label>
               <input
@@ -436,7 +386,6 @@ export default function OnboardingPage() {
                 style={inputStyle}
               />
             </div>
-
             <button
               type="submit"
               disabled={saving}
@@ -450,7 +399,6 @@ export default function OnboardingPage() {
             >
               {saving ? 'Saving...' : '🚀 Enter my dashboard'}
             </button>
-
             {profileMessage && (
               <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: '#AE4A34', textAlign: 'center' }}>
                 {profileMessage}
@@ -462,7 +410,7 @@ export default function OnboardingPage() {
     )
   }
 
-  // SECTOR SELECTION STEP
+  // Sector selection
   const activeSector = categories.find(c => c.is_active)
 
   return (
@@ -474,11 +422,8 @@ export default function OnboardingPage() {
           <span className="step-line"></span>
           <span className="step-dot"></span>
         </div>
-
         <div className="animate-in">
-          <h1 style={{ color: '#1E3A5F', fontSize: '1.5rem', marginBottom: '0.2rem' }}>
-            Welcome to Cresoa 👋
-          </h1>
+          <h1 style={{ color: '#1E3A5F', fontSize: '1.5rem', marginBottom: '0.2rem' }}>Welcome to Cresoa 👋</h1>
           <p style={{ color: '#6B6255', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
             Let's set up your workspace for the way your business works.
           </p>
@@ -488,7 +433,6 @@ export default function OnboardingPage() {
             </p>
           )}
         </div>
-
         <div className="animate-in-delay" style={{ marginTop: '1.2rem' }}>
           {categories.map((c) => {
             const info = SECTOR_INFO[c.sector]
@@ -525,4 +469,4 @@ export default function OnboardingPage() {
       </div>
     </main>
   )
-    }
+      }
