@@ -22,9 +22,12 @@ export default function SubscriptionPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        console.error('❌ No user logged in')
         router.push('/login')
         return null
       }
+
+      console.log('🔵 User ID:', user.id)
 
       const { data: businessData, error } = await supabase
         .from('businesses')
@@ -33,7 +36,12 @@ export default function SubscriptionPage() {
         .single()
 
       if (error) {
-        console.error('Error loading business:', error)
+        console.error('❌ Error loading business:', error)
+        return null
+      }
+
+      if (!businessData) {
+        console.error('❌ No business record found for user:', user.id)
         return null
       }
 
@@ -42,7 +50,7 @@ export default function SubscriptionPage() {
       setSelectedPlan(businessData?.plan || 'free')
       return businessData
     } catch (err) {
-      console.error('Error loading business:', err)
+      console.error('❌ loadBusiness error:', err)
       return null
     }
   }
@@ -90,6 +98,7 @@ export default function SubscriptionPage() {
     setProcessing(true)
 
     try {
+      // ✅ Always fetch fresh business data to avoid stale state
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setMessage('Please log in first.')
@@ -97,25 +106,31 @@ export default function SubscriptionPage() {
         return
       }
 
-      // ✅ Ensure business is loaded
-      let currentBusiness = business
-      if (!currentBusiness) {
-        currentBusiness = await loadBusiness()
-      }
+      console.log('🔵 Fetching fresh business for user:', user.id)
 
-      if (!currentBusiness || !currentBusiness.id) {
-        setMessage('Could not find your business account. Please contact support.')
+      const { data: freshBusiness, error } = await supabase
+        .from('businesses')
+        .select('id, plan')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (error || !freshBusiness) {
+        console.error('❌ Business not found:', error)
+        setMessage('Could not find your business account. Please complete onboarding first.')
         setProcessing(false)
         return
       }
 
-      console.log('🔵 Upgrading with business:', currentBusiness.id, planId, user.email)
+      console.log('✅ Fresh business loaded:', freshBusiness)
+
+      // Update state
+      setBusiness(freshBusiness)
 
       const response = await fetch('/api/paystack/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessId: currentBusiness.id,
+          businessId: freshBusiness.id,
           planId: planId,
           email: user.email,
         }),
@@ -130,7 +145,7 @@ export default function SubscriptionPage() {
         setProcessing(false)
       }
     } catch (error) {
-      console.error('Upgrade error:', error)
+      console.error('❌ Upgrade error:', error)
       setMessage('Error: ' + error.message)
       setProcessing(false)
     }
@@ -358,7 +373,7 @@ export default function SubscriptionPage() {
               <button
                 className="btn-upgrade"
                 onClick={() => handleUpgrade(key)}
-                disabled={processing || !business}
+                disabled={processing}
               >
                 {processing ? 'Processing...' : `Upgrade to ${plan.name}`}
               </button>
@@ -380,4 +395,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-}
+                 }
