@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import LetterLogo from '../../components/LetterLogo'
@@ -16,6 +16,25 @@ export default function DashboardPage() {
   const [deactivated, setDeactivated] = useState(false)
   const [showOwingOnly, setShowOwingOnly] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
+
+  // Quick Order Modal
+  const [showQuickOrder, setShowQuickOrder] = useState(false)
+  const [quickOrderCustomer, setQuickOrderCustomer] = useState('')
+  const [quickOrderItem, setQuickOrderItem] = useState('')
+  const [quickOrderPrice, setQuickOrderPrice] = useState('')
+  const [quickOrderDeposit, setQuickOrderDeposit] = useState('')
+  const [quickOrderDue, setQuickOrderDue] = useState('')
+  const [quickOrderLoading, setQuickOrderLoading] = useState(false)
+  const [quickOrderMessage, setQuickOrderMessage] = useState('')
+
+  // Settle Payment Modal
+  const [showSettleModal, setShowSettleModal] = useState(false)
+  const [settleOrder, setSettleOrder] = useState(null)
+  const [settleAmount, setSettleAmount] = useState('')
+  const [settleNote, setSettleNote] = useState('')
+  const [settleLoading, setSettleLoading] = useState(false)
+
+  const modalRef = useRef(null)
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -96,6 +115,18 @@ export default function DashboardPage() {
     loadDashboard()
   }, [])
 
+  // Click outside to close modals
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (modalRef.current && !modalRef.current.contains(e.target)) {
+        setShowQuickOrder(false)
+        setShowSettleModal(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -114,6 +145,94 @@ export default function DashboardPage() {
   const clearFilter = () => {
     setShowOwingOnly(false)
     setStatusFilter('all')
+  }
+
+  // Quick Order handlers
+  const handleQuickOrderSubmit = async (e) => {
+    e.preventDefault()
+    setQuickOrderMessage('')
+    setQuickOrderLoading(true)
+
+    if (!quickOrderCustomer || !quickOrderItem || !quickOrderPrice) {
+      setQuickOrderMessage('Please fill in customer, item, and price.')
+      setQuickOrderLoading(false)
+      return
+    }
+
+    const customerId = quickOrderCustomer
+    const priceNum = Number(quickOrderPrice) || 0
+    const depositNum = Number(quickOrderDeposit) || 0
+
+    const { error } = await supabase
+      .from('orders')
+      .insert({
+        business_id: business.id,
+        customer_id: customerId,
+        title: quickOrderItem,
+        price: priceNum,
+        amount_paid: depositNum,
+        due_date: quickOrderDue || null,
+        current_status: 'Order placed',
+      })
+
+    if (error) {
+      setQuickOrderMessage('Error: ' + error.message)
+      setQuickOrderLoading(false)
+      return
+    }
+
+    setQuickOrderMessage('✅ Order created!')
+    setQuickOrderCustomer('')
+    setQuickOrderItem('')
+    setQuickOrderPrice('')
+    setQuickOrderDeposit('')
+    setQuickOrderDue('')
+    setQuickOrderLoading(false)
+    setTimeout(() => {
+      setShowQuickOrder(false)
+      setQuickOrderMessage('')
+      loadDashboard()
+    }, 800)
+  }
+
+  // Settle Payment handlers
+  const openSettleModal = (order) => {
+    setSettleOrder(order)
+    setSettleAmount('')
+    setSettleNote('')
+    setShowSettleModal(true)
+  }
+
+  const handleSettleSubmit = async (e) => {
+    e.preventDefault()
+    setSettleLoading(true)
+
+    const amount = Number(settleAmount)
+    if (!amount || amount <= 0) {
+      setSettleLoading(false)
+      return
+    }
+
+    const newTotal = settleOrder.amount_paid + amount
+    if (newTotal > settleOrder.price) {
+      setSettleLoading(false)
+      return
+    }
+
+    await supabase.from('payment_records').insert({
+      order_id: settleOrder.id,
+      amount: amount,
+      note: settleNote || 'Payment recorded from dashboard',
+    })
+
+    await supabase
+      .from('orders')
+      .update({ amount_paid: newTotal })
+      .eq('id', settleOrder.id)
+
+    setShowSettleModal(false)
+    setSettleLoading(false)
+    loadDashboard()
   }
 
   // Loading skeleton
@@ -136,8 +255,6 @@ export default function DashboardPage() {
           .skeleton-title { height: 20px; width: 60%; margin-bottom: 8px; }
           .skeleton-card { height: 80px; border-radius: 12px; }
         `}</style>
-
-        {/* Header skeleton */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
             <div className="skeleton" style={{ width: '44px', height: '44px', borderRadius: '12px' }}></div>
@@ -148,25 +265,17 @@ export default function DashboardPage() {
           </div>
           <div className="skeleton" style={{ width: '60px', height: '32px', borderRadius: '6px' }}></div>
         </div>
-
-        {/* Stats skeleton */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
           {[1, 2, 3].map(i => (
             <div key={i} className="skeleton skeleton-card"></div>
           ))}
         </div>
-
-        {/* Search skeleton */}
         <div className="skeleton" style={{ height: '44px', borderRadius: '10px', marginBottom: '1rem' }}></div>
-
-        {/* Actions skeleton */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
           {[1, 2, 3].map(i => (
             <div key={i} className="skeleton" style={{ height: '40px', width: '80px', borderRadius: '8px' }}></div>
           ))}
         </div>
-
-        {/* Orders skeleton */}
         <div className="skeleton" style={{ height: '24px', width: '120px', marginBottom: '0.7rem' }}></div>
         {[1, 2, 3].map(i => (
           <div key={i} className="skeleton" style={{ height: '60px', borderRadius: '12px', marginBottom: '0.6rem' }}></div>
@@ -199,26 +308,24 @@ export default function DashboardPage() {
   )
 
   const todayStr = new Date().toISOString().split('T')[0]
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   const dueTodayCount = allActiveOrders.filter(
     (o) => o.due_date === todayStr && o.current_status !== 'Delivered'
   ).length
+
   const readyCount = allActiveOrders.filter((o) => o.current_status === 'Ready').length
 
-  // Calculate trends (mock - in production would compare to previous period)
-  const getTrend = (current, previous) => {
-    if (previous === 0) return { direction: 'up', percentage: 0 }
-    const diff = ((current - previous) / previous) * 100
-    return {
-      direction: diff >= 0 ? 'up' : 'down',
-      percentage: Math.abs(Math.round(diff))
-    }
-  }
+  // Overdue count
+  const overdueCount = allActiveOrders.filter((o) => {
+    if (!o.due_date || o.current_status === 'Delivered') return false
+    const due = new Date(o.due_date)
+    due.setHours(0, 0, 0, 0)
+    return due < today
+  }).length
 
-  // Mock previous values - in production these would come from DB
-  const customerTrend = getTrend(customers.length, customers.length - 2)
-  const orderTrend = getTrend(totalOrders, totalOrders - 3)
-  const balanceTrend = getTrend(totalBalanceOwed, totalBalanceOwed + 5000)
-
+  // Get Status Info
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
@@ -240,8 +347,6 @@ export default function DashboardPage() {
 
   const isOverdue = (dueDate) => {
     if (!dueDate) return false
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
     const due = new Date(dueDate)
     due.setHours(0, 0, 0, 0)
     return due < today
@@ -292,17 +397,54 @@ export default function DashboardPage() {
 
   const filteredPreviewOrders = getFilteredOrders(previewOrders)
 
-  // Quick order button
-  const handleQuickOrder = () => {
-    router.push('/dashboard/orders/new')
-  }
-
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem', paddingBottom: '5rem' }}>
       <style>{`
         @keyframes pulseGlow {
           0%, 100% { opacity: 1; text-shadow: 0 0 4px rgba(174, 74, 52, 0.2); }
           50% { opacity: 0.8; text-shadow: 0 0 12px rgba(174, 74, 52, 0.5); }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideDown {
+          from { opacity: 1; transform: translateY(0); }
+          to { opacity: 0; transform: translateY(30px); }
+        }
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.4);
+          backdrop-filter: blur(4px);
+          z-index: 1000;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          animation: slideUp 0.3s ease-out;
+        }
+        .modal-overlay.closing {
+          animation: slideDown 0.25s ease-in;
+        }
+        .modal-content {
+          background: #F5EFE2;
+          border-radius: 20px 20px 0 0;
+          padding: 1.5rem;
+          max-width: 480px;
+          width: 100%;
+          max-height: 85vh;
+          overflow-y: auto;
+          position: relative;
+        }
+        .modal-handle {
+          width: 40px;
+          height: 4px;
+          background: #D6D0C5;
+          border-radius: 4px;
+          margin: 0 auto 1rem;
         }
         .order-status-badge {
           display: inline-block;
@@ -332,17 +474,6 @@ export default function DashboardPage() {
           border-color: #AE4A34;
           background: #F1DBD3;
         }
-        .stat-card .trend {
-          font-size: 0.6rem;
-          font-weight: 600;
-          margin-top: 0.1rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.2rem;
-        }
-        .stat-card .trend.up { color: #4C7A5E; }
-        .stat-card .trend.down { color: #AE4A34; }
         .stat-card .label {
           color: #6B6255;
           font-size: 0.7rem;
@@ -356,13 +487,6 @@ export default function DashboardPage() {
         .stat-card .value.red { color: #AE4A34; }
         .stat-card .value.green { color: #4C7A5E; }
         .stat-card .value.navy { color: #1E3A5F; }
-        .stat-card.overdue-warning {
-          background: linear-gradient(135deg, #FFF5F0, #F1DBD3);
-          border-color: #AE4A34;
-        }
-        .stat-card.overdue-warning .value {
-          color: #AE4A34;
-        }
         .action-btn {
           padding: 0.6rem 1rem;
           border-radius: 8px;
@@ -385,6 +509,7 @@ export default function DashboardPage() {
           padding: 1rem;
           margin-bottom: 1rem;
           background: #fff;
+          transition: border-color 0.2s ease;
         }
         .group-card.expanded {
           border-color: #C79A2B;
@@ -429,7 +554,7 @@ export default function DashboardPage() {
           color: #4C7A5E;
         }
         .order-actions {
-          display: flex;
+        display: flex;
           gap: 0.4rem;
           flex-shrink: 0;
           align-items: center;
@@ -479,6 +604,15 @@ export default function DashboardPage() {
         }
         .order-actions .btn-edit:hover {
           background: #0F1E30;
+        }
+        .order-actions .btn-settle {
+          background: #4C7A5E;
+          border-color: #4C7A5E;
+          color: #fff;
+          font-weight: 600;
+        }
+        .order-actions .btn-settle:hover {
+          background: #3A5F4A;
         }
         .customer-row {
           display: flex;
@@ -553,6 +687,7 @@ export default function DashboardPage() {
           background: #fff;
           box-sizing: border-box;
           color: #2B2620;
+          transition: border-color 0.2s ease;
         }
         .search-bar:focus {
           outline: none;
@@ -561,31 +696,19 @@ export default function DashboardPage() {
         .search-bar::placeholder {
           color: #A89888;
         }
-        .alert-badge {
-          display: flex;
-          gap: 0.5rem;
-          margin-bottom: 1.2rem;
-        }
-        .alert-badge > div {
-          flex: 1;
-          padding: 0.6rem 0.5rem;
-          border-radius: 10px;
-          text-align: center;
+        .filter-select {
+          padding: 0.4rem 0.6rem;
+          border-radius: 8px;
+          border: 1px solid #E8E0D5;
           font-size: 0.75rem;
-          font-weight: 600;
+          background: #fff;
+          color: #1E3A5F;
+          cursor: pointer;
+          min-width: 90px;
         }
-        .alert-badge .due {
-          background: #F1DBD3;
-          color: #AE4A34;
-        }
-        .alert-badge .ready {
-          background: #F6E9C8;
-          color: #B4881E;
-        }
-        .alert-badge .count {
-          font-size: 1.1rem;
-          font-weight: 800;
-          display: block;
+        .filter-select:focus {
+          outline: none;
+          border-color: #C79A2B;
         }
         .group-coordinator {
           font-size: 0.78rem;
@@ -665,12 +788,73 @@ export default function DashboardPage() {
           margin: 0;
         }
         .header-actions {
-
-             .fab:active {
-          transform: scale(0.92);
+          display: flex;
+          gap: 0.4rem;
+          align-items: center;
         }
-        .fab:hover {
-          box-shadow: 0 6px 24px rgba(199, 154, 43, 0.5);
+        .header-actions a,
+        .header-actions button {
+          padding: 0.3rem 0.6rem;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          text-decoration: none;
+          border: 1px solid #E8E0D5;
+          background: #fff;
+          color: #1E3A5F;
+          cursor: pointer;
+        }
+        .header-actions a:hover,
+        .header-actions button:hover {
+          background: #F5EFE2;
+          border-color: #C79A2B;
+        }
+        .clear-filter-btn {
+          background: #AE4A34;
+          color: #fff;
+          border: none;
+          padding: 0.2rem 0.7rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.1s ease;
+        }
+        .clear-filter-btn:hover {
+          background: #8A3626;
+        }
+        .filter-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: #F1DBD3;
+          padding: 0.2rem 0.7rem 0.2rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          color: #AE4A34;
+          font-weight: 600;
+        }
+        .fab {
+          position: fixed;
+          bottom: 1.5rem;
+          right: 1.5rem;
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+          color: #1E3A5F;
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          border: none;
+          font-size: 1.8rem;
+          font-weight: 700;
+          box-shadow: 0 4px 16px rgba(199, 154, 43, 0.4);
+          cursor: pointer;
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .fab:active {
+          transform: scale(0.92);
         }
         .fab-label {
           position: fixed;
@@ -692,9 +876,105 @@ export default function DashboardPage() {
         .fab:hover + .fab-label {
           opacity: 1;
         }
-      `}</style>
+        .alert-strip {
+          display: flex;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+        }
+        .alert-strip .alert-item {
+          flex: 1;
+          min-width: 80px;
+          padding: 0.5rem 0.6rem;
+          border-radius: 8px;
+          text-align: center;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-decoration: none;
+          transition: transform 0.1s ease;
+        }
+        .alert-strip .alert-item:active {
+          transform: scale(0.97);
+        }
+        .alert-strip .alert-item .count {
+          font-size: 1rem;
+          font-weight: 800;
+          display: block;
+        }
+        .alert-strip .overdue {
+          background: #F1DBD3;
+          color: #AE4A34;
+        }
+        .alert-strip .overdue:hover {
+          background: #E8C8BE;
+        }
+        .alert-strip .today {
+          background: #FFF3E0;
+          color: #E67E22;
+        }
+        .alert-strip .today:hover {
+          background: #FFE8CC;
+        }
+        .alert-strip .ready {
+          background: #F6E9C8;
+          color: #B4881E;
+        }
+        .alert-strip .ready:hover {
+          background: #F0DEB0;
+        }
+        .quick-order-input {
+          width: 100%;
+          padding: 0.7rem;
+          border-radius: 8px;
+          border: 1px solid #E8E0D5;
+          font-size: 0.95rem;
+          background: #fff;
+          box-sizing: border-box;
+          color: #2B2620;
+        }
+        .quick-order-input:focus {
+          outline: none;
+          border-color: #C79A2B;
+        }
+        .quick-order-select {
+          width: 100%;
+          padding: 0.7rem;
+          border-radius: 8px;
+          border: 1px solid #E8E0D5;
+          font-size: 0.95rem;
+          background: #fff;
+          box-sizing: border-box;
+          color: #2B2620;
+        }
+        .quick-order-select:focus {
+          outline: none;
+          border-color: #C79A2B;
+        }
+        .settle-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.5);
+          backdrop-filter: blur(4px);
+          z-index: 1100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+        }
+        .settle-modal-content {
+          background: #F5EFE2;
+          border-radius: 20px;
+          padding: 1.8rem;
+          max-width: 380px;
+          width: 100%;
+          animation: slideUp 0.3s ease-out;
+    }
+    `}</style>
 
-      {/* HEADER */}
+      {/* ===== HEADER ===== */}
       <div className="header-top">
         <div className="header-brand">
           <LetterLogo name={business?.name} size={44} />
@@ -709,56 +989,53 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* STATS with Trend Arrows */}
+      {/* ===== ALERT STRIP (Compact) ===== */}
+      {(overdueCount > 0 || dueTodayCount > 0 || readyCount > 0) && (
+        <div className="alert-strip">
+          {overdueCount > 0 && (
+            <a href="/dashboard/orders?filter=overdue" className="alert-item overdue">
+              <span className="count">{overdueCount}</span>
+              Overdue
+            </a>
+          )}
+          {dueTodayCount > 0 && (
+            <a href="/dashboard/orders?filter=due_today" className="alert-item today">
+              <span className="count">{dueTodayCount}</span>
+              Due today
+            </a>
+          )}
+          {readyCount > 0 && (
+            <a href="/dashboard/orders?filter=ready" className="alert-item ready">
+              <span className="count">{readyCount}</span>
+              Ready
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* ===== STATS ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
         <a href="/dashboard/customers" className="stat-card">
           <p className="value navy">{customers.length}</p>
           <p className="label">👤 Customers</p>
-          <div className={`trend ${customerTrend.direction === 'up' ? 'up' : 'down'}`}>
-            {customerTrend.direction === 'up' ? '↑' : '↓'} {customerTrend.percentage}% from last month
-          </div>
         </a>
         <a href="/dashboard/orders" className="stat-card">
           <p className="value navy">{totalOrders}</p>
           <p className="label">📦 Orders</p>
-          <div className={`trend ${orderTrend.direction === 'up' ? 'up' : 'down'}`}>
-            {orderTrend.direction === 'up' ? '↑' : '↓'} {orderTrend.percentage}% from last month
-          </div>
         </a>
         <button
           onClick={toggleOwingFilter}
-          className={`stat-card ${showOwingOnly ? 'active' : ''} ${totalBalanceOwed > 50000 ? 'overdue-warning' : ''}`}
+          className={`stat-card ${showOwingOnly ? 'active' : ''}`}
           style={{ border: showOwingOnly ? '2px solid #AE4A34' : '' }}
         >
           <p className={`value ${totalBalanceOwed > 0 ? 'red' : 'green'}`}>
             ₦{totalBalanceOwed.toLocaleString()}
           </p>
-          <p className="label">{showOwingOnly ? '🔴 Owed (filtered)' : '💰 Owed'}</p>
-          <div className={`trend ${balanceTrend.direction === 'up' ? 'down' : 'up'}`}>
-            {balanceTrend.direction === 'up' ? '↑' : '↓'} {balanceTrend.percentage}% from last month
-          </div>
+          <p className="label">{showOwingOnly ? '🔴 Filtered' : '💰 Owed'}</p>
         </button>
       </div>
 
-      {/* ALERT BADGES */}
-      {(dueTodayCount > 0 || readyCount > 0) && (
-        <div className="alert-badge">
-          {dueTodayCount > 0 && (
-            <div className="due">
-              <span className="count">{dueTodayCount}</span>
-              Due today
-            </div>
-          )}
-          {readyCount > 0 && (
-            <div className="ready">
-              <span className="count">{readyCount}</span>
-              Ready for pickup
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SEARCH + FILTERS */}
+      {/* ===== SEARCH + FILTER ===== */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <input
           type="text"
@@ -785,7 +1062,7 @@ export default function DashboardPage() {
         </select>
       </div>
 
-      {/* QUICK ACTIONS */}
+      {/* ===== QUICK ACTIONS ===== */}
       <div className="quick-actions">
         <a href="/dashboard/customers/new" className="action-btn" style={{ background: '#1E3A5F', color: '#fff' }}>
           👤 + Customer
@@ -797,15 +1074,14 @@ export default function DashboardPage() {
           👥 + Group
         </a>
       </div>
-
-      {/* GROUP ORDERS */}
+      {/* ===== GROUP ORDERS ===== */}
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
           <h2>Group Orders</h2>
           {showOwingOnly && (
             <span className="filter-badge">
-              💰 Showing unpaid only
-              <button onClick={clearFilter} className="clear-filter-btn">✕ Clear</button>
+              💰 Unpaid only
+              <button onClick={clearFilter} className="clear-filter-btn">✕</button>
             </span>
           )}
         </div>
@@ -837,7 +1113,7 @@ export default function DashboardPage() {
                       <span className="group-count">{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
                       {showOwingOnly && combinedBalance > 0 && (
                         <span style={{ fontSize: '0.6rem', background: '#F1DBD3', color: '#AE4A34', padding: '0.1rem 0.4rem', borderRadius: '10px', fontWeight: '700' }}>
-                          owes ₦{combinedBalance.toLocaleString()}
+                          ₦{combinedBalance.toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -858,6 +1134,8 @@ export default function DashboardPage() {
                       const orderName = getOrderName(o)
                       const dueDisplay = getDueDisplay(o.due_date)
                       const phone = o.customers?.phone
+                      const balance = o.price - o.amount_paid
+
                       return (
                         <div key={o.id} className="order-row">
                           <div className="order-info">
@@ -877,13 +1155,18 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                            <span className={`order-balance ${o.price - o.amount_paid <= 0 ? 'paid' : ''}`}>
-                              {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
+                            <span className={`order-balance ${balance <= 0 ? 'paid' : ''}`}>
+                              {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
                             </span>
                             <div className="order-actions">
                               <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️ View</a>
                               {phone && (
                                 <a href={`tel:${phone}`} className="btn btn-call">📞 Call</a>
+                              )}
+                              {balance > 0 && (
+                                <button className="btn btn-settle" onClick={() => openSettleModal(o)}>
+                                  💰 Settle
+                                </button>
                               )}
                               <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️ Edit</a>
                             </div>
@@ -898,7 +1181,8 @@ export default function DashboardPage() {
           })
         )}
       </div>
-      {/* INDIVIDUAL ORDERS */}
+
+      {/* ===== INDIVIDUAL ORDERS ===== */}
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
           <h2>Recent Orders</h2>
@@ -907,8 +1191,8 @@ export default function DashboardPage() {
               <button onClick={clearFilter} className="clear-filter-btn">✕ Clear filter</button>
             )}
             {statusFilter !== 'all' && (
-              <button 
-                onClick={() => setStatusFilter('all')} 
+              <button
+                onClick={() => setStatusFilter('all')}
                 className="clear-filter-btn"
                 style={{ background: '#6B6255' }}
               >
@@ -934,6 +1218,8 @@ export default function DashboardPage() {
               const orderName = getOrderName(o)
               const dueDisplay = getDueDisplay(o.due_date)
               const phone = o.customers?.phone
+              const balance = o.price - o.amount_paid
+
               return (
                 <div key={o.id} className="order-row">
                   <div className="order-info">
@@ -953,13 +1239,18 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                    <span className={`order-balance ${o.price - o.amount_paid <= 0 ? 'paid' : ''}`}>
-                      {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
+                    <span className={`order-balance ${balance <= 0 ? 'paid' : ''}`}>
+                      {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
                     </span>
                     <div className="order-actions">
                       <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️ View</a>
                       {phone && (
                         <a href={`tel:${phone}`} className="btn btn-call">📞 Call</a>
+                      )}
+                      {balance > 0 && (
+                        <button className="btn btn-settle" onClick={() => openSettleModal(o)}>
+                          💰 Settle
+                        </button>
                       )}
                       <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️ Edit</a>
                     </div>
@@ -971,7 +1262,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* CUSTOMERS */}
+      {/* ===== CUSTOMERS ===== */}
       <div>
         <div className="section-header">
           <h2>Recent Customers</h2>
@@ -997,11 +1288,169 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* FLOATING QUICK ORDER BUTTON */}
-      <a href="/dashboard/orders/new" className="fab" title="Quick Order">
+      {/* ===== FLOATING QUICK ORDER BUTTON ===== */}
+      <button className="fab" onClick={() => setShowQuickOrder(true)}>
         +
-      </a>
+      </button>
       <span className="fab-label">Quick Order</span>
+
+      {/* ===== QUICK ORDER MODAL ===== */}
+      {showQuickOrder && (
+        <div className="modal-overlay" onClick={() => setShowQuickOrder(false)}>
+          <div className="modal-content" ref={modalRef} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-handle"></div>
+            <h2 style={{ color: '#1E3A5F', fontSize: '1.2rem', margin: '0 0 0.3rem' }}>Quick Order</h2>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0 0 1.2rem' }}>Create an order in seconds.</p>
+
+            <form onSubmit={handleQuickOrderSubmit}>
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Customer</label>
+                <select
+                  className="quick-order-select"
+                  value={quickOrderCustomer}
+                  onChange={(e) => setQuickOrderCustomer(e.target.value)}
+                  required
+                >
+                  <option value="">Select customer</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {customers.length === 0 && (
+                  <p style={{ fontSize: '0.75rem', color: '#AE4A34', marginTop: '0.2rem' }}>
+                    No customers yet. Add one first.
+                  </p>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Item / Garment</label>
+                <input
+                  className="quick-order-input"
+                  type="text"
+                  value={quickOrderItem}
+                  onChange={(e) => setQuickOrderItem(e.target.value)}
+                  placeholder="e.g. Aso-ebi gown"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Price (₦)</label>
+                  <input
+                    className="quick-order-input"
+                    type="number"
+                    value={quickOrderPrice}
+                    onChange={(e) => setQuickOrderPrice(e.target.value)}
+                    placeholder="5000"
+                    required
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Deposit (₦)</label>
+                  <input
+                    className="quick-order-input"
+                    type="number"
+                    value={quickOrderDeposit}
+                    onChange={(e) => setQuickOrderDeposit(e.target.value)}
+                    placeholder="2000"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1.2rem' }}>
+                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Due date</label>
+                <input
+                  className="quick-order-input"
+                  type="date"
+                  value={quickOrderDue}
+                  onChange={(e) => setQuickOrderDue(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={quickOrderLoading || customers.length === 0}
+                style={{
+                  width: '100%', padding: '0.8rem', borderRadius: '8px',
+                  border: 'none', background: 'linear-gradient(135deg, #C79A2B, #B4881E)',
+                  color: '#1E3A5F', fontSize: '1rem', fontWeight: '700',
+                  boxShadow: '0 4px 14px rgba(199,154,43,0.3)',
+                  transition: 'transform 0.1s ease',
+                }}
+              >
+                {quickOrderLoading ? 'Creating...' : '🚀 Create order'}
+              </button>
+
+              {quickOrderMessage && (
+                <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: quickOrderMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34', textAlign: 'center' }}>
+                  {quickOrderMessage}
+                </p>
+              )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SETTLE PAYMENT MODAL ===== */}
+      {showSettleModal && settleOrder && (
+        <div className="settle-modal" onClick={() => setShowSettleModal(false)}>
+          <div className="settle-modal-content" ref={modalRef} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+              <h2 style={{ color: '#1E3A5F', fontSize: '1.1rem', margin: 0 }}>💰 Record Payment</h2>
+              <button
+                onClick={() => setShowSettleModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.3rem', color: '#6B6255', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0 0 1.2rem' }}>
+              {settleOrder.customers?.name || 'Customer'} · Balance: ₦{(settleOrder.price - settleOrder.amount_paid).toLocaleString()}
+            </p>
+
+            <form onSubmit={handleSettleSubmit}>
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Amount paid (₦)</label>
+                <input
+                  className="quick-order-input"
+                  type="number"
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.2rem' }}>
+                <label style={{ display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Note (optional)</label>
+                <input
+                  className="quick-order-input"
+                  type="text"
+                  value={settleNote}
+                  onChange={(e) => setSettleNote(e.target.value)}
+                  placeholder="e.g. Cash payment"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={settleLoading}
+                style={{
+                  width: '100%', padding: '0.8rem', borderRadius: '8px',
+                  border: 'none', background: '#4C7A5E',
+                  color: '#fff', fontSize: '1rem', fontWeight: '700',
+                  transition: 'transform 0.1s ease',
+                }}
+              >
+                {settleLoading ? 'Recording...' : '💰 Record payment'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   )
-              }
+        }
