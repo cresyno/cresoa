@@ -618,4 +618,5 @@ export default function DashboardPage() {
                               {o.customers?.name || 'No customer'} · {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
                             </p>
                           </div>
-     
+          }
+                               }
