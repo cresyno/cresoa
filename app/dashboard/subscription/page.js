@@ -19,29 +19,39 @@ export default function SubscriptionPage() {
   const [verifying, setVerifying] = useState(false)
 
   const loadBusiness = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return null
+      }
+
+      const { data: businessData, error } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (error) {
+        console.error('Error loading business:', error)
+        return null
+      }
+
+      console.log('✅ Business loaded:', businessData)
+      setBusiness(businessData)
+      setSelectedPlan(businessData?.plan || 'free')
+      return businessData
+    } catch (err) {
+      console.error('Error loading business:', err)
+      return null
     }
-
-    const { data: businessData } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('owner_id', user.id)
-      .single()
-
-    setBusiness(businessData)
-    setSelectedPlan(businessData?.plan || 'free')
-    setLoading(false)
-    return businessData
   }
 
   useEffect(() => {
-    loadBusiness()
+    loadBusiness().finally(() => setLoading(false))
   }, [])
 
-  // ✅ FIX: Detect reference or trxref from Paystack callback
+  // Handle Paystack callback verification
   useEffect(() => {
     const reference = searchParams?.get('reference') || searchParams?.get('trxref')
 
@@ -50,24 +60,16 @@ export default function SubscriptionPage() {
         setVerifying(true)
         try {
           console.log('🔄 Verifying payment with reference:', reference)
-          
+
           const res = await fetch(`/api/paystack/verify?reference=${reference}`)
           const data = await res.json()
-          
+
           console.log('📦 Verify response:', data)
 
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
-            
-            // ✅ Reload business data from database
-            const updatedBusiness = await loadBusiness()
-            console.log('📦 Updated business:', updatedBusiness)
-            
-            // ✅ Force page reload to show updated plan
-            setTimeout(() => {
-              window.location.reload()
-            }, 1500)
-            
+            await loadBusiness()
+            router.replace('/dashboard/subscription')
           } else {
             showToast('❌ Payment verification failed: ' + (data.error || 'Unknown error'), '#AE4A34')
           }
@@ -78,7 +80,7 @@ export default function SubscriptionPage() {
           setVerifying(false)
         }
       }
-      
+
       verifyPayment()
     }
   }, [searchParams, router])
@@ -87,18 +89,33 @@ export default function SubscriptionPage() {
     setMessage('')
     setProcessing(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setProcessing(false)
-      return
-    }
-
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setMessage('Please log in first.')
+        setProcessing(false)
+        return
+      }
+
+      // ✅ Ensure business is loaded
+      let currentBusiness = business
+      if (!currentBusiness) {
+        currentBusiness = await loadBusiness()
+      }
+
+      if (!currentBusiness || !currentBusiness.id) {
+        setMessage('Could not find your business account. Please contact support.')
+        setProcessing(false)
+        return
+      }
+
+      console.log('🔵 Upgrading with business:', currentBusiness.id, planId, user.email)
+
       const response = await fetch('/api/paystack/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessId: business.id,
+          businessId: currentBusiness.id,
           planId: planId,
           email: user.email,
         }),
@@ -113,6 +130,7 @@ export default function SubscriptionPage() {
         setProcessing(false)
       }
     } catch (error) {
+      console.error('Upgrade error:', error)
       setMessage('Error: ' + error.message)
       setProcessing(false)
     }
@@ -122,7 +140,7 @@ export default function SubscriptionPage() {
 
   if (loading || verifying) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner {
@@ -340,7 +358,7 @@ export default function SubscriptionPage() {
               <button
                 className="btn-upgrade"
                 onClick={() => handleUpgrade(key)}
-                disabled={processing}
+                disabled={processing || !business}
               >
                 {processing ? 'Processing...' : `Upgrade to ${plan.name}`}
               </button>
@@ -362,4 +380,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-      }
+}
