@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [expandedGroups, setExpandedGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [deactivated, setDeactivated] = useState(false)
+  const [showOwingOnly, setShowOwingOnly] = useState(false)
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -105,6 +106,14 @@ export default function DashboardPage() {
     )
   }
 
+  const toggleOwingFilter = () => {
+    setShowOwingOnly(!showOwingOnly)
+  }
+
+  const clearFilter = () => {
+    setShowOwingOnly(false)
+  }
+
   if (loading) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -192,6 +201,34 @@ export default function DashboardPage() {
     return `Due ${new Date(dueDate).toLocaleDateString('en-GB')}`
   }
 
+  // Helper: Check if order has balance > 0
+  const hasBalance = (order) => {
+    return (order.price - order.amount_paid) > 0
+  }
+
+  // Filter orders based on owing filter
+  const getFilteredOrders = (orders) => {
+    if (showOwingOnly) {
+      return orders.filter(o => hasBalance(o))
+    }
+    return orders
+  }
+
+  // Filter groups' orders based on owing filter
+  const getFilteredGroupOrders = (group) => {
+    if (showOwingOnly) {
+      return group.orders.filter(o => hasBalance(o))
+    }
+    return group.orders
+  }
+
+  // Check if any order in group has balance
+  const groupHasBalance = (group) => {
+    return group.orders.some(o => hasBalance(o))
+  }
+
+  const filteredPreviewOrders = getFilteredOrders(previewOrders)
+
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
@@ -203,7 +240,7 @@ export default function DashboardPage() {
           font-weight: 600;
           letter-spacing: 0.3px;
           text-transform: uppercase;
-      }
+        }
         .stat-card {
           background: #fff;
           border-radius: 10px;
@@ -211,10 +248,16 @@ export default function DashboardPage() {
           border: 1px solid #E8E0D5;
           text-align: center;
           text-decoration: none;
-          transition: border-color 0.15s ease;
+          transition: border-color 0.15s ease, background 0.15s ease;
+          cursor: pointer;
         }
         .stat-card:hover {
           border-color: #C79A2B;
+          background: #FBF8F0;
+        }
+        .stat-card.active {
+          border-color: #AE4A34;
+          background: #F1DBD3;
         }
         .action-btn {
           padding: 0.6rem 1rem;
@@ -224,7 +267,7 @@ export default function DashboardPage() {
           text-decoration: none;
           display: inline-flex;
           align-items: center;
-          gap: 0.3rem;
+          gap: 0.4rem;
           border: none;
           cursor: pointer;
           transition: transform 0.1s ease;
@@ -274,8 +317,8 @@ export default function DashboardPage() {
           color: #AE4A34;
           margin-right: 0.8rem;
           white-space: nowrap;
-        }
-        .order-balance.paid {
+              }
+               .order-balance.paid {
           color: #4C7A5E;
         }
         .order-actions {
@@ -293,6 +336,9 @@ export default function DashboardPage() {
           border: 1px solid #E8E0D5;
           background: #fff;
           transition: background 0.1s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
         }
         .order-actions a:hover {
           background: #F5EFE2;
@@ -300,11 +346,12 @@ export default function DashboardPage() {
         .order-actions .call-btn {
           color: #1E3A5F;
           border-color: #C79A2B;
-          background: #FBF3EC;
+          background: #F6E9C8;
           font-weight: 600;
+          padding: 0.2rem 0.6rem;
         }
         .order-actions .call-btn:hover {
-          background: #F6E9C8;
+          background: #E8D5A0;
         }
         .customer-row {
           display: flex;
@@ -335,6 +382,8 @@ export default function DashboardPage() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 0.7rem;
+          flex-wrap: wrap;
+          gap: 0.4rem;
         }
         .section-header h2 {
           color: #1E3A5F;
@@ -509,10 +558,30 @@ export default function DashboardPage() {
           background: #F5EFE2;
           border-color: #C79A2B;
         }
-        .meta-overdue {
+        .clear-filter-btn {
+          background: #AE4A34;
+          color: #fff;
+          border: none;
+          padding: 0.2rem 0.7rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.1s ease;
+        }
+        .clear-filter-btn:hover {
+          background: #8A3626;
+        }
+        .filter-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: #F1DBD3;
+          padding: 0.2rem 0.7rem 0.2rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
           color: #AE4A34;
-          font-weight: 700;
-          text-transform: uppercase;
+          font-weight: 600;
         }
       `}</style>
 
@@ -535,18 +604,24 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
         <a href="/dashboard/customers" className="stat-card">
           <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.3rem', fontWeight: '700' }}>{customers.length}</p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Customers</p>
+          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>👤 Customers</p>
         </a>
         <a href="/dashboard/orders" className="stat-card">
           <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.3rem', fontWeight: '700' }}>{totalOrders}</p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Orders</p>
+          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>📦 Orders</p>
         </a>
-        <a href="/dashboard/orders?filter=owing" className="stat-card">
+        <button
+          onClick={toggleOwingFilter}
+          className={`stat-card ${showOwingOnly ? 'active' : ''}`}
+          style={{ border: showOwingOnly ? '2px solid #AE4A34' : '' }}
+        >
           <p style={{ margin: 0, color: totalBalanceOwed > 0 ? '#AE4A34' : '#4C7A5E', fontSize: '1.1rem', fontWeight: '700' }}>
             ₦{totalBalanceOwed.toLocaleString()}
           </p>
-          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>Owed</p>
-        </a>
+          <p style={{ margin: '0.1rem 0 0', color: '#6B6255', fontSize: '0.7rem' }}>
+            {showOwingOnly ? '🔴 Owed (filtered)' : '💰 Owed'}
+          </p>
+        </button>
       </div>
 
       {/* ALERT BADGES */}
@@ -572,7 +647,7 @@ export default function DashboardPage() {
         <input
           type="text"
           className="search-bar"
-          placeholder="Search by customer, order, or phone..."
+          placeholder="🔍 Search by customer, order, or phone..."
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.value.trim()) {
               router.push(`/dashboard/orders?search=${encodeURIComponent(e.target.value.trim())}`)
@@ -584,13 +659,13 @@ export default function DashboardPage() {
       {/* QUICK ACTIONS */}
       <div className="quick-actions">
         <a href="/dashboard/customers/new" className="action-btn" style={{ background: '#1E3A5F', color: '#fff' }}>
-          + Customer
+          👤 + Customer
         </a>
         <a href="/dashboard/orders/new" className="action-btn" style={{ background: '#C79A2B', color: '#1E3A5F' }}>
-          + Order
+          📋 + Order
         </a>
         <a href="/dashboard/groups/new" className="action-btn" style={{ background: '#AE4A34', color: '#fff' }}>
-          + Group
+          👥 + Group
         </a>
       </div>
 
@@ -598,19 +673,31 @@ export default function DashboardPage() {
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
           <h2>Group Orders</h2>
+          {showOwingOnly && (
+            <span className="filter-badge">
+              💰 Showing unpaid only
+              <button onClick={clearFilter} className="clear-filter-btn">✕ Clear</button>
+            </span>
+          )}
         </div>
 
         {groups.length === 0 ? (
           <div className="empty-state">
             <p style={{ margin: '0 0 0.4rem' }}>No group orders yet.</p>
             <a href="/dashboard/groups/new" style={{ color: '#AE4A34', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none' }}>
-              + Create a group order
+              👥 + Create a group order
             </a>
           </div>
         ) : (
           groups.map((g) => {
             const isExpanded = expandedGroups.includes(g.id)
-            const combinedBalance = g.orders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
+            const filteredOrders = getFilteredGroupOrders(g)
+            const hasVisibleOrders = filteredOrders.length > 0
+
+            // Only show group if it has visible orders or filter is off
+            if (showOwingOnly && !hasVisibleOrders) return null
+
+            const combinedBalance = filteredOrders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
             const memberCount = g.orders.length
 
             return (
@@ -620,6 +707,11 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                       <h3>{g.group_name}</h3>
                       <span className="group-count">{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
+                      {showOwingOnly && combinedBalance > 0 && (
+                        <span style={{ fontSize: '0.6rem', background: '#F1DBD3', color: '#AE4A34', padding: '0.1rem 0.4rem', borderRadius: '10px', fontWeight: '700' }}>
+                          owes ₦{combinedBalance.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                     <p className="group-coordinator">Coordinator: {g.customers?.name || 'Unnamed'}</p>
                     <p className={`group-balance ${combinedBalance > 0 ? 'owing' : 'paid'}`}>
@@ -631,9 +723,9 @@ export default function DashboardPage() {
                   <span className="group-toggle">{isExpanded ? '▲ Hide' : '▼ Show'}</span>
                 </button>
 
-                {isExpanded && (
+                {isExpanded && hasVisibleOrders && (
                   <div style={{ marginTop: '0.8rem', borderTop: '1px solid #F0EDE8', paddingTop: '0.8rem' }}>
-                    {g.orders.map((o) => {
+                    {filteredOrders.map((o) => {
                       const status = getStatusInfo(o.current_status)
                       const orderName = getOrderName(o)
                       const dueDisplay = getDueDisplay(o.due_date)
@@ -659,11 +751,11 @@ export default function DashboardPage() {
                               {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
                             </span>
                             <div className="order-actions">
-                              <a href={`/dashboard/orders/${o.id}`}>View</a>
+                              <a href={`/dashboard/orders/${o.id}`}>👁️</a>
                               {phone && (
-                                <a href={`tel:${phone}`} className="call-btn">Call</a>
+                                <a href={`tel:${phone}`} className="call-btn">📞 Call</a>
                               )}
-                              <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
+                              <a href={`/dashboard/orders/${o.id}/edit`}>✏️</a>
                             </div>
                           </div>
                         </div>
@@ -680,16 +772,25 @@ export default function DashboardPage() {
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
           <h2>Recent Orders</h2>
-          <a href="/dashboard/orders">View all →</a>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {showOwingOnly && (
+              <button onClick={clearFilter} className="clear-filter-btn">✕ Clear filter</button>
+            )}
+            <a href="/dashboard/orders">View all →</a>
+          </div>
         </div>
 
-        {previewOrders.length === 0 ? (
+        {filteredPreviewOrders.length === 0 ? (
           <div className="empty-state">
-            <p>No individual orders yet. Create your first order to get started.</p>
+            {showOwingOnly ? (
+              <p>🎉 No unpaid orders! All your customers have paid up.</p>
+            ) : (
+              <p>No individual orders yet. Create your first order to get started.</p>
+            )}
           </div>
         ) : (
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E8E0D5', padding: '0.2rem 1rem' }}>
-            {previewOrders.map((o) => {
+            {filteredPreviewOrders.map((o) => {
               const status = getStatusInfo(o.current_status)
               const orderName = getOrderName(o)
               const dueDisplay = getDueDisplay(o.due_date)
@@ -715,11 +816,11 @@ export default function DashboardPage() {
                       {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
                     </span>
                     <div className="order-actions">
-                      <a href={`/dashboard/orders/${o.id}`}>View</a>
+                      <a href={`/dashboard/orders/${o.id}`}>👁️</a>
                       {phone && (
-                        <a href={`tel:${phone}`} className="call-btn">Call</a>
+                        <a href={`tel:${phone}`} className="call-btn">📞 Call</a>
                       )}
-                      <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
+                      <a href={`/dashboard/orders/${o.id}/edit`}>✏️</a>
                     </div>
                   </div>
                 </div>
@@ -756,4 +857,4 @@ export default function DashboardPage() {
       </div>
     </main>
   )
-                        }
+          }
