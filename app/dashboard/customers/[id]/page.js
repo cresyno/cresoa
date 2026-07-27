@@ -52,12 +52,31 @@ export default function CustomerDetailPage({ params }) {
         .eq('customer_id', params.id)
 
       setOrderCount(count || 0)
+
+      const { data: custOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', params.id)
+        .order('created_at', { ascending: false })
+
+      if (custOrders && custOrders.length > 0) {
+        const totalSpent = custOrders.reduce((sum, o) => sum + o.price, 0)
+        const totalPaid = custOrders.reduce((sum, o) => sum + o.amount_paid, 0)
+        setStats({
+          totalSpent,
+          totalPaid,
+          count: custOrders.length,
+          lastDate: custOrders[0].created_at,
+          avg: totalSpent / custOrders.length,
+        })
+        setLastOrderId(custOrders[0].id)
+      }
+
       setLoading(false)
     }
 
     load()
   }, [params.id])
-
   const updateMeasurement = (key, value) => {
     setMeasurements({ ...measurements, [key]: value })
   }
