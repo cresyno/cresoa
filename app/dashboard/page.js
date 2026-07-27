@@ -164,6 +164,16 @@ export default function DashboardPage() {
     return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
   }
 
+  // Helper: Get order display name - tries multiple fields
+  const getOrderName = (order) => {
+    if (order.item_name && order.item_name.trim()) return order.item_name
+    if (order.name && order.name.trim()) return order.name
+    if (order.title && order.title.trim()) return order.title
+    // If no name, show customer name + item type or fallback
+    if (order.customers?.name) return `${order.customers.name}'s order`
+    return 'Order'
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
@@ -591,11 +601,12 @@ export default function DashboardPage() {
                   <div style={{ marginTop: '0.8rem', borderTop: '1px solid #F0EDE8', paddingTop: '0.8rem' }}>
                     {g.orders.map((o) => {
                       const status = getStatusInfo(o.current_status)
+                      const orderName = getOrderName(o)
                       return (
                         <div key={o.id} className="order-row">
                           <div className="order-info">
                             <p className="name">
-                              {o.item_name || 'Untitled'}
+                              {orderName}
                               <span
                                 className="order-status-badge"
                                 style={{ background: status.bg, color: status.color, marginLeft: '0.5rem' }}
@@ -641,11 +652,12 @@ export default function DashboardPage() {
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E8E0D5', padding: '0.2rem 1rem' }}>
             {previewOrders.map((o) => {
               const status = getStatusInfo(o.current_status)
+              const orderName = getOrderName(o)
               return (
                 <div key={o.id} className="order-row">
                   <div className="order-info">
                     <p className="name">
-                      {o.item_name || 'Untitled'}
+                      {orderName}
                       <span
                         className="order-status-badge"
                         style={{ background: status.bg, color: status.color, marginLeft: '0.5rem' }}
@@ -700,4 +712,4 @@ export default function DashboardPage() {
       </div>
     </main>
   )
-          }
+}
