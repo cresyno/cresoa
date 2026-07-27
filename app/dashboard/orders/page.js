@@ -667,9 +667,7 @@ function OrdersContent() {
           )
         })}
       </div>
-    </main>
-  )
-      }
+
       {/* ===== ORDERS LIST ===== */}
       {filteredOrders.length === 0 ? (
         <div className="empty-state">
@@ -828,4 +826,4 @@ export default function Page() {
       <OrdersContent />
     </Suspense>
   )
-                    }
+}
