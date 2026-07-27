@@ -10,7 +10,6 @@ export async function POST(request) {
   try {
     const { businessId, planId, email } = await request.json()
 
-    // 1. Validate required fields
     if (!businessId || !planId || !email) {
       return NextResponse.json(
         { error: 'Missing required fields: businessId, planId, email' },
@@ -18,7 +17,6 @@ export async function POST(request) {
       )
     }
 
-    // 2. Validate plan exists
     const plan = PLANS[planId]
     if (!plan) {
       return NextResponse.json(
@@ -27,7 +25,6 @@ export async function POST(request) {
       )
     }
 
-    // 3. Check Paystack secret key
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
       console.error('PAYSTACK_SECRET_KEY is not set')
@@ -37,7 +34,7 @@ export async function POST(request) {
       )
     }
 
-    // 4. Verify the business exists
+    // ✅ Verify business exists and log details
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id, plan')
@@ -45,24 +42,25 @@ export async function POST(request) {
       .single()
 
     if (bizError || !business) {
-      console.error('Business not found:', businessId)
+      console.error('❌ Business not found for ID:', businessId)
+      console.error('❌ Supabase error:', bizError)
       return NextResponse.json(
-        { error: 'Invalid business account' },
+        { error: 'Invalid business account. Business ID: ' + businessId },
         { status: 400 }
       )
     }
 
-    // 5. Get the app URL
+    console.log('✅ Business confirmed:', business)
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!appUrl) {
-      console.error('NEXT_PUBLIC_APP_URL is not set')
       return NextResponse.json(
         { error: 'App URL not configured' },
         { status: 500 }
       )
     }
 
-    // 6. 🔥 FIRST: Store pending transaction in subscription_history
+    // Store pending transaction in subscription_history
     const { data: historyRecord, error: insertError } = await supabase
       .from('subscription_history')
       .insert({
@@ -84,57 +82,38 @@ export async function POST(request) {
       )
     }
 
-    console.log('✅ Created pending record:', historyRecord.id)
-
-    // 7. Call Paystack to initialize transaction
-    const payload = {
-      email,
-      amount: plan.price * 100,
-      currency: 'NGN',
-      metadata: {
-        business_id: businessId,
-        plan: planId,
-        plan_name: plan.name,
-        platform: 'cresoa',
-        history_id: historyRecord.id, // 🔥 Store the history ID for reference
-      },
-      callback_url: `${appUrl}/dashboard/subscription`,
-    }
-
-    console.log('🔵 Initiating Paystack payment:', {
-      businessId,
-      planId,
-      email,
-      amount: plan.price,
-    })
-
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        email,
+        amount: plan.price * 100,
+        currency: 'NGN',
+        metadata: {
+          business_id: businessId,
+          plan: planId,
+          plan_name: plan.name,
+          platform: 'cresoa',
+          history_id: historyRecord.id,
+        },
+        callback_url: `${appUrl}/dashboard/subscription`,
+      }),
     })
 
     const data = await response.json()
 
     if (!data.status) {
       console.error('Paystack initiation error:', data.message)
-
-      // 🔥 Clean up: delete the pending record if Paystack failed
-      await supabase
-        .from('subscription_history')
-        .delete()
-        .eq('id', historyRecord.id)
-
+      await supabase.from('subscription_history').delete().eq('id', historyRecord.id)
       return NextResponse.json(
         { error: data.message || 'Payment initiation failed' },
         { status: 400 }
       )
     }
 
-    // 8. Update the history record with the transaction reference
     await supabase
       .from('subscription_history')
       .update({
@@ -155,4 +134,4 @@ export async function POST(request) {
       { status: 500 }
     )
   }
-            }
+}
