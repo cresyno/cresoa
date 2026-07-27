@@ -169,9 +169,27 @@ export default function DashboardPage() {
     if (order.item_name && order.item_name.trim()) return order.item_name
     if (order.name && order.name.trim()) return order.name
     if (order.title && order.title.trim()) return order.title
-    // If no name, show customer name + item type or fallback
     if (order.customers?.name) return `${order.customers.name}'s order`
     return 'Order'
+  }
+
+  // Helper: Check if overdue
+  const isOverdue = (dueDate) => {
+    if (!dueDate) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const due = new Date(dueDate)
+    due.setHours(0, 0, 0, 0)
+    return due < today
+  }
+
+  // Helper: Format due date or return OVERDUE
+  const getDueDisplay = (dueDate) => {
+    if (!dueDate) return 'No deadline'
+    if (isOverdue(dueDate)) {
+      return <span style={{ color: '#AE4A34', fontWeight: '700', textTransform: 'uppercase' }}>OVERDUE</span>
+    }
+    return `Due ${new Date(dueDate).toLocaleDateString('en-GB')}`
   }
 
   return (
@@ -185,7 +203,7 @@ export default function DashboardPage() {
           font-weight: 600;
           letter-spacing: 0.3px;
           text-transform: uppercase;
-        }
+      }
         .stat-card {
           background: #fff;
           border-radius: 10px;
@@ -264,6 +282,7 @@ export default function DashboardPage() {
           display: flex;
           gap: 0.3rem;
           flex-shrink: 0;
+          align-items: center;
         }
         .order-actions a {
           color: #6B6255;
@@ -273,9 +292,19 @@ export default function DashboardPage() {
           border-radius: 4px;
           border: 1px solid #E8E0D5;
           background: #fff;
+          transition: background 0.1s ease;
         }
         .order-actions a:hover {
           background: #F5EFE2;
+        }
+        .order-actions .call-btn {
+          color: #1E3A5F;
+          border-color: #C79A2B;
+          background: #FBF3EC;
+          font-weight: 600;
+        }
+        .order-actions .call-btn:hover {
+          background: #F6E9C8;
         }
         .customer-row {
           display: flex;
@@ -480,6 +509,11 @@ export default function DashboardPage() {
           background: #F5EFE2;
           border-color: #C79A2B;
         }
+        .meta-overdue {
+          color: #AE4A34;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
       `}</style>
 
       {/* HEADER */}
@@ -602,6 +636,8 @@ export default function DashboardPage() {
                     {g.orders.map((o) => {
                       const status = getStatusInfo(o.current_status)
                       const orderName = getOrderName(o)
+                      const dueDisplay = getDueDisplay(o.due_date)
+                      const phone = o.customers?.phone
                       return (
                         <div key={o.id} className="order-row">
                           <div className="order-info">
@@ -615,7 +651,7 @@ export default function DashboardPage() {
                               </span>
                             </p>
                             <p className="meta">
-                              {o.customers?.name || 'No customer'} · {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
+                              {o.customers?.name || 'No customer'} · {dueDisplay}
                             </p>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -624,6 +660,9 @@ export default function DashboardPage() {
                             </span>
                             <div className="order-actions">
                               <a href={`/dashboard/orders/${o.id}`}>View</a>
+                              {phone && (
+                                <a href={`tel:${phone}`} className="call-btn">Call</a>
+                              )}
                               <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
                             </div>
                           </div>
@@ -653,6 +692,8 @@ export default function DashboardPage() {
             {previewOrders.map((o) => {
               const status = getStatusInfo(o.current_status)
               const orderName = getOrderName(o)
+              const dueDisplay = getDueDisplay(o.due_date)
+              const phone = o.customers?.phone
               return (
                 <div key={o.id} className="order-row">
                   <div className="order-info">
@@ -666,7 +707,7 @@ export default function DashboardPage() {
                       </span>
                     </p>
                     <p className="meta">
-                      {o.customers?.name || 'No customer'} · {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
+                      {o.customers?.name || 'No customer'} · {dueDisplay}
                     </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -675,6 +716,9 @@ export default function DashboardPage() {
                     </span>
                     <div className="order-actions">
                       <a href={`/dashboard/orders/${o.id}`}>View</a>
+                      {phone && (
+                        <a href={`tel:${phone}`} className="call-btn">Call</a>
+                      )}
                       <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
                     </div>
                   </div>
@@ -712,4 +756,4 @@ export default function DashboardPage() {
       </div>
     </main>
   )
-}
+                        }
