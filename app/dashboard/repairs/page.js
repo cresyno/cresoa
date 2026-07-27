@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import LetterLogo from '../../../components/LetterLogo'
 
 export default function RepairsDashboardPage() {
   const router = useRouter()
@@ -38,7 +37,6 @@ export default function RepairsDashboardPage() {
 
     setBusiness(businessData)
 
-    // Load repair jobs
     const { data: jobData } = await supabase
       .from('orders')
       .select('*, customers(name, phone)')
@@ -48,7 +46,6 @@ export default function RepairsDashboardPage() {
 
     setJobs(jobData || [])
 
-    // Load customers
     const { data: customerData } = await supabase
       .from('customers')
       .select('*')
@@ -57,7 +54,6 @@ export default function RepairsDashboardPage() {
 
     setCustomers(customerData || [])
 
-    // Calculate stats
     const total = jobData?.length || 0
     const active = jobData?.filter(j => 
       j.current_status !== 'Completed' && j.current_status !== 'Delivered'
@@ -123,9 +119,13 @@ export default function RepairsDashboardPage() {
   const previewCustomers = customers.slice(0, 3)
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+    <main style={{ 
+      minHeight: '100vh', 
+      background: '#F5EFE2', 
+      padding: '1.5rem 1.2rem 3rem'
+    }}>
       <style>{`
-        /* ===== STATS GRID ===== */
+        /* ===== STATS ===== */
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -135,14 +135,16 @@ export default function RepairsDashboardPage() {
         .stat-card {
           background: #fff;
           border-radius: 12px;
-          padding: 0.8rem 0.6rem;
+          padding: 0.8rem 0.4rem;
           border: 1px solid #E8E0D5;
           text-align: center;
+          box-shadow: 0 2px 4px rgba(30,58,95,0.04);
         }
         .stat-card .number {
-          font-size: 1.4rem;
+          font-size: 1.5rem;
           font-weight: 700;
           margin: 0;
+          line-height: 1.2;
         }
         .stat-card .number.navy { color: #1E3A5F; }
         .stat-card .number.gold { color: #C79A2B; }
@@ -150,10 +152,10 @@ export default function RepairsDashboardPage() {
         .stat-card .number.green { color: #4C7A5E; }
         .stat-card .label {
           color: #6B6255;
-          font-size: 0.65rem;
+          font-size: 0.6rem;
           margin: 0.1rem 0 0;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.3px;
         }
 
         /* ===== QUICK ACTIONS ===== */
@@ -193,7 +195,7 @@ export default function RepairsDashboardPage() {
         }
         .section-header a {
           color: #6B6255;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 500;
           text-decoration: none;
         }
@@ -208,6 +210,7 @@ export default function RepairsDashboardPage() {
           margin-bottom: 0.6rem;
           cursor: pointer;
           transition: border-color 0.15s ease;
+          box-shadow: 0 1px 3px rgba(30,58,95,0.03);
         }
         .job-card:hover { border-color: #C79A2B; }
         .job-card .row {
@@ -224,7 +227,7 @@ export default function RepairsDashboardPage() {
         .job-card .info .name {
           font-weight: 600;
           color: #1E3A5F;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           margin: 0;
           display: flex;
           align-items: center;
@@ -232,7 +235,7 @@ export default function RepairsDashboardPage() {
           flex-wrap: wrap;
         }
         .job-card .info .meta {
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           color: #6B6255;
           margin: 0.1rem 0 0;
           display: flex;
@@ -242,7 +245,7 @@ export default function RepairsDashboardPage() {
         }
         .job-card .balance {
           font-weight: 700;
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           color: #AE4A34;
           white-space: nowrap;
         }
@@ -250,9 +253,9 @@ export default function RepairsDashboardPage() {
 
         .status-badge {
           display: inline-block;
-          padding: 0.12rem 0.5rem;
+          padding: 0.1rem 0.5rem;
           border-radius: 12px;
-          font-size: 0.6rem;
+          font-size: 0.55rem;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.3px;
@@ -270,17 +273,18 @@ export default function RepairsDashboardPage() {
           text-decoration: none;
           margin-bottom: 0.5rem;
           transition: border-color 0.15s ease;
+          box-shadow: 0 1px 3px rgba(30,58,95,0.03);
         }
         .customer-row:hover { border-color: #C79A2B; }
         .customer-row .name {
           color: #1E3A5F;
           font-weight: 600;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           margin: 0;
         }
         .customer-row .phone {
           color: #6B6255;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           margin: 0;
         }
 
@@ -293,42 +297,39 @@ export default function RepairsDashboardPage() {
           text-align: center;
           color: #6B6255;
           font-size: 0.85rem;
+          box-shadow: 0 1px 3px rgba(30,58,95,0.03);
         }
-        .empty-state .icon { font-size: 2rem; margin-bottom: 0.3rem; }
+        .empty-state .icon { 
+          font-size: 2rem; 
+          margin-bottom: 0.3rem;
+          display: block;
+        }
+        .empty-state a {
+          color: #1E3A5F;
+          font-weight: 600;
+          text-decoration: none;
+        }
+        .empty-state a:hover { text-decoration: underline; }
 
-        /* ===== RESPONSIVE ===== */
+        /* ===== MOBILE ===== */
         @media (max-width: 480px) {
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
             gap: 0.4rem;
           }
-          .stat-card { padding: 0.6rem 0.4rem; }
+          .stat-card { padding: 0.6rem 0.3rem; }
           .stat-card .number { font-size: 1.1rem; }
+          .stat-card .label { font-size: 0.5rem; }
           .job-card .row { flex-direction: column; align-items: stretch; }
           .job-card .balance { text-align: right; }
+          .quick-actions .action-btn { 
+            flex: 1; 
+            justify-content: center;
+            font-size: 0.7rem;
+            padding: 0.5rem 0.6rem;
+          }
         }
       `}</style>
-
-      {/* ===== HEADER ===== */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '1.2rem' }}>
-        <LetterLogo name={business?.name} size={40} />
-        <div>
-          <p style={{ color: '#2B2620', fontSize: '0.8rem', margin: 0 }}>Welcome back,</p>
-          <p style={{ color: '#1E3A5F', fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>
-            {business ? business.name : 'Your business'}
-            <span style={{
-              display: 'inline-block',
-              background: 'rgba(199,154,43,0.15)',
-              color: '#C79A2B',
-              padding: '0.05rem 0.5rem',
-              borderRadius: '10px',
-              fontSize: '0.55rem',
-              fontWeight: '600',
-              marginLeft: '0.4rem',
-            }}>🔧 Repairs</span>
-          </p>
-        </div>
-      </div>
 
       {/* ===== STATS ===== */}
       <div className="stats-grid">
@@ -353,13 +354,13 @@ export default function RepairsDashboardPage() {
       {/* ===== QUICK ACTIONS ===== */}
       <div className="quick-actions">
         <a href="/dashboard/repairs/jobs/new" className="action-btn" style={{ background: '#1E3A5F', color: '#fff' }}>
-          🔧 + New Job
+          + New Job
         </a>
         <a href="/dashboard/customers/new" className="action-btn" style={{ background: '#C79A2B', color: '#1E3A5F' }}>
-          👤 + Customer
+          + Customer
         </a>
         <a href="/dashboard/repairs/parts" className="action-btn" style={{ background: '#4C7A5E', color: '#fff' }}>
-          📦 Parts
+          Parts
         </a>
       </div>
 
@@ -372,11 +373,9 @@ export default function RepairsDashboardPage() {
 
         {jobs.length === 0 ? (
           <div className="empty-state">
-            <div className="icon">🔧</div>
-            <p>No repair jobs yet.</p>
-            <a href="/dashboard/repairs/jobs/new" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>
-              Create your first repair job →
-            </a>
+            <span className="icon">🔧</span>
+            <p style={{ margin: '0 0 0.3rem' }}>No repair jobs yet.</p>
+            <a href="/dashboard/repairs/jobs/new">Create your first repair job</a>
           </div>
         ) : (
           previewJobs.map((job) => {
@@ -430,11 +429,9 @@ export default function RepairsDashboardPage() {
 
         {customers.length === 0 ? (
           <div className="empty-state">
-            <div className="icon">👤</div>
-            <p>No customers yet.</p>
-            <a href="/dashboard/customers/new" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>
-              Add your first customer →
-            </a>
+            <span className="icon">👤</span>
+            <p style={{ margin: '0 0 0.3rem' }}>No customers yet.</p>
+            <a href="/dashboard/customers/new">Add your first customer</a>
           </div>
         ) : (
           previewCustomers.map((c) => (
