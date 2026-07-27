@@ -27,14 +27,12 @@ export async function POST(request) {
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
-      console.error('PAYSTACK_SECRET_KEY is not set')
       return NextResponse.json(
         { error: 'Payment initiation failed – server configuration error' },
         { status: 500 }
       )
     }
 
-    // ✅ Verify business exists and log details
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id, plan')
@@ -43,14 +41,11 @@ export async function POST(request) {
 
     if (bizError || !business) {
       console.error('❌ Business not found for ID:', businessId)
-      console.error('❌ Supabase error:', bizError)
       return NextResponse.json(
-        { error: 'Invalid business account. Business ID: ' + businessId },
+        { error: 'Business account not found. Please complete onboarding.' },
         { status: 400 }
       )
     }
-
-    console.log('✅ Business confirmed:', business)
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!appUrl) {
@@ -60,7 +55,7 @@ export async function POST(request) {
       )
     }
 
-    // Store pending transaction in subscription_history
+    // Create pending record
     const { data: historyRecord, error: insertError } = await supabase
       .from('subscription_history')
       .insert({
@@ -106,7 +101,7 @@ export async function POST(request) {
     const data = await response.json()
 
     if (!data.status) {
-      console.error('Paystack initiation error:', data.message)
+      console.error('Paystack error:', data.message)
       await supabase.from('subscription_history').delete().eq('id', historyRecord.id)
       return NextResponse.json(
         { error: data.message || 'Payment initiation failed' },
