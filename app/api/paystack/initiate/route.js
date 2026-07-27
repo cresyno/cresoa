@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabaseClient'
 import { PLANS } from '../../../../lib/planLimits'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { businessId, planId, email } = await request.json()
@@ -25,13 +27,13 @@ export async function POST(request) {
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
+      console.error('PAYSTACK_SECRET_KEY is not set')
       return NextResponse.json(
-        { error: 'Paystack not configured' },
+        { error: 'Payment initiation failed' },
         { status: 500 }
       )
     }
 
-    // Initiate Paystack transaction
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -48,22 +50,20 @@ export async function POST(request) {
           plan_name: plan.name,
           platform: 'cresoa',
         },
-        // ✅ Remove ?status=success
-        callback_url: `${NEXT_PUBLIC_APP_URL}/dashboard/subscription`,
+        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription`,
       }),
     })
 
     const data = await response.json()
 
     if (!data.status) {
-      console.error('Paystack initiation error:', data)
+      console.error('Paystack initiation error:', data.message)
       return NextResponse.json(
         { error: data.message || 'Payment initiation failed' },
         { status: 400 }
       )
     }
 
-    // Store transaction reference
     await supabase
       .from('subscription_history')
       .insert({
