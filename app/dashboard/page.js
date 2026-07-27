@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import LetterLogo from '../../components/LetterLogo'
-import OrderCard from '../../components/OrderCard'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -154,7 +153,6 @@ export default function DashboardPage() {
   ).length
   const readyCount = allActiveOrders.filter((o) => o.current_status === 'Ready').length
 
-  // Helper: status color and label
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
@@ -201,7 +199,7 @@ export default function DashboardPage() {
           gap: 0.3rem;
           border: none;
           cursor: pointer;
-          transition: transform 0.1s ease, box-shadow 0.1s ease;
+          transition: transform 0.1s ease;
         }
         .action-btn:active {
           transform: scale(0.97);
@@ -212,7 +210,6 @@ export default function DashboardPage() {
           padding: 1rem;
           margin-bottom: 1rem;
           background: #fff;
-          box-shadow: 0 2px 6px rgba(30,58,95,0.04);
         }
         .group-card.expanded {
           border-color: #C79A2B;
@@ -266,7 +263,6 @@ export default function DashboardPage() {
           border-radius: 4px;
           border: 1px solid #E8E0D5;
           background: #fff;
-          transition: background 0.1s ease;
         }
         .order-actions a:hover {
           background: #F5EFE2;
@@ -280,7 +276,6 @@ export default function DashboardPage() {
           border-radius: 8px;
           border: 1px solid #E8E0D5;
           text-decoration: none;
-          transition: border-color 0.15s ease;
         }
         .customer-row:hover {
           border-color: #C79A2B;
@@ -307,7 +302,6 @@ export default function DashboardPage() {
           font-size: 1rem;
           font-weight: 700;
           margin: 0;
-          letter-spacing: -0.3px;
         }
         .section-header a {
           color: #6B6255;
@@ -315,7 +309,6 @@ export default function DashboardPage() {
           font-weight: 500;
           text-decoration: none;
           border-bottom: 1px solid transparent;
-          transition: border-color 0.15s ease;
         }
         .section-header a:hover {
           border-bottom-color: #6B6255;
@@ -344,7 +337,6 @@ export default function DashboardPage() {
           font-size: 0.9rem;
           background: #fff;
           box-sizing: border-box;
-          transition: border-color 0.15s ease;
           color: #2B2620;
         }
         .search-bar:focus {
@@ -404,7 +396,6 @@ export default function DashboardPage() {
           cursor: pointer;
           padding: 0.2rem 0.4rem;
           border-radius: 4px;
-          transition: background 0.1s ease;
         }
         .group-toggle:hover {
           background: #F0EDE8;
@@ -457,7 +448,6 @@ export default function DashboardPage() {
           font-size: 1.2rem;
           font-weight: 700;
           margin: 0;
-          line-height: 1.2;
         }
         .header-actions {
           display: flex;
@@ -474,7 +464,6 @@ export default function DashboardPage() {
           background: #fff;
           color: #1E3A5F;
           cursor: pointer;
-          transition: background 0.1s ease, border-color 0.1s ease;
         }
         .header-actions a:hover,
         .header-actions button:hover {
@@ -483,7 +472,7 @@ export default function DashboardPage() {
         }
       `}</style>
 
-      {/* ===== HEADER ===== */}
+      {/* HEADER */}
       <div className="header-top">
         <div className="header-brand">
           <LetterLogo name={business?.name} size={44} />
@@ -498,7 +487,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ===== STATS ===== */}
+      {/* STATS */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1.2rem' }}>
         <a href="/dashboard/customers" className="stat-card">
           <p style={{ margin: 0, color: '#1E3A5F', fontSize: '1.3rem', fontWeight: '700' }}>{customers.length}</p>
@@ -516,7 +505,7 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      {/* ===== ALERT BADGES ===== */}
+      {/* ALERT BADGES */}
       {(dueTodayCount > 0 || readyCount > 0) && (
         <div className="alert-badge">
           {dueTodayCount > 0 && (
@@ -534,7 +523,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ===== SEARCH ===== */}
+      {/* SEARCH */}
       <div style={{ marginBottom: '1rem' }}>
         <input
           type="text"
@@ -548,7 +537,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* ===== QUICK ACTIONS ===== */}
+      {/* QUICK ACTIONS */}
       <div className="quick-actions">
         <a href="/dashboard/customers/new" className="action-btn" style={{ background: '#1E3A5F', color: '#fff' }}>
           + Customer
@@ -561,7 +550,7 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      {/* ===== GROUP ORDERS ===== */}
+      {/* GROUP ORDERS */}
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
           <h2>Group Orders</h2>
@@ -618,5 +607,47 @@ export default function DashboardPage() {
                               {o.customers?.name || 'No customer'} · {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
                             </p>
                           </div>
-          )
-                               }
+                          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                            <span className={`order-balance ${o.price - o.amount_paid <= 0 ? 'paid' : ''}`}>
+                              {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
+                            </span>
+                            <div className="order-actions">
+                              <a href={`/dashboard/orders/${o.id}`}>View</a>
+                              <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* CUSTOMERS */}
+      <div>
+        <div className="section-header">
+          <h2>Recent Customers</h2>
+          <a href="/dashboard/customers">View all →</a>
+        </div>
+
+        {previewCustomers.length === 0 ? (
+          <div className="empty-state">
+            <p>No customers yet. Add your first customer to start tracking orders.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {previewCustomers.map((c) => (
+              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row">
+                <div>
+                  <p className="name">{c.name}</p>
+                  {c.phone && <p className="phone">{c.phone}</p>}
+                </div>
+                <span style={{ color: '#C79A2B', fontSize: '0.8rem' }}>→</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}
