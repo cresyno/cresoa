@@ -18,38 +18,6 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
 
-  // ✅ FIX: Detect reference or trxref from Paystack callback
-  useEffect(() => {
-    const reference = searchParams?.get('reference') || searchParams?.get('trxref')
-
-    if (reference) {
-      const verifyPayment = async () => {
-        setVerifying(true)
-        try {
-          console.log('🔄 Verifying payment with reference:', reference)
-          const res = await fetch(`/api/paystack/verify?reference=${reference}`)
-          const data = await res.json()
-          console.log('📦 Verify response:', data)
-
-          if (data.status === 'success') {
-            showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
-            await loadBusiness()
-            // Remove query params from URL
-            router.replace('/dashboard/subscription')
-          } else {
-            showToast('❌ Payment verification failed: ' + (data.error || 'Unknown error'), '#AE4A34')
-          }
-        } catch (error) {
-          console.error('❌ Verification error:', error)
-          showToast('❌ An error occurred during verification.', '#AE4A34')
-        } finally {
-          setVerifying(false)
-        }
-      }
-      verifyPayment()
-    }
-  }, [searchParams, router])
-
   const loadBusiness = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -66,11 +34,54 @@ export default function SubscriptionPage() {
     setBusiness(businessData)
     setSelectedPlan(businessData?.plan || 'free')
     setLoading(false)
+    return businessData
   }
 
   useEffect(() => {
     loadBusiness()
   }, [])
+
+  // ✅ FIX: Detect reference or trxref from Paystack callback
+  useEffect(() => {
+    const reference = searchParams?.get('reference') || searchParams?.get('trxref')
+
+    if (reference) {
+      const verifyPayment = async () => {
+        setVerifying(true)
+        try {
+          console.log('🔄 Verifying payment with reference:', reference)
+          
+          const res = await fetch(`/api/paystack/verify?reference=${reference}`)
+          const data = await res.json()
+          
+          console.log('📦 Verify response:', data)
+
+          if (data.status === 'success') {
+            showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
+            
+            // ✅ Reload business data from database
+            const updatedBusiness = await loadBusiness()
+            console.log('📦 Updated business:', updatedBusiness)
+            
+            // ✅ Force page reload to show updated plan
+            setTimeout(() => {
+              window.location.reload()
+            }, 1500)
+            
+          } else {
+            showToast('❌ Payment verification failed: ' + (data.error || 'Unknown error'), '#AE4A34')
+          }
+        } catch (error) {
+          console.error('❌ Verification error:', error)
+          showToast('❌ An error occurred during verification.', '#AE4A34')
+        } finally {
+          setVerifying(false)
+        }
+      }
+      
+      verifyPayment()
+    }
+  }, [searchParams, router])
 
   const handleUpgrade = async (planId) => {
     setMessage('')
@@ -123,6 +134,7 @@ export default function SubscriptionPage() {
           }
         `}</style>
         <div className="spinner"></div>
+        {verifying && <p style={{ color: '#6B6255', marginTop: '1rem' }}>Verifying payment...</p>}
       </div>
     )
   }
@@ -350,4 +362,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-    }
+      }
