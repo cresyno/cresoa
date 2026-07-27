@@ -34,6 +34,16 @@ export async function POST(request) {
       )
     }
 
+    // ✅ Use the correct callback URL (no ?status=success)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!appUrl) {
+      console.error('NEXT_PUBLIC_APP_URL is not set')
+      return NextResponse.json(
+        { error: 'App URL not configured' },
+        { status: 500 }
+      )
+    }
+
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -42,7 +52,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         email,
-        amount: plan.price * 100,
+        amount: plan.price * 100, // Paystack uses kobo
         currency: 'NGN',
         metadata: {
           business_id: businessId,
@@ -50,7 +60,7 @@ export async function POST(request) {
           plan_name: plan.name,
           platform: 'cresoa',
         },
-        callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription`,
+        callback_url: `${appUrl}/dashboard/subscription`,
       }),
     })
 
@@ -64,6 +74,7 @@ export async function POST(request) {
       )
     }
 
+    // Store transaction reference in database
     await supabase
       .from('subscription_history')
       .insert({
@@ -89,4 +100,4 @@ export async function POST(request) {
       { status: 500 }
     )
   }
-}
+      }
