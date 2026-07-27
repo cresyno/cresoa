@@ -1,8 +1,12 @@
+// app/dashboard/customers/page.js
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
+import UpgradeBanner from '../../../components/UpgradeBanner'
+import { getPlanLimits } from '../../../lib/planLimits'
 
 export default function CustomersPage() {
   const router = useRouter()
@@ -10,12 +14,14 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [business, setBusiness] = useState(null)
   const [stats, setStats] = useState({
     total: 0,
     withOrders: 0,
     owing: 0,
-    highValue: 0, // customers with > ₦50,000 total spent
+    highValue: 0,
   })
+  const [plan, setPlan] = useState('free')
 
   const loadCustomers = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -26,7 +32,7 @@ export default function CustomersPage() {
 
     const { data: businessData } = await supabase
       .from('businesses')
-      .select('id')
+      .select('id, plan')
       .eq('owner_id', user.id)
       .single()
 
@@ -35,7 +41,9 @@ export default function CustomersPage() {
       return
     }
 
-    // Get all customers
+    setBusiness(businessData)
+    setPlan(businessData.plan || 'free')
+
     const { data: customerData } = await supabase
       .from('customers')
       .select('*')
@@ -54,19 +62,12 @@ export default function CustomersPage() {
         const totalOwing = totalSpent - totalPaid
         const orderCount = orders?.length || 0
 
-        return {
-          ...c,
-          totalSpent,
-          totalOwing,
-          orderCount,
-          phone: c.phone || '',
-        }
+        return { ...c, totalSpent, totalOwing, orderCount }
       })
     )
 
     setCustomers(customersWithOrders)
 
-    // Calculate stats
     const total = customersWithOrders.length
     const withOrders = customersWithOrders.filter(c => c.orderCount > 0).length
     const owing = customersWithOrders.filter(c => c.totalOwing > 0).length
@@ -80,12 +81,6 @@ export default function CustomersPage() {
     loadCustomers()
   }, [])
 
-  const formatPhone = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
-  }
-
-  // Filter logic
   const filteredCustomers = customers
     .filter((c) =>
       c.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -100,6 +95,10 @@ export default function CustomersPage() {
       return true
     })
 
+  const limits = getPlanLimits(plan)
+  const customerCount = customers.length
+  const showUpgradeBanner = customerCount >= limits.customers - 2 && plan === 'free'
+
   if (loading) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -111,17 +110,6 @@ export default function CustomersPage() {
             border-top: 4px solid #1E3A5F;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-          }
-          @keyframes shimmer {
-            0% { background-position: -200px 0; }
-            100% { background-position: calc(200px + 100%) 0; }
-          }
-          .skeleton {
-            background: #E8E0D5;
-            border-radius: 8px;
-            background-image: linear-gradient(90deg, #E8E0D5 0px, #F5EFE2 40px, #E8E0D5 80px);
-            background-size: 200px 100%;
-            animation: shimmer 1.2s ease-in-out infinite;
           }
         `}</style>
         <div className="cresoa-spinner"></div>
@@ -167,9 +155,7 @@ export default function CustomersPage() {
           transition: all 0.15s ease;
           white-space: nowrap;
         }
-        .filter-chip:hover {
-          border-color: #C79A2B;
-        }
+        .filter-chip:hover { border-color: #C79A2B; }
         .filter-chip.active {
           background: #1E3A5F;
           border-color: #1E3A5F;
@@ -180,9 +166,7 @@ export default function CustomersPage() {
           opacity: 0.7;
           margin-left: 0.2rem;
         }
-        .filter-chip.active .count {
-          opacity: 0.8;
-        }
+        .filter-chip.active .count { opacity: 0.8; }
         .customer-card {
           background: #fff;
           border-radius: 12px;
@@ -192,9 +176,7 @@ export default function CustomersPage() {
           transition: border-color 0.15s ease;
           cursor: pointer;
         }
-        .customer-card:hover {
-          border-color: #C79A2B;
-        }
+        .customer-card:hover { border-color: #C79A2B; }
         .customer-card .row {
           display: flex;
           align-items: center;
@@ -259,9 +241,7 @@ export default function CustomersPage() {
           gap: 0.15rem;
           min-height: 28px;
         }
-        .customer-actions .btn:hover {
-          background: #F5EFE2;
-        }
+        .customer-actions .btn:hover { background: #F5EFE2; }
         .customer-actions .btn-call {
           background: #F6E9C8;
           border-color: #C79A2B;
@@ -273,17 +253,13 @@ export default function CustomersPage() {
           color: #4C7A5E;
           font-weight: 700;
         }
-        .customer-actions .btn-whatsapp:hover {
-          background: #C8DCCD;
-        }
+        .customer-actions .btn-whatsapp:hover { background: #C8DCCD; }
         .customer-actions .btn-order {
           background: #1E3A5F;
           border-color: #1E3A5F;
           color: #fff;
         }
-        .customer-actions .btn-order:hover {
-          background: #0F1E30;
-        }
+        .customer-actions .btn-order:hover { background: #0F1E30; }
         .search-bar {
           width: 100%;
           padding: 0.6rem 0.9rem;
@@ -295,10 +271,7 @@ export default function CustomersPage() {
           color: #2B2620;
           transition: border-color 0.2s ease;
         }
-        .search-bar:focus {
-          outline: none;
-          border-color: #C79A2B;
-        }
+        .search-bar:focus { outline: none; border-color: #C79A2B; }
         .empty-state {
           background: #fff;
           border-radius: 12px;
@@ -308,10 +281,7 @@ export default function CustomersPage() {
           color: #6B6255;
           font-size: 0.9rem;
         }
-        .empty-state .icon {
-          font-size: 2.5rem;
-          margin-bottom: 0.5rem;
-        }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
         .stats-row {
           display: flex;
           gap: 0.4rem;
@@ -336,9 +306,7 @@ export default function CustomersPage() {
           margin-bottom: 1rem;
           cursor: pointer;
         }
-        .back-link:hover {
-          text-decoration: underline;
-        }
+        .back-link:hover { text-decoration: underline; }
         .header-row {
           display: flex;
           align-items: center;
@@ -381,42 +349,36 @@ export default function CustomersPage() {
           cursor: pointer;
           transition: transform 0.1s ease;
         }
-        .add-btn:active {
-          transform: scale(0.97);
-        }
+        .add-btn:active { transform: scale(0.97); }
         @media (max-width: 420px) {
-          .customer-card .row {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .customer-actions {
-            justify-content: flex-start;
-            margin-top: 0.3rem;
-          }
-          .header-row {
-            flex-direction: column;
-            align-items: stretch;
-          }
+          .customer-card .row { flex-direction: column; align-items: stretch; }
+          .customer-actions { justify-content: flex-start; margin-top: 0.3rem; }
+          .header-row { flex-direction: column; align-items: stretch; }
         }
       `}</style>
 
-      {/* ===== BACK BUTTON ===== */}
       <button className="back-link" onClick={() => router.push('/dashboard')}>
         ← Back to dashboard
       </button>
 
-      {/* ===== HEADER ===== */}
       <div className="header-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <h1>Customers</h1>
           <span className="customer-count-badge">{customers.length}</span>
         </div>
-        <a href="/dashboard/customers/new" className="add-btn">
-          👤 + Add customer
-        </a>
+        <a href="/dashboard/customers/new" className="add-btn">👤 + Add customer</a>
       </div>
 
-      {/* ===== STATS ===== */}
+      {/* ===== UPGRADE BANNER ===== */}
+      {showUpgradeBanner && (
+        <UpgradeBanner
+          resource="customers"
+          currentCount={customerCount}
+          limit={limits.customers}
+          plan={plan}
+        />
+      )}
+
       <div className="stats-row">
         <div className="stat-card">
           <p className="value navy">{stats.total}</p>
@@ -435,7 +397,7 @@ export default function CustomersPage() {
           <p className="label">High Value</p>
         </div>
       </div>
-      {/* ===== SEARCH ===== */}
+
       <input
         type="text"
         className="search-bar"
@@ -445,7 +407,6 @@ export default function CustomersPage() {
         style={{ marginBottom: '0.8rem' }}
       />
 
-      {/* ===== FILTER CHIPS ===== */}
       <div className="filters-row">
         {['all', 'with_orders', 'owing', 'high_value', 'no_orders'].map((f) => {
           const labels = {
@@ -475,11 +436,10 @@ export default function CustomersPage() {
         })}
       </div>
 
-      {/* ===== CUSTOMERS LIST ===== */}
       {filteredCustomers.length === 0 ? (
         <div className="empty-state">
           <div className="icon">👤</div>
-          <p style={{ margin: 0 }}>
+          <p>
             {search || filter !== 'all' ? (
               <>No customers match your search or filter.</>
             ) : (
@@ -513,42 +473,19 @@ export default function CustomersPage() {
                         <span>₦{c.totalSpent.toLocaleString()} spent</span>
                       </>
                     )}
-                    {!hasOrders && (
-                      <span className="badge">No orders</span>
-                    )}
-                    {hasOwing && (
-                      <span className="badge owing">₦{c.totalOwing.toLocaleString()} owing</span>
-                    )}
-                    {isHighValue && (
-                      <span className="badge high">⭐ High value</span>
-                    )}
+                    {!hasOrders && <span className="badge">No orders</span>}
+                    {hasOwing && <span className="badge owing">₦{c.totalOwing.toLocaleString()} owing</span>}
+                    {isHighValue && <span className="badge high">⭐ High value</span>}
                   </div>
                 </div>
-
                 <div className="customer-actions">
                   {phone && (
                     <>
-                      <a href={`tel:${phone}`} className="btn btn-call" onClick={(e) => e.stopPropagation()}>
-                        📞 Call
-                      </a>
-                      <a
-                        href={`https://wa.me/${formatPhone(phone)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-whatsapp"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        💬 WhatsApp
-                      </a>
+                      <a href={`tel:${phone}`} className="btn btn-call" onClick={(e) => e.stopPropagation()}>📞 Call</a>
+                      <a href={`https://wa.me/234${phone.slice(1)}`} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp" onClick={(e) => e.stopPropagation()}>💬 WhatsApp</a>
                     </>
                   )}
-                  <a
-                    href={`/dashboard/orders/new?customer=${c.id}`}
-                    className="btn btn-order"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    📋 Order
-                  </a>
+                  <a href={`/dashboard/orders/new?customer=${c.id}`} className="btn btn-order" onClick={(e) => e.stopPropagation()}>📋 Order</a>
                 </div>
               </div>
             </div>
@@ -557,4 +494,4 @@ export default function CustomersPage() {
       )}
     </main>
   )
-        }
+            }
