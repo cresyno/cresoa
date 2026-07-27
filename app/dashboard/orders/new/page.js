@@ -439,7 +439,8 @@ export default function NewOrderPage() {
           </button>
         </div>
       )}
-               {/* ===== FORM ===== */}
+
+      {/* ===== FORM ===== */}
       <form onSubmit={handleSubmit} className="form-card">
         {/* Customer */}
         <div className="form-group">
@@ -585,4 +586,4 @@ export default function NewOrderPage() {
       </form>
     </main>
   )
-                    }
+}
