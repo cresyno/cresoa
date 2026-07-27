@@ -626,4 +626,78 @@ export default function DashboardPage() {
           })
         )}
       </div>
-...
+      {/* INDIVIDUAL ORDERS */}
+      <div style={{ marginBottom: '1.8rem' }}>
+        <div className="section-header">
+          <h2>Recent Orders</h2>
+          <a href="/dashboard/orders">View all →</a>
+        </div>
+
+        {previewOrders.length === 0 ? (
+          <div className="empty-state">
+            <p>No individual orders yet. Create your first order to get started.</p>
+          </div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E8E0D5', padding: '0.2rem 1rem' }}>
+            {previewOrders.map((o) => {
+              const status = getStatusInfo(o.current_status)
+              return (
+                <div key={o.id} className="order-row">
+                  <div className="order-info">
+                    <p className="name">
+                      {o.item_name || 'Untitled'}
+                      <span
+                        className="order-status-badge"
+                        style={{ background: status.bg, color: status.color, marginLeft: '0.5rem' }}
+                      >
+                        {status.label}
+                      </span>
+                    </p>
+                    <p className="meta">
+                      {o.customers?.name || 'No customer'} · {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <span className={`order-balance ${o.price - o.amount_paid <= 0 ? 'paid' : ''}`}>
+                      {o.price - o.amount_paid > 0 ? `₦${(o.price - o.amount_paid).toLocaleString()}` : '✓'}
+                    </span>
+                    <div className="order-actions">
+                      <a href={`/dashboard/orders/${o.id}`}>View</a>
+                      <a href={`/dashboard/orders/${o.id}/edit`}>Edit</a>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* CUSTOMERS */}
+      <div>
+        <div className="section-header">
+          <h2>Recent Customers</h2>
+          <a href="/dashboard/customers">View all →</a>
+        </div>
+
+        {previewCustomers.length === 0 ? (
+          <div className="empty-state">
+            <p>No customers yet. Add your first customer to start tracking orders.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {previewCustomers.map((c) => (
+              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row">
+                <div>
+                  <p className="name">{c.name}</p>
+                  {c.phone && <p className="phone">{c.phone}</p>}
+                </div>
+                <span style={{ color: '#C79A2B', fontSize: '0.8rem' }}>→</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  )
+          }
