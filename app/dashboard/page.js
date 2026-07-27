@@ -127,11 +127,6 @@ export default function DashboardPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
   const toggleGroup = (groupId) => {
     setExpandedGroups((prev) =>
       prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
@@ -554,15 +549,15 @@ export default function DashboardPage() {
           color: #4C7A5E;
         }
         .order-actions {
-        display: flex;
-          gap: 0.4rem;
+          display: flex;
+          gap: 0.3rem;
           flex-shrink: 0;
           align-items: center;
         }
         .order-actions .btn {
-          padding: 0.3rem 0.7rem;
+          padding: 0.3rem 0.6rem;
           border-radius: 6px;
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           font-weight: 600;
           text-decoration: none;
           border: 1px solid #E8E0D5;
@@ -572,10 +567,8 @@ export default function DashboardPage() {
           cursor: pointer;
           display: inline-flex;
           align-items: center;
-          gap: 0.2rem;
-          min-height: 30px;
-          min-width: 44px;
-          justify-content: center;
+          gap: 0.15rem;
+          min-height: 28px;
         }
         .order-actions .btn:hover {
           background: #F5EFE2;
@@ -655,7 +648,7 @@ export default function DashboardPage() {
         .section-header a {
           color: #6B6255;
           font-size: 0.8rem;
-          font-weight: 500;
+          font-weight:500;
           text-decoration: none;
           border-bottom: 1px solid transparent;
         }
@@ -786,27 +779,6 @@ export default function DashboardPage() {
           font-size: 1.2rem;
           font-weight: 700;
           margin: 0;
-        }
-        .header-actions {
-          display: flex;
-          gap: 0.4rem;
-          align-items: center;
-        }
-        .header-actions a,
-        .header-actions button {
-          padding: 0.3rem 0.6rem;
-          border-radius: 6px;
-          font-size: 0.75rem;
-          text-decoration: none;
-          border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
-        }
-        .header-actions a:hover,
-        .header-actions button:hover {
-          background: #F5EFE2;
-          border-color: #C79A2B;
         }
         .clear-filter-btn {
           background: #AE4A34;
@@ -971,10 +943,9 @@ export default function DashboardPage() {
           max-width: 380px;
           width: 100%;
           animation: slideUp 0.3s ease-out;
-    }
-    `}</style>
-
-      {/* ===== HEADER ===== */}
+        }
+      `}</style>
+      {/* ===== HEADER (No Profile/Logout buttons) ===== */}
       <div className="header-top">
         <div className="header-brand">
           <LetterLogo name={business?.name} size={44} />
@@ -982,10 +953,6 @@ export default function DashboardPage() {
             <p className="greeting">Welcome back,</p>
             <p className="business-name">{business ? business.name : 'Your business'}</p>
           </div>
-        </div>
-        <div className="header-actions">
-          <a href="/dashboard/profile">Profile</a>
-          <button onClick={handleLogout}>Log out</button>
         </div>
       </div>
 
@@ -1062,7 +1029,7 @@ export default function DashboardPage() {
         </select>
       </div>
 
-      {/* ===== QUICK ACTIONS ===== */}
+      {/* ===== QUICK ACTIONS (Added Reminders button) ===== */}
       <div className="quick-actions">
         <a href="/dashboard/customers/new" className="action-btn" style={{ background: '#1E3A5F', color: '#fff' }}>
           👤 + Customer
@@ -1073,7 +1040,11 @@ export default function DashboardPage() {
         <a href="/dashboard/groups/new" className="action-btn" style={{ background: '#AE4A34', color: '#fff' }}>
           👥 + Group
         </a>
+        <a href="/dashboard/reminders" className="action-btn" style={{ background: '#4C7A5E', color: '#fff' }}>
+          🔔 Reminders
+        </a>
       </div>
+
       {/* ===== GROUP ORDERS ===== */}
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
@@ -1159,16 +1130,16 @@ export default function DashboardPage() {
                               {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
                             </span>
                             <div className="order-actions">
-                              <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️ View</a>
+                              <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️</a>
                               {phone && (
-                                <a href={`tel:${phone}`} className="btn btn-call">📞 Call</a>
+                                <a href={`tel:${phone}`} className="btn btn-call">📞</a>
                               )}
                               {balance > 0 && (
                                 <button className="btn btn-settle" onClick={() => openSettleModal(o)}>
-                                  💰 Settle
+                                  💰
                                 </button>
                               )}
-                              <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️ Edit</a>
+                              <a href={`/dashboard/orders/${o.id}?edit=true`} className="btn btn-edit">✏️</a>
                             </div>
                           </div>
                         </div>
@@ -1243,16 +1214,16 @@ export default function DashboardPage() {
                       {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
                     </span>
                     <div className="order-actions">
-                      <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️ View</a>
+                      <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️</a>
                       {phone && (
-                        <a href={`tel:${phone}`} className="btn btn-call">📞 Call</a>
+                        <a href={`tel:${phone}`} className="btn btn-call">📞</a>
                       )}
                       {balance > 0 && (
                         <button className="btn btn-settle" onClick={() => openSettleModal(o)}>
-                          💰 Settle
+                          💰
                         </button>
                       )}
-                      <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️ Edit</a>
+                      <a href={`/dashboard/orders/${o.id}?edit=true`} className="btn btn-edit">✏️</a>
                     </div>
                   </div>
                 </div>
