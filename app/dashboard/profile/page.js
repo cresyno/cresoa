@@ -10,55 +10,77 @@ export default function ProfilePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [business, setBusiness] = useState(null)
+  const [stats, setStats] = useState({ orders: 0, customers: 0 })
 
+  // Business info
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [location, setLocation] = useState('')
   const [savingInfo, setSavingInfo] = useState(false)
 
+  // Email
   const [newEmail, setNewEmail] = useState('')
   const [savingEmail, setSavingEmail] = useState(false)
   const [emailMessage, setEmailMessage] = useState('')
 
+  // Password
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
 
+  // Deactivate
   const [deactivating, setDeactivating] = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      setNewEmail(user.email || '')
-
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (businessData) {
-        setBusiness(businessData)
-        setName(businessData.name || '')
-        setPhone(businessData.phone || '')
-        setWhatsapp(businessData.whatsapp || '')
-        setLocation(businessData.location || '')
-      }
-
-      setLoading(false)
+  const load = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
     }
 
+    setNewEmail(user.email || '')
+
+    const { data: businessData } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('owner_id', user.id)
+      .single()
+
+    if (businessData) {
+      setBusiness(businessData)
+      setName(businessData.name || '')
+      setPhone(businessData.phone || '')
+      setWhatsapp(businessData.whatsapp || '')
+      setLocation(businessData.location || '')
+
+      // Load stats
+      const { count: orderCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessData.id)
+
+      const { count: customerCount } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessData.id)
+
+      setStats({
+        orders: orderCount || 0,
+        customers: customerCount || 0,
+      })
+    }
+
+    setLoading(false)
+  }
+
+  useEffect(() => {
     load()
   }, [router])
 
+  // Business info
   const handleSaveInfo = async (e) => {
     e.preventDefault()
     setSavingInfo(true)
@@ -71,12 +93,13 @@ export default function ProfilePage() {
     if (error) {
       showToast('Error saving info', '#AE4A34')
     } else {
-      showToast('Business info updated!', '#4C7A5E')
+      showToast('✅ Business info updated!', '#4C7A5E')
       setBusiness({ ...business, name, phone, whatsapp, location })
     }
     setSavingInfo(false)
   }
 
+  // Email
   const handleChangeEmail = async (e) => {
     e.preventDefault()
     setSavingEmail(true)
@@ -87,11 +110,13 @@ export default function ProfilePage() {
     if (error) {
       setEmailMessage('Error: ' + error.message)
     } else {
-      setEmailMessage('Check your new email address to confirm the change.')
+      setEmailMessage('✅ Check your new email to confirm the change.')
+      showToast('Confirmation email sent!', '#4C7A5E')
     }
     setSavingEmail(false)
   }
 
+  // Password
   const handleChangePassword = async (e) => {
     e.preventDefault()
     setPasswordMessage('')
@@ -116,16 +141,17 @@ export default function ProfilePage() {
     if (error) {
       setPasswordMessage('Error: ' + error.message)
     } else {
-      showToast('Password updated!', '#4C7A5E')
+      showToast('✅ Password updated!', '#4C7A5E')
       setNewPassword('')
       setConfirmNewPassword('')
     }
     setSavingPassword(false)
   }
 
+  // Deactivate
   const handleDeactivate = async () => {
     const confirmed = window.confirm(
-      'Are you sure you want to deactivate your account? You will be logged out and will need to contact support to reactivate.'
+      '⚠️ Are you sure you want to deactivate your account? You will be logged out and will need to contact support to reactivate.'
     )
     if (!confirmed) return
 
@@ -161,128 +187,377 @@ export default function ProfilePage() {
 
   const inputStyle = {
     width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box'
+    border: '1px solid #E8E0D5', fontSize: '1rem', boxSizing: 'border-box',
+    background: '#fff', color: '#2B2620',
+    transition: 'border-color 0.2s ease',
   }
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem' }
-  const cardStyle = { background: '#fff', borderRadius: '14px', padding: '1.3rem', border: '1px solid #e4d8c2', marginBottom: '1.2rem' }
-  const buttonStyle = { width: '100%', padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#1E3A5F', color: '#fff', fontSize: '0.95rem', fontWeight: '600' }
+
+  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
+
+  const handlePhoneChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
+    setPhone(digits)
+  }
+
+  const handleWhatsAppChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
+    setWhatsapp(digits)
+  }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
-      <div style={{ maxWidth: '420px', margin: '0 auto' }}>
-        <button
-          onClick={() => router.push('/dashboard')}
-          style={{ background: 'none', border: 'none', color: '#1E3A5F', fontSize: '0.85rem', padding: 0, marginBottom: '1rem' }}
-        >
-          ← Back to dashboard
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+      <style>{`
+        .profile-card {
+          background: #fff;
+          border-radius: 14px;
+          padding: 1.5rem;
+          border: 1px solid #E8E0D5;
+          max-width: 480px;
+          margin: 0 auto;
+          margin-bottom: 1rem;
+        }
+        .profile-card .title {
+          color: #1E3A5F;
+          font-size: 1rem;
+          font-weight: 700;
+          margin: 0 0 1rem;
+        }
+        .profile-card .subtitle {
+          color: #6B6255;
+          font-size: 0.8rem;
+          margin: -0.5rem 0 1rem;
+        }
+        .btn-primary {
+          width: 100%;
+          padding: 0.8rem;
+          border-radius: 8px;
+          border: none;
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+          color: #1E3A5F;
+          font-size: 1rem;
+          font-weight: 700;
+          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .btn-primary:active {
+          transform: scale(0.98);
+        }
+        .btn-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .btn-secondary {
+          width: 100%;
+          padding: 0.8rem;
+          border-radius: 8px;
+          border: 1px solid #E8E0D5;
+          background: #fff;
+          color: #1E3A5F;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.1s ease;
+        }
+        .btn-secondary:hover {
+          background: #F5EFE2;
+        }
+        .btn-secondary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .btn-danger {
+          width: 100%;
+          padding: 0.8rem;
+          border-radius: 8px;
+          border: 1px solid #AE4A34;
+          background: #fff;
+          color: #AE4A34;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.1s ease;
+        }
+        .btn-danger:hover {
+          background: #F1DBD3;
+        }
+        .btn-danger:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .danger-zone {
+          border: 2px solid #AE4A34;
+          background: #FFF5F0;
+        }
+        .danger-zone .title {
+          color: #AE4A34;
+        }
+        .back-link {
+          background: none;
+          border: none;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+          padding: 0;
+          margin-bottom: 1rem;
+          cursor: pointer;
+        }
+        .back-link:hover {
+          text-decoration: underline;
+        }
+        .header-row {
+          display: flex;
+          align-items: center;
+          gap: 0.8rem;
+          margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+        }
+        .header-row .info h1 {
+          color: #1E3A5F;
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .header-row .info p {
+          color: #6B6255;
+          font-size: 0.85rem;
+          margin: 0.1rem 0 0;
+        }
+        .stats-row {
+          display: flex;
+          gap: 0.5rem;
+          margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+        }
+        .stat-card {
+          background: #fff;
+          border-radius: 10px;
+          padding: 0.7rem 0.5rem;
+          border: 1px solid #E8E0D5;
+          text-align: center;
+          flex: 1;
+          min-width: 70px;
+        }
+        .stat-card .value {
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #1E3A5F;
+          margin: 0;
+        }
+        .stat-card .label {
+          color: #6B6255;
+          font-size: 0.65rem;
+          margin: 0.1rem 0 0;
+        }
+        @media (max-width: 420px) {
+          .profile-card {
+            padding: 1rem;
+          }
+          .header-row {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .stats-row {
+            flex-wrap: wrap;
+          }
+          .stat-card {
+            min-width: 60px;
+          }
+        }
+      `}</style>
+
+      {/* ===== BACK BUTTON ===== */}
+      <button className="back-link" onClick={() => router.push('/dashboard')}>
+        ← Back to dashboard
+      </button>
+
+      {/* ===== HEADER ===== */}
+      <div className="header-row">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <LetterLogo name={business?.name} size={48} />
+          <div className="info">
+            <h1>Profile & Settings</h1>
+            <p>{business?.name || 'Your business'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== STATS ===== */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <p className="value">{stats.customers}</p>
+          <p className="label">👤 Customers</p>
+        </div>
+        <div className="stat-card">
+          <p className="value">{stats.orders}</p>
+          <p className="label">📦 Orders</p>
+        </div>
+        <div className="stat-card">
+          <p className="value">{business?.business_type || '—'}</p>
+          <p className="label">📌 Business Type</p>
+        </div>
+        <div className="stat-card">
+          <p className="value">{business?.location || '—'}</p>
+          <p className="label">📍 Location</p>
+        </div>
+      </div>
+
+      {/* ===== BUSINESS INFO ===== */}
+      <form onSubmit={handleSaveInfo} className="profile-card">
+        <h2 className="title">🏢 Business Info</h2>
+
+        <div style={{ marginBottom: '0.8rem' }}>
+          <label style={labelStyle}>Business name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginBottom: '0.8rem' }}>
+          <label style={labelStyle}>Phone number</label>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={handlePhoneChange}
+            placeholder="08012345678"
+            style={inputStyle}
+          />
+          <p style={{ fontSize: '0.7rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.2rem' }}>
+            {phone.length}/11 digits
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '0.8rem' }}>
+          <label style={labelStyle}>WhatsApp number <span style={{ fontWeight: '400', color: '#6B6255' }}>(optional)</span></label>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={whatsapp}
+            onChange={handleWhatsAppChange}
+            placeholder="If different from phone"
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={labelStyle}>Location</label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Ibadan, Oyo State"
+            style={inputStyle}
+          />
+        </div>
+
+        <button type="submit" className="btn-primary" disabled={savingInfo}>
+          {savingInfo ? 'Saving...' : '💾 Save business info'}
+        </button>
+      </form>
+      {/* ===== CHANGE EMAIL ===== */}
+      <form onSubmit={handleChangeEmail} className="profile-card">
+        <h2 className="title">📧 Change Email</h2>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={labelStyle}>New email address</label>
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            required
+            style={inputStyle}
+          />
+        </div>
+
+        <button type="submit" className="btn-secondary" disabled={savingEmail}>
+          {savingEmail ? 'Updating...' : '✉️ Update email'}
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.5rem' }}>
-          <LetterLogo name={business?.name} size={48} />
-          <div>
-            <h1 style={{ color: '#1E3A5F', fontSize: '1.4rem', margin: 0 }}>Profile & settings</h1>
-            {business?.business_type && (
-              <p style={{ color: '#6B6255', fontSize: '0.8rem', margin: '0.1rem 0 0' }}>{business.business_type}</p>
-            )}
-          </div>
-        </div>
+        {emailMessage && (
+          <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: emailMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
+            {emailMessage}
+          </p>
+        )}
+      </form>
 
-        <form onSubmit={handleSaveInfo} style={cardStyle}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 1rem' }}>Business info</h2>
+      {/* ===== CHANGE PASSWORD ===== */}
+      <form onSubmit={handleChangePassword} className="profile-card">
+        <h2 className="title">🔒 Change Password</h2>
 
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={labelStyle}>Business name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={labelStyle}>Phone</label>
-            <input type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={labelStyle}>WhatsApp number</label>
-            <input type="tel" inputMode="numeric" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, '').slice(0, 11))} style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Location</label>
-            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} style={inputStyle} />
-          </div>
-
-          <button type="submit" disabled={savingInfo} style={buttonStyle}>
-            {savingInfo ? 'Saving...' : 'Save business info'}
-          </button>
-        </form>
-
-        <form onSubmit={handleChangeEmail} style={cardStyle}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 1rem' }}>Change email</h2>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>New email address</label>
-            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required style={inputStyle} />
-          </div>
-          <button type="submit" disabled={savingEmail} style={buttonStyle}>
-            {savingEmail ? 'Updating...' : 'Update email'}
-          </button>
-          {emailMessage && (
-            <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: emailMessage.startsWith('Error') ? '#AE4A34' : '#4C7A5E' }}>
-              {emailMessage}
-            </p>
-          )}
-        </form>
-
-        <form onSubmit={handleChangePassword} style={cardStyle}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 1rem' }}>Change password</h2>
-          <div style={{ marginBottom: '0.6rem' }}>
-            <label style={labelStyle}>New password</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showNewPassword ? 'text' : 'password'}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                style={{ ...inputStyle, paddingRight: '2.6rem' }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPassword(!showNewPassword)}
-                style={{ position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, color: '#6B6255', fontSize: '0.8rem' }}
-              >
-                {showNewPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Confirm new password</label>
+        <div style={{ marginBottom: '0.6rem' }}>
+          <label style={labelStyle}>New password</label>
+          <div style={{ position: 'relative' }}>
             <input
               type={showNewPassword ? 'text' : 'password'}
-              value={confirmNewPassword}
-              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
               required
-              style={inputStyle}
+              style={{ ...inputStyle, paddingRight: '2.6rem' }}
             />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword(!showNewPassword)}
+              style={{
+                position: 'absolute', right: '0.7rem', top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none', border: 'none',
+                color: '#6B6255', fontSize: '0.8rem', cursor: 'pointer'
+              }}
+            >
+              {showNewPassword ? 'Hide' : 'Show'}
+            </button>
           </div>
-          <button type="submit" disabled={savingPassword} style={buttonStyle}>
-            {savingPassword ? 'Updating...' : 'Update password'}
-          </button>
-          {passwordMessage && (
-            <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: '#AE4A34' }}>
-              {passwordMessage}
+          <div style={{ marginTop: '0.3rem', fontSize: '0.7rem', color: '#6B6255' }}>
+            <span style={{ display: 'block' }}>{newPassword.length >= 8 ? '✅' : '○'} At least 8 characters</span>
+            <span style={{ display: 'block' }}>{/\d/.test(newPassword) ? '✅' : '○'} Contains a number</span>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={labelStyle}>Confirm new password</label>
+          <input
+            type={showNewPassword ? 'text' : 'password'}
+            value={confirmNewPassword}
+            onChange={(e) => setConfirmNewPassword(e.target.value)}
+            required
+            style={inputStyle}
+          />
+          {confirmNewPassword && (
+            <p style={{ marginTop: '0.2rem', fontSize: '0.75rem', color: newPassword === confirmNewPassword ? '#4C7A5E' : '#AE4A34' }}>
+              {newPassword === confirmNewPassword ? '✅ Passwords match' : '✕ Passwords do not match'}
             </p>
           )}
-        </form>
-
-        <div style={{ ...cardStyle, borderColor: '#AE4A34' }}>
-          <h2 style={{ color: '#AE4A34', fontSize: '1rem', margin: '0 0 0.6rem' }}>Danger zone</h2>
-          <p style={{ color: '#6B6255', fontSize: '0.85rem', marginBottom: '1rem' }}>
-            Deactivating logs you out immediately. Contact support to reactivate.
-          </p>
-          <button
-            onClick={handleDeactivate}
-            disabled={deactivating}
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #AE4A34', background: '#fff', color: '#AE4A34', fontSize: '0.95rem', fontWeight: '600' }}
-          >
-            {deactivating ? 'Deactivating...' : 'Deactivate account'}
-          </button>
         </div>
+
+        <button type="submit" className="btn-secondary" disabled={savingPassword}>
+          {savingPassword ? 'Updating...' : '🔑 Update password'}
+        </button>
+
+        {passwordMessage && (
+          <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#AE4A34' }}>
+            {passwordMessage}
+          </p>
+        )}
+      </form>
+
+      {/* ===== DANGER ZONE ===== */}
+      <div className="profile-card danger-zone">
+        <h2 className="title">⚠️ Danger Zone</h2>
+        <p style={{ color: '#6B6255', fontSize: '0.85rem', marginBottom: '1rem' }}>
+          Deactivating your account will log you out immediately. You'll need to contact support to reactivate.
+        </p>
+        <button
+          type="button"
+          className="btn-danger"
+          onClick={handleDeactivate}
+          disabled={deactivating}
+        >
+          {deactivating ? 'Deactivating...' : '🗑️ Deactivate account'}
+        </button>
       </div>
     </main>
   )
-}
+              }
