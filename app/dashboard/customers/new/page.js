@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-
+import { supabase } from '../../../../lib/supabaseClient'
 const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust/Chest (inches)' },
   { key: 'waist', label: 'Waist (inches)' },
