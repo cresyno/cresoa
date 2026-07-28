@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
+import { supabase } from '../../../lib/supabaseClient'      // ← correct path
 import { PLANS, getPlanStatusMessage } from '../../../lib/planLimits'
 import { showToast } from '../../../lib/toast'
 
@@ -17,7 +17,10 @@ export default function SubscriptionPage() {
   const [processing, setProcessing] = useState(false)
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createMessage, setCreateMessage] = useState('')
 
+  // -------- 1. Load business --------
   const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -33,8 +36,8 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !businessData) {
-        // ✅ No business → redirect to onboarding
-        router.replace('/onboarding')
+        setBusiness(null)
+        setLoading(false)
         return null
       }
 
@@ -43,7 +46,8 @@ export default function SubscriptionPage() {
       return businessData
     } catch (err) {
       console.error('loadBusiness error:', err)
-      router.replace('/onboarding')
+      setBusiness(null)
+      setLoading(false)
       return null
     }
   }
@@ -52,17 +56,68 @@ export default function SubscriptionPage() {
     loadBusiness().finally(() => setLoading(false))
   }, [])
 
-  // Handle Paystack callback
+  // -------- 2. Direct business creation (no API) --------
+  const createBusiness = async () => {
+    setCreating(true)
+    setCreateMessage('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setCreateMessage('You must be logged in.')
+        setCreating(false)
+        return
+      }
+
+      const newBusiness = {
+        owner_id: user.id,
+        name: user.user_metadata?.business_name || 'My Business',
+        phone: '',
+        location: '',
+        sector: 'Fashion & Custom Wear',
+        business_type: 'Fashion Designer',
+        onboarding_completed: true,
+        plan: 'free',
+        plan_status: 'active',
+        trial_starts_at: new Date().toISOString(),
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        is_active: true,
+      }
+
+      const { data: inserted, error } = await supabase
+        .from('businesses')
+        .insert(newBusiness)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Insert error:', error)
+        setCreateMessage('❌ Failed: ' + error.message)
+        setCreating(false)
+        return
+      }
+
+      setCreateMessage('✅ Business created! Refreshing...')
+      setBusiness(inserted)
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
+    } catch (err) {
+      console.error('Create error:', err)
+      setCreateMessage('❌ Error: ' + err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  // -------- 3. Paystack callback verification --------
   useEffect(() => {
     const reference = searchParams?.get('reference') || searchParams?.get('trxref')
-
     if (reference) {
       const verifyPayment = async () => {
         setVerifying(true)
         try {
           const res = await fetch(`/api/paystack/verify?reference=${reference}`)
           const data = await res.json()
-
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
             await loadBusiness()
@@ -77,15 +132,14 @@ export default function SubscriptionPage() {
           setVerifying(false)
         }
       }
-
       verifyPayment()
     }
   }, [searchParams, router])
 
+  // -------- 4. Upgrade handler --------
   const handleUpgrade = async (planId) => {
     setMessage('')
     setProcessing(true)
-
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -94,7 +148,7 @@ export default function SubscriptionPage() {
         return
       }
 
-      // ✅ Always fetch fresh business
+      // Always fetch fresh business
       const { data: freshBusiness, error } = await supabase
         .from('businesses')
         .select('id, plan')
@@ -102,7 +156,8 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !freshBusiness) {
-        router.replace('/onboarding')
+        setMessage('Business not found. Click "Create My Business" below first.')
+        setProcessing(false)
         return
       }
 
@@ -119,7 +174,6 @@ export default function SubscriptionPage() {
       })
 
       const data = await response.json()
-
       if (data.status === 'success') {
         window.location.href = data.authorization_url
       } else {
@@ -135,6 +189,7 @@ export default function SubscriptionPage() {
 
   const planStatus = business ? getPlanStatusMessage(business) : null
 
+  // -------- 5. Render logic --------
   if (loading || verifying) {
     return (
       <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -154,11 +209,43 @@ export default function SubscriptionPage() {
     )
   }
 
-  // If business is still null after loading, return null (will redirect)
+  // If no business, show the creation button
   if (!business) {
-    return null
+    return (
+      <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+        <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'center', padding: '2rem 0' }}>
+          <h2 style={{ color: '#1E3A5F' }}>🔧 Business Profile Missing</h2>
+          <p style={{ color: '#6B6255', marginBottom: '1.5rem' }}>
+            Your account does not have a business profile yet. Click the button below to create one instantly.
+          </p>
+          <button
+            onClick={createBusiness}
+            disabled={creating}
+            style={{
+              background: '#1E3A5F',
+              color: '#fff',
+              padding: '0.8rem 2rem',
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            {creating ? 'Creating...' : '🚀 Create My Business'}
+          </button>
+          {createMessage && (
+            <p style={{ marginTop: '1rem', color: createMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
+              {createMessage}
+            </p>
+          )}
+        </div>
+      </main>
+    )
   }
 
+  // -------- 6. Subscription plans UI (when business exists) --------
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
@@ -382,4 +469,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-    }
+              }
