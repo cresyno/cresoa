@@ -2,7 +2,12 @@
 
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { supabase } from '../../../../lib/supabaseClient'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function POST(request) {
   try {
@@ -12,13 +17,9 @@ export async function POST(request) {
 
     if (!secretKey) {
       console.error('PAYSTACK_SECRET_KEY not set')
-      return NextResponse.json(
-        { error: 'Paystack not configured' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Paystack not configured' }, { status: 500 })
     }
 
-    // Verify webhook signature
     const expectedSignature = crypto
       .createHmac('sha512', secretKey)
       .update(body)
@@ -26,15 +27,11 @@ export async function POST(request) {
 
     if (signature !== expectedSignature) {
       console.error('Invalid webhook signature')
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
     const event = JSON.parse(body)
 
-    // Only handle successful charge events
     if (event.event !== 'charge.success') {
       return NextResponse.json({ received: true })
     }
@@ -45,8 +42,7 @@ export async function POST(request) {
       return NextResponse.json({ received: true })
     }
 
-    // Verify this transaction hasn't been processed
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('subscription_history')
       .select('id')
       .eq('paystack_transaction_ref', reference)
@@ -57,8 +53,7 @@ export async function POST(request) {
       return NextResponse.json({ received: true, message: 'Already processed' })
     }
 
-    // Update business plan
-    await supabase
+    await supabaseAdmin
       .from('businesses')
       .update({
         plan: metadata.plan,
@@ -68,8 +63,7 @@ export async function POST(request) {
       })
       .eq('id', metadata.business_id)
 
-    // Update subscription history
-    await supabase
+    await supabaseAdmin
       .from('subscription_history')
       .update({
         status: 'success',
@@ -79,24 +73,18 @@ export async function POST(request) {
       })
       .eq('paystack_transaction_ref', reference)
 
-    // Record payment
-    await supabase
+    await supabaseAdmin
       .from('payment_records')
       .insert({
         business_id: metadata.business_id,
         amount: amount / 100,
-        type: 'subscription',
         note: `Subscription to ${metadata.plan_name} plan`,
-        reference: reference,
       })
 
     return NextResponse.json({ received: true })
 
   } catch (error) {
     console.error('Paystack webhook error:', error)
-    return NextResponse.json(
-      { error: 'Webhook processing failed' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
-      }
+}
