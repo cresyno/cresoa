@@ -25,7 +25,6 @@ export async function GET(request) {
       )
     }
 
-    // 1. Verify with Paystack
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
@@ -52,18 +51,17 @@ export async function GET(request) {
       )
     }
 
-    // 2. 🔥 Look up business_id from subscription_history
+    // Look up business_id from subscription_history
     const { data: history, error: historyError } = await supabase
       .from('subscription_history')
-      .select('business_id, new_plan, amount_paid')
+      .select('business_id, new_plan')
       .eq('paystack_transaction_ref', txRef)
       .eq('status', 'pending')
       .single()
 
     if (historyError || !history) {
-      console.error('❌ No pending transaction found for reference:', txRef)
       return NextResponse.json(
-        { error: 'No pending transaction found for this reference' },
+        { error: 'No pending transaction found' },
         { status: 404 }
       )
     }
@@ -71,25 +69,8 @@ export async function GET(request) {
     const businessId = history.business_id
     const planId = history.new_plan
 
-    console.log('✅ Found business ID from history:', businessId)
-
-    // 3. Check if business exists
-    const { data: existingBusiness, error: checkError } = await supabase
-      .from('businesses')
-      .select('id, plan')
-      .eq('id', businessId)
-      .single()
-
-    if (checkError || !existingBusiness) {
-      console.error('❌ Business not found:', businessId)
-      return NextResponse.json(
-        { error: 'Business not found' },
-        { status: 404 }
-      )
-    }
-
-    // 4. Update business plan
-    const { data: updatedBusiness, error: updateError } = await supabase
+    // Update business plan
+    const { error: updateError } = await supabase
       .from('businesses')
       .update({
         plan: planId,
@@ -98,17 +79,15 @@ export async function GET(request) {
         last_payment_date: new Date(),
       })
       .eq('id', businessId)
-      .select()
 
     if (updateError) {
-      console.error('❌ Update error:', updateError)
       return NextResponse.json(
-        { error: 'Database update failed: ' + updateError.message },
+        { error: 'Database update failed' },
         { status: 500 }
       )
     }
 
-    // 5. Update subscription history status
+    // Update subscription history
     await supabase
       .from('subscription_history')
       .update({
@@ -119,7 +98,7 @@ export async function GET(request) {
       })
       .eq('paystack_transaction_ref', txRef)
 
-    // 6. Record payment
+    // Record payment
     await supabase
       .from('payment_records')
       .insert({
@@ -130,19 +109,16 @@ export async function GET(request) {
         reference: txRef,
       })
 
-    console.log('✅ Plan upgraded successfully for business:', businessId)
-
     return NextResponse.json({
       status: 'success',
       plan: planId,
       message: 'Subscription activated successfully',
-      business: updatedBusiness,
     })
 
   } catch (error) {
-    console.error('❌ Paystack verification error:', error)
+    console.error('Paystack verification error:', error)
     return NextResponse.json(
-      { error: 'Verification failed: ' + error.message },
+      { error: 'Verification failed' },
       { status: 500 }
     )
   }
