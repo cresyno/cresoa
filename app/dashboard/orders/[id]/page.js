@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { getPlanLimits } from '../../../../lib/planLimits'
+import { isFeatureAvailable } from '../../../../lib/planLimits'
 import { showToast } from '../../../../lib/toast'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
@@ -19,25 +19,21 @@ export default function OrderDetailPage({ params }) {
   const [editing, setEditing] = useState(false)
   const [plan, setPlan] = useState('free')
 
-  // Edit form
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
-  // Payment form
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
 
-  // Notes
   const [internalNotes, setInternalNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesMessage, setNotesMessage] = useState('')
 
-  // Delete
   const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
@@ -104,7 +100,6 @@ export default function OrderDetailPage({ params }) {
     return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
-  // -------- Actions --------
   const advanceStatus = async () => {
     const currentIndex = STAGES.indexOf(order.current_status)
     if (currentIndex === -1 || currentIndex === STAGES.length - 1) return
@@ -119,7 +114,6 @@ export default function OrderDetailPage({ params }) {
     load()
   }
 
-  // -------- Locked feature handlers --------
   const copyTrackingLink = () => {
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
     navigator.clipboard.writeText(link)
@@ -133,7 +127,7 @@ export default function OrderDetailPage({ params }) {
       return
     }
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
-    const msg = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link — you can check your order status anytime: ${link}`
+    const msg = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link: ${link}`
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -144,7 +138,7 @@ export default function OrderDetailPage({ params }) {
       return
     }
     const status = getStatusInfo(order.current_status)
-    const msg = `Hi ${order.customers?.name}, this is ${business?.name}. Your order "${order.title}" is now at the "${status.label}" stage. Thank you for your patience.`
+    const msg = `Hi ${order.customers?.name}, this is ${business?.name}. Your order "${order.title}" is now at the "${status.label}" stage.`
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -155,7 +149,7 @@ export default function OrderDetailPage({ params }) {
       return
     }
     const bal = order.price - order.amount_paid
-    const msg = `Hi ${order.customers?.name}, this is a reminder for your balance of ₦${bal.toLocaleString()} for "${order.title}". Thank you - ${business?.name}`
+    const msg = `Hi ${order.customers?.name}, this is a reminder for your balance of ₦${bal.toLocaleString()} for "${order.title}". Thank you.`
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
     await supabase.from('orders').update({ last_reminder_sent_at: new Date().toISOString() }).eq('id', order.id)
     load()
@@ -165,7 +159,6 @@ export default function OrderDetailPage({ params }) {
     router.push(`/dashboard/orders/new?duplicate=${order.id}`)
   }
 
-  // -------- Edit handlers --------
   const handleSave = async (e) => {
     e.preventDefault()
     setMessage('')
@@ -219,7 +212,7 @@ export default function OrderDetailPage({ params }) {
 
     const newTotal = order.amount_paid + amount
     if (newTotal > order.price) {
-      alert(`This payment would bring the total paid above the order price (₦${order.price.toLocaleString()}).`)
+      alert(`This payment would exceed the order price (₦${order.price.toLocaleString()}).`)
       return
     }
 
@@ -244,7 +237,7 @@ export default function OrderDetailPage({ params }) {
   }
 
   const handleDelete = async () => {
-    const confirmed = window.confirm(`Do you want to delete "${order.title}"? This can't be undone.`)
+    const confirmed = window.confirm(`Delete "${order.title}"? This cannot be undone.`)
     if (!confirmed) return
 
     setDeleting(true)
@@ -254,7 +247,7 @@ export default function OrderDetailPage({ params }) {
 
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner {
@@ -265,8 +258,8 @@ export default function OrderDetailPage({ params }) {
             animation: spin 0.8s linear infinite;
           }
         `}</style>
-<div className="spinner"></div>
-        <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Loading order...</p>
+        <div className="spinner"></div>
+        <p style={{ color: '#6B6255', marginTop: '1rem' }}>Loading order...</p>
       </main>
     )
   }
@@ -296,7 +289,6 @@ export default function OrderDetailPage({ params }) {
   }
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
 
-  // ✅ Helper: render a locked or unlocked action button with value proposition
   const renderLockableAction = (label, benefit, onClick, isAvailable) => {
     const isLocked = !isAvailable
 
@@ -409,7 +401,7 @@ export default function OrderDetailPage({ params }) {
         .status-dot .dot.done {
           border-color: #4C7A5E;
           background: #4C7A5E;
-        }
+    }
         .status-dot .label {
           font-size: 0.55rem;
           color: #6B6255;
@@ -533,13 +525,6 @@ export default function OrderDetailPage({ params }) {
           letter-spacing: 0.3px;
           text-transform: uppercase;
         }
-        .feature-locked {
-          opacity: 0.7;
-          filter: grayscale(0.2);
-        }
-        .feature-unlocked {
-          opacity: 1;
-        }
         @media (max-width: 420px) {
           .header-row { flex-direction: column; }
           .header-actions { width: 100%; }
@@ -552,12 +537,10 @@ export default function OrderDetailPage({ params }) {
         }
       `}</style>
 
-      {/* ===== BACK BUTTON ===== */}
       <button className="back-link" onClick={() => router.back()}>
         ← Back
       </button>
 
-      {/* ===== HEADER ===== */}
       <div className="header-row">
         <div className="name-section">
           <h1>
@@ -566,7 +549,7 @@ export default function OrderDetailPage({ params }) {
               {status.label}
             </span>
           </h1>
-<p className="customer">
+          <p className="customer">
             👤 {order.customers?.name || 'No customer'}
             {order.customers?.phone && ` · 📱 ${order.customers.phone}`}
           </p>
@@ -592,7 +575,6 @@ export default function OrderDetailPage({ params }) {
         </div>
       </div>
 
-      {/* ===== STATS ===== */}
       <div className="stats-row">
         <div className="stat-card">
           <p className="value navy">₦{order.price.toLocaleString()}</p>
@@ -614,7 +596,6 @@ export default function OrderDetailPage({ params }) {
         </div>
       </div>
 
-      {/* ===== STATUS TIMELINE ===== */}
       <div className="card">
         <div className="status-timeline">
           {STAGES.map((stage, i) => {
@@ -649,7 +630,6 @@ export default function OrderDetailPage({ params }) {
         </div>
       </div>
 
-      {/* ===== ACTION BUTTONS WITH LOCK + VALUE ===== */}
       <div className="action-row">
         {renderLockableAction(
           'Copy Link',
@@ -680,7 +660,6 @@ export default function OrderDetailPage({ params }) {
         )}
       </div>
 
-      {/* ===== EDIT SECTION ===== */}
       {editing && (
         <form onSubmit={handleSave} className="card">
           <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.8rem' }}>✏️ Edit Order</h2>
@@ -707,7 +686,6 @@ export default function OrderDetailPage({ params }) {
         </form>
       )}
 
-      {/* ===== PAYMENTS ===== */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: 0 }}>💰 Payments</h2>
@@ -763,7 +741,6 @@ export default function OrderDetailPage({ params }) {
         )}
       </div>
 
-      {/* ===== NOTES ===== */}
       <div className="card">
         <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.3rem' }}>📝 Internal Notes</h2>
         <p style={{ color: '#6B6255', fontSize: '0.75rem', margin: '0 0 0.6rem' }}>Only you see these — not shared with the customer.</p>
@@ -784,7 +761,6 @@ export default function OrderDetailPage({ params }) {
         )}
       </div>
 
-      {/* ===== DANGER ZONE ===== */}
       <button
         className="btn btn-red btn-block"
         onClick={handleDelete}
@@ -795,4 +771,4 @@ export default function OrderDetailPage({ params }) {
       </button>
     </main>
   )
-              }
+          }
