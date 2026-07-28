@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import { showToast } from '../../../../../lib/toast'
+
 const REPAIR_STAGES = [
   { value: 'Diagnosing', label: 'Diagnosing' },
   { value: 'Awaiting Parts', label: 'Awaiting Parts' },
@@ -398,18 +399,15 @@ export default function NewRepairJobPage() {
         }
       `}</style>
 
-      {/* ===== BACK BUTTON ===== */}
       <button className="back-link" onClick={() => router.push('/dashboard/repairs')}>
         ← Back to dashboard
       </button>
 
-      {/* ===== HEADER ===== */}
       <div className="header-row">
-        <h1>🔧 New Repair Job</h1>
+          <h1>🔧 New Repair Job</h1>
         <span className="badge">Repairs</span>
       </div>
 
-      {/* ===== FORM ===== */}
       <form onSubmit={handleSubmit} className="form-card">
         {/* Customer */}
         <div className="form-group">
@@ -529,7 +527,7 @@ export default function NewRepairJobPage() {
             />
           </div>
         </div>
-        {/* Device Condition */}
+
         <div className="form-group">
           <label style={labelStyle}>Device Condition</label>
           <input
@@ -542,7 +540,6 @@ export default function NewRepairJobPage() {
           />
         </div>
 
-        {/* Issue Description */}
         <div className="form-group">
           <label style={labelStyle}>Issue Description <span style={{ color: '#AE4A34' }}>*</span></label>
           <textarea
@@ -638,7 +635,6 @@ export default function NewRepairJobPage() {
           </div>
         </div>
 
-        {/* Estimated Time & Due Date */}
         <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
             <label style={labelStyle}>Estimated Time (minutes)</label>
@@ -663,7 +659,6 @@ export default function NewRepairJobPage() {
           </div>
         </div>
 
-        {/* Status */}
         <div className="form-group">
           <label style={labelStyle}>Status</label>
           <select
@@ -678,7 +673,6 @@ export default function NewRepairJobPage() {
           </select>
         </div>
 
-        {/* Submit */}
         <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? 'Creating job...' : '🔧 Create repair job'}
         </button>
@@ -691,4 +685,4 @@ export default function NewRepairJobPage() {
       </form>
     </main>
   )
-                }
+          }
