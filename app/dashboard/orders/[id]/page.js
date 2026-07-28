@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
+import { isFeatureAvailable } from '../../../../lib/planLimits'
+import { showToast } from '../../../../lib/toast'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
@@ -15,6 +17,8 @@ export default function OrderDetailPage({ params }) {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [plan, setPlan] = useState('free')
+  const [planLimits, setPlanLimits] = useState({})
 
   // Edit form
   const [title, setTitle] = useState('')
@@ -51,12 +55,18 @@ export default function OrderDetailPage({ params }) {
       setDueDate(orderData.due_date || '')
       setInternalNotes(orderData.internal_notes || '')
 
+      // Fetch business to get plan
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('name')
+        .select('name, plan')
         .eq('id', orderData.business_id)
         .single()
+
       setBusiness(businessData)
+      setPlan(businessData?.plan || 'free')
+      // Fetch plan limits (we already have the function)
+      const { getPlanLimits } = await import('../../../../lib/planLimits')
+      setPlanLimits(getPlanLimits(businessData?.plan || 'free'))
 
       const { data: paymentData } = await supabase
         .from('payment_records')
@@ -88,12 +98,7 @@ export default function OrderDetailPage({ params }) {
     return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
   }
 
-  const getOrderName = (order) => {
-    if (order?.title) return order.title
-    if (order?.item_name) return order.item_name
-    if (order?.name) return order.name
-    return 'Order'
-  }
+  const getOrderName = (order) => order?.title || 'Order'
 
   const formatPhone = (phone) => {
     if (!phone) return ''
@@ -120,13 +125,22 @@ export default function OrderDetailPage({ params }) {
     load()
   }
 
+  // ✅ Locked functions — check plan before action
   const copyTrackingLink = () => {
+    if (!isFeatureAvailable(plan, 'tracking_links')) {
+      router.push('/dashboard/subscription')
+      return
+    }
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
     navigator.clipboard.writeText(link)
-    alert('Tracking link copied!')
+    showToast('Tracking link copied!', '#1E3A5F')
   }
 
   const sendLinkViaWhatsApp = () => {
+    if (!isFeatureAvailable(plan, 'tracking_links')) {
+      router.push('/dashboard/subscription')
+      return
+    }
     const phone = formatPhone(order.customers?.phone)
     if (!phone) {
       alert('This customer has no phone number saved.')
@@ -138,6 +152,10 @@ export default function OrderDetailPage({ params }) {
   }
 
   const sendStatusUpdate = () => {
+    if (!isFeatureAvailable(plan, 'whatsapp_reminders')) {
+      router.push('/dashboard/subscription')
+      return
+    }
     const phone = formatPhone(order.customers?.phone)
     if (!phone) {
       alert('This customer has no phone number saved.')
@@ -149,6 +167,10 @@ export default function OrderDetailPage({ params }) {
   }
 
   const sendReminder = async () => {
+    if (!isFeatureAvailable(plan, 'whatsapp_reminders')) {
+      router.push('/dashboard/subscription')
+      return
+    }
     const phone = formatPhone(order.customers?.phone)
     if (!phone) {
       alert('This customer has no phone number saved.')
@@ -297,6 +319,37 @@ export default function OrderDetailPage({ params }) {
   }
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
 
+  // ✅ Helper: render action button with lock if needed
+  const renderActionButton = (label, onClick, featureKey, icon = '') => {
+    const available = isFeatureAvailable(plan, featureKey)
+    const isFree = plan === 'free'
+    const isLocked = isFree && !available
+
+    return (
+        <button
+        className={`btn ${isLocked ? 'btn-locked' : ''}`}
+        onClick={isLocked ? () => router.push('/dashboard/subscription') : onClick}
+        style={{
+          padding: '0.6rem 1rem',
+          borderRadius: '8px',
+          border: '1px solid #E8E0D5',
+          background: isLocked ? '#F0EDE8' : '#fff',
+          color: isLocked ? '#6B6255' : '#1E3A5F',
+          cursor: isLocked ? 'pointer' : 'pointer',
+          fontWeight: '600',
+          fontSize: '0.85rem',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          transition: 'background 0.1s ease',
+        }}
+      >
+        {icon && <span>{icon}</span>}
+        {isLocked ? '🔒 Upgrade' : label}
+      </button>
+    )
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
@@ -397,45 +450,32 @@ export default function OrderDetailPage({ params }) {
           align-items: center;
           gap: 0.2rem;
         }
-        .btn:hover {
-          background: #F5EFE2;
-        }
+        .btn:hover:not(.btn-locked) { background: #F5EFE2; }
         .btn-primary {
           background: #1E3A5F;
           border-color: #1E3A5F;
           color: #fff;
         }
-        .btn-primary:hover {
-          background: #0F1E30;
-        }
-        .btn-primary:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
+        .btn-primary:hover { background: #0F1E30; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-gold {
           background: #C79A2B;
           border-color: #C79A2B;
           color: #1E3A5F;
         }
-        .btn-gold:hover {
-          background: #B4881E;
-        }
+        .btn-gold:hover { background: #B4881E; }
         .btn-green {
           background: #4C7A5E;
           border-color: #4C7A5E;
           color: #fff;
         }
-        .btn-green:hover {
-          background: #3A5F4A;
-        }
+        .btn-green:hover { background: #3A5F4A; }
         .btn-red {
           background: #AE4A34;
           border-color: #AE4A34;
           color: #fff;
         }
-        .btn-red:hover {
-          background: #8A3626;
-        }
+        .btn-red:hover { background: #8A3626; }
         .btn-sm {
           padding: 0.2rem 0.5rem;
           font-size: 0.6rem;
@@ -444,6 +484,13 @@ export default function OrderDetailPage({ params }) {
           width: 100%;
           justify-content: center;
         }
+        .btn-locked {
+          opacity: 0.6;
+          cursor: pointer;
+          background: #F0EDE8;
+          color: #6B6255;
+        }
+        .btn-locked:hover { background: #E8E0D5; }
         .back-link {
           background: none;
           border: none;
@@ -453,9 +500,7 @@ export default function OrderDetailPage({ params }) {
           margin-bottom: 1rem;
           cursor: pointer;
         }
-        .back-link:hover {
-          text-decoration: underline;
-        }
+        .back-link:hover { text-decoration: underline; }
         .header-row {
           display: flex;
           justify-content: space-between;
@@ -506,9 +551,7 @@ export default function OrderDetailPage({ params }) {
           border-bottom: 1px solid #F0EDE8;
           font-size: 0.8rem;
         }
-        .payment-row:last-child {
-          border-bottom: none;
-        }
+        .payment-row:last-child { border-bottom: none; }
         .order-status-badge {
           display: inline-block;
           padding: 0.2rem 0.7rem;
@@ -518,38 +561,28 @@ export default function OrderDetailPage({ params }) {
           letter-spacing: 0.3px;
           text-transform: uppercase;
         }
+        .plan-badge {
+          font-size: 0.6rem;
+          background: #4C7A5E;
+          color: #fff;
+          padding: 0.1rem 0.5rem;
+          border-radius: 10px;
+          margin-left: 0.5rem;
+        }
         @media (max-width: 420px) {
-          .header-row {
-            flex-direction: column;
-          }
-          .header-actions {
-            width: 100%;
-          }
-          .header-actions .btn {
-            flex: 1;
-            justify-content: center;
-          }
-          .action-row .btn {
-            flex: 1;
-            justify-content: center;
-          }
-          .status-timeline {
-            flex-wrap: wrap;
-            gap: 0.2rem;
-          }
-          .status-dot .label {
-            font-size: 0.5rem;
-            max-width: 30px;
-          }
+          .header-row { flex-direction: column; }
+          .header-actions { width: 100%; }
+          .header-actions .btn { flex: 1; justify-content: center; }
+          .action-row .btn { flex: 1; justify-content: center; }
+          .status-timeline { flex-wrap: wrap; gap: 0.2rem; }
+          .status-dot .label { font-size: 0.5rem; max-width: 30px; }
         }
       `}</style>
 
-      {/* ===== BACK BUTTON ===== */}
       <button className="back-link" onClick={() => router.back()}>
         ← Back
       </button>
 
-      {/* ===== HEADER ===== */}
       <div className="header-row">
         <div className="name-section">
           <h1>
@@ -557,6 +590,7 @@ export default function OrderDetailPage({ params }) {
             <span className="order-status-badge" style={{ background: status.bg, color: status.color }}>
               {status.label}
             </span>
+            <span className="plan-badge">{plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)}</span>
           </h1>
           <p className="customer">
             👤 {order.customers?.name || 'No customer'}
@@ -583,7 +617,7 @@ export default function OrderDetailPage({ params }) {
           </button>
         </div>
       </div>
-      {/* ===== STATS ===== */}
+
       <div className="stats-row">
         <div className="stat-card">
           <p className="value navy">₦{order.price.toLocaleString()}</p>
@@ -605,7 +639,6 @@ export default function OrderDetailPage({ params }) {
         </div>
       </div>
 
-      {/* ===== STATUS TIMELINE ===== */}
       <div className="card">
         <div className="status-timeline">
           {STAGES.map((stage, i) => {
@@ -640,14 +673,12 @@ export default function OrderDetailPage({ params }) {
         </div>
       </div>
 
-      {/* ===== ACTIONS ===== */}
+      {/* ===== ACTION BUTTONS WITH PLAN LOCK ===== */}
       <div className="action-row">
-        <button className="btn btn-gold" onClick={copyTrackingLink}>🔗 Copy Link</button>
-        <button className="btn btn-green" onClick={sendLinkViaWhatsApp}>📱 Send Link</button>
-        <button className="btn btn-primary" onClick={sendStatusUpdate}>📤 Status Update</button>
-        {balance > 0 && (
-          <button className="btn btn-red" onClick={sendReminder}>🔔 Reminder</button>
-        )}
+        {renderActionButton('🔗 Copy Link', copyTrackingLink, 'tracking_links')}
+        {renderActionButton('📱 Send Link', sendLinkViaWhatsApp, 'tracking_links')}
+        {renderActionButton('📤 Status Update', sendStatusUpdate, 'whatsapp_reminders')}
+        {balance > 0 && renderActionButton('🔔 Reminder', sendReminder, 'whatsapp_reminders')}
       </div>
 
       {/* ===== EDIT SECTION ===== */}
@@ -754,7 +785,6 @@ export default function OrderDetailPage({ params }) {
         )}
       </div>
 
-      {/* ===== DANGER ZONE ===== */}
       <button
         className="btn btn-red btn-block"
         onClick={handleDelete}
@@ -765,4 +795,4 @@ export default function OrderDetailPage({ params }) {
       </button>
     </main>
   )
-        }
+                                                                                            }
