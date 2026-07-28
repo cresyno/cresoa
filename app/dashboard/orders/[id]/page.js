@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { isFeatureAvailable } from '../../../../lib/planLimits'
+import { getPlanLimits } from '../../../../lib/planLimits'
 import { showToast } from '../../../../lib/toast'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
