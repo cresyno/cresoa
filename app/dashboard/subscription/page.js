@@ -18,51 +18,6 @@ export default function SubscriptionPage() {
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
 
-  // ✅ NEW: Ensure business exists – if not, create one automatically
-  const ensureBusiness = async (user) => {
-    // Try to fetch existing business
-    const { data: existing, error } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('owner_id', user.id)
-      .single()
-
-    if (existing) {
-      return existing
-    }
-
-    // No business found – create one now
-    console.log('🔵 No business found for user, creating one...')
-    const newBusiness = {
-      owner_id: user.id,
-      name: user.user_metadata?.business_name || 'My Business',
-      phone: '',
-      location: '',
-      sector: 'Fashion & Custom Wear',
-      business_type: 'Fashion Designer',
-      onboarding_completed: true,
-      plan: 'free',
-      plan_status: 'active',
-      trial_starts_at: new Date().toISOString(),
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      is_active: true,
-    }
-
-    const { data: inserted, error: insertError } = await supabase
-      .from('businesses')
-      .insert(newBusiness)
-      .select()
-      .single()
-
-    if (insertError) {
-      console.error('❌ Failed to create business:', insertError)
-      return null
-    }
-
-    console.log('✅ Business created:', inserted)
-    return inserted
-  }
-
   const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -71,13 +26,24 @@ export default function SubscriptionPage() {
         return null
       }
 
-      // ✅ Use the ensure function
-      const businessData = await ensureBusiness(user)
+      const { data: businessData, error } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (error || !businessData) {
+        console.log('No business found — redirecting to onboarding')
+        router.push('/onboarding')
+        return null
+      }
+
       setBusiness(businessData)
       setSelectedPlan(businessData?.plan || 'free')
       return businessData
     } catch (err) {
-      console.error('❌ loadBusiness error:', err)
+      console.error('loadBusiness error:', err)
+      router.push('/onboarding')
       return null
     }
   }
@@ -128,21 +94,25 @@ export default function SubscriptionPage() {
         return
       }
 
-      // ✅ Ensure business exists before upgrade
-      let currentBusiness = await ensureBusiness(user)
-      if (!currentBusiness) {
-        setMessage('Could not create or find your business. Please contact support.')
-        setProcessing(false)
+      // ✅ Ensure business exists — if not, redirect to onboarding
+      const { data: freshBusiness, error } = await supabase
+        .from('businesses')
+        .select('id, plan')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (error || !freshBusiness) {
+        router.push('/onboarding')
         return
       }
 
-      setBusiness(currentBusiness)
+      setBusiness(freshBusiness)
 
       const response = await fetch('/api/paystack/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessId: currentBusiness.id,
+          businessId: freshBusiness.id,
           planId: planId,
           email: user.email,
         }),
@@ -407,4 +377,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-            }
+}
