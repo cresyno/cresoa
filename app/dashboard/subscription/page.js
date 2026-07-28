@@ -17,15 +17,13 @@ export default function SubscriptionPage() {
   const [processing, setProcessing] = useState(false)
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createMessage, setCreateMessage] = useState('')
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
 
-  // -------- 1. Load business --------
   const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.replace('/login')
+        router.push('/login')
         return null
       }
 
@@ -36,8 +34,8 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !businessData) {
-        setBusiness(null)
-        setLoading(false)
+        // No business found — redirect to onboarding
+        router.push('/onboarding')
         return null
       }
 
@@ -46,8 +44,7 @@ export default function SubscriptionPage() {
       return businessData
     } catch (err) {
       console.error('loadBusiness error:', err)
-      setBusiness(null)
-      setLoading(false)
+      router.push('/onboarding')
       return null
     }
   }
@@ -56,58 +53,52 @@ export default function SubscriptionPage() {
     loadBusiness().finally(() => setLoading(false))
   }, [])
 
-  // -------- 2. Create business using the new API --------
-  const createBusiness = async () => {
-    setCreating(true)
-    setCreateMessage('')
-    try {
-      const res = await fetch('/api/create-business', { method: 'POST' })
-      const data = await res.json()
-      if (data.success) {
-        setCreateMessage('✅ Business created! Refreshing...')
-        setBusiness(data.business)
-        setTimeout(() => window.location.reload(), 1500)
-      } else {
-        setCreateMessage('❌ ' + (data.error || 'Unknown error'))
-      }
-    } catch (err) {
-      setCreateMessage('❌ Error: ' + err.message)
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  // -------- 3. Paystack callback verification --------
+  // ✅ Handle Paystack callback — THIS IS THE CRITICAL PART
   useEffect(() => {
     const reference = searchParams?.get('reference') || searchParams?.get('trxref')
+
     if (reference) {
+      setPaymentSuccess(true)
+
       const verifyPayment = async () => {
         setVerifying(true)
         try {
+          console.log('🔄 Verifying payment with reference:', reference)
+
           const res = await fetch(`/api/paystack/verify?reference=${reference}`)
           const data = await res.json()
+
+          console.log('📦 Verify response:', data)
+
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
+            // Reload business data
             await loadBusiness()
-            router.replace('/dashboard/subscription')
+            // Redirect to clean URL after 2 seconds
+            setTimeout(() => {
+              router.replace('/dashboard/subscription')
+            }, 2000)
           } else {
             showToast('❌ Payment verification failed: ' + (data.error || 'Unknown error'), '#AE4A34')
+            setPaymentSuccess(false)
           }
         } catch (error) {
           console.error('❌ Verification error:', error)
           showToast('❌ An error occurred during verification.', '#AE4A34')
+          setPaymentSuccess(false)
         } finally {
           setVerifying(false)
         }
       }
+
       verifyPayment()
     }
   }, [searchParams, router])
 
-  // -------- 4. Upgrade handler --------
   const handleUpgrade = async (planId) => {
     setMessage('')
     setProcessing(true)
+
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -116,7 +107,7 @@ export default function SubscriptionPage() {
         return
       }
 
-      // Always fetch fresh business
+      // Fetch fresh business
       const { data: freshBusiness, error } = await supabase
         .from('businesses')
         .select('id, plan')
@@ -124,7 +115,7 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !freshBusiness) {
-        setMessage('Business not found. Click "Create My Business" below first.')
+        setMessage('Business not found.')
         setProcessing(false)
         return
       }
@@ -142,6 +133,7 @@ export default function SubscriptionPage() {
       })
 
       const data = await response.json()
+
       if (data.status === 'success') {
         window.location.href = data.authorization_url
       } else {
@@ -157,7 +149,6 @@ export default function SubscriptionPage() {
 
   const planStatus = business ? getPlanStatusMessage(business) : null
 
-  // -------- 5. Render logic --------
   if (loading || verifying) {
     return (
       <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -177,43 +168,31 @@ export default function SubscriptionPage() {
     )
   }
 
-  // If no business, show the creation button
-  if (!business) {
+  // ✅ Show success state if payment was just made
+  if (paymentSuccess && !verifying) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
         <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'center', padding: '2rem 0' }}>
-          <h2 style={{ color: '#1E3A5F' }}>🔧 Business Profile Missing</h2>
-          <p style={{ color: '#6B6255', marginBottom: '1.5rem' }}>
-            Your account does not have a business profile yet. Click the button below to create one instantly.
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
+          <h2 style={{ color: '#1E3A5F' }}>Payment Successful!</h2>
+          <p style={{ color: '#6B6255', marginBottom: '0.5rem' }}>
+            Your plan is being upgraded...
           </p>
-          <button
-            onClick={createBusiness}
-            disabled={creating}
-            style={{
-              background: '#1E3A5F',
-              color: '#fff',
-              padding: '0.8rem 2rem',
-              borderRadius: '8px',
-              border: 'none',
-              fontSize: '1rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              width: '100%',
-            }}
-          >
-            {creating ? 'Creating...' : '🚀 Create My Business'}
-          </button>
-          {createMessage && (
-            <p style={{ marginTop: '1rem', color: createMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
-              {createMessage}
-            </p>
-          )}
+          <p style={{ color: '#6B6255', fontSize: '0.85rem' }}>
+            Redirecting back to dashboard...
+          </p>
+          <div style={{ marginTop: '1rem' }}>
+            <div className="spinner" style={{ width: '30px', height: '30px', margin: '0 auto' }}></div>
+          </div>
         </div>
       </main>
     )
   }
 
-  // -------- 6. Subscription plans UI (when business exists) --------
+  if (!business) {
+    return null
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
@@ -345,6 +324,14 @@ export default function SubscriptionPage() {
         .status-banner.active { background: #DCEBE2; color: #4C7A5E; }
         .status-banner.free { background: #F0EDE8; color: #6B6255; }
         .status-banner.beta { background: #D6E0EB; color: #1E3A5F; }
+        .spinner {
+          width: 40px; height: 40px;
+          border: 4px solid #e4d8c2;
+          border-top: 4px solid #1E3A5F;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <button className="btn-back" onClick={() => router.push('/dashboard')}>
@@ -437,4 +424,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-          }
+      }
