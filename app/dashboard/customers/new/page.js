@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { getPlanLimits } from '../../../lib/planLimits'
+import { supabase } from '../../../../lib/supabaseClient'
+import { PLAN_LIMITS } from '../../../../lib/planLimits'
 
 const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust/Chest (inches)' },
