@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { PLAN_LIMITS } from '../../../../lib/planLimits'
+import { getPlanLimits } from '../../../../lib/planLimits'
 
 const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust/Chest (inches)' },
@@ -53,16 +53,12 @@ export default function NewCustomerPage() {
       setSector(business.sector)
       setPlan(business.plan || 'free')
 
-      // Count existing customers
-      const { count, error } = await supabase
+      const { count } = await supabase
         .from('customers')
         .select('*', { count: 'exact', head: true })
         .eq('business_id', business.id)
 
-      if (!error) {
-        setCurrentCustomerCount(count || 0)
-      }
-
+      setCurrentCustomerCount(count || 0)
       setLoading(false)
     }
 
@@ -90,7 +86,6 @@ export default function NewCustomerPage() {
       return
     }
 
-    // ✅ Check free plan limit
     const limits = getPlanLimits(plan)
     if (currentCustomerCount >= limits.customers) {
       setMessage(`❌ You've reached the limit of ${limits.customers} customers on your Free plan. Please upgrade to add more.`)
@@ -127,7 +122,6 @@ export default function NewCustomerPage() {
       setNotes('')
       setMeasurements({})
       setMessage('')
-      // Refresh count
       setCurrentCustomerCount(currentCustomerCount + 1)
     } else {
       setTimeout(() => {
@@ -394,4 +388,4 @@ export default function NewCustomerPage() {
       </form>
     </main>
   )
-}
+                       }
