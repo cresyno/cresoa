@@ -1,62 +1,51 @@
 // app/api/paystack/initiate/route.js
 
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabaseClient'
+import { createClient } from '@supabase/supabase-js'
 import { PLANS } from '../../../../lib/planLimits'
 
 export const dynamic = 'force-dynamic'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function POST(request) {
   try {
     const { businessId, planId, email } = await request.json()
 
     if (!businessId || !planId || !email) {
-      return NextResponse.json(
-        { error: 'Missing required fields: businessId, planId, email' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required fields: businessId, planId, email' }, { status: 400 })
     }
 
     const plan = PLANS[planId]
     if (!plan) {
-      return NextResponse.json(
-        { error: 'Invalid plan selected' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid plan selected' }, { status: 400 })
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
-      return NextResponse.json(
-        { error: 'Payment initiation failed – server configuration error' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Payment initiation failed – server configuration error' }, { status: 500 })
     }
 
-    const { data: business, error: bizError } = await supabase
+    const { data: business, error: bizError } = await supabaseAdmin
       .from('businesses')
       .select('id, owner_id, plan')
       .eq('id', businessId)
       .single()
 
     if (bizError || !business) {
-      console.error('❌ Business not found for ID:', businessId)
-      return NextResponse.json(
-        { error: 'Business account not found. Please complete onboarding.' },
-        { status: 400 }
-      )
+      console.error('❌ Business not found for ID:', businessId, bizError)
+      return NextResponse.json({ error: 'Business account not found. Please complete onboarding.' }, { status: 400 })
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!appUrl) {
-      return NextResponse.json(
-        { error: 'App URL not configured' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'App URL not configured' }, { status: 500 })
     }
 
-    // Create pending record
-    const { data: historyRecord, error: insertError } = await supabase
+    const { data: historyRecord, error: insertError } = await supabaseAdmin
       .from('subscription_history')
       .insert({
         business_id: businessId,
@@ -71,18 +60,12 @@ export async function POST(request) {
 
     if (insertError) {
       console.error('Failed to create subscription history:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to initialize payment record' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to initialize payment record' }, { status: 500 })
     }
 
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${secretKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
         amount: plan.price * 100,
@@ -102,18 +85,13 @@ export async function POST(request) {
 
     if (!data.status) {
       console.error('Paystack error:', data.message)
-      await supabase.from('subscription_history').delete().eq('id', historyRecord.id)
-      return NextResponse.json(
-        { error: data.message || 'Payment initiation failed' },
-        { status: 400 }
-      )
+      await supabaseAdmin.from('subscription_history').delete().eq('id', historyRecord.id)
+      return NextResponse.json({ error: data.message || 'Payment initiation failed' }, { status: 400 })
     }
 
-    await supabase
+    await supabaseAdmin
       .from('subscription_history')
-      .update({
-        paystack_transaction_ref: data.data.reference,
-      })
+      .update({ paystack_transaction_ref: data.data.reference })
       .eq('id', historyRecord.id)
 
     return NextResponse.json({
@@ -124,9 +102,6 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Paystack initiate error:', error)
-    return NextResponse.json(
-      { error: 'Payment initiation failed: ' + error.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Payment initiation failed: ' + error.message }, { status: 500 })
   }
 }
