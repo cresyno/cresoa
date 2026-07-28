@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'      // ← correct path
+import { supabase } from '../../../lib/supabaseClient'
 import { PLANS, getPlanStatusMessage } from '../../../lib/planLimits'
 import { showToast } from '../../../lib/toast'
 
@@ -56,53 +56,21 @@ export default function SubscriptionPage() {
     loadBusiness().finally(() => setLoading(false))
   }, [])
 
-  // -------- 2. Direct business creation (no API) --------
+  // -------- 2. Create business using the new API --------
   const createBusiness = async () => {
     setCreating(true)
     setCreateMessage('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setCreateMessage('You must be logged in.')
-        setCreating(false)
-        return
+      const res = await fetch('/api/create-business', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setCreateMessage('✅ Business created! Refreshing...')
+        setBusiness(data.business)
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        setCreateMessage('❌ ' + (data.error || 'Unknown error'))
       }
-
-      const newBusiness = {
-        owner_id: user.id,
-        name: user.user_metadata?.business_name || 'My Business',
-        phone: '',
-        location: '',
-        sector: 'Fashion & Custom Wear',
-        business_type: 'Fashion Designer',
-        onboarding_completed: true,
-        plan: 'free',
-        plan_status: 'active',
-        trial_starts_at: new Date().toISOString(),
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
-      }
-
-      const { data: inserted, error } = await supabase
-        .from('businesses')
-        .insert(newBusiness)
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Insert error:', error)
-        setCreateMessage('❌ Failed: ' + error.message)
-        setCreating(false)
-        return
-      }
-
-      setCreateMessage('✅ Business created! Refreshing...')
-      setBusiness(inserted)
-      setTimeout(() => {
-        window.location.reload()
-      }, 1500)
     } catch (err) {
-      console.error('Create error:', err)
       setCreateMessage('❌ Error: ' + err.message)
     } finally {
       setCreating(false)
@@ -469,4 +437,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-              }
+          }
