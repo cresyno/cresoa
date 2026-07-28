@@ -41,6 +41,20 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Transaction not successful' }, { status: 400 })
     }
 
+    const { data: existingHistory } = await supabaseAdmin
+      .from('subscription_history')
+      .select('business_id, new_plan, status')
+      .eq('paystack_transaction_ref', txRef)
+      .single()
+
+    if (existingHistory?.status === 'success') {
+      return NextResponse.json({
+        status: 'success',
+        plan: existingHistory.new_plan,
+        message: 'Subscription already activated',
+      })
+    }
+
     const { data: history, error: historyError } = await supabaseAdmin
       .from('subscription_history')
       .select('business_id, new_plan')
@@ -52,7 +66,6 @@ export async function GET(request) {
       console.error('History lookup failed:', historyError)
       return NextResponse.json({ error: 'No pending transaction found' }, { status: 404 })
     }
-
     const businessId = history.business_id
     const planId = history.new_plan
 
