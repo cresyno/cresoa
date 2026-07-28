@@ -22,7 +22,7 @@ export default function SubscriptionPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.push('/login')
+        router.replace('/login')
         return null
       }
 
@@ -33,8 +33,8 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !businessData) {
-        console.log('No business found — redirecting to onboarding')
-        router.push('/onboarding')
+        // ✅ No business → redirect to onboarding
+        router.replace('/onboarding')
         return null
       }
 
@@ -43,7 +43,7 @@ export default function SubscriptionPage() {
       return businessData
     } catch (err) {
       console.error('loadBusiness error:', err)
-      router.push('/onboarding')
+      router.replace('/onboarding')
       return null
     }
   }
@@ -52,7 +52,7 @@ export default function SubscriptionPage() {
     loadBusiness().finally(() => setLoading(false))
   }, [])
 
-  // Handle Paystack callback verification
+  // Handle Paystack callback
   useEffect(() => {
     const reference = searchParams?.get('reference') || searchParams?.get('trxref')
 
@@ -94,7 +94,7 @@ export default function SubscriptionPage() {
         return
       }
 
-      // ✅ Ensure business exists — if not, redirect to onboarding
+      // ✅ Always fetch fresh business
       const { data: freshBusiness, error } = await supabase
         .from('businesses')
         .select('id, plan')
@@ -102,7 +102,7 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !freshBusiness) {
-        router.push('/onboarding')
+        router.replace('/onboarding')
         return
       }
 
@@ -152,6 +152,11 @@ export default function SubscriptionPage() {
         {verifying && <p style={{ color: '#6B6255', marginTop: '1rem' }}>Verifying payment...</p>}
       </div>
     )
+  }
+
+  // If business is still null after loading, return null (will redirect)
+  if (!business) {
+    return null
   }
 
   return (
@@ -377,4 +382,4 @@ export default function SubscriptionPage() {
       </p>
     </main>
   )
-}
+    }
