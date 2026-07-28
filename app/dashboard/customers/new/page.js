@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabaseClient'
+import { supabase } from '../../../lib/supabaseClient'
+import { getPlanLimits } from '../../../lib/planLimits'
+
 const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust/Chest (inches)' },
   { key: 'waist', label: 'Waist (inches)' },
@@ -16,6 +18,8 @@ export default function NewCustomerPage() {
   const router = useRouter()
   const [businessId, setBusinessId] = useState(null)
   const [sector, setSector] = useState(null)
+  const [plan, setPlan] = useState('free')
+  const [currentCustomerCount, setCurrentCustomerCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -36,7 +40,7 @@ export default function NewCustomerPage() {
 
       const { data: business } = await supabase
         .from('businesses')
-        .select('id, sector')
+        .select('id, sector, plan')
         .eq('owner_id', user.id)
         .single()
 
@@ -47,6 +51,18 @@ export default function NewCustomerPage() {
 
       setBusinessId(business.id)
       setSector(business.sector)
+      setPlan(business.plan || 'free')
+
+      // Count existing customers
+      const { count, error } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.id)
+
+      if (!error) {
+        setCurrentCustomerCount(count || 0)
+      }
+
       setLoading(false)
     }
 
@@ -70,6 +86,14 @@ export default function NewCustomerPage() {
     const phoneDigits = phone.replace(/\D/g, '')
     if (!name.trim() || phoneDigits.length !== 11) {
       setMessage('Please provide a name and a valid 11-digit phone number.')
+      setSaving(false)
+      return
+    }
+
+    // ✅ Check free plan limit
+    const limits = getPlanLimits(plan)
+    if (currentCustomerCount >= limits.customers) {
+      setMessage(`❌ You've reached the limit of ${limits.customers} customers on your Free plan. Please upgrade to add more.`)
       setSaving(false)
       return
     }
@@ -103,6 +127,8 @@ export default function NewCustomerPage() {
       setNotes('')
       setMeasurements({})
       setMessage('')
+      // Refresh count
+      setCurrentCustomerCount(currentCustomerCount + 1)
     } else {
       setTimeout(() => {
         router.push(`/dashboard/customers/${customer.id}`)
@@ -129,6 +155,8 @@ export default function NewCustomerPage() {
   }
 
   const isFashion = sector === 'Fashion & Custom Wear'
+  const limits = getPlanLimits(plan)
+  const canAddMore = currentCustomerCount < limits.customers
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
@@ -152,7 +180,7 @@ export default function NewCustomerPage() {
         .form-input {
           width: 100%;
           padding: 0.7rem;
-          borderRadius: 8px;
+          border-radius: 8px;
           border: 1px solid #E8E0D5;
           font-size: 0.95rem;
           background: #fff;
@@ -227,6 +255,16 @@ export default function NewCustomerPage() {
         }
         .action-row .btn-primary { flex: 1; }
         .action-row .btn-secondary { flex: 1; }
+        .plan-limit-warning {
+          background: #F1DBD3;
+          border: 1px solid #AE4A34;
+          border-radius: 8px;
+          padding: 0.8rem 1rem;
+          margin-bottom: 1rem;
+          color: #AE4A34;
+          font-size: 0.85rem;
+          text-align: center;
+        }
         @media (max-width: 420px) {
           .form-card { padding: 1rem; }
           .measurement-grid { grid-template-columns: 1fr; }
@@ -241,12 +279,32 @@ export default function NewCustomerPage() {
       <div className="header-row">
         <h1>Add customer</h1>
         {!isFashion && <span style={{ fontSize: '0.7rem', background: '#F6E9C8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#1E3A5F' }}>🔧 Repairs</span>}
+        {plan === 'free' && (
+          <span style={{ fontSize: '0.7rem', background: '#F0EDE8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#6B6255' }}>
+            Free ({currentCustomerCount}/{limits.customers} customers)
+          </span>
+        )}
       </div>
+
+      {!canAddMore && (
+        <div className="plan-limit-warning">
+          <strong>⚠️ You've reached the limit of {limits.customers} customers on your Free plan.</strong>
+          <br />
+          <a href="/dashboard/subscription" style={{ color: '#AE4A34', fontWeight: '600' }}>Upgrade now to add more →</a>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="form-card">
         <div className="form-group">
           <label>Customer name</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="form-input" />
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className="form-input"
+            disabled={!canAddMore}
+          />
         </div>
 
         <div className="form-group">
@@ -259,6 +317,7 @@ export default function NewCustomerPage() {
             required
             placeholder="e.g. 08012345678"
             className="form-input"
+            disabled={!canAddMore}
           />
           <div style={{ fontSize: '0.75rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.2rem' }}>
             {phone.length}/11 digits {phone.length === 11 && '✓ valid'}
@@ -274,6 +333,7 @@ export default function NewCustomerPage() {
             placeholder="e.g. Customer preferences, special instructions..."
             className="form-input"
             style={{ fontFamily: 'inherit', resize: 'vertical' }}
+            disabled={!canAddMore}
           />
         </div>
 
@@ -291,6 +351,7 @@ export default function NewCustomerPage() {
                     onChange={(e) => updateMeasurement(f.key, e.target.value)}
                     className="form-input"
                     style={{ padding: '0.5rem' }}
+                    disabled={!canAddMore}
                   />
                 </div>
               ))}
@@ -298,19 +359,32 @@ export default function NewCustomerPage() {
           </>
         )}
 
-        <div className="action-row">
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Saving...' : '💾 Save customer'}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setSaveAndAdd(!saveAndAdd)}
-            style={{ background: saveAndAdd ? '#1E3A5F' : '#fff', color: saveAndAdd ? '#fff' : '#1E3A5F' }}
-          >
-            {saveAndAdd ? '✓ Save & add another' : 'Save & add another'}
-          </button>
-        </div>
+        {canAddMore ? (
+          <div className="action-row">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving...' : '💾 Save customer'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setSaveAndAdd(!saveAndAdd)}
+              style={{ background: saveAndAdd ? '#1E3A5F' : '#fff', color: saveAndAdd ? '#fff' : '#1E3A5F' }}
+            >
+              {saveAndAdd ? '✓ Save & add another' : 'Save & add another'}
+            </button>
+          </div>
+        ) : (
+          <div className="action-row">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => router.push('/dashboard/subscription')}
+              style={{ background: '#AE4A34', boxShadow: '0 4px 14px rgba(174,74,52,0.3)' }}
+            >
+              🔒 Upgrade to add more customers
+            </button>
+          </div>
+        )}
 
         {message && (
           <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34', textAlign: 'center' }}>
@@ -320,4 +394,4 @@ export default function NewCustomerPage() {
       </form>
     </main>
   )
-                                    }
+}
