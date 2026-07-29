@@ -29,7 +29,6 @@ export default function RepairsDashboardPage() {
   const [alerts, setAlerts] = useState([])
   const [readyOverdueAlerts, setReadyOverdueAlerts] = useState([])
   const [readyJobs, setReadyJobs] = useState([])
-  const [pipelineStages, setPipelineStages] = useState([])
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -109,7 +108,7 @@ export default function RepairsDashboardPage() {
 
     setStats({ total, active, awaitingParts, ready, received, diagnosing, awaitingApproval, repairing, testing, overdue, totalOwing, dueToday, dueTomorrow })
 
-    // Pipeline stages
+    // Pipeline stages (for mobile: horizontal scroll)
     const stages = [
       { key: 'Received', label: 'Received', count: received, icon: '📥' },
       { key: 'Diagnosing', label: 'Diagnosing', count: diagnosing, icon: '🔍' },
@@ -118,7 +117,7 @@ export default function RepairsDashboardPage() {
       { key: 'Testing', label: 'Testing', count: testing, icon: '🧪' },
       { key: 'Ready', label: 'Ready for Pickup', count: ready, icon: '✅' },
     ]
-    setPipelineStages(stages)
+    // We'll render directly
 
     // Ready jobs for pickup
     const readyJobsList = jobData?.filter(j => j.current_status === 'Ready') || []
@@ -157,11 +156,18 @@ export default function RepairsDashboardPage() {
     return map[status] || { label: status || 'Received', color: '#6B6255', bg: '#F0EDE8' }
   }
 
+  // Fix: clean device name to avoid duplication
   const getDeviceDisplay = (job) => {
-    if (job.device_type && job.device_model) {
-      return `${job.device_type} ${job.device_model}`
+    let type = job.device_type || ''
+    let model = job.device_model || ''
+    // Remove leading brand if already in model
+    if (type && model.toLowerCase().startsWith(type.toLowerCase())) {
+      return model // e.g., "Samsung" + "Samsung A16" → "Samsung A16"
     }
-    if (job.device_type) return job.device_type
+    if (type && model) {
+      return `${type} ${model}`
+    }
+    if (type) return type
     return job.title || 'Device'
   }
 
@@ -235,6 +241,16 @@ export default function RepairsDashboardPage() {
     awaitingParts: '/dashboard/repairs/jobs?filter=awaiting_parts',
     ready: '/dashboard/repairs/jobs?filter=ready',
     totalOwing: '/dashboard/repairs/jobs?filter=owing',
+  }
+
+  // Pipeline status filter mapping
+  const statusFilterMap = {
+    'Received': 'received',
+    'Diagnosing': 'diagnosing',
+    'Awaiting Approval': 'awaiting_approval',
+    'Repairing': 'repairing',
+    'Testing': 'testing',
+    'Ready': 'ready',
   }
 
   return (
@@ -313,23 +329,20 @@ export default function RepairsDashboardPage() {
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
-        .stat-card .sub {
-          font-size: 0.45rem;
-          color: #A89888;
-          margin-top: 0.05rem;
-        }
 
         .pipeline-section {
           margin-bottom: 1.2rem;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
         }
+        .pipeline-section::-webkit-scrollbar { display: none; }
         .pipeline-scroll {
           display: flex;
           gap: 0.4rem;
-          overflow-x: auto;
           padding: 0.2rem 0;
-          -webkit-overflow-scrolling: touch;
+          min-width: max-content;
         }
-        .pipeline-scroll::-webkit-scrollbar { display: none; }
         .pipeline-item {
           flex: 0 0 auto;
           min-width: 70px;
@@ -552,6 +565,12 @@ export default function RepairsDashboardPage() {
           color: #fff;
         }
         .job-card .bottom-actions .btn-whatsapp:hover { background: #1DA851; }
+        .job-card .bottom-actions .btn-add-deadline {
+          background: #f0edE8;
+          border-color: #D6D0C5;
+          color: #6B6255;
+          font-size: 0.55rem;
+        }
 
         .customer-row {
           display: flex;
@@ -594,8 +613,8 @@ export default function RepairsDashboardPage() {
         }
         .customer-row .badge.owing {
           background: #F1DBD3;
-          color: #AE4A34;
-        }
+          color: #AE4A
+           }
         .customer-row .arrow { color: #C79A2B; font-size: 0.7rem; }
 
         .empty-state {
@@ -607,7 +626,7 @@ export default function RepairsDashboardPage() {
           color: #6B6255;
           box-shadow: 0 2px 4px rgba(30,58,95,0.03);
         }
-  .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
+        .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
         .empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
         .empty-state p { margin: 0 0 0.6rem; font-size: 0.8rem; }
         .empty-state .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 8px; background: linear-gradient(135deg, #C79A2B, #B4881E); color: #1E3A5F; font-weight: 600; text-decoration: none; font-size: 0.8rem; }
@@ -625,6 +644,33 @@ export default function RepairsDashboardPage() {
           align-items: center;
           gap: 0.4rem;
           flex-wrap: wrap;
+        }
+        .ready-pickup-section {
+          margin-bottom: 1.5rem;
+        }
+        .ready-pickup-section .ready-banner {
+          background: #DCEBE2;
+          border: 1px solid #4C7A5E;
+          border-radius: 8px;
+          padding: 0.5rem 0.8rem;
+          margin-bottom: 0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 0.3rem;
+        }
+        .ready-pickup-section .ready-banner .label {
+          font-weight: 700;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+        }
+        .ready-pickup-section .ready-banner .count {
+          background: #4C7A5E;
+          color: #fff;
+          padding: 0.1rem 0.5rem;
+          border-radius: 20px;
+          font-size: 0.7rem;
         }
 
         @media (max-width: 480px) {
@@ -649,6 +695,7 @@ export default function RepairsDashboardPage() {
           .alert-item { min-width: 55px; padding: 0.3rem 0.4rem; font-size: 0.55rem; }
           .alert-item .count { font-size: 0.8rem; }
           .customer-row { flex-wrap: wrap; gap: 0.3rem; }
+          .ready-pickup-section .ready-banner { flex-direction: column; align-items: stretch; }
         }
       `}</style>
 
@@ -690,10 +737,17 @@ export default function RepairsDashboardPage() {
         </a>
       </div>
 
-      {/* PIPELINE */}
+      {/* PIPELINE — Responsive horizontal scroll */}
       <div className="pipeline-section">
         <div className="pipeline-scroll">
-          {pipelineStages.map((stage) => (
+          {[
+            { key: 'Received', label: 'Received', count: stats.received, icon: '📥' },
+            { key: 'Diagnosing', label: 'Diagnosing', count: stats.diagnosing, icon: '🔍' },
+            { key: 'Awaiting Approval', label: 'Awaiting Approval', count: stats.awaitingApproval, icon: '⏳' },
+            { key: 'Repairing', label: 'Repairing', count: stats.repairing, icon: '🔧' },
+            { key: 'Testing', label: 'Testing', count: stats.testing, icon: '🧪' },
+            { key: 'Ready', label: 'Ready for Pickup', count: stats.ready, icon: '✅' },
+          ].map((stage) => (
             <a
               key={stage.key}
               href={`/dashboard/repairs/jobs?filter=${stage.key.toLowerCase().replace(' ', '_')}`}
@@ -804,12 +858,22 @@ export default function RepairsDashboardPage() {
           </div>
 
           <div className="details-row" style={{ marginTop: '0.2rem' }}>
-            {dueInfo && (
+            {dueInfo ? (
               <span className={`due ${dueInfo.color === '#AE4A34' ? 'overdue' : dueInfo.color === '#C79A2B' ? 'today' : dueInfo.color === '#1E3A5F' ? 'tomorrow' : ''}`}>
                 {dueInfo.label}
               </span>
+            ) : (
+              <span className="due" style={{ color: '#A89888' }}>
+                No deadline
+                <a
+                  href={`/dashboard/repairs/jobs/${job.id}/edit`}
+                  style={{ marginLeft: '0.4rem', color: '#1E3A5F', textDecoration: 'underline', fontSize: '0.6rem' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  + Add
+                </a>
+              </span>
             )}
-            {!dueInfo && <span className="due" style={{ color: '#A89888' }}>No deadline</span>}
           </div>
 
           <div className="bottom-actions">
@@ -839,53 +903,12 @@ export default function RepairsDashboardPage() {
     })
   )}
 </div>
-      {/* PARTS NEEDED */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div className="section-header">
-          <h2>🔩 Parts Needed</h2>
-          <a href="/dashboard/repairs/parts">View inventory →</a>
-        </div>
-
-        {awaitingPartsJobs.length === 0 ? (
-          <div className="empty-state" style={{ padding: '1.2rem' }}>
-            <span className="icon" style={{ fontSize: '1.5rem' }}>✅</span>
-            <p style={{ margin: 0, fontSize: '0.8rem' }}>All parts available. No jobs awaiting parts.</p>
-          </div>
-        ) : (
-          awaitingPartsJobs.map((job) => {
-            const device = getDeviceDisplay(job)
-            const partName = job.parts_used && job.parts_used.length > 0
-              ? job.parts_used.map(p => p.name).join(', ')
-              : 'Unknown part'
-            return (
-              <div
-                key={job.id}
-                className="job-card"
-                onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
-              >
-                <div className="top-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="device">{device}</p>
-                    <p className="customer">{job.customers?.name || 'No customer'}</p>
-                    <p className="issue" style={{ fontStyle: 'normal', color: '#B4881E' }}>
-                      Part: {partName}
-                    </p>
-                  </div>
-                  <span className="status-badge" style={{ background: '#F6E9C8', color: '#B4881E' }}>
-                    ⏳ Awaiting Parts
-                  </span>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* READY FOR PICKUP — Special Section */}
+      {/* READY FOR PICKUP — Enhanced */}
       {readyJobs.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div className="section-header">
-            <h2>🔔 Ready for Pickup</h2>
+        <div className="ready-pickup-section">
+          <div className="ready-banner">
+            <span className="label">🔔 {readyJobs.length} repair{readyJobs.length > 1 ? 's' : ''} ready for pickup</span>
+            <span className="count">Ready</span>
           </div>
 
           {readyJobs.slice(0, 3).map((job) => {
@@ -950,6 +973,48 @@ export default function RepairsDashboardPage() {
         </div>
       )}
 
+      {/* PARTS NEEDED */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div className="section-header">
+          <h2>🔩 Parts Needed</h2>
+          <a href="/dashboard/repairs/parts">View inventory →</a>
+        </div>
+
+        {awaitingPartsJobs.length === 0 ? (
+          <div className="empty-state" style={{ padding: '1.2rem' }}>
+            <span className="icon" style={{ fontSize: '1.5rem' }}>✅</span>
+            <p style={{ margin: 0, fontSize: '0.8rem' }}>All parts available. No jobs awaiting parts.</p>
+          </div>
+        ) : (
+          awaitingPartsJobs.map((job) => {
+            const device = getDeviceDisplay(job)
+            const partNames = job.parts_used && job.parts_used.length > 0
+              ? job.parts_used.map(p => p.name).join(', ')
+              : 'Unknown part'
+            return (
+              <div
+                key={job.id}
+                className="job-card"
+                onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
+              >
+                <div className="top-row">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p className="device">{device}</p>
+                    <p className="customer">{job.customers?.name || 'No customer'}</p>
+                    <p className="issue" style={{ fontStyle: 'normal', color: '#B4881E' }}>
+                      Part: {partNames}
+                    </p>
+                  </div>
+                  <span className="status-badge" style={{ background: '#F6E9C8', color: '#B4881E' }}>
+                    ⏳ Awaiting Parts
+                  </span>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
       {/* RECENT CUSTOMERS */}
       <div>
         <div className="section-header">
@@ -990,4 +1055,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-          }
+                  }
