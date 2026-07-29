@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
@@ -61,15 +61,9 @@ export default function RepairsDashboardPage() {
     setCustomers(customerData || [])
 
     const total = jobData?.length || 0
-    const active = jobData?.filter(j =>
-      j.current_status !== 'Completed' && j.current_status !== 'Delivered'
-    ).length || 0
-    const awaitingParts = jobData?.filter(j =>
-      j.current_status === 'Awaiting Parts'
-    ).length || 0
-    const ready = jobData?.filter(j =>
-      j.current_status === 'Ready'
-    ).length || 0
+    const active = jobData?.filter(j => j.current_status !== 'Completed' && j.current_status !== 'Delivered').length || 0
+    const awaitingParts = jobData?.filter(j => j.current_status === 'Awaiting Parts').length || 0
+    const ready = jobData?.filter(j => j.current_status === 'Ready').length || 0
     const waitingOnCustomer = ready
 
     const today = new Date()
@@ -94,24 +88,14 @@ export default function RepairsDashboardPage() {
     setStats({ total, active, awaitingParts, ready, waitingOnCustomer, overdue, todayRevenue })
 
     const newAlerts = []
-    if (overdue > 0) {
-      newAlerts.push({ type: 'overdue', message: `${overdue} job${overdue > 1 ? 's' : ''} overdue`, count: overdue })
-    }
-    if (awaitingParts > 0) {
-      newAlerts.push({ type: 'awaiting_parts', message: `${awaitingParts} job${awaitingParts > 1 ? 's' : ''} awaiting parts`, count: awaitingParts })
-    }
-    if (ready > 0) {
-      newAlerts.push({ type: 'ready', message: `${ready} job${ready > 1 ? 's' : ''} ready for pickup`, count: ready })
-    }
+    if (overdue > 0) newAlerts.push({ type: 'overdue', message: `${overdue} job${overdue > 1 ? 's' : ''} overdue`, count: overdue })
+    if (awaitingParts > 0) newAlerts.push({ type: 'awaiting_parts', message: `${awaitingParts} job${awaitingParts > 1 ? 's' : ''} awaiting parts`, count: awaitingParts })
+    if (ready > 0) newAlerts.push({ type: 'ready', message: `${ready} job${ready > 1 ? 's' : ''} ready for pickup`, count: ready })
     setAlerts(newAlerts)
 
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const longReady = jobData?.filter(j => {
-      if (j.current_status !== 'Ready') return false
-      const updated = new Date(j.updated_at || j.created_at)
-      return updated < sevenDaysAgo
-    }) || []
+    const longReady = jobData?.filter(j => j.current_status === 'Ready' && new Date(j.updated_at || j.created_at) < sevenDaysAgo) || []
     setReadyOverdueAlerts(longReady)
 
     setLoading(false)
@@ -156,9 +140,7 @@ export default function RepairsDashboardPage() {
 
   const getDueDisplay = (dueDate) => {
     if (!dueDate) return 'No deadline'
-    if (isOverdue(dueDate)) {
-      return '🔴 Overdue'
-    }
+    if (isOverdue(dueDate)) return '🔴 Overdue'
     return `Due ${formatDate(dueDate)}`
   }
 
@@ -194,16 +176,8 @@ export default function RepairsDashboardPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-        * {
-          box-sizing: border-box;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.06) transparent;
-        }
-
-        ::-webkit-scrollbar {
-          width: 4px;
-          height: 4px;
-        }
+        * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
 
@@ -220,55 +194,14 @@ export default function RepairsDashboardPage() {
           padding-right: 1rem;
           border-bottom: 1px solid rgba(255,255,255,0.04);
         }
+        .header-content { max-width: 480px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .header-left { display: flex; align-items: center; gap: 0.6rem; }
+        .header-left .business-name { color: #fff; font-size: 1rem; font-weight: 600; letter-spacing: -0.3px; margin: 0; }
+        .header-left .badge { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); font-size: 0.5rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(255,255,255,0.04); }
+        .header-right .greeting { color: rgba(255,255,255,0.4); font-size: 0.7rem; margin: 0; }
 
-        .header-content {
-          max-width: 480px;
-          margin: 0 auto;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-        }
-        .header-left .business-name {
-          color: #fff;
-          font-size: 1rem;
-          font-weight: 600;
-          letter-spacing: -0.3px;
-          margin: 0;
-        }
-        .header-left .badge {
-          background: rgba(255,255,255,0.06);
-          color: rgba(255,255,255,0.5);
-          font-size: 0.5rem;
-          font-weight: 600;
-          padding: 0.1rem 0.5rem;
-          border-radius: 20px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          border: 1px solid rgba(255,255,255,0.04);
-        }
-        .header-right {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        .header-right .greeting {
-          color: rgba(255,255,255,0.4);
-          font-size: 0.7rem;
-          margin: 0;
-        }
+        .container { max-width: 480px; margin: 0 auto; padding: 0; }
 
-        .container {
-          max-width: 480px;
-          margin: 0 auto;
-          padding: 0;
-        }
-
-        /* Stats - horizontal scroll */
         .stats-scroll {
           display: flex;
           gap: 0.6rem;
@@ -328,7 +261,6 @@ export default function RepairsDashboardPage() {
           font-weight: 500;
         }
 
-        /* Stat card gradients */
         .stat-card.grad-total { background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
         .stat-card.grad-active { background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02)); }
         .stat-card.grad-parts { background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.02)); }
@@ -358,8 +290,8 @@ export default function RepairsDashboardPage() {
           font-weight: 700;
           display: block;
           color: #fff;
-      }
-            .alert-item.overdue { border-color: rgba(239,68,68,0.2); }
+        }
+        .alert-item.overdue { border-color: rgba(239,68,68,0.2); }
         .alert-item.overdue .count { color: #EF4444; }
         .alert-item.awaiting_parts { border-color: rgba(245,158,11,0.2); }
         .alert-item.awaiting_parts .count { color: #F59E0B; }
@@ -598,7 +530,6 @@ export default function RepairsDashboardPage() {
         }
       `}</style>
 
-      {/* ===== HEADER ===== */}
       <div className="header">
         <div className="header-content">
           <div className="header-left">
@@ -615,7 +546,6 @@ export default function RepairsDashboardPage() {
       </div>
 
       <div className="container">
-        {/* ===== STATS ===== */}
         <div className="stats-scroll">
           <div className="stat-card grad-total">
             <span className="icon">📋</span>
@@ -637,48 +567,44 @@ export default function RepairsDashboardPage() {
             <p className="number purple">{stats.waitingOnCustomer}</p>
             <p className="label">Waiting on Customer</p>
           </div>
-          <div className="stat-card grad-revenue">
+<div className="stat-card grad-revenue">
             <span className="icon">💰</span>
             <p className="number white">₦{stats.todayRevenue.toLocaleString()}</p>
             <p className="label">Today's Revenue</p>
           </div>
         </div>
-{/* ===== RED ALERT ===== */}
-{readyOverdueAlerts.length > 0 && (
-  <div className="red-alert">
-    <span className="icon">🚨</span>
-    <span>
-      <strong>{readyOverdueAlerts.length}</strong> job{readyOverdueAlerts.length > 1 ? 's' : ''} ready for <strong>7+ days</strong> — waiting on customer!
-    </span>
-  </div>
-)}
 
-{/* ===== ALERT STRIP ===== */}
-{alerts.length > 0 && (
-  <div className="alert-strip">
-    {alerts.map((alert, i) => (
-      <div key={i} className={`alert-item ${alert.type}`}>
-        <span className="count">{alert.count}</span>
-        {alert.message}
-      </div>
-    ))}
-  </div>
-)}
+        {readyOverdueAlerts.length > 0 && (
+          <div className="red-alert">
+            <span className="icon">🚨</span>
+            <span>
+              <strong>{readyOverdueAlerts.length}</strong> job{readyOverdueAlerts.length > 1 ? 's' : ''} ready for <strong>7+ days</strong>
+            </span>
+          </div>
+        )}
 
-{/* ===== QUICK ACTIONS ===== */}
-<div className="quick-actions">
-  <a href="/dashboard/repairs/jobs/new" className="action-btn action-btn-primary">
-    + New Job
-  </a>
-  <a href="/dashboard/customers/new" className="action-btn action-btn-secondary">
-    + Customer
-  </a>
-  <a href="/dashboard/repairs/parts" className="action-btn action-btn-secondary">
-    📦 Parts
-  </a>
-</div>
+        {alerts.length > 0 && (
+          <div className="alert-strip">
+            {alerts.map((alert, i) => (
+              <div key={i} className={`alert-item ${alert.type}`}>
+                <span className="count">{alert.count}</span>
+                {alert.message}
+              </div>
+            ))}
+          </div>
+        )}
 
-{/* ===== RECENT JOBS ===== */}
+        <div className="quick-actions">
+          <a href="/dashboard/repairs/jobs/new" className="action-btn action-btn-primary">
+            + New Job
+          </a>
+          <a href="/dashboard/customers/new" className="action-btn action-btn-secondary">
+            + Customer
+          </a>
+          <a href="/dashboard/repairs/parts" className="action-btn action-btn-secondary">
+            📦 Parts
+          </a>
+        </div>
 <div style={{ marginBottom: '1.8rem' }}>
   <div className="section-header">
     <h2>Recent Jobs</h2>
@@ -754,7 +680,6 @@ export default function RepairsDashboardPage() {
     })
   )}
 </div>
-        {/* ===== PARTS NEEDED ===== */}
         <div style={{ marginBottom: '1.8rem' }}>
           <div className="section-header">
             <h2>🔩 Parts Needed</h2>
@@ -800,7 +725,6 @@ export default function RepairsDashboardPage() {
           )}
         </div>
 
-        {/* ===== RECENT CUSTOMERS ===== */}
         <div>
           <div className="section-header">
             <h2>Recent Customers</h2>
@@ -828,4 +752,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-                    }
+            }
