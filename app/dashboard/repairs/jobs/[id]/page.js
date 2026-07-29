@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
+import { isFeatureAvailable } from '../../../../../lib/planLimits'
 import { showToast } from '../../../../../lib/toast'
+
 const REPAIR_STAGES = ['Diagnosing', 'Awaiting Parts', 'Repairing', 'Ready', 'Completed', 'Delivered']
 
 export default function RepairJobDetailPage({ params }) {
@@ -13,6 +15,7 @@ export default function RepairJobDetailPage({ params }) {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [plan, setPlan] = useState('free')
 
   // Edit form state
   const [deviceType, setDeviceType] = useState('')
@@ -42,8 +45,6 @@ export default function RepairJobDetailPage({ params }) {
 
   // Delete state
   const [deleting, setDeleting] = useState(false)
-
-  // Parts used in the job
   const [partsUsed, setPartsUsed] = useState([])
 
   const load = async () => {
@@ -71,11 +72,12 @@ export default function RepairJobDetailPage({ params }) {
 
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('name')
+        .select('name, plan')
         .eq('id', jobData.business_id)
         .single()
 
       setBusiness(businessData)
+      setPlan(businessData?.plan || 'free')
 
       const { data: paymentData } = await supabase
         .from('payment_records')
@@ -104,6 +106,14 @@ export default function RepairJobDetailPage({ params }) {
     return map[status] || { label: status || 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' }
   }
 
+  const getDeviceDisplay = (job) => {
+    if (job.device_type && job.device_model) {
+      return `${job.device_type} ${job.device_model}`
+    }
+    if (job.device_type) return job.device_type
+    return job.title || 'Device'
+  }
+
   const formatDate = (d) => {
     if (!d) return ''
     return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -128,6 +138,7 @@ export default function RepairJobDetailPage({ params }) {
     load()
   }
 
+  // LOCKED ACTIONS — only available on paid plans
   const copyTrackingLink = () => {
     const link = `https://cresoa.vercel.app/track/${job.tracking_token}`
     navigator.clipboard.writeText(link)
@@ -310,6 +321,36 @@ export default function RepairJobDetailPage({ params }) {
 
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
 
+  // Check if features are available
+  const canUseTracking = isFeatureAvailable(plan, 'tracking_links')
+  const canUseWhatsApp = isFeatureAvailable(plan, 'whatsapp_reminders')
+
+  // Helper: render locked action button
+  const renderAction = (label, icon, action, isAvailable) => {
+    return (
+      <button
+        className={`btn ${isAvailable ? '' : 'btn-locked'}`}
+        onClick={isAvailable ? action : () => router.push('/dashboard/subscription')}
+        style={{
+          padding: '0.6rem 1rem',
+          borderRadius: '8px',
+          border: '1px solid #E8E0D5',
+          background: isAvailable ? '#fff' : '#F0EDE8',
+          color: isAvailable ? '#1E3A5F' : '#6B6255',
+          cursor: 'pointer',
+          fontWeight: '600',
+          fontSize: '0.85rem',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          transition: 'all 0.1s ease',
+        }}
+      >
+        {icon} {label} {!isAvailable && '🔒'}
+      </button>
+    )
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
@@ -348,6 +389,7 @@ export default function RepairJobDetailPage({ params }) {
           justify-content: space-between;
           margin-bottom: 1rem;
           position: relative;
+          overflow-x: auto;
         }
         .status-timeline::before {
           content: '';
@@ -358,6 +400,7 @@ export default function RepairJobDetailPage({ params }) {
           height: 2px;
           background: #E8E0D5;
           transform: translateY(-50%);
+          z-index: 0;
         }
         .status-dot {
           display: flex;
@@ -367,6 +410,7 @@ export default function RepairJobDetailPage({ params }) {
           position: relative;
           z-index: 1;
           flex: 1;
+          min-width: 40px;
         }
         .status-dot .dot {
           width: 12px;
@@ -387,7 +431,7 @@ export default function RepairJobDetailPage({ params }) {
           background: #4C7A5E;
         }
         .status-dot .label {
-          font-size: 0.55rem;
+          font-size: 0.5rem;
           color: #6B6255;
           text-align: center;
           max-width: 40px;
@@ -411,7 +455,7 @@ export default function RepairJobDetailPage({ params }) {
           align-items: center;
           gap: 0.2rem;
         }
-        .btn:hover { background: #F5EFE2; }
+        .btn:hover:not(.btn-locked) { background: #F5EFE2; }
         .btn-primary {
           background: #1E3A5F;
           border-color: #1E3A5F;
@@ -437,6 +481,14 @@ export default function RepairJobDetailPage({ params }) {
           color: #fff;
         }
         .btn-red:hover { background: #8A3626; }
+        .btn-locked {
+          opacity: 0.6;
+          background: #F0EDE8;
+          color: #6B6255;
+          border-color: #D6D0C5;
+          cursor: pointer;
+        }
+        .btn-locked:hover { background: #E8E0D5; }
         .btn-block { width: 100%; justify-content: center; }
         .back-link {
           background: none;
@@ -506,6 +558,14 @@ export default function RepairJobDetailPage({ params }) {
           letter-spacing: 0.3px;
           text-transform: uppercase;
         }
+        .plan-badge {
+          font-size: 0.6rem;
+          background: #4C7A5E;
+          color: #fff;
+          padding: 0.1rem 0.5rem;
+          border-radius: 10px;
+          margin-left: 0.5rem;
+        }
         .parts-used-item {
           display: flex;
           justify-content: space-between;
@@ -514,209 +574,275 @@ export default function RepairJobDetailPage({ params }) {
           font-size: 0.85rem;
         }
         .parts-used-item:last-child { border-bottom: none; }
+        .upgrade-banner {
+          background: #FBF3EC;
+          border: 1px solid #C79A2B;
+          border-radius: 10px;
+          padding: 0.8rem 1rem;
+          margin-bottom: 1rem;
+        }
+        .upgrade-banner p {
+          margin: 0;
+          font-size: 0.8rem;
+          color: #1E3A5F;
+        }
+        .upgrade-banner a {
+          color: #C79A2B;
+          font-weight: 600;
+          text-decoration: none;
+        }
+        .upgrade-banner a:hover { text-decoration: underline; }
         @media (max-width: 420px) {
           .header-row { flex-direction: column; }
           .header-actions { width: 100%; }
+          .header-actions .btn { flex: 1; justify-content: center; }
+          .action-row .btn { flex: 1; justify-content: center; }
           .action-row { flex-direction: column; }
           .action-row button { width: 100%; }
-          .status-timeline { flex-wrap: wrap; gap: 0.2rem; }
-          .status-dot .label { font-size: 0.5rem; max-width: 30px; }
+          .status-timeline { gap: 0.1rem; }
+          .status-dot { min-width: 30px; }
+          .status-dot .label { font-size: 0.4rem; max-width: 30px; }
         }
       `}</style>
 
       <button className="back-link" onClick={() => router.back()}>← Back</button>
-<div className="header-row">
-  <div className="name-section">
-    <h1>
-      {job.title || 'Repair Job'}
-      <span className="order-status-badge" style={{ background: statusInfo.bg, color: statusInfo.color }}>
-        {statusInfo.label}
-      </span>
-    </h1>
-    <p className="customer">
-      👤 {job.customers?.name || 'No customer'}
-      {job.customers?.phone && ` · 📱 ${job.customers.phone}`}
-    </p>
-  </div>
-  <div className="header-actions">
-    {job.customers?.phone && (
-      <>
-        <a href={`tel:${job.customers.phone}`} className="btn btn-gold">📞 Call</a>
-        <a href={`https://wa.me/${formatPhone(job.customers.phone)}`} target="_blank" rel="noopener noreferrer" className="btn btn-green">💬 WhatsApp</a>
-      </>
-    )}
-    <button className="btn btn-primary" onClick={duplicateJob}>📋 Duplicate</button>
-    <button className="btn" onClick={() => setEditing(!editing)}>
-      {editing ? '✕ Close' : '✏️ Edit'}
-    </button>
-  </div>
-</div>
 
-{/* Stats */}
-<div className="stats-row">
-  <div className="stat-card">
-    <p className="value navy">₦{job.price.toLocaleString()}</p>
-    <p className="label">Total</p>
-  </div>
-  <div className="stat-card">
-    <p className="value green">₦{job.amount_paid.toLocaleString()}</p>
-    <p className="label">Paid</p>
-  </div>
-  <div className="stat-card">
-    <p className={`value ${balance > 0 ? 'red' : 'green'}`}>
-      {balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid'}
-    </p>
-    <p className="label">Balance</p>
-  </div>
-  <div className="stat-card">
-    <p className="value navy">{job.due_date ? formatDate(job.due_date) : '—'}</p>
-    <p className="label">Due Date</p>
-  </div>
-</div>
-
-{/* Device Details */}
-<div className="card">
-  <h3 style={{ color: '#1E3A5F', fontSize: '0.95rem', margin: '0 0 0.6rem' }}>📱 Device Details</h3>
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem' }}>
-    <div><span style={{ color: '#6B6255' }}>Type:</span> <strong>{job.device_type || '—'}</strong></div>
-    <div><span style={{ color: '#6B6255' }}>Model:</span> <strong>{job.device_model || '—'}</strong></div>
-    <div><span style={{ color: '#6B6255' }}>Serial/IMEI:</span> <strong>{job.serial_number || '—'}</strong></div>
-    <div><span style={{ color: '#6B6255' }}>Color:</span> <strong>{job.device_color || '—'}</strong></div>
-    <div><span style={{ color: '#6B6255' }}>Condition:</span> <strong>{job.device_condition || '—'}</strong></div>
-    <div><span style={{ color: '#6B6255' }}>Est. Time:</span> <strong>{job.estimated_repair_time ? `${job.estimated_repair_time} min` : '—'}</strong></div>
-  </div>
-  <div style={{ marginTop: '0.5rem' }}>
-    <span style={{ color: '#6B6255' }}>Issue:</span>
-    <p style={{ margin: '0.2rem 0 0', color: '#2B2620', fontSize: '0.9rem' }}>{job.customer_notes || 'No description'}</p>
-  </div>
-</div>
-
-{/* Parts Used */}
-{partsUsed.length > 0 && (
-  <div className="card">
-    <h3 style={{ color: '#1E3A5F', fontSize: '0.95rem', margin: '0 0 0.6rem' }}>🔩 Parts Used</h3>
-    {partsUsed.map((p, i) => (
-      <div key={i} className="parts-used-item">
-        <span>{p.name}</span>
-        <span>{p.quantity} × ₦{p.cost.toLocaleString()} = ₦{(p.quantity * p.cost).toLocaleString()}</span>
-      </div>
-    ))}
-  </div>
-)}
-
-{/* Status Timeline */}
-<div className="card">
-  <div className="status-timeline">
-    {REPAIR_STAGES.map((stage, i) => {
-      const isActive = i === currentIndex
-      const isDone = i < currentIndex
-      return (
-        <div key={stage} className="status-dot">
-          <div className={`dot ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`} />
-          <span className={`label ${isActive ? 'active' : ''}`}>{stage}</span>
+      <div className="header-row">
+        <div className="name-section">
+          <h1>
+            {getDeviceDisplay(job)}
+            <span className="order-status-badge" style={{ background: statusInfo.bg, color: statusInfo.color }}>
+              {statusInfo.label}
+            </span>
+            <span className="plan-badge">{plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)}</span>
+          </h1>
+          <p className="customer">
+            👤 {job.customers?.name || 'No customer'}
+            {job.customers?.phone && ` · 📱 ${job.customers.phone}`}
+          </p>
         </div>
-      )
-    })}
-  </div>
+        <div className="header-actions">
+          {job.customers?.phone && (
+            <>
+              <a href={`tel:${job.customers.phone}`} className="btn btn-gold">📞 Call</a>
+              <a
+                href={`https://wa.me/${formatPhone(job.customers.phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-green"
+              >
+                💬 WhatsApp
+              </a>
+            </>
+          )}
+          <button className="btn btn-primary" onClick={duplicateJob}>📋 Duplicate</button>
+          <button className="btn" onClick={() => setEditing(!editing)}>
+            {editing ? '✕ Close' : '✏️ Edit'}
+          </button>
+        </div>
+      </div>
 
-  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-    <button className="btn" onClick={undoStatus} disabled={isFirstStage} style={{ opacity: isFirstStage ? 0.4 : 1 }}>← Undo</button>
-    <button className="btn btn-primary" onClick={advanceStatus} disabled={isLastStage} style={{ opacity: isLastStage ? 0.4 : 1 }}>
-      {isLastStage ? '✓ Completed' : `→ ${REPAIR_STAGES[currentIndex + 1]}`}
-    </button>
-  </div>
-</div>
+      <div className="stats-row">
+        <div className="stat-card">
+          <p className="value navy">₦{job.price.toLocaleString()}</p>
+          <p className="label">Total</p>
+        </div>
+        <div className="stat-card">
+          <p className="value green">₦{job.amount_paid.toLocaleString()}</p>
+          <p className="label">Paid</p>
+        </div>
+        <div className="stat-card">
+          <p className={`value ${balance > 0 ? 'red' : 'green'}`}>
+            {balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid'}
+          </p>
+          <p className="label">Balance</p>
+        </div>
+        <div className="stat-card">
+          <p className="value navy">{job.due_date ? formatDate(job.due_date) : '—'}</p>
+          <p className="label">Due Date</p>
+        </div>
+      </div>
 
-{/* Actions */}
-<div className="action-row">
-  <button className="btn btn-gold" onClick={copyTrackingLink}>🔗 Copy Link</button>
-  <button className="btn btn-green" onClick={sendLinkViaWhatsApp}>📱 Send Link</button>
-  <button className="btn btn-primary" onClick={sendStatusUpdate}>📤 Status Update</button>
-  {balance > 0 && <button className="btn btn-red" onClick={sendReminder}>🔔 Reminder</button>}
-</div>
+      <div className="card">
+        <h3 style={{ color: '#1E3A5F', fontSize: '0.95rem', margin: '0 0 0.6rem' }}>📱 Device Details</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem' }}>
+          <div><span style={{ color: '#6B6255' }}>Type:</span> <strong>{job.device_type || '—'}</strong></div>
+          <div><span style={{ color: '#6B6255' }}>Model:</span> <strong>{job.device_model || '—'}</strong></div>
+          <div><span style={{ color: '#6B6255' }}>Serial/IMEI:</span> <strong>{job.serial_number || '—'}</strong></div>
+          <div><span style={{ color: '#6B6255' }}>Color:</span> <strong>{job.device_color || '—'}</strong></div>
+          <div><span style={{ color: '#6B6255' }}>Condition:</span> <strong>{job.device_condition || '—'}</strong></div>
+          <div><span style={{ color: '#6B6255' }}>Est. Time:</span> <strong>{job.estimated_repair_time ? `${job.estimated_repair_time} min` : '—'}</strong></div>
+        </div>
+        <div style={{ marginTop: '0.5rem' }}>
+          <span style={{ color: '#6B6255' }}>Issue:</span>
+          <p style={{ margin: '0.2rem 0 0', color: '#2B2620', fontSize: '0.9rem' }}>{job.customer_notes || 'No description'}</p>
+        </div>
+      </div>
 
-{/* Edit Form */}
-{editing && (
-  <form onSubmit={handleSave} className="card">
-    <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.8rem' }}>✏️ Edit Repair Job</h2>
-    <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Device Type</label>
-        <input type="text" value={deviceType} onChange={(e) => setDeviceType(e.target.value)} style={inputStyle} />
+      {partsUsed.length > 0 && (
+        <div className="card">
+          <h3 style={{ color: '#1E3A5F', fontSize: '0.95rem', margin: '0 0 0.6rem' }}>🔩 Parts Used</h3>
+          {partsUsed.map((p, i) => (
+            <div key={i} className="parts-used-item">
+              <span>{p.name}</span>
+              <span>{p.quantity} × ₦{p.cost.toLocaleString()} = ₦{(p.quantity * p.cost).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card">
+        <div className="status-timeline">
+          {REPAIR_STAGES.map((stage, i) => {
+            const isActive = i === currentIndex
+            const isDone = i < currentIndex
+            return (
+              <div key={stage} className="status-dot">
+                <div className={`dot ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`} />
+                <span className={`label ${isActive ? 'active' : ''}`}>{stage}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn"
+            onClick={undoStatus}
+            disabled={isFirstStage}
+            style={{ opacity: isFirstStage ? 0.4 : 1 }}
+          >
+            ← Undo
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={advanceStatus}
+            disabled={isLastStage}
+            style={{ opacity: isLastStage ? 0.4 : 1 }}
+          >
+            {isLastStage ? '✓ Completed' : `→ ${REPAIR_STAGES[currentIndex + 1]}`}
+          </button>
+        </div>
       </div>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Device Model</label>
-        <input type="text" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} style={inputStyle} />
+
+      {/* ===== LOCKED ACTIONS ===== */}
+      <div className="action-row">
+        {renderAction('Copy Link', '🔗', copyTrackingLink, canUseTracking)}
+        {renderAction('Send Link', '📱', sendLinkViaWhatsApp, canUseTracking)}
+        {renderAction('Status Update', '📤', sendStatusUpdate, canUseWhatsApp)}
+        {balance > 0 && renderAction('Send Reminder', '🔔', sendReminder, canUseWhatsApp)}
       </div>
-    </div>
-    <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Serial / IMEI</label>
-        <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} style={inputStyle} />
-      </div>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Color</label>
-        <input type="text" value={deviceColor} onChange={(e) => setDeviceColor(e.target.value)} style={inputStyle} />
-      </div>
-    </div>
-    <div className="form-group">
-      <label style={labelStyle}>Condition</label>
-      <input type="text" value={deviceCondition} onChange={(e) => setDeviceCondition(e.target.value)} style={inputStyle} />
-    </div>
-    <div className="form-group">
-      <label style={labelStyle}>Issue Description</label>
-      <textarea value={issueDescription} onChange={(e) => setIssueDescription(e.target.value)} rows={2} style={inputStyle} />
-    </div>
-    <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Total Price (₦)</label>
-        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} />
-      </div>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Deposit (₦)</label>
-        <input type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={inputStyle} />
-      </div>
-    </div>
-    <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Est. Time (min)</label>
-        <input type="number" value={estimatedTime} onChange={(e) => setEstimatedTime(e.target.value)} style={inputStyle} />
-      </div>
-      <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-        <label style={labelStyle}>Due Date</label>
-        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
-      </div>
-    </div>
-    <div className="form-group">
-      <label style={labelStyle}>Status</label>
-      <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
-        {REPAIR_STAGES.map((s) => (<option key={s} value={s}>{s}</option>))}
-      </select>
-    </div>
-    <button type="submit" className="btn btn-gold btn-block" disabled={saving}>
-      {saving ? 'Saving...' : '💾 Save changes'}
-    </button>
-    {message && <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>{message}</p>}
-  </form>
-)}
-      {/* Payments */}
+
+      {/* ===== UPGRADE BANNER ===== */}
+      {(!canUseTracking || !canUseWhatsApp) && (
+        <div className="upgrade-banner">
+          <p>
+            💡 Upgrade to <strong>Starter</strong> or <strong>Pro</strong> to unlock tracking links, WhatsApp updates, and payment reminders.
+            <a href="/dashboard/subscription"> Upgrade now →</a>
+          </p>
+        </div>
+      )}
+
+      {editing && (
+        <form onSubmit={handleSave} className="card">
+          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.8rem' }}>✏️ Edit Repair Job</h2>
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Device Type</label>
+              <input type="text" value={deviceType} onChange={(e) => setDeviceType(e.target.value)} style={inputStyle} />
+            </div>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Device Model</label>
+              <input type="text" value={deviceModel} onChange={(e) => setDeviceModel(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Serial / IMEI</label>
+              <input type="text" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} style={inputStyle} />
+            </div>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Color</label>
+              <input type="text" value={deviceColor} onChange={(e) => setDeviceColor(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label style={labelStyle}>Condition</label>
+            <input type="text" value={deviceCondition} onChange={(e) => setDeviceCondition(e.target.value)} style={inputStyle} />
+          </div>
+          <div className="form-group">
+            <label style={labelStyle}>Issue Description</label>
+            <textarea value={issueDescription} onChange={(e) => setIssueDescription(e.target.value)} rows={2} style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Total Price (₦)</label>
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} />
+            </div>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Deposit (₦)</label>
+              <input type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Est. Time (min)</label>
+              <input type="number" value={estimatedTime} onChange={(e) => setEstimatedTime(e.target.value)} style={inputStyle} />
+            </div>
+            <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <label style={labelStyle}>Due Date</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label style={labelStyle}>Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+              {REPAIR_STAGES.map((s) => (<option key={s} value={s}>{s}</option>))}
+            </select>
+          </div>
+          <button type="submit" className="btn btn-gold btn-block" disabled={saving}>
+            {saving ? 'Saving...' : '💾 Save changes'}
+          </button>
+          {message && (
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
+              {message}
+            </p>
+          )}
+        </form>
+      )}
+
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: 0 }}>💰 Payments</h2>
-          {balance > 0 && <button className="btn btn-green" onClick={() => setShowPaymentForm(!showPaymentForm)}>
-            {showPaymentForm ? '✕ Cancel' : '+ Record Payment'}
-          </button>}
+          {balance > 0 && (
+            <button className="btn btn-green" onClick={() => setShowPaymentForm(!showPaymentForm)}>
+              {showPaymentForm ? '✕ Cancel' : '+ Record Payment'}
+            </button>
+          )}
         </div>
 
         {showPaymentForm && (
           <form onSubmit={handleRecordPayment} style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid #E8E0D5' }}>
             <div style={{ marginBottom: '0.6rem' }}>
               <label style={labelStyle}>Amount (₦)</label>
-              <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} style={inputStyle} required autoFocus />
+              <input
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                style={inputStyle}
+                required
+                autoFocus
+              />
             </div>
             <div style={{ marginBottom: '0.8rem' }}>
               <label style={labelStyle}>Note (optional)</label>
-              <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment" style={inputStyle} />
+              <input
+                type="text"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                placeholder="e.g. Cash payment"
+                style={inputStyle}
+              />
             </div>
             <button type="submit" className="btn btn-green btn-block" disabled={recordingPayment}>
               {recordingPayment ? 'Recording...' : '💰 Record payment'}
@@ -730,7 +856,9 @@ export default function RepairJobDetailPage({ params }) {
           <div style={{ marginTop: '0.5rem' }}>
             {payments.map((p) => (
               <div key={p.id} className="payment-row">
-                <span style={{ color: '#6B6255' }}>{formatDate(p.created_at)} {p.note && `— ${p.note}`}</span>
+                <span style={{ color: '#6B6255' }}>
+                  {formatDate(p.created_at)} {p.note && `— ${p.note}`}
+                </span>
                 <span style={{ fontWeight: '600', color: '#4C7A5E' }}>₦{p.amount.toLocaleString()}</span>
               </div>
             ))}
@@ -738,21 +866,34 @@ export default function RepairJobDetailPage({ params }) {
         )}
       </div>
 
-      {/* Internal Notes */}
       <div className="card">
         <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.3rem' }}>📝 Internal Notes</h2>
         <p style={{ color: '#6B6255', fontSize: '0.75rem', margin: '0 0 0.6rem' }}>Only you see these — not shared with the customer.</p>
-        <textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} rows={3} placeholder="Add internal notes..." style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }} />
+        <textarea
+          value={internalNotes}
+          onChange={(e) => setInternalNotes(e.target.value)}
+          rows={3}
+          placeholder="Add internal notes..."
+          style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
+        />
         <button className="btn btn-primary btn-block" onClick={handleSaveNotes} disabled={savingNotes}>
           {savingNotes ? 'Saving...' : '💾 Save notes'}
         </button>
-        {notesMessage && <p style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: notesMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>{notesMessage}</p>}
+        {notesMessage && (
+          <p style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: notesMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
+            {notesMessage}
+          </p>
+        )}
       </div>
 
-      {/* Delete */}
-      <button className="btn btn-red btn-block" onClick={handleDelete} disabled={deleting} style={{ marginTop: '0.5rem' }}>
+      <button
+        className="btn btn-red btn-block"
+        onClick={handleDelete}
+        disabled={deleting}
+        style={{ marginTop: '0.5rem' }}
+      >
         {deleting ? 'Deleting...' : '🗑️ Delete job'}
       </button>
     </main>
   )
-    }
+}
