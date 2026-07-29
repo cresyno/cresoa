@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
+import LetterLogo from '../../../components/LetterLogo'
 
 export default function RepairsDashboardPage() {
   const router = useRouter()
+  const [business, setBusiness] = useState(null)
   const [jobs, setJobs] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,6 +36,9 @@ export default function RepairsDashboardPage() {
       return
     }
 
+    setBusiness(businessData)
+
+    // Load repair jobs (orders with device_type)
     const { data: jobData } = await supabase
       .from('orders')
       .select('*, customers(name, phone)')
@@ -43,6 +48,7 @@ export default function RepairsDashboardPage() {
 
     setJobs(jobData || [])
 
+    // Load customers
     const { data: customerData } = await supabase
       .from('customers')
       .select('*')
@@ -51,14 +57,15 @@ export default function RepairsDashboardPage() {
 
     setCustomers(customerData || [])
 
+    // Stats
     const total = jobData?.length || 0
-    const active = jobData?.filter(j => 
+    const active = jobData?.filter(j =>
       j.current_status !== 'Completed' && j.current_status !== 'Delivered'
     ).length || 0
-    const awaitingParts = jobData?.filter(j => 
+    const awaitingParts = jobData?.filter(j =>
       j.current_status === 'Awaiting Parts'
     ).length || 0
-    const ready = jobData?.filter(j => 
+    const ready = jobData?.filter(j =>
       j.current_status === 'Ready'
     ).length || 0
 
@@ -116,8 +123,38 @@ export default function RepairsDashboardPage() {
   const previewCustomers = customers.slice(0, 3)
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem 3rem' }}>
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
+        /* Header */
+        .header {
+          display: flex;
+          align-items: center;
+          gap: 0.7rem;
+          margin-bottom: 1.5rem;
+        }
+        .header .greeting {
+          color: #2B2620;
+          font-size: 0.8rem;
+          margin: 0;
+        }
+        .header .business-name {
+          color: #1E3A5F;
+          font-size: 1.2rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .header .badge {
+          display: inline-block;
+          background: rgba(199,154,43,0.15);
+          color: #C79A2B;
+          padding: 0.05rem 0.5rem;
+          border-radius: 10px;
+          font-size: 0.55rem;
+          font-weight: 600;
+          margin-left: 0.3rem;
+        }
+
+        /* Stats */
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -130,10 +167,10 @@ export default function RepairsDashboardPage() {
           padding: 0.8rem 0.4rem;
           border: 1px solid #E8E0D5;
           text-align: center;
-          box-shadow: 0 2px 4px rgba(30,58,95,0.04);
+          box-shadow: 0 2px 4px rgba(30,58,95,0.03);
         }
         .stat-card .number {
-          font-size: 1.5rem;
+          font-size: 1.4rem;
           font-weight: 700;
           margin: 0;
           line-height: 1.2;
@@ -149,6 +186,8 @@ export default function RepairsDashboardPage() {
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
+
+        /* Quick Actions */
         .quick-actions {
           display: flex;
           gap: 0.5rem;
@@ -169,6 +208,8 @@ export default function RepairsDashboardPage() {
           transition: transform 0.1s ease;
         }
         .action-btn:active { transform: scale(0.97); }
+
+        /* Section Header */
         .section-header {
           display: flex;
           justify-content: space-between;
@@ -188,6 +229,8 @@ export default function RepairsDashboardPage() {
           text-decoration: none;
         }
         .section-header a:hover { text-decoration: underline; }
+
+        /* Job Card */
         .job-card {
           background: #fff;
           border-radius: 10px;
@@ -236,6 +279,7 @@ export default function RepairsDashboardPage() {
           white-space: nowrap;
         }
         .job-card .balance.paid { color: #4C7A5E; }
+
         .status-badge {
           display: inline-block;
           padding: 0.1rem 0.5rem;
@@ -245,6 +289,8 @@ export default function RepairsDashboardPage() {
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
+
+        /* Customer Row */
         .customer-row {
           display: flex;
           align-items: center;
@@ -270,6 +316,8 @@ export default function RepairsDashboardPage() {
           font-size: 0.75rem;
           margin: 0;
         }
+
+        /* Empty State */
         .empty-state {
           background: #fff;
           border-radius: 10px;
@@ -280,8 +328,8 @@ export default function RepairsDashboardPage() {
           font-size: 0.85rem;
           box-shadow: 0 1px 3px rgba(30,58,95,0.03);
         }
-        .empty-state .icon { 
-          font-size: 2rem; 
+        .empty-state .icon {
+          font-size: 2rem;
           margin-bottom: 0.3rem;
           display: block;
         }
@@ -291,6 +339,7 @@ export default function RepairsDashboardPage() {
           text-decoration: none;
         }
         .empty-state a:hover { text-decoration: underline; }
+
         @media (max-width: 480px) {
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -301,8 +350,8 @@ export default function RepairsDashboardPage() {
           .stat-card .label { font-size: 0.5rem; }
           .job-card .row { flex-direction: column; align-items: stretch; }
           .job-card .balance { text-align: right; }
-          .quick-actions .action-btn { 
-            flex: 1; 
+          .quick-actions .action-btn {
+            flex: 1;
             justify-content: center;
             font-size: 0.7rem;
             padding: 0.5rem 0.6rem;
@@ -310,7 +359,19 @@ export default function RepairsDashboardPage() {
         }
       `}</style>
 
-      {/* ===== STATS ===== */}
+      {/* Header */}
+      <div className="header">
+        <LetterLogo name={business?.name} size={40} />
+        <div>
+          <p className="greeting">Welcome back,</p>
+          <p className="business-name">
+            {business ? business.name : 'Your business'}
+            <span className="badge">🔧 Repairs</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Stats */}
       <div className="stats-grid">
         <div className="stat-card">
           <p className="number navy">{stats.total}</p>
@@ -330,7 +391,7 @@ export default function RepairsDashboardPage() {
         </div>
       </div>
 
-      {/* ===== QUICK ACTIONS ===== */}
+      {/* Quick Actions */}
       <div className="quick-actions">
         <a href="/dashboard/repairs/jobs/new" className="action-btn" style={{ background: '#1E3A5F', color: '#fff' }}>
           + New Job
@@ -342,64 +403,65 @@ export default function RepairsDashboardPage() {
           Parts
         </a>
       </div>
+    </main>
+  )
+    }
+{/* Recent Jobs */}
+<div style={{ marginBottom: '1.8rem' }}>
+  <div className="section-header">
+    <h2>Recent Jobs</h2>
+    <a href="/dashboard/repairs/jobs">View all →</a>
+  </div>
 
-      {/* ===== RECENT JOBS ===== */}
-      <div style={{ marginBottom: '1.8rem' }}>
-        <div className="section-header">
-          <h2>Recent Jobs</h2>
-          <a href="/dashboard/repairs/jobs">View all →</a>
-        </div>
+  {jobs.length === 0 ? (
+    <div className="empty-state">
+      <span className="icon">🔧</span>
+      <p style={{ margin: '0 0 0.3rem' }}>No repair jobs yet.</p>
+      <a href="/dashboard/repairs/jobs/new">Create your first repair job</a>
+    </div>
+  ) : (
+    previewJobs.map((job) => {
+      const status = getStatusInfo(job.current_status)
+      const device = getDeviceDisplay(job)
+      const balance = job.price - job.amount_paid
 
-        {jobs.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon">🔧</span>
-            <p style={{ margin: '0 0 0.3rem' }}>No repair jobs yet.</p>
-            <a href="/dashboard/repairs/jobs/new">Create your first repair job</a>
+      return (
+        <div
+          key={job.id}
+          className="job-card"
+          onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
+        >
+          <div className="row">
+            <div className="info">
+              <p className="name">
+                {device}
+                <span
+                  className="status-badge"
+                  style={{ background: status.bg, color: status.color }}
+                >
+                  {status.label}
+                </span>
+              </p>
+              <p className="meta">
+                <span>{job.customers?.name || 'No customer'}</span>
+                {job.due_date && (
+                  <>
+                    <span>·</span>
+                    <span>Due {formatDate(job.due_date)}</span>
+                  </>
+                )}
+              </p>
+            </div>
+            <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
+              {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
+            </span>
           </div>
-        ) : (
-          previewJobs.map((job) => {
-            const status = getStatusInfo(job.current_status)
-            const device = getDeviceDisplay(job)
-            const balance = job.price - job.amount_paid
-
-            return (
-              <div
-                key={job.id}
-                className="job-card"
-                onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
-              >
-                <div className="row">
-                  <div className="info">
-                    <p className="name">
-                      {device}
-                      <span
-                        className="status-badge"
-                        style={{ background: status.bg, color: status.color }}
-                      >
-                        {status.label}
-                      </span>
-                    </p>
-                    <p className="meta">
-                      <span>{job.customers?.name || 'No customer'}</span>
-                      {job.due_date && (
-                        <>
-                          <span>·</span>
-                          <span>Due {formatDate(job.due_date)}</span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
-                    {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
-                  </span>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* ===== RECENT CUSTOMERS ===== */}
+        </div>
+      )
+    })
+  )}
+</div>
+      {/* Recent Customers */}
       <div>
         <div className="section-header">
           <h2>Recent Customers</h2>
