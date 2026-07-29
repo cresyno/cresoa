@@ -16,13 +16,20 @@ export default function RepairsDashboardPage() {
     active: 0,
     awaitingParts: 0,
     ready: 0,
+    received: 0,
+    diagnosing: 0,
     awaitingApproval: 0,
+    repairing: 0,
     testing: 0,
     overdue: 0,
     totalOwing: 0,
+    dueToday: 0,
+    dueTomorrow: 0,
   })
   const [alerts, setAlerts] = useState([])
   const [readyOverdueAlerts, setReadyOverdueAlerts] = useState([])
+  const [readyJobs, setReadyJobs] = useState([])
+  const [pipelineStages, setPipelineStages] = useState([])
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -61,17 +68,26 @@ export default function RepairsDashboardPage() {
 
     setCustomers(customerData || [])
 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const todayStr = today.toISOString().split('T')[0]
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+
     const total = jobData?.length || 0
     const active = jobData?.filter(j => 
       j.current_status !== 'Completed' && j.current_status !== 'Delivered'
     ).length || 0
     const awaitingParts = jobData?.filter(j => j.current_status === 'Awaiting Parts').length || 0
     const ready = jobData?.filter(j => j.current_status === 'Ready').length || 0
+    const received = jobData?.filter(j => j.current_status === 'Received').length || 0
+    const diagnosing = jobData?.filter(j => j.current_status === 'Diagnosing').length || 0
     const awaitingApproval = jobData?.filter(j => j.current_status === 'Awaiting Approval').length || 0
+    const repairing = jobData?.filter(j => j.current_status === 'Repairing').length || 0
     const testing = jobData?.filter(j => j.current_status === 'Testing').length || 0
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
     const overdue = jobData?.filter(j => {
       if (!j.due_date || j.current_status === 'Delivered' || j.current_status === 'Completed') return false
       const due = new Date(j.due_date)
@@ -79,9 +95,34 @@ export default function RepairsDashboardPage() {
       return due < today
     }).length || 0
 
+    const dueToday = jobData?.filter(j => {
+      if (!j.due_date || j.current_status === 'Delivered' || j.current_status === 'Completed') return false
+      return j.due_date === todayStr
+    }).length || 0
+
+    const dueTomorrow = jobData?.filter(j => {
+      if (!j.due_date || j.current_status === 'Delivered' || j.current_status === 'Completed') return false
+      return j.due_date === tomorrowStr
+    }).length || 0
+
     const totalOwing = jobData?.reduce((sum, j) => sum + Math.max(0, j.price - j.amount_paid), 0) || 0
 
-    setStats({ total, active, awaitingParts, ready, awaitingApproval, testing, overdue, totalOwing })
+    setStats({ total, active, awaitingParts, ready, received, diagnosing, awaitingApproval, repairing, testing, overdue, totalOwing, dueToday, dueTomorrow })
+
+    // Pipeline stages
+    const stages = [
+      { key: 'Received', label: 'Received', count: received, icon: '📥' },
+      { key: 'Diagnosing', label: 'Diagnosing', count: diagnosing, icon: '🔍' },
+      { key: 'Awaiting Approval', label: 'Awaiting Approval', count: awaitingApproval, icon: '⏳' },
+      { key: 'Repairing', label: 'Repairing', count: repairing, icon: '🔧' },
+      { key: 'Testing', label: 'Testing', count: testing, icon: '🧪' },
+      { key: 'Ready', label: 'Ready for Pickup', count: ready, icon: '✅' },
+    ]
+    setPipelineStages(stages)
+
+    // Ready jobs for pickup
+    const readyJobsList = jobData?.filter(j => j.current_status === 'Ready') || []
+    setReadyJobs(readyJobsList)
 
     const newAlerts = []
     if (overdue > 0) newAlerts.push({ type: 'overdue', message: `${overdue} job${overdue > 1 ? 's' : ''} overdue`, count: overdue })
@@ -103,6 +144,7 @@ export default function RepairsDashboardPage() {
 
   const getStatusInfo = (status) => {
     const map = {
+      'Received': { label: 'Received', color: '#6B6255', bg: '#F0EDE8' },
       'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' },
       'Awaiting Approval': { label: 'Awaiting Approval', color: '#B4881E', bg: '#F6E9C8' },
       'Awaiting Parts': { label: 'Awaiting Parts', color: '#B4881E', bg: '#F6E9C8' },
@@ -112,13 +154,14 @@ export default function RepairsDashboardPage() {
       'Completed': { label: 'Completed', color: '#4C7A5E', bg: '#DCEBE2' },
       'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
     }
-    return map[status] || { label: status || 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' }
+    return map[status] || { label: status || 'Received', color: '#6B6255', bg: '#F0EDE8' }
   }
 
   const getDeviceDisplay = (job) => {
-    if (job.device_type) {
-      return `${job.device_type}${job.device_model ? ` ${job.device_model}` : ''}`
+    if (job.device_type && job.device_model) {
+      return `${job.device_type} ${job.device_model}`
     }
+    if (job.device_type) return job.device_type
     return job.title || 'Device'
   }
 
@@ -136,10 +179,31 @@ export default function RepairsDashboardPage() {
     return due < today
   }
 
+  const isToday = (dueDate) => {
+    if (!dueDate) return false
+    const today = new Date().toISOString().split('T')[0]
+    return dueDate === today
+  }
+
+  const isTomorrow = (dueDate) => {
+    if (!dueDate) return false
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    return dueDate === tomorrowStr
+  }
+
   const getDueDisplay = (dueDate) => {
-    if (!dueDate) return 'No deadline'
-    if (isOverdue(dueDate)) return '⚠️ Overdue'
-    return `Due ${formatDate(dueDate)}`
+    if (!dueDate) return null
+    if (isOverdue(dueDate)) return { label: '⚠️ Overdue', color: '#AE4A34' }
+    if (isToday(dueDate)) return { label: '📅 Due today', color: '#C79A2B' }
+    if (isTomorrow(dueDate)) return { label: '📅 Due tomorrow', color: '#1E3A5F' }
+    return { label: `Due ${formatDate(dueDate)}`, color: '#6B6255' }
+  }
+
+  const formatPhone = (phone) => {
+    if (!phone) return ''
+    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
   }
 
   if (loading) {
@@ -163,10 +227,18 @@ export default function RepairsDashboardPage() {
   const previewJobs = jobs.slice(0, 5)
   const previewCustomers = customers.slice(0, 5)
   const awaitingPartsJobs = jobs.filter(j => j.current_status === 'Awaiting Parts').slice(0, 5)
-  const lowStockParts = [] // Will be populated from inventory
+
+  // Stats filters mapping
+  const statsFilters = {
+    total: '/dashboard/repairs/jobs',
+    active: '/dashboard/repairs/jobs?filter=active',
+    awaitingParts: '/dashboard/repairs/jobs?filter=awaiting_parts',
+    ready: '/dashboard/repairs/jobs?filter=ready',
+    totalOwing: '/dashboard/repairs/jobs?filter=owing',
+  }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem', paddingBottom: '3rem' }}>
       <style>{`
         .header-top {
           display: flex;
@@ -204,7 +276,7 @@ export default function RepairsDashboardPage() {
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
-          gap: 0.5rem;
+          gap: 0.4rem;
           margin-bottom: 1rem;
         }
         .stat-card {
@@ -214,6 +286,14 @@ export default function RepairsDashboardPage() {
           border: 1px solid #E8E0D5;
           text-align: center;
           box-shadow: 0 2px 4px rgba(30,58,95,0.04);
+          text-decoration: none;
+          transition: all 0.15s ease;
+          cursor: pointer;
+        }
+        .stat-card:hover {
+          border-color: #C79A2B;
+          box-shadow: 0 4px 12px rgba(199,154,43,0.1);
+          transform: translateY(-1px);
         }
         .stat-card .number {
           font-size: 1.1rem;
@@ -228,29 +308,79 @@ export default function RepairsDashboardPage() {
         .stat-card .number.purple { color: #6C5B7B; }
         .stat-card .label {
           color: #6B6255;
-          font-size: 0.55rem;
+          font-size: 0.5rem;
           margin: 0.1rem 0 0;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+        .stat-card .sub {
+          font-size: 0.45rem;
+          color: #A89888;
+          margin-top: 0.05rem;
+        }
+
+        .pipeline-section {
+          margin-bottom: 1.2rem;
+        }
+        .pipeline-scroll {
+          display: flex;
+          gap: 0.4rem;
+          overflow-x: auto;
+          padding: 0.2rem 0;
+          -webkit-overflow-scrolling: touch;
+        }
+        .pipeline-scroll::-webkit-scrollbar { display: none; }
+        .pipeline-item {
+          flex: 0 0 auto;
+          min-width: 70px;
+          background: #fff;
+          border-radius: 8px;
+          padding: 0.4rem 0.5rem;
+          border: 1px solid #E8E0D5;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          text-decoration: none;
+        }
+        .pipeline-item:hover {
+          border-color: #C79A2B;
+        }
+        .pipeline-item .icon { font-size: 0.8rem; display: block; }
+        .pipeline-item .count {
+          font-weight: 700;
+          font-size: 0.85rem;
+          color: #1E3A5F;
+          margin: 0;
+        }
+        .pipeline-item .label {
+          font-size: 0.5rem;
+          color: #6B6255;
+          margin: 0;
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
 
         .alert-strip {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.4rem;
           flex-wrap: wrap;
           margin-bottom: 1rem;
         }
         .alert-item {
           flex: 1;
-          min-width: 80px;
-          padding: 0.4rem 0.6rem;
+          min-width: 70px;
+          padding: 0.4rem 0.5rem;
           border-radius: 8px;
           text-align: center;
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           font-weight: 600;
+          cursor: pointer;
+          text-decoration: none;
+          transition: all 0.15s ease;
         }
+        .alert-item:hover { opacity: 0.8; }
         .alert-item .count {
-          font-size: 1rem;
+          font-size: 0.95rem;
           font-weight: 800;
           display: block;
         }
@@ -260,19 +390,19 @@ export default function RepairsDashboardPage() {
 
         .quick-actions {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.4rem;
           flex-wrap: wrap;
           margin-bottom: 1.5rem;
         }
         .action-btn {
-          padding: 0.6rem 1rem;
+          padding: 0.5rem 0.9rem;
           border-radius: 8px;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 600;
           text-decoration: none;
           display: inline-flex;
           align-items: center;
-          gap: 0.4rem;
+          gap: 0.3rem;
           border: none;
           cursor: pointer;
           transition: transform 0.1s ease;
@@ -300,17 +430,17 @@ export default function RepairsDashboardPage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 0.6rem;
+          margin-bottom: 0.5rem;
         }
         .section-header h2 {
           color: #1E3A5F;
-          font-size: 1rem;
+          font-size: 0.95rem;
           font-weight: 700;
           margin: 0;
         }
         .section-header a {
           color: #6B6255;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           font-weight: 500;
           text-decoration: none;
         }
@@ -321,8 +451,7 @@ export default function RepairsDashboardPage() {
           border-radius: 12px;
           padding: 0.8rem 1rem;
           border: 1px solid #E8E0D5;
-          margin-bottom: 0.6rem;
-          cursor: pointer;
+          margin-bottom: 0.5rem;
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
           box-shadow: 0 2px 4px rgba(30,58,95,0.03);
         }
@@ -344,81 +473,85 @@ export default function RepairsDashboardPage() {
         }
         .job-card .status-badge {
           display: inline-block;
-          padding: 0.1rem 0.6rem;
+          padding: 0.1rem 0.5rem;
           border-radius: 20px;
-          font-size: 0.6rem;
+          font-size: 0.55rem;
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.3px;
           flex-shrink: 0;
         }
-        .job-card .status-badge.overdue {
-          background: #F1DBD3;
-          color: #AE4A34;
-        }
         .job-card .customer {
-          color: #6B6255;
-          font-size: 0.78rem;
-          margin: 0.1rem 0 0;
-        }
-        .job-card .issue {
           color: #6B6255;
           font-size: 0.75rem;
           margin: 0.1rem 0 0;
-          font-style: italic;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          max-width: 200px;
         }
-        .job-card .deposit-badge {
-          display: inline-block;
-          background: #F6E9C8;
-          color: #1E3A5F;
-          font-size: 0.6rem;
-          font-weight: 600;
-          padding: 0.05rem 0.4rem;
-          border-radius: 10px;
-          margin-left: 0.3rem;
+        .job-card .customer .phone {
+          color: #A89888;
         }
-        .job-card .bottom-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-top: 0.5rem;
-          padding-top: 0.5rem;
-          border-top: 1px solid #F0EDE8;
-        }
-        .job-card .bottom-row .balance {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #AE4A34;
-        }
-        .job-card .bottom-row .balance.paid { color: #4C7A5E; }
-        .job-card .bottom-row .meta {
+        .job-card .issue {
           color: #6B6255;
           font-size: 0.7rem;
+          margin: 0.1rem 0 0;
+          font-style: italic;
         }
-        .job-card .actions {
+        .job-card .divider {
+          border: none;
+          border-top: 1px solid #F0EDE8;
+          margin: 0.4rem 0;
+        }
+        .job-card .details-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.3rem 0.8rem;
+          align-items: center;
+        }
+        .job-card .details-row .price {
+          font-size: 0.75rem;
+          color: #6B6255;
+        }
+        .job-card .details-row .price strong { color: #1E3A5F; }
+        .job-card .details-row .balance {
+          font-weight: 700;
+          font-size: 0.8rem;
+          color: #AE4A34;
+        }
+        .job-card .details-row .balance.paid { color: #4C7A5E; }
+        .job-card .details-row .due {
+          font-size: 0.7rem;
+          font-weight: 600;
+        }
+        .job-card .details-row .due.overdue { color: #AE4A34; }
+        .job-card .details-row .due.today { color: #C79A2B; }
+        .job-card .details-row .due.tomorrow { color: #1E3A5F; }
+        .job-card .bottom-actions {
           display: flex;
           gap: 0.3rem;
+          margin-top: 0.4rem;
+          flex-wrap: wrap;
         }
-        .job-card .actions .whatsapp-btn {
-          background: #25D366;
-          color: #fff;
-          border: none;
-          border-radius: 6px;
+        .job-card .bottom-actions .btn {
           padding: 0.2rem 0.6rem;
+          border-radius: 6px;
           font-size: 0.6rem;
           font-weight: 600;
+          text-decoration: none;
+          border: 1px solid #E8E0D5;
+          background: #fff;
+          color: #1E3A5F;
           cursor: pointer;
-          transition: background 0.15s ease;
+          transition: all 0.1s ease;
           display: inline-flex;
           align-items: center;
           gap: 0.2rem;
         }
-        .job-card .actions .whatsapp-btn:hover { background: #1DA851; }
-        .job-card .actions .whatsapp-btn:active { transform: scale(0.95); }
+        .job-card .bottom-actions .btn:hover { background: #F5EFE2; }
+        .job-card .bottom-actions .btn-whatsapp {
+          background: #25D366;
+          border-color: #25D366;
+          color: #fff;
+        }
+        .job-card .bottom-actions .btn-whatsapp:hover { background: #1DA851; }
 
         .customer-row {
           display: flex;
@@ -429,7 +562,7 @@ export default function RepairsDashboardPage() {
           border-radius: 8px;
           border: 1px solid #E8E0D5;
           text-decoration: none;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.4rem;
           transition: border-color 0.15s ease;
           box-shadow: 0 1px 3px rgba(30,58,95,0.03);
         }
@@ -442,66 +575,80 @@ export default function RepairsDashboardPage() {
         }
         .customer-row .phone {
           color: #6B6255;
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           margin: 0;
         }
+        .customer-row .badges {
+          display: flex;
+          gap: 0.3rem;
+          flex-wrap: wrap;
+          margin-top: 0.1rem;
+        }
         .customer-row .badge {
-          background: #F6E9C8;
-          color: #1E3A5F;
-          font-size: 0.6rem;
+          font-size: 0.55rem;
           font-weight: 600;
           padding: 0.05rem 0.4rem;
           border-radius: 10px;
+          background: #F6E9C8;
+          color: #1E3A5F;
         }
-        .customer-row .arrow { color: #C79A2B; font-size: 0.8rem; }
+        .customer-row .badge.owing {
+          background: #F1DBD3;
+          color: #AE4A34;
+        }
+        .customer-row .arrow { color: #C79A2B; font-size: 0.7rem; }
 
         .empty-state {
           background: #fff;
           border-radius: 12px;
-          padding: 2rem 1.5rem;
+          padding: 1.5rem;
           border: 1px solid #E8E0D5;
           text-align: center;
           color: #6B6255;
           box-shadow: 0 2px 4px rgba(30,58,95,0.03);
         }
-        .empty-state .icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
-        .empty-state h3 { color: #1E3A5F; font-size: 1.1rem; margin: 0 0 0.3rem; }
-        .empty-state p { margin: 0 0 0.8rem; font-size: 0.9rem; }
-        .empty-state .btn { display: inline-block; padding: 0.5rem 1.2rem; border-radius: 8px; background: linear-gradient(135deg, #C79A2B, #B4881E); color: #1E3A5F; font-weight: 600; text-decoration: none; }
+  .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
+        .empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
+        .empty-state p { margin: 0 0 0.6rem; font-size: 0.8rem; }
+        .empty-state .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 8px; background: linear-gradient(135deg, #C79A2B, #B4881E); color: #1E3A5F; font-weight: 600; text-decoration: none; font-size: 0.8rem; }
 
         .red-alert {
           background: #F1DBD3;
           border: 1px solid #AE4A34;
           border-radius: 8px;
-          padding: 0.6rem 1rem;
+          padding: 0.5rem 0.8rem;
           margin-bottom: 1rem;
           color: #AE4A34;
           font-weight: 600;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.4rem;
           flex-wrap: wrap;
         }
 
         @media (max-width: 480px) {
           .stats-grid {
             grid-template-columns: repeat(3, 1fr);
-            gap: 0.4rem;
+            gap: 0.3rem;
           }
           .stat-card { padding: 0.4rem 0.2rem; }
           .stat-card .number { font-size: 0.9rem; }
-          .stat-card .label { font-size: 0.45rem; }
+          .stat-card .label { font-size: 0.4rem; }
+          .pipeline-item { min-width: 55px; padding: 0.3rem 0.4rem; }
+          .pipeline-item .count { font-size: 0.7rem; }
+          .pipeline-item .label { font-size: 0.4rem; }
           .job-card .top-row { flex-wrap: wrap; }
-          .job-card .issue { max-width: 100%; }
+          .job-card .details-row { gap: 0.2rem 0.5rem; }
           .quick-actions .action-btn {
             flex: 1;
             justify-content: center;
-            font-size: 0.7rem;
-            padding: 0.5rem 0.6rem;
+            font-size: 0.65rem;
+            padding: 0.4rem 0.5rem;
           }
-          .alert-item { min-width: 60px; padding: 0.3rem 0.4rem; font-size: 0.6rem; }
+          .alert-item { min-width: 55px; padding: 0.3rem 0.4rem; font-size: 0.55rem; }
           .alert-item .count { font-size: 0.8rem; }
+          .customer-row { flex-wrap: wrap; gap: 0.3rem; }
         }
       `}</style>
 
@@ -519,27 +666,44 @@ export default function RepairsDashboardPage() {
         </div>
       </div>
 
-      {/* STATS */}
+      {/* STATS — Clickable */}
       <div className="stats-grid">
-        <div className="stat-card">
+        <a href={statsFilters.total} className="stat-card">
           <p className="number navy">{stats.total}</p>
           <p className="label">Total Jobs</p>
-        </div>
-        <div className="stat-card">
+        </a>
+        <a href={statsFilters.active} className="stat-card">
           <p className="number gold">{stats.active}</p>
           <p className="label">Active</p>
-        </div>
-        <div className="stat-card">
+        </a>
+        <a href={statsFilters.awaitingParts} className="stat-card">
           <p className="number red">{stats.awaitingParts}</p>
           <p className="label">Awaiting Parts</p>
-        </div>
-        <div className="stat-card">
+        </a>
+        <a href={statsFilters.ready} className="stat-card">
           <p className="number green">{stats.ready}</p>
           <p className="label">Ready for Pickup</p>
-        </div>
-        <div className="stat-card">
+        </a>
+        <a href={statsFilters.totalOwing} className="stat-card">
           <p className="number red">₦{stats.totalOwing.toLocaleString()}</p>
           <p className="label">Outstanding</p>
+        </a>
+      </div>
+
+      {/* PIPELINE */}
+      <div className="pipeline-section">
+        <div className="pipeline-scroll">
+          {pipelineStages.map((stage) => (
+            <a
+              key={stage.key}
+              href={`/dashboard/repairs/jobs?filter=${stage.key.toLowerCase().replace(' ', '_')}`}
+              className="pipeline-item"
+            >
+              <span className="icon">{stage.icon}</span>
+              <p className="count">{stage.count}</p>
+              <p className="label">{stage.label}</p>
+            </a>
+          ))}
         </div>
       </div>
 
@@ -547,17 +711,21 @@ export default function RepairsDashboardPage() {
       {readyOverdueAlerts.length > 0 && (
         <div className="red-alert">
           <span>🚨</span>
-          <span>{readyOverdueAlerts.length} job{readyOverdueAlerts.length > 1 ? 's' : ''} ready for over 7 days</span>
+          <span>{readyOverdueAlerts.length} job{readyOverdueAlerts.length > 1 ? 's' : ''} ready for over 7 days — waiting on customer!</span>
         </div>
       )}
 
       {alerts.length > 0 && (
         <div className="alert-strip">
           {alerts.map((alert, i) => (
-            <div key={i} className={`alert-item ${alert.type}`}>
+            <a
+              key={i}
+              href={`/dashboard/repairs/jobs?filter=${alert.type}`}
+              className={`alert-item ${alert.type}`}
+            >
               <span className="count">{alert.count}</span>
               {alert.message}
-            </div>
+            </a>
           ))}
         </div>
       )}
@@ -575,7 +743,7 @@ export default function RepairsDashboardPage() {
         </a>
       </div>
 {/* RECENT JOBS */}
-<div style={{ marginBottom: '1.8rem' }}>
+<div style={{ marginBottom: '1.5rem' }}>
   <div className="section-header">
     <h2>Recent Jobs</h2>
     <a href="/dashboard/repairs/jobs">View all →</a>
@@ -584,7 +752,7 @@ export default function RepairsDashboardPage() {
   {jobs.length === 0 ? (
     <div className="empty-state">
       <span className="icon">🔧</span>
-      <h3>No repair jobs yet</h3>
+      <h4>No repair jobs yet</h4>
       <p>Create your first repair job and start tracking it from diagnosis to pickup.</p>
       <a href="/dashboard/repairs/jobs/new" className="btn">Create First Job</a>
     </div>
@@ -596,24 +764,22 @@ export default function RepairsDashboardPage() {
       const isOverdueStatus = isOverdue(job.due_date) && job.current_status !== 'Delivered' && job.current_status !== 'Completed'
       const deposit = job.amount_paid || 0
       const issue = job.customer_notes || ''
+      const dueInfo = getDueDisplay(job.due_date)
+      const phone = job.customers?.phone || ''
 
       return (
-        <div
-          key={job.id}
-          className="job-card"
-          onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
-        >
+        <div key={job.id} className="job-card">
           <div className="top-row">
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p className="device">
-                {device}
-                {deposit > 0 && <span className="deposit-badge">Deposit: ₦{deposit.toLocaleString()}</span>}
+              <p className="device">{device}</p>
+              <p className="customer">
+                {job.customers?.name || 'No customer'}
+                {phone && <span className="phone"> · {phone}</span>}
               </p>
-              <p className="customer">{job.customers?.name || 'No customer'}</p>
               {issue && <p className="issue">Issue: {issue}</p>}
             </div>
             <span
-              className={`status-badge ${isOverdueStatus ? 'overdue' : ''}`}
+              className="status-badge"
               style={{
                 background: isOverdueStatus ? '#F1DBD3' : status.bg,
                 color: isOverdueStatus ? '#AE4A34' : status.color,
@@ -622,31 +788,51 @@ export default function RepairsDashboardPage() {
               {isOverdueStatus ? '⚠️ Overdue' : status.label}
             </span>
           </div>
-          <div className="bottom-row">
-            <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
-              {balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid in full'}
+
+          <hr className="divider" />
+
+          <div className="details-row">
+            <span className="price">
+              <strong>₦{job.price.toLocaleString()}</strong> total
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="meta">{job.due_date ? getDueDisplay(job.due_date) : 'No deadline'}</span>
-              <div className="actions">
-                <button
-                  className="whatsapp-btn"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const phone = job.customers?.phone
-                    if (!phone) {
-                      alert('No phone number for this customer.')
-                      return
-                    }
-                    const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
-                    const msg = `Hi, your ${device} is ready for pickup.`
-                    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
-                  }}
-                >
-                  💬 WhatsApp
-                </button>
-              </div>
-            </div>
+            {deposit > 0 && (
+              <span className="price">Deposit ₦{deposit.toLocaleString()}</span>
+            )}
+            <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
+              {balance > 0 ? `Balance ₦${balance.toLocaleString()}` : '✓ Paid in full'}
+            </span>
+          </div>
+
+          <div className="details-row" style={{ marginTop: '0.2rem' }}>
+            {dueInfo && (
+              <span className={`due ${dueInfo.color === '#AE4A34' ? 'overdue' : dueInfo.color === '#C79A2B' ? 'today' : dueInfo.color === '#1E3A5F' ? 'tomorrow' : ''}`}>
+                {dueInfo.label}
+              </span>
+            )}
+            {!dueInfo && <span className="due" style={{ color: '#A89888' }}>No deadline</span>}
+          </div>
+
+          <div className="bottom-actions">
+            <a
+              href={`/dashboard/repairs/jobs/${job.id}`}
+              className="btn"
+              onClick={(e) => e.stopPropagation()}
+            >
+              👁️ View Job
+            </a>
+            {phone && (
+              <button
+                className="btn btn-whatsapp"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
+                  const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ${status.label}. ${job.due_date ? `Expected by ${formatDate(job.due_date)}.` : ''}`
+                  window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+                }}
+              >
+                💬 WhatsApp
+              </button>
+            )}
           </div>
         </div>
       )
@@ -654,16 +840,16 @@ export default function RepairsDashboardPage() {
   )}
 </div>
       {/* PARTS NEEDED */}
-      <div style={{ marginBottom: '1.8rem' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
         <div className="section-header">
           <h2>🔩 Parts Needed</h2>
           <a href="/dashboard/repairs/parts">View inventory →</a>
         </div>
 
         {awaitingPartsJobs.length === 0 ? (
-          <div className="empty-state" style={{ padding: '1.5rem' }}>
-            <span className="icon" style={{ fontSize: '1.8rem' }}>✅</span>
-            <p style={{ margin: 0 }}>No jobs awaiting parts. All parts available.</p>
+          <div className="empty-state" style={{ padding: '1.2rem' }}>
+            <span className="icon" style={{ fontSize: '1.5rem' }}>✅</span>
+            <p style={{ margin: 0, fontSize: '0.8rem' }}>All parts available. No jobs awaiting parts.</p>
           </div>
         ) : (
           awaitingPartsJobs.map((job) => {
@@ -681,21 +867,88 @@ export default function RepairsDashboardPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p className="device">{device}</p>
                     <p className="customer">{job.customers?.name || 'No customer'}</p>
-                    <p className="issue" style={{ fontStyle: 'normal' }}>Part: {partName}</p>
+                    <p className="issue" style={{ fontStyle: 'normal', color: '#B4881E' }}>
+                      Part: {partName}
+                    </p>
                   </div>
                   <span className="status-badge" style={{ background: '#F6E9C8', color: '#B4881E' }}>
                     ⏳ Awaiting Parts
                   </span>
-                </div>
-                <div className="bottom-row" style={{ borderTop: '1px solid #F0EDE8' }}>
-                  <span style={{ color: '#6B6255', fontSize: '0.7rem' }}>Part needed</span>
-                  <span style={{ color: '#B4881E', fontSize: '0.7rem' }}>⏳</span>
                 </div>
               </div>
             )
           })
         )}
       </div>
+
+      {/* READY FOR PICKUP — Special Section */}
+      {readyJobs.length > 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div className="section-header">
+            <h2>🔔 Ready for Pickup</h2>
+          </div>
+
+          {readyJobs.slice(0, 3).map((job) => {
+            const device = getDeviceDisplay(job)
+            const phone = job.customers?.phone || ''
+            const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
+
+            return (
+              <div key={job.id} className="job-card" style={{ borderColor: '#4C7A5E' }}>
+                <div className="top-row">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p className="device">{device}</p>
+                    <p className="customer">
+                      {job.customers?.name || 'No customer'}
+                      {phone && <span className="phone"> · {phone}</span>}
+                    </p>
+                  </div>
+                  <span className="status-badge" style={{ background: '#DCEBE2', color: '#4C7A5E' }}>
+                    ✅ Ready
+                  </span>
+                </div>
+                <div className="bottom-actions">
+                  <a
+                    href={`/dashboard/repairs/jobs/${job.id}`}
+                    className="btn"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    👁️ View
+                  </a>
+                  {phone && (
+                    <button
+                      className="btn btn-whatsapp"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ready for pickup!`
+                        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+                      }}
+                    >
+                      💬 Notify Customer
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+
+          {readyJobs.length > 3 && (
+            <a
+              href="/dashboard/repairs/jobs?filter=ready"
+              style={{
+                display: 'block',
+                textAlign: 'center',
+                fontSize: '0.75rem',
+                color: '#6B6255',
+                marginTop: '0.3rem',
+                textDecoration: 'none',
+              }}
+            >
+              + {readyJobs.length - 3} more ready for pickup
+            </a>
+          )}
+        </div>
+      )}
 
       {/* RECENT CUSTOMERS */}
       <div>
@@ -705,9 +958,9 @@ export default function RepairsDashboardPage() {
         </div>
 
         {customers.length === 0 ? (
-          <div className="empty-state" style={{ padding: '1.5rem' }}>
-            <span className="icon" style={{ fontSize: '1.8rem' }}>👤</span>
-            <p style={{ margin: 0 }}>No customers yet. Add your first customer to start tracking repairs.</p>
+          <div className="empty-state" style={{ padding: '1.2rem' }}>
+            <span className="icon" style={{ fontSize: '1.5rem' }}>👤</span>
+            <p style={{ margin: 0, fontSize: '0.8rem' }}>No customers yet. Add your first customer to start tracking repairs.</p>
           </div>
         ) : (
           previewCustomers.map((c) => {
@@ -719,19 +972,15 @@ export default function RepairsDashboardPage() {
               <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row">
                 <div>
                   <p className="name">{c.name}</p>
-                  <p className="phone">
-                    {c.phone || 'No phone'}
+                  <p className="phone">{c.phone || 'No phone'}</p>
+                  <div className="badges">
                     {activeJobs.length > 0 && (
-                      <span className="badge" style={{ marginLeft: '0.3rem' }}>
-                        {activeJobs.length} active
-                      </span>
+                      <span className="badge">{activeJobs.length} active repair{activeJobs.length > 1 ? 's' : ''}</span>
                     )}
                     {totalOwing > 0 && (
-                      <span className="badge" style={{ marginLeft: '0.3rem', background: '#F1DBD3', color: '#AE4A34' }}>
-                        ₦{totalOwing.toLocaleString()}
-                      </span>
+                      <span className="badge owing">₦{totalOwing.toLocaleString()} owing</span>
                     )}
-                  </p>
+                  </div>
                 </div>
                 <span className="arrow">→</span>
               </a>
@@ -741,4 +990,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-        }
+          }
