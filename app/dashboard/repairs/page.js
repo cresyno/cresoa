@@ -38,7 +38,6 @@ export default function RepairsDashboardPage() {
 
     setBusiness(businessData)
 
-    // Load repair jobs (orders with device_type)
     const { data: jobData } = await supabase
       .from('orders')
       .select('*, customers(name, phone)')
@@ -48,7 +47,6 @@ export default function RepairsDashboardPage() {
 
     setJobs(jobData || [])
 
-    // Load customers
     const { data: customerData } = await supabase
       .from('customers')
       .select('*')
@@ -57,7 +55,6 @@ export default function RepairsDashboardPage() {
 
     setCustomers(customerData || [])
 
-    // Stats
     const total = jobData?.length || 0
     const active = jobData?.filter(j =>
       j.current_status !== 'Completed' && j.current_status !== 'Delivered'
@@ -125,7 +122,6 @@ export default function RepairsDashboardPage() {
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
-        /* Header */
         .header {
           display: flex;
           align-items: center;
@@ -153,8 +149,6 @@ export default function RepairsDashboardPage() {
           font-weight: 600;
           margin-left: 0.3rem;
         }
-
-        /* Stats */
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -186,8 +180,6 @@ export default function RepairsDashboardPage() {
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
-
-        /* Quick Actions */
         .quick-actions {
           display: flex;
           gap: 0.5rem;
@@ -208,8 +200,6 @@ export default function RepairsDashboardPage() {
           transition: transform 0.1s ease;
         }
         .action-btn:active { transform: scale(0.97); }
-
-        /* Section Header */
         .section-header {
           display: flex;
           justify-content: space-between;
@@ -229,8 +219,6 @@ export default function RepairsDashboardPage() {
           text-decoration: none;
         }
         .section-header a:hover { text-decoration: underline; }
-
-        /* Job Card */
         .job-card {
           background: #fff;
           border-radius: 10px;
@@ -279,7 +267,6 @@ export default function RepairsDashboardPage() {
           white-space: nowrap;
         }
         .job-card .balance.paid { color: #4C7A5E; }
-
         .status-badge {
           display: inline-block;
           padding: 0.1rem 0.5rem;
@@ -289,8 +276,6 @@ export default function RepairsDashboardPage() {
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
-
-        /* Customer Row */
         .customer-row {
           display: flex;
           align-items: center;
@@ -316,8 +301,6 @@ export default function RepairsDashboardPage() {
           font-size: 0.75rem;
           margin: 0;
         }
-
-        /* Empty State */
         .empty-state {
           background: #fff;
           border-radius: 10px;
@@ -339,7 +322,6 @@ export default function RepairsDashboardPage() {
           text-decoration: none;
         }
         .empty-state a:hover { text-decoration: underline; }
-
         @media (max-width: 480px) {
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -403,9 +385,6 @@ export default function RepairsDashboardPage() {
           Parts
         </a>
       </div>
-    </main>
-  )
-    }
 {/* Recent Jobs */}
 <div style={{ marginBottom: '1.8rem' }}>
   <div className="section-header">
@@ -488,4 +467,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-                  }
+}
