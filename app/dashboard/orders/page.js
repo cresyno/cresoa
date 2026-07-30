@@ -1,16 +1,13 @@
-// app/dashboard/orders/page.js
-
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import UpgradeBanner from '../../../components/UpgradeBanner'
 import { getPlanLimits } from '../../../lib/planLimits'
 
-function OrdersContent() {
+export default function OrdersPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [orders, setOrders] = useState([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -25,7 +22,7 @@ function OrdersContent() {
     owing: 0,
   })
 
-  const load = async () => {
+  const loadOrders = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       router.push('/login')
@@ -38,16 +35,19 @@ function OrdersContent() {
       .eq('owner_id', user.id)
       .single()
 
-    setBusiness(businessData)
-    setPlan(businessData?.plan || 'free')
+    if (!businessData) {
+      setLoading(false)
+      return
+    }
 
-    if (!businessData) return
+    setBusiness(businessData)
+    setPlan(businessData.plan || 'free')
 
     const { data: orderData } = await supabase
       .from('orders')
       .select('*, customers(name, phone)')
       .eq('business_id', businessData.id)
-      .is('group_order_id', null)
+      .is('group_order_id', null) // individual orders only
       .order('created_at', { ascending: false })
 
     setOrders(orderData || [])
@@ -89,46 +89,15 @@ function OrdersContent() {
   }
 
   useEffect(() => {
-    const urlSearch = searchParams?.get('search')
-    if (urlSearch) setSearch(urlSearch)
+    loadOrders()
+  }, [])
 
-    const urlFilter = searchParams?.get('filter')
-    if (urlFilter) setFilter(urlFilter)
+  // ---- Plan limit check ----
+  const limits = getPlanLimits(plan)
+  const orderCount = orders.length
+  const canAddMore = orderCount < limits.orders
 
-    load()
-  }, [searchParams])
-
-  const getStatusInfo = (status) => {
-    const map = {
-      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
-      'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
-      'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
-      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
-    }
-    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
-  }
-
-  const getOrderName = (order) => {
-    if (order.title) return order.title
-    return 'Order'
-  }
-
-  const isOverdue = (dueDate) => {
-    if (!dueDate) return false
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const due = new Date(dueDate)
-    due.setHours(0, 0, 0, 0)
-    return due < today
-  }
-
-  const isDueToday = (dueDate) => {
-    if (!dueDate) return false
-    const today = new Date().toISOString().split('T')[0]
-    return dueDate === today
-  }
-
+  // ---- Filtering logic ----
   const filteredOrders = orders
     .filter((o) =>
       o.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -147,22 +116,34 @@ function OrdersContent() {
       return true
     })
 
-  const advanceStatus = async (order) => {
-    const stages = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
-    const currentIndex = stages.indexOf(order.current_status)
-    if (currentIndex === -1 || currentIndex === stages.length - 1) return
-
-    await supabase
-      .from('orders')
-      .update({ current_status: stages[currentIndex + 1] })
-      .eq('id', order.id)
-
-    load()
+  // Helper functions
+  const isOverdue = (dueDate) => {
+    if (!dueDate) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const due = new Date(dueDate)
+    due.setHours(0, 0, 0, 0)
+    return due < today
   }
 
-  const limits = getPlanLimits(plan)
-  const orderCount = orders.length
-  const showUpgradeBanner = orderCount >= limits.orders - 2 && plan === 'free'
+  const isDueToday = (dueDate) => {
+    if (!dueDate) return false
+    const today = new Date().toISOString().split('T')[0]
+    return dueDate === today
+  }
+
+  const getStatusInfo = (status) => {
+    const map = {
+      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
+      'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
+      'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
+      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
+    }
+    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
+  }
+
+  const getOrderName = (order) => order?.title || 'Order'
 
   if (loading) {
     return (
@@ -352,39 +333,6 @@ function OrdersContent() {
           font-size: 0.9rem;
         }
         .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-        .settle-modal {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.5);
-          backdrop-filter: blur(4px);
-          z-index: 1100;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          animation: slideUp 0.3s ease-out;
-        }
-        .settle-modal-content {
-          background: #F5EFE2;
-          border-radius: 20px;
-          padding: 1.8rem;
-          max-width: 380px;
-          width: 100%;
-        }
-        .quick-input {
-          width: 100%;
-          padding: 0.7rem;
-          border-radius: 8px;
-          border: 1px solid #E8E0D5;
-          font-size: 0.95rem;
-          background: #fff;
-          box-sizing: border-box;
-          color: #2B2620;
-        }
-        .quick-input:focus { outline: none; border-color: #C79A2B; }
         .stats-row {
           display: flex;
           gap: 0.4rem;
@@ -436,14 +384,57 @@ function OrdersContent() {
           font-size: 0.7rem;
           font-weight: 600;
         }
+        .action-btn {
+          padding: 0.6rem 1rem;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .action-btn:active { transform: scale(0.97); }
+        .add-btn {
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+          color: #1E3A5F;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .add-btn:active { transform: scale(0.97); }
+        .add-btn:disabled {
+          background: #E8E0D5;
+          color: #6B6255;
+          cursor: default;
+        }
+        .order-status-badge {
+          display: inline-block;
+          padding: 0.15rem 0.6rem;
+          border-radius: 20px;
+          font-size: 0.65rem;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+        }
         @media (max-width: 420px) {
           .order-card .row { flex-direction: column; align-items: stretch; }
           .order-actions { justify-content: flex-start; margin-top: 0.3rem; }
           .order-card .balance { margin-right: 0; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
+          .header-row { flex-direction: column; align-items: stretch; }
+          .stats-row { flex-wrap: wrap; }
+          .stat-card { flex: 1 0 45%; }
         }
       `}</style>
 
@@ -452,11 +443,31 @@ function OrdersContent() {
       </button>
 
       <div className="header-row">
-        <h1>All Orders</h1>
-        <span className="order-count-badge">{orders.length}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <h1>All Orders</h1>
+          <span className="order-count-badge">{orders.length}</span>
+        </div>
+        <a
+          href={canAddMore ? "/dashboard/orders/new" : "#"}
+          className={`add-btn ${!canAddMore ? 'add-btn-disabled' : ''}`}
+          style={{
+            background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
+            color: canAddMore ? '#1E3A5F' : '#6B6255',
+            cursor: canAddMore ? 'pointer' : 'default',
+          }}
+          onClick={(e) => {
+            if (!canAddMore) {
+              e.preventDefault()
+              router.push('/dashboard/subscription')
+            }
+          }}
+        >
+          {canAddMore ? '📋 + New Order' : '🔒 New Order (Upgrade)'}
+        </a>
       </div>
 
-      {showUpgradeBanner && (
+      {/* ===== UPGRADE BANNER ===== */}
+      {!canAddMore && (
         <UpgradeBanner
           resource="orders"
           currentCount={orderCount}
@@ -583,9 +594,22 @@ function OrdersContent() {
                     <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️</a>
                     {phone && <a href={`tel:${phone}`} className="btn btn-call">📞</a>}
                     {balance > 0 && <button className="btn btn-settle" onClick={() => alert('Settle payment')}>💰</button>}
-                    <a href={`/dashboard/orders/${o.id}/edit`} className="btn btn-edit">✏️</a>
+                    <a href={`/dashboard/orders/${o.id}?edit=true`} className="btn btn-edit">✏️</a>
                     {!isLastStage && (
-                      <button className="btn btn-advance" onClick={() => advanceStatus(o)}>
+                      <button
+                        className="btn btn-advance"
+                        onClick={() => {
+                          // Advance status
+                          const nextIndex = currentIndex + 1
+                          if (nextIndex < stages.length) {
+                            supabase
+                              .from('orders')
+                              .update({ current_status: stages[nextIndex] })
+                              .eq('id', o.id)
+                              .then(() => loadOrders())
+                          }
+                        }}
+                       >
                         → {stages[currentIndex + 1]}
                       </button>
                     )}
@@ -599,16 +623,4 @@ function OrdersContent() {
       )}
     </main>
   )
-}
-
-export default function Page() {
-  return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#6B6255' }}>Loading orders...</p>
-      </div>
-    }>
-      <OrdersContent />
-    </Suspense>
-  )
-    }
+        }
