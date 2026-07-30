@@ -3,15 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { showToast } from '../../../../lib/toast'
-const REPAIR_STAGES = [
-  'Diagnosing',
-  'Awaiting Parts',
-  'Repairing',
-  'Ready',
-  'Completed',
-  'Delivered'
-]
+import UpgradeBanner from '../../../../components/UpgradeBanner'
+import { getPlanLimits } from '../../../../lib/planLimits'
+
+const REPAIR_STAGES = ['Diagnosing', 'Awaiting Parts', 'Repairing', 'Ready', 'Completed', 'Delivered']
 
 export default function RepairsJobsPage() {
   const router = useRouter()
@@ -19,12 +14,15 @@ export default function RepairsJobsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  const [business, setBusiness] = useState(null)
+  const [plan, setPlan] = useState('free')
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     awaitingParts: 0,
     ready: 0,
   })
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0) // for limit check
 
   const loadJobs = async () => {
     try {
@@ -34,18 +32,32 @@ export default function RepairsJobsPage() {
         return
       }
 
-      const { data: business } = await supabase
+      const { data: businessData } = await supabase
         .from('businesses')
-        .select('id')
+        .select('id, plan')
         .eq('owner_id', user.id)
         .single()
 
-      if (!business) return
+      if (!businessData) {
+        setLoading(false)
+        return
+      }
 
+      setBusiness(businessData)
+      setPlan(businessData.plan || 'free')
+
+      // Count total orders (for limit check)
+      const { count: totalCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessData.id)
+      setTotalOrdersCount(totalCount || 0)
+
+      // Fetch only repair jobs (orders with device_type)
       const { data: jobData, error } = await supabase
         .from('orders')
         .select('*, customers(name, phone)')
-        .eq('business_id', business.id)
+        .eq('business_id', businessData.id)
         .not('device_type', 'is', null)
         .order('created_at', { ascending: false })
 
@@ -53,9 +65,10 @@ export default function RepairsJobsPage() {
         console.error('Error loading jobs:', error)
         setJobs([])
       } else {
-        setJobs(jobData || [])
-      }
+        setJobs(jobData || []
+      )
 
+      // Calculate stats
       const total = jobData?.length || 0
       const active = jobData?.filter(j => 
         j.current_status !== 'Completed' && j.current_status !== 'Delivered'
@@ -80,6 +93,11 @@ export default function RepairsJobsPage() {
     loadJobs()
   }, [])
 
+  // Plan limit check
+  const limits = getPlanLimits(plan)
+  const canAddMore = totalOrdersCount < limits.orders
+
+  // Helper functions
   const getStatusInfo = (status) => {
     const map = {
       'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' },
@@ -133,10 +151,12 @@ export default function RepairsJobsPage() {
   const deleteJob = async (id) => {
     const confirmed = window.confirm('Delete this repair job? This cannot be undone.')
     if (!confirmed) return
+
     await supabase.from('orders').delete().eq('id', id)
     loadJobs()
   }
 
+  // Filter logic
   const filteredJobs = jobs
     .filter(j => {
       const searchTerm = search.toLowerCase()
@@ -383,33 +403,104 @@ export default function RepairsJobsPage() {
           margin-bottom: 1.2rem;
           flex-wrap: wrap;
         }
+        .back-link {
+          background: none;
+          border: none;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+          padding: 0;
+          margin-bottom: 1rem;
+          cursor: pointer;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.8rem;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+        .header-row h1 {
+          color: #1E3A5F;
+          font-size: 1.3rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .header-row .count {
+          color: #6B6255;
+          font-size: 0.8rem;
+          font-weight: 400;
+        }
+        .job-count-badge {
+          background: #E8E0D5;
+          color: #6B6255;
+          padding: 0.05rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+        }
+        .add-btn {
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .add-btn:active { transform: scale(0.97); }
         @media (max-width: 420px) {
           .job-card .row { flex-direction: column; align-items: stretch; }
           .job-actions { justify-content: flex-start; margin-top: 0.3rem; }
           .job-card .balance { margin-right: 0; }
+          .header-row { flex-direction: column; align-items: stretch; }
+          .stats-row { flex-wrap: wrap; }
+          .stat-card { flex: 1 0 45%; }
         }
       `}</style>
 
-      <div className="section-header">
+      <button className="back-link" onClick={() => router.push('/dashboard/repairs')}>
+        ← Back to repairs
+      </button>
+
+      <div className="header-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <h1>🔧 Repair Jobs</h1>
-          <span className="count">{jobs.length} total</span>
+          <span className="job-count-badge">{jobs.length}</span>
         </div>
         <a
-          href="/dashboard/repairs/jobs/new"
+          href={canAddMore ? "/dashboard/repairs/jobs/new" : "#"}
+          className="add-btn"
           style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #C79A2B, #B4881E)',
-            color: '#1E3A5F',
-            fontWeight: '700',
-            fontSize: '0.8rem',
-            textDecoration: 'none'
+            background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
+            color: canAddMore ? '#1E3A5F' : '#6B6255',
+            cursor: canAddMore ? 'pointer' : 'default',
+          }}
+          onClick={(e) => {
+            if (!canAddMore) {
+              e.preventDefault()
+              router.push('/dashboard/subscription')
+            }
           }}
         >
-          + New Job
+          {canAddMore ? '+ New Job' : '🔒 New Job (Upgrade)'}
         </a>
       </div>
+
+      {/* ===== UPGRADE BANNER ===== */}
+      {!canAddMore && (
+        <UpgradeBanner
+          resource="orders"
+          currentCount={totalOrdersCount}
+          limit={limits.orders}
+          plan={plan}
+        />
+      )}
 
       <div className="stats-row">
         <div className="stat-card">
@@ -527,4 +618,4 @@ export default function RepairsJobsPage() {
       )}
     </main>
   )
-                                     }
+    }
