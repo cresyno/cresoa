@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
 import { isFeatureAvailable } from '../../../lib/planLimits'
-import FeedbackBanner from '../../../components/FeedbackBanner
+import FeedbackBanner from '../../../components/FeedbackBanner'
 export default function FashionDashboardPage() {
   const router = useRouter()
   const [business, setBusiness] = useState(null)
