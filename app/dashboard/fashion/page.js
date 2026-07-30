@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import LetterLogo from '../../../components/LetterLogo'
+import { supabase } from '../../lib/supabaseClient'
+import LetterLogo from '../../components/LetterLogo'
+import { isFeatureAvailable } from '../../lib/planLimits'
+import FeedbackBanner from '../../components/FeedbackBanner'
 
 export default function FashionDashboardPage() {
   const router = useRouter()
@@ -38,7 +40,6 @@ export default function FashionDashboardPage() {
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-
     if (!user) {
       router.push('/login')
       return
@@ -230,6 +231,9 @@ export default function FashionDashboardPage() {
     loadDashboard()
   }
 
+  // Check if group orders are available on the current plan
+  const canCreateGroup = business ? isFeatureAvailable(business.plan || 'free', 'groups') : false
+
   // Loading skeleton
   if (loading) {
     return (
@@ -250,7 +254,7 @@ export default function FashionDashboardPage() {
           .skeleton-title { height: 20px; width: 60%; margin-bottom: 8px; }
           .skeleton-card { height: 80px; border-radius: 12px; }
         `}</style>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
             <div className="skeleton" style={{ width: '44px', height: '44px', borderRadius: '12px' }}></div>
             <div>
@@ -266,7 +270,7 @@ export default function FashionDashboardPage() {
         </div>
         <div className="skeleton" style={{ height: '44px', borderRadius: '10px', marginBottom: '1rem' }}></div>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3, 4].map(i => (
             <div key={i} className="skeleton" style={{ height: '40px', width: '80px', borderRadius: '8px' }}></div>
           ))}
         </div>
@@ -494,9 +498,7 @@ export default function FashionDashboardPage() {
           cursor: pointer;
           transition: transform 0.1s ease;
         }
-        .action-btn:active {
-          transform: scale(0.97);
-        }
+        .action-btn:active { transform: scale(0.97); }
         .group-card {
           border: 1px solid #E8E0D5;
           border-radius: 12px;
@@ -570,7 +572,7 @@ export default function FashionDashboardPage() {
           min-height: 28px;
         }
         .order-actions .btn:hover {
-        background: #F5EFE2;
+          background: #F5EFE2;
         }
         .order-actions .btn-view {
           background: #F5EFE2;
@@ -954,7 +956,8 @@ export default function FashionDashboardPage() {
           margin-left: 0.3rem;
         }
       `}</style>
-    {/* ===== HEADER ===== */}
+
+      {/* ===== HEADER ===== */}
       <div className="header-top">
         <div className="header-brand">
           <LetterLogo name={business?.name} size={44} />
@@ -967,6 +970,9 @@ export default function FashionDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ===== FEEDBACK BANNER (for beta users) ===== */}
+      {business && <FeedbackBanner business={business} />}
 
       {/* ===== ALERT STRIP ===== */}
       {(overdueCount > 0 || dueTodayCount > 0 || readyCount > 0) && (
@@ -1049,8 +1055,22 @@ export default function FashionDashboardPage() {
         <a href="/dashboard/orders/new" className="action-btn" style={{ background: '#C79A2B', color: '#1E3A5F' }}>
           📋 + Order
         </a>
-        <a href="/dashboard/groups/new" className="action-btn" style={{ background: '#AE4A34', color: '#fff' }}>
-          👥 + Group
+        <a
+          href={canCreateGroup ? "/dashboard/groups/new" : "#"}
+          className="action-btn"
+          style={{
+            background: canCreateGroup ? '#AE4A34' : '#E8E0D5',
+            color: canCreateGroup ? '#fff' : '#6B6255',
+            cursor: canCreateGroup ? 'pointer' : 'default',
+          }}
+          onClick={(e) => {
+            if (!canCreateGroup) {
+              e.preventDefault()
+              router.push('/dashboard/subscription')
+            }
+          }}
+        >
+          {canCreateGroup ? '👥 + Group' : '🔒 Group (Upgrade)'}
         </a>
         <a href="/dashboard/reminders" className="action-btn" style={{ background: '#4C7A5E', color: '#fff' }}>
           🔔 Reminders
@@ -1072,9 +1092,18 @@ export default function FashionDashboardPage() {
         {groups.length === 0 ? (
           <div className="empty-state">
             <p style={{ margin: '0 0 0.4rem' }}>No group orders yet.</p>
-            <a href="/dashboard/groups/new" style={{ color: '#AE4A34', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none' }}>
-              👥 + Create a group order
-            </a>
+            {canCreateGroup ? (
+              <a href="/dashboard/groups/new" style={{ color: '#AE4A34', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none' }}>
+                👥 + Create a group order
+              </a>
+            ) : (
+              <button
+                onClick={() => router.push('/dashboard/subscription')}
+                style={{ color: '#6B6255', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                🔒 Upgrade to create group orders
+              </button>
+            )}
           </div>
         ) : (
           groups.map((g) => {
@@ -1137,7 +1166,7 @@ export default function FashionDashboardPage() {
                               {dueDisplay}
                             </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignIems: 'center', flexShrink: 0 }}>
                             <span className={`order-balance ${balance <= 0 ? 'paid' : ''}`}>
                               {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
                             </span>
@@ -1164,6 +1193,7 @@ export default function FashionDashboardPage() {
           })
         )}
       </div>
+
       {/* ===== INDIVIDUAL ORDERS ===== */}
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-header">
@@ -1435,4 +1465,4 @@ export default function FashionDashboardPage() {
       )}
     </main>
   )
-              }
+          }
