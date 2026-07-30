@@ -22,7 +22,7 @@ export default function RepairsJobsPage() {
     awaitingParts: 0,
     ready: 0,
   })
-  const [totalOrdersCount, setTotalOrdersCount] = useState(0) // for limit check
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0)
 
   const loadJobs = async () => {
     try {
@@ -46,14 +46,12 @@ export default function RepairsJobsPage() {
       setBusiness(businessData)
       setPlan(businessData.plan || 'free')
 
-      // Count total orders (for limit check)
       const { count: totalCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('business_id', businessData.id)
       setTotalOrdersCount(totalCount || 0)
 
-      // Fetch only repair jobs (orders with device_type)
       const { data: jobData, error } = await supabase
         .from('orders')
         .select('*, customers(name, phone)')
@@ -65,10 +63,9 @@ export default function RepairsJobsPage() {
         console.error('Error loading jobs:', error)
         setJobs([])
       } else {
-        setJobs(jobData || []
-      )
+        setJobs(jobData || [])
+      }
 
-      // Calculate stats
       const total = jobData?.length || 0
       const active = jobData?.filter(j => 
         j.current_status !== 'Completed' && j.current_status !== 'Delivered'
@@ -93,11 +90,9 @@ export default function RepairsJobsPage() {
     loadJobs()
   }, [])
 
-  // Plan limit check
   const limits = getPlanLimits(plan)
   const canAddMore = totalOrdersCount < limits.orders
 
-  // Helper functions
   const getStatusInfo = (status) => {
     const map = {
       'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' },
@@ -156,7 +151,6 @@ export default function RepairsJobsPage() {
     loadJobs()
   }
 
-  // Filter logic
   const filteredJobs = jobs
     .filter(j => {
       const searchTerm = search.toLowerCase()
@@ -232,9 +226,7 @@ export default function RepairsJobsPage() {
           margin-bottom: 0.7rem;
           transition: border-color 0.15s ease;
         }
-        .job-card:hover {
-          border-color: #D6D0C5;
-        }
+        .job-card:hover { border-color: #D6D0C5; }
         .job-card .row {
           display: flex;
           align-items: center;
@@ -271,9 +263,7 @@ export default function RepairsJobsPage() {
           color: #AE4A34;
           white-space: nowrap;
         }
-        .job-card .balance.paid {
-          color: #4C7A5E;
-        }
+        .job-card .balance.paid { color: #4C7A5E; }
         .order-status-badge {
           display: inline-block;
           padding: 0.15rem 0.6rem;
@@ -300,6 +290,7 @@ export default function RepairsJobsPage() {
         .section-header .count {
           color: #6B6255;
           font-size: 0.8rem;
+          font-weight: 400;
         }
         .search-bar {
           width: 100%;
@@ -312,10 +303,7 @@ export default function RepairsJobsPage() {
           color: #2B2620;
           transition: border-color 0.2s ease;
         }
-        .search-bar:focus {
-          outline: none;
-          border-color: #C79A2B;
-        }
+        .search-bar:focus { outline: none; border-color: #C79A2B; }
         .filter-chip {
           padding: 0.3rem 0.7rem;
           border-radius: 20px;
@@ -381,10 +369,7 @@ export default function RepairsJobsPage() {
           min-height: 28px;
         }
         .job-actions .btn:hover { background: #F5EFE2; }
-        .job-actions .btn-view {
-          background: #F5EFE2;
-          border-color: #D6D0C5;
-        }
+        .job-actions .btn-view { background: #F5EFE2; border-color: #D6D0C5; }
         .job-actions .btn-edit {
           background: #1E3A5F;
           border-color: #1E3A5F;
@@ -492,7 +477,6 @@ export default function RepairsJobsPage() {
         </a>
       </div>
 
-      {/* ===== UPGRADE BANNER ===== */}
       {!canAddMore && (
         <UpgradeBanner
           resource="orders"
@@ -618,4 +602,4 @@ export default function RepairsJobsPage() {
       )}
     </main>
   )
-    }
+            }
