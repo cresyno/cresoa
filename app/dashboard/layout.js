@@ -1,5 +1,3 @@
-// app/dashboard/layout.js
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -36,63 +34,79 @@ export default function DashboardLayout({ children }) {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
 
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (!businessData) {
-        router.push('/onboarding')
-        return
-      }
-
-      // ----- SUBSCRIPTION & TRIAL CHECK -----
-
-      // 1. Initialize trial if not set
-      if (!businessData.trial_ends_at) {
-        const trialEndsAt = new Date()
-        trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
-        await supabase
+        let { data: businessData } = await supabase
           .from('businesses')
-          .update({
-            trial_ends_at: trialEndsAt.toISOString(),
-            trial_starts_at: new Date().toISOString(),
-          })
-          .eq('id', businessData.id)
-        businessData.trial_ends_at = trialEndsAt.toISOString()
-      }
+          .select('*')
+          .eq('owner_id', user.id)
+          .single()
 
-      // 2. Check if trial expired
-      const now = new Date()
-      const trialEnd = new Date(businessData.trial_ends_at)
-      if (trialEnd < now && businessData.plan === 'free') {
-        // Trial expired — keep free
-        // Optionally show a banner
-      }
+        if (!businessData) {
+          router.push('/onboarding')
+          return
+        }
 
-      // 3. Check subscription expiry for paid plans
-      if (businessData.plan !== 'free' && businessData.plan !== 'beta') {
-        const expiresAt = new Date(businessData.subscription_expires_at)
-        if (expiresAt < now) {
-          // Subscription expired → downgrade to free
+        // 🔥 BETA EXPIRY CHECK — Auto-downgrade after 90 days
+        if (businessData.plan === 'beta' && businessData.beta_expires_at) {
+          const betaExpiry = new Date(businessData.beta_expires_at)
+          const now = new Date()
+          if (betaExpiry < now) {
+            await supabase
+              .from('businesses')
+              .update({ plan: 'free', plan_status: 'expired' })
+              .eq('id', businessData.id)
+            businessData.plan = 'free'
+            businessData.plan_status = 'expired'
+          }
+        }
+
+        // ✅ Initialize trial if not set
+        if (!businessData.trial_ends_at) {
+          const trialEndsAt = new Date()
+          trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
           await supabase
             .from('businesses')
-            .update({ plan: 'free', plan_status: 'expired' })
+            .update({
+              trial_ends_at: trialEndsAt.toISOString(),
+              trial_starts_at: new Date().toISOString(),
+            })
             .eq('id', businessData.id)
-          businessData.plan = 'free'
-          businessData.plan_status = 'expired'
+          businessData.trial_ends_at = trialEndsAt.toISOString()
         }
-      }
 
-      setBusiness(businessData)
-      setLoading(false)
+        // ✅ Check trial expiry
+        const now = new Date()
+        const trialEnd = new Date(businessData.trial_ends_at)
+        if (trialEnd < now && businessData.plan === 'free') {
+          // Trial expired, keep free (already free)
+          // Optionally show a banner
+        }
+
+        // ✅ Check subscription expiry for paid plans
+        if (businessData.plan !== 'free' && businessData.plan !== 'beta') {
+          const expiresAt = new Date(businessData.subscription_expires_at)
+          if (expiresAt < now) {
+            await supabase
+              .from('businesses')
+              .update({ plan: 'free', plan_status: 'expired' })
+              .eq('id', businessData.id)
+            businessData.plan = 'free'
+            businessData.plan_status = 'expired'
+          }
+        }
+
+        setBusiness(businessData)
+      } catch (error) {
+        console.error('Dashboard layout error:', error)
+      } finally {
+        setLoading(false)
+      }
     }
 
     load()
@@ -219,6 +233,10 @@ export default function DashboardLayout({ children }) {
           margin-left: 0.3rem;
           text-transform: uppercase;
         }
+        .sidebar .plan-badge.beta {
+          background: #1E3A5F;
+          color: #C79A2B;
+        }
         .sidebar .nav {
           display: flex;
           flex-direction: column;
@@ -332,7 +350,9 @@ export default function DashboardLayout({ children }) {
               {business?.name || 'Your business'}
               <span className="badge">{getIndustryBadge()}</span>
               <br />
-              <span className="plan-badge">{business?.plan || 'Free'}</span>
+              <span className={`plan-badge ${business?.plan === 'beta' ? 'beta' : ''}`}>
+                {business?.plan || 'Free'}
+              </span>
             </div>
           </div>
         </div>
@@ -363,4 +383,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-}
+  }
