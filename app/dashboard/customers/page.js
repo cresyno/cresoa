@@ -96,9 +96,8 @@ export default function CustomersPage() {
     })
 
   const limits = getPlanLimits(plan)
-  const customerCount = customers.length
-  const showUpgradeBanner = customerCount >= limits.customers - 2 && plan === 'free'
-
+  const canAddMore = customerCount < limits.customers
+  const showUpgradeBanner = !canAddMore || (customerCount >= limits.customers - 2 && plan === 'free')
   if (loading) {
     return (
       <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -366,7 +365,23 @@ export default function CustomersPage() {
           <h1>Customers</h1>
           <span className="customer-count-badge">{customers.length}</span>
         </div>
-        <a href="/dashboard/customers/new" className="add-btn">👤 + Add customer</a>
+        <a
+  href={canAddMore ? "/dashboard/customers/new" : "#"}
+  className="add-btn"
+  style={{
+    background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
+    color: canAddMore ? '#1E3A5F' : '#6B6255',
+    cursor: canAddMore ? 'pointer' : 'default',
+  }}
+  onClick={(e) => {
+    if (!canAddMore) {
+      e.preventDefault();
+      router.push('/dashboard/subscription');
+    }
+  }}
+>
+  {canAddMore ? '👤 + Add customer' : '🔒 Add customer (Upgrade)'}
+</a>
       </div>
 
       {/* ===== UPGRADE BANNER ===== */}
