@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../../lib/supabaseClient'
-import { showToast } from '../../../../../lib/toast'
+import { supabase } from '../../../../lib/supabaseClient'
+import { getPlanLimits } from '../../../../lib/planLimits'
+import { showToast } from '../../../../lib/toast'
 
 const REPAIR_STAGES = [
   { value: 'Diagnosing', label: 'Diagnosing' },
@@ -17,7 +18,11 @@ const REPAIR_STAGES = [
 export default function NewRepairJobPage() {
   const router = useRouter()
   const [businessId, setBusinessId] = useState(null)
+  const [business, setBusiness] = useState(null)
+  const [plan, setPlan] = useState('free')
+  const [currentOrderCount, setCurrentOrderCount] = useState(0)
   const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
 
   // Form state
   const [customerId, setCustomerId] = useState('')
@@ -39,7 +44,7 @@ export default function NewRepairJobPage() {
   const [partQuantity, setPartQuantity] = useState(1)
   const [partCost, setPartCost] = useState('')
 
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
   // New customer form
@@ -55,21 +60,36 @@ export default function NewRepairJobPage() {
       return
     }
 
-    const { data: business } = await supabase
+    const { data: businessData } = await supabase
       .from('businesses')
-      .select('id')
+      .select('id, plan')
       .eq('owner_id', user.id)
       .single()
 
-    setBusinessId(business.id)
+    if (!businessData) {
+      router.push('/onboarding')
+      return
+    }
+
+    setBusinessId(businessData.id)
+    setBusiness(businessData)
+    setPlan(businessData.plan || 'free')
+
+    // Count total orders (for limit check)
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessData.id)
+    setCurrentOrderCount(count || 0)
 
     const { data: customerData } = await supabase
       .from('customers')
       .select('*')
-      .eq('business_id', business.id)
+      .eq('business_id', businessData.id)
       .order('name', { ascending: true })
 
     setCustomers(customerData || [])
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -148,29 +168,37 @@ export default function NewRepairJobPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setMessage('')
-    setLoading(true)
+    setSaving(true)
 
     if (!customerId) {
       setMessage('Please select a customer.')
-      setLoading(false)
+      setSaving(false)
+      return
+    }
+
+    // Plan limit check
+    const limits = getPlanLimits(plan)
+    if (currentOrderCount >= limits.orders) {
+      setMessage(`❌ You've reached the limit of ${limits.orders} orders on your Free plan. Please upgrade to add more.`)
+      setSaving(false)
       return
     }
 
     if (!deviceType.trim()) {
       setMessage('Please enter the device type.')
-      setLoading(false)
+      setSaving(false)
       return
     }
 
     if (!issueDescription.trim()) {
       setMessage('Please describe the issue.')
-      setLoading(false)
+      setSaving(false)
       return
     }
 
     if (!price || Number(price) <= 0) {
       setMessage('Please enter a valid price.')
-      setLoading(false)
+      setSaving(false)
       return
     }
 
@@ -203,12 +231,12 @@ export default function NewRepairJobPage() {
 
     if (error) {
       setMessage('Error: ' + error.message)
-      setLoading(false)
+      setSaving(false)
       return
     }
 
     showToast('✅ Repair job created!', '#4C7A5E')
-    setLoading(false)
+    setSaving(false)
 
     setTimeout(() => {
       router.push(`/dashboard/repairs/jobs/${job.id}`)
@@ -227,7 +255,7 @@ export default function NewRepairJobPage() {
     fontSize: '0.85rem', fontWeight: '500',
   }
 
-  if (!businessId) {
+  if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
@@ -245,6 +273,8 @@ export default function NewRepairJobPage() {
     )
   }
 
+  const limits = getPlanLimits(plan)
+  const canAddMore = currentOrderCount < limits.orders
   const totalPartsCost = parts.reduce((sum, p) => sum + p.total, 0)
 
   return (
@@ -258,9 +288,7 @@ export default function NewRepairJobPage() {
           max-width: 480px;
           margin: 0 auto;
         }
-        .form-group {
-          margin-bottom: 1rem;
-        }
+        .form-group { margin-bottom: 1rem; }
         .btn-primary {
           width: 100%;
           padding: 0.85rem;
@@ -275,10 +303,7 @@ export default function NewRepairJobPage() {
           transition: transform 0.1s ease;
         }
         .btn-primary:active { transform: scale(0.98); }
-        .btn-primary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary {
           padding: 0.5rem 1rem;
           border-radius: 6px;
@@ -390,23 +415,47 @@ export default function NewRepairJobPage() {
           flex: 0.5;
           min-width: 60px;
         }
+        .plan-limit-warning {
+          background: #F1DBD3;
+          border: 1px solid #AE4A34;
+          border-radius: 8px;
+          padding: 0.8rem 1rem;
+          margin-bottom: 1rem;
+          color: #AE4A34;
+          font-size: 0.85rem;
+          text-align: center;
+        }
         @media (max-width: 420px) {
           .form-card { padding: 1rem; }
           .new-customer-form .row { flex-direction: column; }
           .new-customer-form .row input { width: 100%; }
           .parts-section .row { flex-direction: column; }
           .parts-section .row input { width: 100%; }
+          .inline-flex { flex-direction: column; align-items: stretch; }
         }
       `}</style>
 
       <button className="back-link" onClick={() => router.push('/dashboard/repairs')}>
-        ← Back to dashboard
+        ← Back to repairs
       </button>
 
       <div className="header-row">
-          <h1>🔧 New Repair Job</h1>
+        <h1>🔧 New Repair Job</h1>
         <span className="badge">Repairs</span>
+        {plan === 'free' && (
+          <span style={{ fontSize: '0.7rem', background: '#F0EDE8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#6B6255' }}>
+            Free ({currentOrderCount}/{limits.orders} total orders)
+          </span>
+        )}
       </div>
+
+      {!canAddMore && (
+        <div className="plan-limit-warning">
+          <strong>⚠️ You've reached the limit of {limits.orders} orders on your Free plan.</strong>
+          <br />
+          <a href="/dashboard/subscription" style={{ color: '#AE4A34', fontWeight: '600' }}>Upgrade now to add more →</a>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="form-card">
         {/* Customer */}
@@ -435,6 +484,7 @@ export default function NewRepairJobPage() {
                   onChange={(e) => setNewCustomerName(e.target.value)}
                   placeholder="Customer name"
                   required
+                  disabled={!canAddMore}
                   style={inputStyle}
                 />
                 <input
@@ -445,6 +495,7 @@ export default function NewRepairJobPage() {
                   onChange={(e) => setNewCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
                   placeholder="Phone 080..."
                   required
+                  disabled={!canAddMore}
                   style={inputStyle}
                 />
               </div>
@@ -452,7 +503,7 @@ export default function NewRepairJobPage() {
                 type="button"
                 className="btn-primary"
                 onClick={handleCreateCustomer}
-                disabled={creatingCustomer}
+                disabled={creatingCustomer || !canAddMore}
                 style={{ padding: '0.5rem', fontSize: '0.85rem' }}
               >
                 {creatingCustomer ? 'Creating...' : '➕ Create customer'}
@@ -464,6 +515,7 @@ export default function NewRepairJobPage() {
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               required
+              disabled={!canAddMore}
               style={inputStyle}
             >
               <option value="">Select a customer</option>
@@ -477,52 +529,52 @@ export default function NewRepairJobPage() {
         </div>
 
         {/* Device Details */}
-        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+        <div className="inline-flex">
+          <div className="form-group flex-1" style={{ flex: 1, minWidth: '120px' }}>
             <label style={labelStyle}>Device Type <span style={{ color: '#AE4A34' }}>*</span></label>
             <input
-              className="form-input"
               type="text"
               value={deviceType}
               onChange={(e) => setDeviceType(e.target.value)}
               placeholder="e.g. iPhone, Samsung, Laptop"
               required
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+          <div className="form-group flex-1" style={{ flex: 1, minWidth: '120px' }}>
             <label style={labelStyle}>Device Model</label>
             <input
-              className="form-input"
               type="text"
               value={deviceModel}
               onChange={(e) => setDeviceModel(e.target.value)}
               placeholder="e.g. iPhone 13, Galaxy S22"
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-            <label style={labelStyle}>Serial Number / IMEI</label>
+        <div className="inline-flex">
+          <div className="form-group flex-1">
+            <label style={labelStyle}>Serial / IMEI</label>
             <input
-              className="form-input"
               type="text"
               value={serialNumber}
               onChange={(e) => setSerialNumber(e.target.value)}
               placeholder="e.g. IMEI or Serial #"
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+          <div className="form-group flex-1">
             <label style={labelStyle}>Device Color</label>
             <input
-              className="form-input"
               type="text"
               value={deviceColor}
               onChange={(e) => setDeviceColor(e.target.value)}
               placeholder="e.g. Black, Silver"
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
@@ -531,11 +583,11 @@ export default function NewRepairJobPage() {
         <div className="form-group">
           <label style={labelStyle}>Device Condition</label>
           <input
-            className="form-input"
             type="text"
             value={deviceCondition}
             onChange={(e) => setDeviceCondition(e.target.value)}
             placeholder="e.g. Cracked screen, Water damage, Battery issue"
+            disabled={!canAddMore}
             style={inputStyle}
           />
         </div>
@@ -543,12 +595,12 @@ export default function NewRepairJobPage() {
         <div className="form-group">
           <label style={labelStyle}>Issue Description <span style={{ color: '#AE4A34' }}>*</span></label>
           <textarea
-            className="form-input"
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}
-            placeholder="Describe the problem with the device..."
             rows={3}
+            placeholder="Describe the problem with the device..."
             required
+            disabled={!canAddMore}
             style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
           />
         </div>
@@ -559,33 +611,34 @@ export default function NewRepairJobPage() {
 
           <div className="row">
             <input
-              className="form-input"
               type="text"
               value={partName}
               onChange={(e) => setPartName(e.target.value)}
               placeholder="Part name"
+              disabled={!canAddMore}
               style={{ ...inputStyle, padding: '0.4rem' }}
             />
             <input
-              className="form-input small"
               type="number"
               value={partQuantity}
               onChange={(e) => setPartQuantity(e.target.value)}
               placeholder="Qty"
+              disabled={!canAddMore}
               style={{ ...inputStyle, padding: '0.4rem', minWidth: '60px' }}
             />
             <input
-              className="form-input small"
               type="number"
               value={partCost}
               onChange={(e) => setPartCost(e.target.value)}
               placeholder="Cost (₦)"
+              disabled={!canAddMore}
               style={{ ...inputStyle, padding: '0.4rem', minWidth: '80px' }}
             />
             <button
               type="button"
               className="btn-secondary"
               onClick={addPart}
+              disabled={!canAddMore}
               style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}
             >
               Add
@@ -609,62 +662,64 @@ export default function NewRepairJobPage() {
         </div>
 
         {/* Pricing */}
-        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+        <div className="inline-flex">
+          <div className="form-group flex-1">
             <label style={labelStyle}>Total Price (₦) <span style={{ color: '#AE4A34' }}>*</span></label>
             <input
-              className="form-input"
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="0.00"
               required
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
-            <label style={labelStyle}>Deposit Paid (₦)</label>
+          <div className="form-group flex-1">
+            <label style={labelStyle}>Deposit (₦)</label>
             <input
-              className="form-input"
               type="number"
               value={deposit}
               onChange={(e) => setDeposit(e.target.value)}
               placeholder="0.00"
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+        <div className="inline-flex">
+          <div className="form-group flex-1">
             <label style={labelStyle}>Estimated Time (minutes)</label>
             <input
-              className="form-input"
               type="number"
               value={estimatedTime}
               onChange={(e) => setEstimatedTime(e.target.value)}
               placeholder="e.g. 60"
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
-          <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+          <div className="form-group flex-1">
             <label style={labelStyle}>Due Date</label>
             <input
-              className="form-input"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              disabled={!canAddMore}
               style={inputStyle}
             />
           </div>
         </div>
 
+        {/* Status */}
         <div className="form-group">
           <label style={labelStyle}>Status</label>
           <select
             className="form-input"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
+            disabled={!canAddMore}
             style={inputStyle}
           >
             {REPAIR_STAGES.map((s) => (
@@ -673,9 +728,21 @@ export default function NewRepairJobPage() {
           </select>
         </div>
 
-        <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? 'Creating job...' : '🔧 Create repair job'}
-        </button>
+        {/* Submit */}
+        {canAddMore ? (
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? 'Creating job...' : '🔧 Create repair job'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => router.push('/dashboard/subscription')}
+            style={{ background: '#AE4A34', boxShadow: '0 4px 14px rgba(174,74,52,0.3)' }}
+          >
+            🔒 Upgrade to add more jobs
+          </button>
+        )}
 
         {message && (
           <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: '#AE4A34', textAlign: 'center' }}>
@@ -685,4 +752,4 @@ export default function NewRepairJobPage() {
       </form>
     </main>
   )
-          }
+              }
