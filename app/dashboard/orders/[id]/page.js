@@ -6,7 +6,10 @@ import { supabase } from '../../../../lib/supabaseClient'
 import { isFeatureAvailable } from '../../../../lib/planLimits'
 import { showToast } from '../../../../lib/toast'
 
-const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+const STAGES = {
+  fashion: ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered'],
+  repairs: ['Diagnosing', 'Awaiting Parts', 'Repairing', 'Ready', 'Completed', 'Delivered']
+}
 
 export default function OrderDetailPage({ params }) {
   const router = useRouter()
@@ -18,22 +21,19 @@ export default function OrderDetailPage({ params }) {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [plan, setPlan] = useState('free')
-
+  const [sector, setSector] = useState('fashion')
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
-
   const [internalNotes, setInternalNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesMessage, setNotesMessage] = useState('')
-
   const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
@@ -52,12 +52,13 @@ export default function OrderDetailPage({ params }) {
 
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('name, plan')
+        .select('name, plan, sector')
         .eq('id', orderData.business_id)
         .single()
 
       setBusiness(businessData)
       setPlan(businessData?.plan || 'free')
+      setSector(businessData?.sector === 'Repairs & Technical Services' ? 'repairs' : 'fashion')
 
       const { data: paymentData } = await supabase
         .from('payment_records')
@@ -82,8 +83,12 @@ export default function OrderDetailPage({ params }) {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
       'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
       'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
+      'Ready': { label: 'Ready for Pickup', color: '#4C7A5E', bg: '#DCEBE2' },
       'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
+      'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' },
+      'Awaiting Parts': { label: 'Awaiting Parts', color: '#B4881E', bg: '#F6E9C8' },
+      'Repairing': { label: 'Repairing', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Completed': { label: 'Completed', color: '#4C7A5E', bg: '#DCEBE2' },
     }
     return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
   }
@@ -100,20 +105,24 @@ export default function OrderDetailPage({ params }) {
     return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
+  const stages = sector === 'repairs' ? STAGES.repairs : STAGES.fashion
+  const currentIndex = stages.indexOf(order?.current_status)
+  const isLastStage = currentIndex === stages.length - 1
+  const isFirstStage = currentIndex === 0
+
   const advanceStatus = async () => {
-    const currentIndex = STAGES.indexOf(order.current_status)
-    if (currentIndex === -1 || currentIndex === STAGES.length - 1) return
-    await supabase.from('orders').update({ current_status: STAGES[currentIndex + 1] }).eq('id', order.id)
+    if (currentIndex === -1 || isLastStage) return
+    await supabase.from('orders').update({ current_status: stages[currentIndex + 1] }).eq('id', order.id)
     load()
   }
 
   const undoStatus = async () => {
-    const currentIndex = STAGES.indexOf(order.current_status)
     if (currentIndex <= 0) return
-    await supabase.from('orders').update({ current_status: STAGES[currentIndex - 1] }).eq('id', order.id)
+    await supabase.from('orders').update({ current_status: stages[currentIndex - 1] }).eq('id', order.id)
     load()
   }
 
+  // Locked actions
   const copyTrackingLink = () => {
     const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
     navigator.clipboard.writeText(link)
@@ -237,7 +246,7 @@ export default function OrderDetailPage({ params }) {
   }
 
   const handleDelete = async () => {
-    const confirmed = window.confirm(`Delete "${order.title}"? This cannot be undone.`)
+    const confirmed = window.confirm(`Delete this order? This cannot be undone.`)
     if (!confirmed) return
 
     setDeleting(true)
@@ -247,7 +256,7 @@ export default function OrderDetailPage({ params }) {
 
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner {
@@ -259,8 +268,8 @@ export default function OrderDetailPage({ params }) {
           }
         `}</style>
         <div className="spinner"></div>
-        <p style={{ color: '#6B6255', marginTop: '1rem' }}>Loading order...</p>
-      </main>
+        <p style={{ color: '#6B6255', marginTop: '1rem' }}>Loading...</p>
+      </div>
     )
   }
 
@@ -277,9 +286,8 @@ export default function OrderDetailPage({ params }) {
 
   const status = getStatusInfo(order.current_status)
   const balance = order.price - order.amount_paid
-  const currentIndex = STAGES.indexOf(order.current_status)
-  const isLastStage = currentIndex === STAGES.length - 1
-  const isFirstStage = currentIndex === 0
+  const canUseTracking = isFeatureAvailable(plan, 'tracking_links')
+  const canUseWhatsApp = isFeatureAvailable(plan, 'whatsapp_reminders')
 
   const inputStyle = {
     width: '100%', padding: '0.7rem', borderRadius: '8px',
@@ -288,43 +296,6 @@ export default function OrderDetailPage({ params }) {
     transition: 'border-color 0.2s ease',
   }
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
-
-  const renderLockableAction = (label, benefit, onClick, isAvailable) => {
-    const isLocked = !isAvailable
-
-    return (
-      <button
-        onClick={isLocked ? () => router.push('/dashboard/subscription') : onClick}
-        style={{
-          flex: 1,
-          minWidth: '140px',
-          padding: '0.8rem 1rem',
-          borderRadius: '10px',
-          border: isLocked ? '1px solid #E8E0D5' : '1px solid #C79A2B',
-          background: isLocked ? '#F8F6F2' : '#FBF8F0',
-          cursor: 'pointer',
-          textAlign: 'left',
-          transition: 'all 0.15s ease',
-          boxShadow: isLocked ? 'none' : '0 2px 8px rgba(199,154,43,0.08)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.1rem' }}>{isLocked ? '🔒' : '✓'}</span>
-          <span style={{ fontWeight: '600', color: isLocked ? '#6B6255' : '#1E3A5F', fontSize: '0.9rem' }}>
-            {isLocked ? `${label} (Upgrade)` : label}
-          </span>
-        </div>
-        <p style={{
-          margin: '0.2rem 0 0 1.8rem',
-          fontSize: '0.75rem',
-          color: isLocked ? '#A89888' : '#6B6255',
-          lineHeight: '1.4',
-        }}>
-          {isLocked ? `🔒 ${benefit}` : benefit}
-        </p>
-      </button>
-    )
-  }
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
@@ -364,6 +335,8 @@ export default function OrderDetailPage({ params }) {
           justify-content: space-between;
           margin-bottom: 1rem;
           position: relative;
+          overflow-x: auto;
+          gap: 0.2rem;
         }
         .status-timeline::before {
           content: '';
@@ -374,6 +347,7 @@ export default function OrderDetailPage({ params }) {
           height: 2px;
           background: #E8E0D5;
           transform: translateY(-50%);
+          z-index: 0;
         }
         .status-dot {
           display: flex;
@@ -383,6 +357,7 @@ export default function OrderDetailPage({ params }) {
           position: relative;
           z-index: 1;
           flex: 1;
+          min-width: 40px;
         }
         .status-dot .dot {
           width: 12px;
@@ -401,9 +376,9 @@ export default function OrderDetailPage({ params }) {
         .status-dot .dot.done {
           border-color: #4C7A5E;
           background: #4C7A5E;
-    }
+        }
         .status-dot .label {
-          font-size: 0.55rem;
+          font-size: 0.5rem;
           color: #6B6255;
           text-align: center;
           max-width: 40px;
@@ -453,8 +428,15 @@ export default function OrderDetailPage({ params }) {
           color: #fff;
         }
         .btn-red:hover { background: #8A3626; }
-        .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.6rem; }
         .btn-block { width: 100%; justify-content: center; }
+        .btn-locked {
+          opacity: 0.6;
+          background: #F0EDE8;
+          color: #6B6255;
+          border-color: #D6D0C5;
+          cursor: pointer;
+        }
+        .btn-locked:hover { background: #E8E0D5; }
         .back-link {
           background: none;
           border: none;
@@ -473,9 +455,7 @@ export default function OrderDetailPage({ params }) {
           gap: 0.5rem;
           margin-bottom: 0.5rem;
         }
-        .header-row .name-section {
-          flex: 1;
-        }
+        .header-row .name-section { flex: 1; }
         .header-row .name-section h1 {
           color: #1E3A5F;
           font-size: 1.3rem;
@@ -525,21 +505,46 @@ export default function OrderDetailPage({ params }) {
           letter-spacing: 0.3px;
           text-transform: uppercase;
         }
+        .plan-badge {
+          font-size: 0.6rem;
+          background: #4C7A5E;
+          color: #fff;
+          padding: 0.1rem 0.5rem;
+          border-radius: 10px;
+          margin-left: 0.5rem;
+        }
+        .upgrade-banner {
+          background: #FBF3EC;
+          border: 1px solid #C79A2B;
+          border-radius: 10px;
+          padding: 0.8rem 1rem;
+          margin-bottom: 1rem;
+        }
+        .upgrade-banner p {
+          margin: 0;
+          font-size: 0.8rem;
+          color: #1E3A5F;
+        }
+        .upgrade-banner a {
+          color: #C79A2B;
+          font-weight: 600;
+          text-decoration: none;
+        }
+        .upgrade-banner a:hover { text-decoration: underline; }
         @media (max-width: 420px) {
           .header-row { flex-direction: column; }
           .header-actions { width: 100%; }
           .header-actions .btn { flex: 1; justify-content: center; }
           .action-row .btn { flex: 1; justify-content: center; }
-          .status-timeline { flex-wrap: wrap; gap: 0.2rem; }
-          .status-dot .label { font-size: 0.5rem; max-width: 30px; }
           .action-row { flex-direction: column; }
           .action-row button { width: 100%; }
+          .status-timeline { gap: 0.1rem; }
+          .status-dot { min-width: 30px; }
+          .status-dot .label { font-size: 0.4rem; max-width: 30px; }
         }
       `}</style>
 
-      <button className="back-link" onClick={() => router.back()}>
-        ← Back
-      </button>
+      <button className="back-link" onClick={() => router.back()}>← Back</button>
 
       <div className="header-row">
         <div className="name-section">
@@ -548,6 +553,7 @@ export default function OrderDetailPage({ params }) {
             <span className="order-status-badge" style={{ background: status.bg, color: status.color }}>
               {status.label}
             </span>
+            <span className="plan-badge">{plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)}</span>
           </h1>
           <p className="customer">
             👤 {order.customers?.name || 'No customer'}
@@ -598,7 +604,7 @@ export default function OrderDetailPage({ params }) {
 
       <div className="card">
         <div className="status-timeline">
-          {STAGES.map((stage, i) => {
+          {stages.map((stage, i) => {
             const isActive = i === currentIndex
             const isDone = i < currentIndex
             return (
@@ -625,40 +631,56 @@ export default function OrderDetailPage({ params }) {
             disabled={isLastStage}
             style={{ opacity: isLastStage ? 0.4 : 1 }}
           >
-            {isLastStage ? '✓ Delivered' : `→ ${STAGES[currentIndex + 1]}`}
+            {isLastStage ? '✓ Completed' : `→ ${stages[currentIndex + 1]}`}
           </button>
         </div>
       </div>
 
+      {/* ===== LOCKED ACTIONS ===== */}
       <div className="action-row">
-        {renderLockableAction(
-          'Copy Link',
-          'Customers can check their own order status',
-          copyTrackingLink,
-          isFeatureAvailable(plan, 'tracking_links')
+        {canUseTracking ? (
+          <button className="btn btn-gold" onClick={copyTrackingLink}>🔗 Copy Link</button>
+        ) : (
+          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+            🔒 Copy Link (Upgrade)
+          </button>
         )}
 
-        {renderLockableAction(
-          'Send Link',
-          'Share order status link via WhatsApp',
-          sendLinkViaWhatsApp,
-          isFeatureAvailable(plan, 'tracking_links')
+        {canUseTracking ? (
+          <button className="btn btn-green" onClick={sendLinkViaWhatsApp}>📱 Send Link</button>
+        ) : (
+          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+            🔒 Send Link (Upgrade)
+          </button>
         )}
 
-        {renderLockableAction(
-          'Status Update',
-          'Keep customers informed of progress',
-          sendStatusUpdate,
-          isFeatureAvailable(plan, 'whatsapp_reminders')
+        {canUseWhatsApp ? (
+          <button className="btn btn-primary" onClick={sendStatusUpdate}>📤 Status Update</button>
+        ) : (
+          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+            🔒 Status Update (Upgrade)
+          </button>
         )}
 
-        {balance > 0 && renderLockableAction(
-          'Send Reminder',
-          'Remind customers about pending balance',
-          sendReminder,
-          isFeatureAvailable(plan, 'whatsapp_reminders')
+        {balance > 0 && (
+          canUseWhatsApp ? (
+            <button className="btn btn-red" onClick={sendReminder}>🔔 Reminder</button>
+          ) : (
+            <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+              🔒 Reminder (Upgrade)
+            </button>
+          )
         )}
       </div>
+
+      {(!canUseTracking || !canUseWhatsApp) && (
+        <div className="upgrade-banner">
+          <p>
+            💡 Upgrade to <strong>Starter</strong> or <strong>Pro</strong> to unlock tracking links, WhatsApp updates, and reminders.
+            <a href="/dashboard/subscription"> Upgrade now →</a>
+          </p>
+        </div>
+      )}
 
       {editing && (
         <form onSubmit={handleSave} className="card">
@@ -748,7 +770,7 @@ export default function OrderDetailPage({ params }) {
           value={internalNotes}
           onChange={(e) => setInternalNotes(e.target.value)}
           rows={3}
-          placeholder="e.g. Customer said pick up Friday. Don't forget the extra button."
+          placeholder="Add internal notes..."
           style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
         />
         <button className="btn btn-primary btn-block" onClick={handleSaveNotes} disabled={savingNotes}>
@@ -771,4 +793,4 @@ export default function OrderDetailPage({ params }) {
       </button>
     </main>
   )
-          }
+        }
