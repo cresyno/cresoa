@@ -1,5 +1,3 @@
-// components/UpgradeBanner.jsx
-
 'use client'
 
 import Link from 'next/link'
@@ -8,6 +6,43 @@ export default function UpgradeBanner({ resource, currentCount, limit, plan }) {
   if (plan === 'starter' || plan === 'pro' || plan === 'beta') return null
 
   const remaining = limit - currentCount
+
+  if (remaining <= 0) {
+    return (
+      <div style={{
+        background: '#F1DBD3',
+        border: '1px solid #AE4A34',
+        borderRadius: '10px',
+        padding: '0.8rem 1rem',
+        marginBottom: '1.2rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+      }}>
+        <div>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#AE4A34', fontWeight: '600' }}>
+            ⚠️ You've reached the limit of {limit} {resource} on your Free plan.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/subscription"
+          style={{
+            background: '#AE4A34',
+            color: '#fff',
+            padding: '0.3rem 1rem',
+            borderRadius: '6px',
+            textDecoration: 'none',
+            fontWeight: '600',
+            fontSize: '0.8rem',
+          }}
+        >
+          Upgrade now →
+        </Link>
+      </div>
+    )
+  }
 
   if (remaining > 3) return null
 
@@ -47,7 +82,6 @@ export default function UpgradeBanner({ resource, currentCount, limit, plan }) {
           textDecoration: 'none',
           fontWeight: '600',
           fontSize: '0.8rem',
-          whiteSpace: 'nowrap',
         }}
       >
         Upgrade now →
