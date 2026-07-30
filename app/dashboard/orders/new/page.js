@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { getPlanLimits } from '../../../lib/planLimits'
-
+import { supabase } from '../../../../lib/supabaseClient'
+import { getPlanLimits } from '../../../../lib/planLimits'
 export default function NewOrderPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
