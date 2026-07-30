@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabaseClient'
-import { getPlanLimits } from '../../../../lib/planLimits'
-import { showToast } from '../../../../lib/toast'
+import { supabase } from '../../../../../lib/supabaseClient'
+import { getPlanLimits } from '../../../../../lib/planLimits'
+import { showToast } from '../../../../../lib/toast'
 
 const REPAIR_STAGES = [
   { value: 'Diagnosing', label: 'Diagnosing' },
