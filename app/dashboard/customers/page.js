@@ -1,109 +1,144 @@
-// app/dashboard/customers/page.js
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import UpgradeBanner from '../../../components/UpgradeBanner'
 import { getPlanLimits } from '../../../lib/planLimits'
 
-export default function CustomersPage() {
+const MEASUREMENT_FIELDS = [
+  { key: 'bust', label: 'Bust/Chest (inches)' },
+  { key: 'waist', label: 'Waist (inches)' },
+  { key: 'hip', label: 'Hip (inches)' },
+  { key: 'shoulder', label: 'Shoulder (inches)' },
+  { key: 'sleeve_length', label: 'Sleeve length (inches)' },
+  { key: 'full_length', label: 'Full length (inches)' },
+]
+
+export default function NewCustomerPage() {
   const router = useRouter()
-  const [customers, setCustomers] = useState([])
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [loading, setLoading] = useState(true)
-  const [business, setBusiness] = useState(null)
-  const [stats, setStats] = useState({
-    total: 0,
-    withOrders: 0,
-    owing: 0,
-    highValue: 0,
-  })
+  const [businessId, setBusinessId] = useState(null)
+  const [sector, setSector] = useState(null)
   const [plan, setPlan] = useState('free')
+  const [currentCustomerCount, setCurrentCustomerCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
 
-  const loadCustomers = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
-    const { data: businessData } = await supabase
-      .from('businesses')
-      .select('id, plan')
-      .eq('owner_id', user.id)
-      .single()
-
-    if (!businessData) {
-      setLoading(false)
-      return
-    }
-
-    setBusiness(businessData)
-    setPlan(businessData.plan || 'free')
-
-    const { data: customerData } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('business_id', businessData.id)
-      .order('name', { ascending: true })
-
-    const customersWithOrders = await Promise.all(
-      (customerData || []).map(async (c) => {
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('price, amount_paid')
-          .eq('customer_id', c.id)
-
-        const totalSpent = orders?.reduce((sum, o) => sum + o.price, 0) || 0
-        const totalPaid = orders?.reduce((sum, o) => sum + o.amount_paid, 0) || 0
-        const totalOwing = totalSpent - totalPaid
-        const orderCount = orders?.length || 0
-
-        return { ...c, totalSpent, totalOwing, orderCount }
-      })
-    )
-
-    setCustomers(customersWithOrders)
-
-    const total = customersWithOrders.length
-    const withOrders = customersWithOrders.filter(c => c.orderCount > 0).length
-    const owing = customersWithOrders.filter(c => c.totalOwing > 0).length
-    const highValue = customersWithOrders.filter(c => c.totalSpent > 50000).length
-
-    setStats({ total, withOrders, owing, highValue })
-    setLoading(false)
-  }
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [notes, setNotes] = useState('')
+  const [measurements, setMeasurements] = useState({})
+  const [saveAndAdd, setSaveAndAdd] = useState(false)
 
   useEffect(() => {
-    loadCustomers()
-  }, [])
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-  const filteredCustomers = customers
-    .filter((c) =>
-      c.name?.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone?.includes(search)
-    )
-    .filter((c) => {
-      if (filter === 'all') return true
-      if (filter === 'with_orders') return c.orderCount > 0
-      if (filter === 'owing') return c.totalOwing > 0
-      if (filter === 'high_value') return c.totalSpent > 50000
-      if (filter === 'no_orders') return c.orderCount === 0
-      return true
-    })
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('id, sector, plan')
+        .eq('owner_id', user.id)
+        .single()
 
-  const limits = getPlanLimits(plan)
-  const canAddMore = customerCount < limits.customers
-  const showUpgradeBanner = !canAddMore || (customerCount >= limits.customers - 2 && plan === 'free')
+      if (!business) {
+        router.push('/onboarding')
+        return
+      }
+
+      setBusinessId(business.id)
+      setSector(business.sector)
+      setPlan(business.plan || 'free')
+
+      // Count existing customers for plan limit
+      const { count, error: countError } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.id)
+      if (!countError) setCurrentCustomerCount(count || 0)
+
+      setLoading(false)
+    }
+
+    load()
+  }, [router])
+
+  const updateMeasurement = (key, value) => {
+    setMeasurements({ ...measurements, [key]: value })
+  }
+
+  const handlePhoneChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
+    setPhone(digits)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setMessage('')
+    setSaving(true)
+
+    const phoneDigits = phone.replace(/\D/g, '')
+    if (!name.trim() || phoneDigits.length !== 11) {
+      setMessage('Please provide a name and a valid 11-digit phone number.')
+      setSaving(false)
+      return
+    }
+
+    // Check free plan limit
+    const limits = getPlanLimits(plan)
+    if (currentCustomerCount >= limits.customers) {
+      setMessage(`❌ You've reached the limit of ${limits.customers} customers on your Free plan. Please upgrade to add more.`)
+      setSaving(false)
+      return
+    }
+
+    const measurementData = sector === 'Fashion & Custom Wear' ? measurements : {}
+
+    const { data: customer, error } = await supabase
+      .from('customers')
+      .insert({
+        business_id: businessId,
+        name: name.trim(),
+        phone: phoneDigits,
+        notes: notes.trim(),
+        measurements: measurementData,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      setMessage('Error: ' + error.message)
+      setSaving(false)
+      return
+    }
+
+    setMessage('✅ Customer created!')
+    setSaving(false)
+
+    if (saveAndAdd) {
+      // Reset form and increment count
+      setCurrentCustomerCount(currentCustomerCount + 1)
+      setName('')
+      setPhone('')
+      setNotes('')
+      setMeasurements({})
+      setMessage('')
+    } else {
+      setTimeout(() => {
+        router.push(`/dashboard/customers/${customer.id}`)
+      }, 600)
+    }
+  }
+
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
-          .cresoa-spinner {
+          .spinner {
             width: 40px; height: 40px;
             border: 4px solid #e4d8c2;
             border-top: 4px solid #1E3A5F;
@@ -111,191 +146,74 @@ export default function CustomersPage() {
             animation: spin 0.8s linear infinite;
           }
         `}</style>
-        <div className="cresoa-spinner"></div>
-        <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Loading customers...</p>
-      </main>
+        <div className="spinner"></div>
+      </div>
     )
   }
+
+  const isFashion = sector === 'Fashion & Custom Wear'
+  const limits = getPlanLimits(plan)
+  const canAddMore = currentCustomerCount < limits.customers
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
       <style>{`
-        .stat-card {
+        .form-card {
           background: #fff;
-          border-radius: 10px;
-          padding: 0.6rem 0.4rem;
+          border-radius: 14px;
+          padding: 1.5rem;
           border: 1px solid #E8E0D5;
-          text-align: center;
-          flex: 1;
-          min-width: 50px;
+          max-width: 480px;
+          margin: 0 auto;
         }
-        .stat-card .value {
-          font-size: 1.1rem;
-          font-weight: 700;
-          margin: 0;
+        .form-group { margin-bottom: 1rem; }
+        .form-group label {
+          display: block;
+          color: #2B2620;
+          margin-bottom: 0.3rem;
+          font-size: 0.85rem;
+          font-weight: 500;
         }
-        .stat-card .value.red { color: #AE4A34; }
-        .stat-card .value.green { color: #4C7A5E; }
-        .stat-card .value.navy { color: #1E3A5F; }
-        .stat-card .label {
-          color: #6B6255;
-          font-size: 0.6rem;
-          margin: 0.1rem 0 0;
-        }
-        .filter-chip {
-          padding: 0.3rem 0.7rem;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          white-space: nowrap;
-        }
-        .filter-chip:hover { border-color: #C79A2B; }
-        .filter-chip.active {
-          background: #1E3A5F;
-          border-color: #1E3A5F;
-          color: #fff;
-        }
-        .filter-chip .count {
-          font-weight: 400;
-          opacity: 0.7;
-          margin-left: 0.2rem;
-        }
-        .filter-chip.active .count { opacity: 0.8; }
-        .customer-card {
-          background: #fff;
-          border-radius: 12px;
-          padding: 0.8rem 1rem;
-          border: 1px solid #E8E0D5;
-          margin-bottom: 0.7rem;
-          transition: border-color 0.15s ease;
-          cursor: pointer;
-        }
-        .customer-card:hover { border-color: #C79A2B; }
-        .customer-card .row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 0.4rem;
-        }
-        .customer-card .info {
-          flex: 1;
-          min-width: 140px;
-        }
-        .customer-card .info .name {
-          font-weight: 600;
-          color: #1E3A5F;
-          font-size: 0.9rem;
-          margin: 0;
-        }
-        .customer-card .info .meta {
-          font-size: 0.75rem;
-          color: #6B6255;
-          margin: 0.1rem 0 0;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
-        .customer-card .info .meta .badge {
-          background: #F6E9C8;
-          color: #1E3A5F;
-          padding: 0.05rem 0.5rem;
-          border-radius: 10px;
-          font-size: 0.6rem;
-          font-weight: 600;
-        }
-        .customer-card .info .meta .badge.owing {
-          background: #F1DBD3;
-          color: #AE4A34;
-        }
-        .customer-card .info .meta .badge.high {
-          background: #DCEBE2;
-          color: #4C7A5E;
-        }
-        .customer-actions {
-          display: flex;
-          gap: 0.3rem;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-        .customer-actions .btn {
-          padding: 0.2rem 0.6rem;
-          border-radius: 6px;
-          font-size: 0.65rem;
-          font-weight: 600;
-          text-decoration: none;
-          border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
-          transition: background 0.1s ease;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.15rem;
-          min-height: 28px;
-        }
-        .customer-actions .btn:hover { background: #F5EFE2; }
-        .customer-actions .btn-call {
-          background: #F6E9C8;
-          border-color: #C79A2B;
-          font-weight: 700;
-        }
-        .customer-actions .btn-whatsapp {
-          background: #DCEBE2;
-          border-color: #4C7A5E;
-          color: #4C7A5E;
-          font-weight: 700;
-        }
-        .customer-actions .btn-whatsapp:hover { background: #C8DCCD; }
-        .customer-actions .btn-order {
-          background: #1E3A5F;
-          border-color: #1E3A5F;
-          color: #fff;
-        }
-        .customer-actions .btn-order:hover { background: #0F1E30; }
-        .search-bar {
+        .form-input {
           width: 100%;
-          padding: 0.6rem 0.9rem;
-          border-radius: 10px;
+          padding: 0.7rem;
+          border-radius: 8px;
           border: 1px solid #E8E0D5;
-          font-size: 0.9rem;
+          font-size: 0.95rem;
           background: #fff;
           box-sizing: border-box;
           color: #2B2620;
           transition: border-color 0.2s ease;
         }
-        .search-bar:focus { outline: none; border-color: #C79A2B; }
-        .empty-state {
+        .form-input:focus { outline: none; border-color: #C79A2B; }
+        .btn-primary {
+          width: 100%;
+          padding: 0.85rem;
+          border-radius: 8px;
+          border: none;
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+          color: #1E3A5F;
+          font-size: 1rem;
+          font-weight: 700;
+          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
+          cursor: pointer;
+          transition: transform 0.1s ease;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-secondary {
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          border: 1px solid #1E3A5F;
           background: #fff;
-          border-radius: 12px;
-          padding: 2rem 1.5rem;
-          border: 1px solid #E8E0D5;
-          text-align: center;
-          color: #6B6255;
-          font-size: 0.9rem;
+          color: #1E3A5F;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.1s ease;
         }
-        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-        .stats-row {
-          display: flex;
-          gap: 0.4rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-        }
-        .filters-row {
-          display: flex;
-          gap: 0.4rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-          overflow-x: auto;
-          padding-bottom: 0.2rem;
-          -webkit-overflow-scrolling: touch;
-        }
+        .btn-secondary:hover { background: #F5EFE2; }
+        .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
         .back-link {
           background: none;
           border: none;
@@ -309,10 +227,9 @@ export default function CustomersPage() {
         .header-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          margin-bottom: 0.8rem;
+          gap: 0.8rem;
+          margin-bottom: 1rem;
           flex-wrap: wrap;
-          gap: 0.5rem;
         }
         .header-row h1 {
           color: #1E3A5F;
@@ -320,193 +237,158 @@ export default function CustomersPage() {
           font-weight: 700;
           margin: 0;
         }
-        .header-row .count {
-          color: #6B6255;
-          font-size: 0.8rem;
-          font-weight: 400;
+        .measurement-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.6rem;
         }
-        .customer-count-badge {
-          background: #E8E0D5;
-          color: #6B6255;
-          padding: 0.05rem 0.5rem;
-          border-radius: 12px;
-          font-size: 0.7rem;
-          font-weight: 600;
+        .measurement-grid .form-group { margin-bottom: 0.6rem; }
+        .measurement-grid .form-group input { padding: 0.5rem; }
+        .action-row {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          margin-top: 0.5rem;
         }
-        .add-btn {
-          background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F;
-          padding: 0.5rem 1rem;
+        .action-row .btn-primary { flex: 1; }
+        .action-row .btn-secondary { flex: 1; }
+        .plan-limit-warning {
+          background: #F1DBD3;
+          border: 1px solid #AE4A34;
           border-radius: 8px;
-          font-size: 0.8rem;
-          font-weight: 700;
-          text-decoration: none;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.1s ease;
+          padding: 0.8rem 1rem;
+          margin-bottom: 1rem;
+          color: #AE4A34;
+          font-size: 0.85rem;
+          text-align: center;
         }
-        .add-btn:active { transform: scale(0.97); }
         @media (max-width: 420px) {
-          .customer-card .row { flex-direction: column; align-items: stretch; }
-          .customer-actions { justify-content: flex-start; margin-top: 0.3rem; }
-          .header-row { flex-direction: column; align-items: stretch; }
+          .form-card { padding: 1rem; }
+          .measurement-grid { grid-template-columns: 1fr; }
+          .action-row { flex-direction: column; }
         }
       `}</style>
 
-      <button className="back-link" onClick={() => router.push('/dashboard')}>
-        ← Back to dashboard
+      <button className="back-link" onClick={() => router.push('/dashboard/customers')}>
+        ← Back to customers
       </button>
 
       <div className="header-row">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <h1>Customers</h1>
-          <span className="customer-count-badge">{customers.length}</span>
-        </div>
-        <a
-  href={canAddMore ? "/dashboard/customers/new" : "#"}
-  className="add-btn"
-  style={{
-    background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
-    color: canAddMore ? '#1E3A5F' : '#6B6255',
-    cursor: canAddMore ? 'pointer' : 'default',
-  }}
-  onClick={(e) => {
-    if (!canAddMore) {
-      e.preventDefault();
-      router.push('/dashboard/subscription');
-    }
-  }}
->
-  {canAddMore ? '👤 + Add customer' : '🔒 Add customer (Upgrade)'}
-</a>
+        <h1>Add customer</h1>
+        {!isFashion && <span style={{ fontSize: '0.7rem', background: '#F6E9C8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#1E3A5F' }}>🔧 Repairs</span>}
+        {plan === 'free' && (
+          <span style={{ fontSize: '0.7rem', background: '#F0EDE8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#6B6255' }}>
+            Free ({currentCustomerCount}/{limits.customers} customers)
+          </span>
+        )}
       </div>
 
-      {/* ===== UPGRADE BANNER ===== */}
-      {showUpgradeBanner && (
-        <UpgradeBanner
-          resource="customers"
-          currentCount={customerCount}
-          limit={limits.customers}
-          plan={plan}
-        />
+      {!canAddMore && (
+        <div className="plan-limit-warning">
+          <strong>⚠️ You've reached the limit of {limits.customers} customers on your Free plan.</strong>
+          <br />
+          <a href="/dashboard/subscription" style={{ color: '#AE4A34', fontWeight: '600' }}>Upgrade now to add more →</a>
+        </div>
       )}
 
-      <div className="stats-row">
-        <div className="stat-card">
-          <p className="value navy">{stats.total}</p>
-          <p className="label">Total</p>
+      <form onSubmit={handleSubmit} className="form-card">
+        <div className="form-group">
+          <label>Customer name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className="form-input"
+            disabled={!canAddMore}
+          />
         </div>
-        <div className="stat-card">
-          <p className="value navy">{stats.withOrders}</p>
-          <p className="label">With Orders</p>
-        </div>
-        <div className="stat-card">
-          <p className="value red">{stats.owing}</p>
-          <p className="label">Owing</p>
-        </div>
-        <div className="stat-card">
-          <p className="value green">{stats.highValue}</p>
-          <p className="label">High Value</p>
-        </div>
-      </div>
 
-      <input
-        type="text"
-        className="search-bar"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="🔍 Search by name or phone..."
-        style={{ marginBottom: '0.8rem' }}
-      />
-
-      <div className="filters-row">
-        {['all', 'with_orders', 'owing', 'high_value', 'no_orders'].map((f) => {
-          const labels = {
-            all: 'All',
-            with_orders: 'With Orders',
-            owing: 'Owing',
-            high_value: 'High Value',
-            no_orders: 'No Orders',
-          }
-          const counts = {
-            all: stats.total,
-            with_orders: stats.withOrders,
-            owing: stats.owing,
-            high_value: stats.highValue,
-            no_orders: stats.total - stats.withOrders,
-          }
-          return (
-            <button
-              key={f}
-              className={`filter-chip ${filter === f ? 'active' : ''}`}
-              onClick={() => setFilter(f)}
-            >
-              {labels[f]}
-              <span className="count">({counts[f]})</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {filteredCustomers.length === 0 ? (
-        <div className="empty-state">
-          <div className="icon">👤</div>
-          <p>
-            {search || filter !== 'all' ? (
-              <>No customers match your search or filter.</>
-            ) : (
-              <>No customers yet. <a href="/dashboard/customers/new" style={{ color: '#1E3A5F', fontWeight: '600' }}>Add your first customer</a></>
-            )}
-          </p>
+        <div className="form-group">
+          <label>Phone number</label>
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={phone}
+            onChange={handlePhoneChange}
+            required
+            placeholder="e.g. 08012345678"
+            className="form-input"
+            disabled={!canAddMore}
+          />
+          <div style={{ fontSize: '0.75rem', color: phone.length === 11 ? '#4C7A5E' : '#6B6255', marginTop: '0.2rem' }}>
+            {phone.length}/11 digits {phone.length === 11 && '✓ valid'}
+          </div>
         </div>
-      ) : (
-        filteredCustomers.map((c) => {
-          const phone = c.phone || ''
-          const hasOrders = c.orderCount > 0
-          const hasOwing = c.totalOwing > 0
-          const isHighValue = c.totalSpent > 50000
 
-          return (
-            <div
-              key={c.id}
-              className="customer-card"
-              onClick={() => router.push(`/dashboard/customers/${c.id}`)}
-            >
-              <div className="row">
-                <div className="info">
-                  <p className="name">{c.name}</p>
-                  <div className="meta">
-                    {phone && <span>📱 {phone}</span>}
-                    {hasOrders && (
-                      <>
-                        <span>·</span>
-                        <span>{c.orderCount} order{c.orderCount !== 1 ? 's' : ''}</span>
-                        <span>·</span>
-                        <span>₦{c.totalSpent.toLocaleString()} spent</span>
-                      </>
-                    )}
-                    {!hasOrders && <span className="badge">No orders</span>}
-                    {hasOwing && <span className="badge owing">₦{c.totalOwing.toLocaleString()} owing</span>}
-                    {isHighValue && <span className="badge high">⭐ High value</span>}
-                  </div>
+        <div className="form-group">
+          <label>Notes <span style={{ fontWeight: '400', color: '#6B6255' }}>(optional)</span></label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="e.g. Customer preferences, special instructions..."
+            className="form-input"
+            style={{ fontFamily: 'inherit', resize: 'vertical' }}
+            disabled={!canAddMore}
+          />
+        </div>
+
+        {isFashion && (
+          <>
+            <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '1.2rem 0 0.6rem' }}>📏 Measurements</h2>
+            <div className="measurement-grid">
+              {MEASUREMENT_FIELDS.map((f) => (
+                <div key={f.key} className="form-group">
+                  <label style={{ fontSize: '0.75rem' }}>{f.label}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={measurements[f.key] || ''}
+                    onChange={(e) => updateMeasurement(f.key, e.target.value)}
+                    className="form-input"
+                    style={{ padding: '0.5rem' }}
+                    disabled={!canAddMore}
+                  />
                 </div>
-                <div className="customer-actions">
-                  {phone && (
-                    <>
-                      <a href={`tel:${phone}`} className="btn btn-call" onClick={(e) => e.stopPropagation()}>📞 Call</a>
-                      <a href={`https://wa.me/234${phone.slice(1)}`} target="_blank" rel="noopener noreferrer" className="btn btn-whatsapp" onClick={(e) => e.stopPropagation()}>💬 WhatsApp</a>
-                    </>
-                  )}
-                  <a href={`/dashboard/orders/new?customer=${c.id}`} className="btn btn-order" onClick={(e) => e.stopPropagation()}>📋 Order</a>
-                </div>
-              </div>
+              ))}
             </div>
-          )
-        })
-      )}
+          </>
+        )}
+
+        {canAddMore ? (
+          <div className="action-row">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving...' : '💾 Save customer'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setSaveAndAdd(!saveAndAdd)}
+              style={{ background: saveAndAdd ? '#1E3A5F' : '#fff', color: saveAndAdd ? '#fff' : '#1E3A5F' }}
+            >
+              {saveAndAdd ? '✓ Save & add another' : 'Save & add another'}
+            </button>
+          </div>
+        ) : (
+          <div className="action-row">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => router.push('/dashboard/subscription')}
+              style={{ background: '#AE4A34', boxShadow: '0 4px 14px rgba(174,74,52,0.3)' }}
+            >
+              🔒 Upgrade to add more customers
+            </button>
+          </div>
+        )}
+
+        {message && (
+          <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34', textAlign: 'center' }}>
+            {message}
+          </p>
+        )}
+      </form>
     </main>
   )
-            }
+          }
