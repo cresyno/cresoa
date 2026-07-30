@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
+import FeedbackBanner from '../../../components/FeedbackBanner'
+import { getPlanLimits } from '../../../lib/planLimits'
 
 export default function RepairsDashboardPage() {
   const router = useRouter()
@@ -29,6 +31,8 @@ export default function RepairsDashboardPage() {
   const [alerts, setAlerts] = useState([])
   const [readyOverdueAlerts, setReadyOverdueAlerts] = useState([])
   const [readyJobs, setReadyJobs] = useState([])
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0)
+  const [plan, setPlan] = useState('free')
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -49,6 +53,14 @@ export default function RepairsDashboardPage() {
     }
 
     setBusiness(businessData)
+    setPlan(businessData.plan || 'free')
+
+    // Count total orders (for limit check)
+    const { count: totalCount } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessData.id)
+    setTotalOrdersCount(totalCount || 0)
 
     const { data: jobData } = await supabase
       .from('orders')
@@ -108,17 +120,6 @@ export default function RepairsDashboardPage() {
 
     setStats({ total, active, awaitingParts, ready, received, diagnosing, awaitingApproval, repairing, testing, overdue, totalOwing, dueToday, dueTomorrow })
 
-    // Pipeline stages (for mobile: horizontal scroll)
-    const stages = [
-      { key: 'Received', label: 'Received', count: received, icon: '📥' },
-      { key: 'Diagnosing', label: 'Diagnosing', count: diagnosing, icon: '🔍' },
-      { key: 'Awaiting Approval', label: 'Awaiting Approval', count: awaitingApproval, icon: '⏳' },
-      { key: 'Repairing', label: 'Repairing', count: repairing, icon: '🔧' },
-      { key: 'Testing', label: 'Testing', count: testing, icon: '🧪' },
-      { key: 'Ready', label: 'Ready for Pickup', count: ready, icon: '✅' },
-    ]
-    // We'll render directly
-
     // Ready jobs for pickup
     const readyJobsList = jobData?.filter(j => j.current_status === 'Ready') || []
     setReadyJobs(readyJobsList)
@@ -156,13 +157,11 @@ export default function RepairsDashboardPage() {
     return map[status] || { label: status || 'Received', color: '#6B6255', bg: '#F0EDE8' }
   }
 
-  // Fix: clean device name to avoid duplication
   const getDeviceDisplay = (job) => {
     let type = job.device_type || ''
     let model = job.device_model || ''
-    // Remove leading brand if already in model
     if (type && model.toLowerCase().startsWith(type.toLowerCase())) {
-      return model // e.g., "Samsung" + "Samsung A16" → "Samsung A16"
+      return model
     }
     if (type && model) {
       return `${type} ${model}`
@@ -234,14 +233,8 @@ export default function RepairsDashboardPage() {
   const previewCustomers = customers.slice(0, 5)
   const awaitingPartsJobs = jobs.filter(j => j.current_status === 'Awaiting Parts').slice(0, 5)
 
-  // Stats filters mapping
-  const statsFilters = {
-    total: '/dashboard/repairs/jobs',
-    active: '/dashboard/repairs/jobs?filter=active',
-    awaitingParts: '/dashboard/repairs/jobs?filter=awaiting_parts',
-    ready: '/dashboard/repairs/jobs?filter=ready',
-    totalOwing: '/dashboard/repairs/jobs?filter=owing',
-  }
+  const limits = getPlanLimits(plan)
+  const canAddMore = totalOrdersCount < limits.orders
 
   // Pipeline status filter mapping
   const statusFilterMap = {
@@ -613,8 +606,8 @@ export default function RepairsDashboardPage() {
         }
         .customer-row .badge.owing {
           background: #F1DBD3;
-          color: #AE4A
-           }
+          color: #AE4A34;
+        }
         .customer-row .arrow { color: #C79A2B; font-size: 0.7rem; }
 
         .empty-state {
@@ -627,7 +620,7 @@ export default function RepairsDashboardPage() {
           box-shadow: 0 2px 4px rgba(30,58,95,0.03);
         }
         .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
-        .empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
+        empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
         .empty-state p { margin: 0 0 0.6rem; font-size: 0.8rem; }
         .empty-state .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 8px; background: linear-gradient(135deg, #C79A2B, #B4881E); color: #1E3A5F; font-weight: 600; text-decoration: none; font-size: 0.8rem; }
 
@@ -699,7 +692,6 @@ export default function RepairsDashboardPage() {
         }
       `}</style>
 
-      {/* HEADER */}
       <div className="header-top">
         <div className="header-brand">
           <LetterLogo name={business?.name} size={40} />
@@ -713,31 +705,33 @@ export default function RepairsDashboardPage() {
         </div>
       </div>
 
-      {/* STATS — Clickable */}
+      {/* Feedback Banner */}
+      {business && <FeedbackBanner business={business} />}
+      {/* ===== STATS (clickable) ===== */}
       <div className="stats-grid">
-        <a href={statsFilters.total} className="stat-card">
+        <a href="/dashboard/repairs/jobs" className="stat-card">
           <p className="number navy">{stats.total}</p>
           <p className="label">Total Jobs</p>
         </a>
-        <a href={statsFilters.active} className="stat-card">
+        <a href="/dashboard/repairs/jobs?filter=active" className="stat-card">
           <p className="number gold">{stats.active}</p>
           <p className="label">Active</p>
         </a>
-        <a href={statsFilters.awaitingParts} className="stat-card">
+        <a href="/dashboard/repairs/jobs?filter=awaiting_parts" className="stat-card">
           <p className="number red">{stats.awaitingParts}</p>
           <p className="label">Awaiting Parts</p>
         </a>
-        <a href={statsFilters.ready} className="stat-card">
+        <a href="/dashboard/repairs/jobs?filter=ready" className="stat-card">
           <p className="number green">{stats.ready}</p>
           <p className="label">Ready for Pickup</p>
         </a>
-        <a href={statsFilters.totalOwing} className="stat-card">
+        <a href="/dashboard/repairs/jobs?filter=owing" className="stat-card">
           <p className="number red">₦{stats.totalOwing.toLocaleString()}</p>
           <p className="label">Outstanding</p>
         </a>
       </div>
 
-      {/* PIPELINE — Responsive horizontal scroll */}
+      {/* ===== PIPELINE ===== */}
       <div className="pipeline-section">
         <div className="pipeline-scroll">
           {[
@@ -761,7 +755,7 @@ export default function RepairsDashboardPage() {
         </div>
       </div>
 
-      {/* ALERTS */}
+      {/* ===== ALERTS ===== */}
       {readyOverdueAlerts.length > 0 && (
         <div className="red-alert">
           <span>🚨</span>
@@ -784,10 +778,25 @@ export default function RepairsDashboardPage() {
         </div>
       )}
 
-      {/* QUICK ACTIONS */}
+      {/* ===== QUICK ACTIONS ===== */}
       <div className="quick-actions">
-        <a href="/dashboard/repairs/jobs/new" className="action-btn action-btn-primary">
-          🔧 + New Repair Job
+        <a
+          href={canAddMore ? "/dashboard/repairs/jobs/new" : "#"}
+          className="action-btn"
+          style={{
+            background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
+            color: canAddMore ? '#1E3A5F' : '#6B6255',
+            cursor: canAddMore ? 'pointer' : 'default',
+            boxShadow: canAddMore ? '0 4px 14px rgba(199,154,43,0.3)' : 'none',
+          }}
+          onClick={(e) => {
+            if (!canAddMore) {
+              e.preventDefault()
+              router.push('/dashboard/subscription')
+            }
+          }}
+        >
+          {canAddMore ? '🔧 + New Repair Job' : '🔒 New Job (Upgrade)'}
         </a>
         <a href="/dashboard/customers/new" className="action-btn action-btn-secondary">
           👤 + Customer
@@ -796,114 +805,119 @@ export default function RepairsDashboardPage() {
           📦 Parts
         </a>
       </div>
-{/* RECENT JOBS */}
-<div style={{ marginBottom: '1.5rem' }}>
-  <div className="section-header">
-    <h2>Recent Jobs</h2>
-    <a href="/dashboard/repairs/jobs">View all →</a>
-  </div>
 
-  {jobs.length === 0 ? (
-    <div className="empty-state">
-      <span className="icon">🔧</span>
-      <h4>No repair jobs yet</h4>
-      <p>Create your first repair job and start tracking it from diagnosis to pickup.</p>
-      <a href="/dashboard/repairs/jobs/new" className="btn">Create First Job</a>
-    </div>
-  ) : (
-    previewJobs.map((job) => {
-      const status = getStatusInfo(job.current_status)
-      const device = getDeviceDisplay(job)
-      const balance = job.price - job.amount_paid
-      const isOverdueStatus = isOverdue(job.due_date) && job.current_status !== 'Delivered' && job.current_status !== 'Completed'
-      const deposit = job.amount_paid || 0
-      const issue = job.customer_notes || ''
-      const dueInfo = getDueDisplay(job.due_date)
-      const phone = job.customers?.phone || ''
-
-      return (
-        <div key={job.id} className="job-card">
-          <div className="top-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p className="device">{device}</p>
-              <p className="customer">
-                {job.customers?.name || 'No customer'}
-                {phone && <span className="phone"> · {phone}</span>}
-              </p>
-              {issue && <p className="issue">Issue: {issue}</p>}
-            </div>
-            <span
-              className="status-badge"
-              style={{
-                background: isOverdueStatus ? '#F1DBD3' : status.bg,
-                color: isOverdueStatus ? '#AE4A34' : status.color,
-              }}
-            >
-              {isOverdueStatus ? '⚠️ Overdue' : status.label}
-            </span>
-          </div>
-
-          <hr className="divider" />
-
-          <div className="details-row">
-            <span className="price">
-              <strong>₦{job.price.toLocaleString()}</strong> total
-            </span>
-            {deposit > 0 && (
-              <span className="price">Deposit ₦{deposit.toLocaleString()}</span>
-            )}
-            <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
-              {balance > 0 ? `Balance ₦${balance.toLocaleString()}` : '✓ Paid in full'}
-            </span>
-          </div>
-
-          <div className="details-row" style={{ marginTop: '0.2rem' }}>
-            {dueInfo ? (
-              <span className={`due ${dueInfo.color === '#AE4A34' ? 'overdue' : dueInfo.color === '#C79A2B' ? 'today' : dueInfo.color === '#1E3A5F' ? 'tomorrow' : ''}`}>
-                {dueInfo.label}
-              </span>
-            ) : (
-              <span className="due" style={{ color: '#A89888' }}>
-                No deadline
-                <a
-                  href={`/dashboard/repairs/jobs/${job.id}/edit`}
-                  style={{ marginLeft: '0.4rem', color: '#1E3A5F', textDecoration: 'underline', fontSize: '0.6rem' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  + Add
-                </a>
-              </span>
-            )}
-          </div>
-
-          <div className="bottom-actions">
-            <a
-              href={`/dashboard/repairs/jobs/${job.id}`}
-              className="btn"
-              onClick={(e) => e.stopPropagation()}
-            >
-              👁️ View Job
-            </a>
-            {phone && (
-              <button
-                className="btn btn-whatsapp"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
-                  const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ${status.label}. ${job.due_date ? `Expected by ${formatDate(job.due_date)}.` : ''}`
-                  window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
-                }}
-              >
-                💬 WhatsApp
-              </button>
-            )}
-          </div>
+      {/* ===== RECENT JOBS ===== */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div className="section-header">
+          <h2>Recent Jobs</h2>
+          <a href="/dashboard/repairs/jobs">View all →</a>
         </div>
-      )
-    })
-  )}
-</div>
-      {/* READY FOR PICKUP — Enhanced */}
+
+        {jobs.length === 0 ? (
+          <div className="empty-state">
+            <span className="icon">🔧</span>
+            <h4>No repair jobs yet</h4>
+            <p>Create your first repair job and start tracking it from diagnosis to pickup.</p>
+            <a href="/dashboard/repairs/jobs/new" className="btn">Create First Job</a>
+          </div>
+        ) : (
+          previewJobs.map((job) => {
+            const status = getStatusInfo(job.current_status)
+            const device = getDeviceDisplay(job)
+            const balance = job.price - job.amount_paid
+            const isOverdueStatus = isOverdue(job.due_date) && job.current_status !== 'Delivered' && job.current_status !== 'Completed'
+            const deposit = job.amount_paid || 0
+            const issue = job.customer_notes || ''
+            const dueInfo = getDueDisplay(job.due_date)
+            const phone = job.customers?.phone || ''
+
+            return (
+              <div key={job.id} className="job-card">
+                <div className="top-row">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p className="device">
+                      {device}
+                      {deposit > 0 && <span className="deposit-badge" style={{ display: 'inline-block', background: '#F6E9C8', color: '#1E3A5F', fontSize: '0.55rem', fontWeight: '600', padding: '0.05rem 0.4rem', borderRadius: '10px', marginLeft: '0.3rem' }}>Deposit: ₦{deposit.toLocaleString()}</span>}
+                    </p>
+                    <p className="customer">
+                      {job.customers?.name || 'No customer'}
+                      {phone && <span className="phone"> · {phone}</span>}
+                    </p>
+                    {issue && <p className="issue">Issue: {issue}</p>}
+                  </div>
+                  <span
+                    className="status-badge"
+                    style={{
+                      background: isOverdueStatus ? '#F1DBD3' : status.bg,
+                      color: isOverdueStatus ? '#AE4A34' : status.color,
+                    }}
+                  >
+                    {isOverdueStatus ? '⚠️ Overdue' : status.label}
+                  </span>
+                </div>
+
+                <hr className="divider" />
+
+                <div className="details-row">
+                  <span className="price">
+                    <strong>₦{job.price.toLocaleString()}</strong> total
+                  </span>
+                  {deposit > 0 && (
+                    <span className="price">Deposit ₦{deposit.toLocaleString()}</span>
+                  )}
+                  <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
+                    {balance > 0 ? `Balance ₦${balance.toLocaleString()}` : '✓ Paid in full'}
+                  </span>
+                </div>
+
+                <div className="details-row" style={{ marginTop: '0.2rem' }}>
+                  {dueInfo ? (
+                    <span className={`due ${dueInfo.color === '#AE4A34' ? 'overdue' : dueInfo.color === '#C79A2B' ? 'today' : dueInfo.color === '#1E3A5F' ? 'tomorrow' : ''}`}>
+                      {dueInfo.label}
+                    </span>
+                  ) : (
+                    <span className="due" style={{ color: '#A89888' }}>
+                      No deadline
+                      <a
+                        href={`/dashboard/repairs/jobs/${job.id}/edit`}
+                        style={{ marginLeft: '0.4rem', color: '#1E3A5F', textDecoration: 'underline', fontSize: '0.6rem' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        + Add
+                      </a>
+                    </span>
+                  )}
+                </div>
+
+                <div className="bottom-actions">
+                  <a
+                    href={`/dashboard/repairs/jobs/${job.id}`}
+                    className="btn"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    👁️ View Job
+                  </a>
+                  {phone && (
+                    <button
+                      className="btn btn-whatsapp"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
+                        const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ${status.label}. ${job.due_date ? `Expected by ${formatDate(job.due_date)}.` : ''}`
+                        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+                      }}
+                    >
+                      💬 WhatsApp
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* ===== READY FOR PICKUP ===== */}
       {readyJobs.length > 0 && (
         <div className="ready-pickup-section">
           <div className="ready-banner">
@@ -973,7 +987,7 @@ export default function RepairsDashboardPage() {
         </div>
       )}
 
-      {/* PARTS NEEDED */}
+      {/* ===== PARTS NEEDED ===== */}
       <div style={{ marginBottom: '1.5rem' }}>
         <div className="section-header">
           <h2>🔩 Parts Needed</h2>
@@ -1015,7 +1029,7 @@ export default function RepairsDashboardPage() {
         )}
       </div>
 
-      {/* RECENT CUSTOMERS */}
+      {/* ===== RECENT CUSTOMERS ===== */}
       <div>
         <div className="section-header">
           <h2>Recent Customers</h2>
@@ -1055,4 +1069,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-                  }
+}
