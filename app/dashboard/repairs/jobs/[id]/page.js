@@ -138,7 +138,7 @@ export default function RepairJobDetailPage({ params }) {
     load()
   }
 
-  // LOCKED ACTIONS — only available on paid plans
+  // Locked actions
   const copyTrackingLink = () => {
     const link = `https://cresoa.vercel.app/track/${job.tracking_token}`
     navigator.clipboard.writeText(link)
@@ -312,6 +312,9 @@ export default function RepairJobDetailPage({ params }) {
   const isLastStage = currentIndex === REPAIR_STAGES.length - 1
   const isFirstStage = currentIndex === 0
 
+  const canUseTracking = isFeatureAvailable(plan, 'tracking_links')
+  const canUseWhatsApp = isFeatureAvailable(plan, 'whatsapp_reminders')
+
   const inputStyle = {
     width: '100%', padding: '0.7rem', borderRadius: '8px',
     border: '1px solid #E8E0D5', fontSize: '1rem', boxSizing: 'border-box',
@@ -320,36 +323,6 @@ export default function RepairJobDetailPage({ params }) {
   }
 
   const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
-
-  // Check if features are available
-  const canUseTracking = isFeatureAvailable(plan, 'tracking_links')
-  const canUseWhatsApp = isFeatureAvailable(plan, 'whatsapp_reminders')
-
-  // Helper: render locked action button
-  const renderAction = (label, icon, action, isAvailable) => {
-    return (
-      <button
-        className={`btn ${isAvailable ? '' : 'btn-locked'}`}
-        onClick={isAvailable ? action : () => router.push('/dashboard/subscription')}
-        style={{
-          padding: '0.6rem 1rem',
-          borderRadius: '8px',
-          border: '1px solid #E8E0D5',
-          background: isAvailable ? '#fff' : '#F0EDE8',
-          color: isAvailable ? '#1E3A5F' : '#6B6255',
-          cursor: 'pointer',
-          fontWeight: '600',
-          fontSize: '0.85rem',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-          transition: 'all 0.1s ease',
-        }}
-      >
-        {icon} {label} {!isAvailable && '🔒'}
-      </button>
-    )
-  }
 
   return (
     <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
@@ -643,7 +616,7 @@ export default function RepairJobDetailPage({ params }) {
       </div>
 
       <div className="stats-row">
-        <div className="stat-card">
+          <div className="stat-card">
           <p className="value navy">₦{job.price.toLocaleString()}</p>
           <p className="label">Total</p>
         </div>
@@ -727,17 +700,45 @@ export default function RepairJobDetailPage({ params }) {
 
       {/* ===== LOCKED ACTIONS ===== */}
       <div className="action-row">
-        {renderAction('Copy Link', '🔗', copyTrackingLink, canUseTracking)}
-        {renderAction('Send Link', '📱', sendLinkViaWhatsApp, canUseTracking)}
-        {renderAction('Status Update', '📤', sendStatusUpdate, canUseWhatsApp)}
-        {balance > 0 && renderAction('Send Reminder', '🔔', sendReminder, canUseWhatsApp)}
+        {canUseTracking ? (
+          <button className="btn btn-gold" onClick={copyTrackingLink}>🔗 Copy Link</button>
+        ) : (
+          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+            🔒 Copy Link (Upgrade)
+          </button>
+        )}
+
+        {canUseTracking ? (
+          <button className="btn btn-green" onClick={sendLinkViaWhatsApp}>📱 Send Link</button>
+        ) : (
+          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+            🔒 Send Link (Upgrade)
+          </button>
+        )}
+
+        {canUseWhatsApp ? (
+          <button className="btn btn-primary" onClick={sendStatusUpdate}>📤 Status Update</button>
+        ) : (
+          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+            🔒 Status Update (Upgrade)
+          </button>
+        )}
+
+        {balance > 0 && (
+          canUseWhatsApp ? (
+            <button className="btn btn-red" onClick={sendReminder}>🔔 Reminder</button>
+          ) : (
+            <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
+              🔒 Reminder (Upgrade)
+            </button>
+          )
+        )}
       </div>
 
-      {/* ===== UPGRADE BANNER ===== */}
       {(!canUseTracking || !canUseWhatsApp) && (
         <div className="upgrade-banner">
           <p>
-            💡 Upgrade to <strong>Starter</strong> or <strong>Pro</strong> to unlock tracking links, WhatsApp updates, and payment reminders.
+            💡 Upgrade to <strong>Starter</strong> or <strong>Pro</strong> to unlock tracking links, WhatsApp updates, and reminders.
             <a href="/dashboard/subscription"> Upgrade now →</a>
           </p>
         </div>
@@ -896,4 +897,4 @@ export default function RepairJobDetailPage({ params }) {
       </button>
     </main>
   )
-}
+                  }
