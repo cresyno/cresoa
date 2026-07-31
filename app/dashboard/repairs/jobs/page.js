@@ -15,6 +15,7 @@ export default function RepairsJobsPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [business, setBusiness] = useState(null)
+  const [isOwner, setIsOwner] = useState(false)
   const [plan, setPlan] = useState('free')
   const [stats, setStats] = useState({
     total: 0,
@@ -34,7 +35,7 @@ export default function RepairsJobsPage() {
 
       const { data: businessData } = await supabase
         .from('businesses')
-        .select('id, plan')
+        .select('id, plan, owner_id')
         .eq('owner_id', user.id)
         .single()
 
@@ -45,6 +46,7 @@ export default function RepairsJobsPage() {
 
       setBusiness(businessData)
       setPlan(businessData.plan || 'free')
+      setIsOwner(user.id === businessData.owner_id)
 
       const { count: totalCount } = await supabase
         .from('orders')
@@ -592,7 +594,9 @@ export default function RepairsJobsPage() {
                   <div className="job-actions">
                     <a href={`/dashboard/repairs/jobs/${job.id}`} className="btn btn-view">👁️ View</a>
                     <a href={`/dashboard/repairs/jobs/${job.id}/edit`} className="btn btn-edit">✏️ Edit</a>
-                    <button className="btn btn-delete" onClick={() => deleteJob(job.id)}>🗑️</button>
+                    {isOwner && (
+                      <button className="btn btn-delete" onClick={() => deleteJob(job.id)}>🗑️</button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -602,4 +606,4 @@ export default function RepairsJobsPage() {
       )}
     </main>
   )
-            }
+    }
