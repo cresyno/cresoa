@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabaseClient'
-import { isOwner } from '../../../../lib/staffAuth'
+import { isOwner } from '../../../../../lib/staffAuth'
 
 export const dynamic = 'force-dynamic'
 
