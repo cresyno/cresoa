@@ -152,7 +152,9 @@ export async function POST(req) {
 
     // 8. Send email notification (non-blocking)
     try {
-      const acceptLink = `https://cresoa.vercel.app/accept-invite?email=${encodeURIComponent(email)}&business=${business.id}`
+      // ✅ Use the staff record ID as the token
+      const staffId = newStaff.id
+      const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${staffId}`
       await sendStaffInviteEmail(
         email,
         user.email || 'The business owner',
@@ -175,4 +177,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-            }
+}
