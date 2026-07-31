@@ -1,6 +1,16 @@
+// app/api/staff/invite/route.js
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../../../../lib/supabaseClient'
+import { isOwner, canAddStaff } from '../../../../lib/staffAuth'
+import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
+
+// Admin client (service role) – needed to check auth.users
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function POST(req) {
   try {
@@ -9,17 +19,19 @@ export async function POST(req) {
 
     if (!email || !role) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Email and role are required' },
         { status: 400 }
       )
     }
+
     if (!accessToken) {
       return NextResponse.json(
-        { error: 'No access token. Please log in again.' },
+        { error: 'No access token provided. Please log in again.' },
         { status: 401 }
       )
     }
 
+    // 1. Authenticate the user via token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -33,31 +45,71 @@ export async function POST(req) {
     )
 
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
+
     if (authError || !user) {
       console.error('Auth error:', authError)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'Unauthorized – invalid token' },
+        { status: 401 }
+      )
     }
 
-    const { data: business, error: bizError } = await supabaseWithToken
+    // 2. Get the user's business (they must be the owner)
+    const { data: business, error: bizError } = await supabase
       .from('businesses')
-      .select('id, owner_id, name')
+      .select('id, owner_id, plan, name')
       .eq('owner_id', user.id)
       .single()
 
     if (bizError || !business) {
-      console.error('Business error:', bizError)
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-    if (business.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Only owners can invite' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Business not found' },
+        { status: 404 }
+      )
     }
 
-    // Check for existing invitation
-    const { data: existing } = await supabaseWithToken
+    // 3. Verify the user is the owner
+    if (business.owner_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Only business owners can invite staff' },
+        { status: 403 }
+      )
+    }
+
+    // 4. Check plan limit for staff accounts
+    const planLimits = getPlanLimits(business.plan || 'free')
+    const maxStaff = planLimits.staff_accounts || 0
+    const canAdd = await canAddStaff(business.id, business.plan || 'free')
+
+    if (!canAdd) {
+      return NextResponse.json(
+        { error: `Your plan allows a maximum of ${maxStaff} staff members. Please upgrade to add more.` },
+        { status: 403 }
+      )
+    }
+
+    // 5. Check if the email exists in auth.users (using admin client)
+    const { data: userData, error: userLookupError } = await supabaseAdmin
+      .from('auth.users')
+      .select('id')
+      .eq('email', email)
+      .single()
+
+    if (userLookupError || !userData) {
+      return NextResponse.json(
+        { error: 'User not found. They must sign up first.' },
+        { status: 404 }
+      )
+    }
+
+    const userId = userData.id
+
+    // 6. Check if already a staff member
+    const { data: existing } = await supabase
       .from('staff')
       .select('id, status')
       .eq('business_id', business.id)
-      .eq('email', email)
+      .eq('user_id', userId)
       .maybeSingle()
 
     if (existing) {
@@ -75,17 +127,20 @@ export async function POST(req) {
       }
     }
 
-    // Insert staff record
-    const { error: insertError } = await supabaseWithToken
+    // 7. Insert staff record
+    const { data: newStaff, error: insertError } = await supabase
       .from('staff')
       .insert({
         business_id: business.id,
+        user_id: userId,
         email: email,
         role: role,
         status: 'pending',
         invited_by: user.id,
         invited_at: new Date().toISOString(),
       })
+      .select()
+      .single()
 
     if (insertError) {
       console.error('Insert error:', insertError)
@@ -95,7 +150,7 @@ export async function POST(req) {
       )
     }
 
-    // ✅ Send email (non‑blocking)
+    // 8. Send email notification (non-blocking)
     try {
       const acceptLink = `https://cresoa.vercel.app/accept-invite?email=${encodeURIComponent(email)}&business=${business.id}`
       await sendStaffInviteEmail(
@@ -106,7 +161,7 @@ export async function POST(req) {
       )
     } catch (emailErr) {
       console.error('Email error (non‑fatal):', emailErr)
-      // We don't return an error because the invitation is already saved.
+      // Don't fail the request – the invitation is already saved.
     }
 
     return NextResponse.json({
@@ -120,4 +175,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+            }
