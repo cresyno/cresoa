@@ -25,7 +25,6 @@ export default function StaffPage() {
         return
       }
 
-      // Fetch the user's business where they are owner
       const { data: businessData, error: bizError } = await supabase
         .from('businesses')
         .select('id, owner_id')
@@ -38,10 +37,8 @@ export default function StaffPage() {
         return
       }
 
-      // User is owner of this business
       setIsOwner(true)
 
-      // Load staff for this business
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select('*, users:user_id(email)')
@@ -60,19 +57,29 @@ export default function StaffPage() {
   }
 
   const inviteStaff = async () => {
+    // ✅ Client-side validation
+    if (!email.trim()) {
+      setMessage('Please enter an email address')
+      return
+    }
+
     setMessage('')
-    const res = await fetch('/api/staff/invite', {
-      method: 'POST',
-      body: JSON.stringify({ email, role }),
-      headers: { 'Content-Type': 'application/json' },
-    })
-    const data = await res.json()
-    if (res.ok) {
-      setMessage(`Invitation sent to ${email}`)
-      setEmail('')
-      loadData() // refresh list
-    } else {
-      setMessage(`Error: ${data.error || 'Unknown error'}`)
+    try {
+      const res = await fetch('/api/staff/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email, role }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage(`✅ Invitation sent to ${email}`)
+        setEmail('')
+        loadData()
+      } else {
+        setMessage(`❌ Error: ${data.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      setMessage('❌ Network error. Please try again.')
     }
   }
 
@@ -109,7 +116,7 @@ export default function StaffPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email address"
-          style={{ border: '1px solid #ccc', padding: '0.5rem', borderRadius: '4px' }}
+          style={{ border: '1px solid #ccc', padding: '0.5rem', borderRadius: '4px', flex: 1 }}
         />
         <select
           value={role}
@@ -126,7 +133,7 @@ export default function StaffPage() {
           Invite
         </button>
       </div>
-      {message && <p style={{ marginBottom: '1rem' }}>{message}</p>}
+      {message && <p style={{ marginBottom: '1rem', color: message.startsWith('✅') ? 'green' : 'red' }}>{message}</p>}
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
@@ -164,4 +171,4 @@ export default function StaffPage() {
       </table>
     </div>
   )
-      }
+    }
