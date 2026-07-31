@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../../lib/supabaseClient'
+import { supabase } from '../../../../../lib/supabaseClient'
 
 // Admin client for checking auth.users
 const supabaseAdmin = createClient(
