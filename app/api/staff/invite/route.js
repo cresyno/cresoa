@@ -27,7 +27,7 @@ export async function POST(req) {
       )
     }
 
-    // Use the token to get the user
+    // Create a client with the user's token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -40,6 +40,7 @@ export async function POST(req) {
       }
     )
 
+    // Get the user from the token
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
 
     if (authError || !user) {
@@ -50,14 +51,15 @@ export async function POST(req) {
       )
     }
 
-    // Get the business owned by this user
-    const { data: business, error: bizError } = await supabase
+    // ✅ Use the token client to get the business (so RLS works)
+    const { data: business, error: bizError } = await supabaseWithToken
       .from('businesses')
       .select('id, owner_id')
       .eq('owner_id', user.id)
       .single()
 
     if (bizError || !business) {
+      console.error('Business error:', bizError)
       return NextResponse.json(
         { error: 'Business not found' },
         { status: 404 }
@@ -71,7 +73,7 @@ export async function POST(req) {
       )
     }
 
-    // Check if the email exists in auth.users
+    // Check if the email exists in auth.users (admin client bypasses RLS)
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -87,8 +89,8 @@ export async function POST(req) {
 
     const userId = userData.id
 
-    // Check if already staff
-    const { data: existing } = await supabase
+    // ✅ Use token client to check existing staff
+    const { data: existing } = await supabaseWithToken
       .from('staff')
       .select('id')
       .eq('business_id', business.id)
@@ -102,8 +104,8 @@ export async function POST(req) {
       )
     }
 
-    // Insert staff record
-    const { error: insertError } = await supabase
+    // ✅ Use token client to insert staff
+    const { error: insertError } = await supabaseWithToken
       .from('staff')
       .insert({
         business_id: business.id,
@@ -133,4 +135,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-  }
+      }
