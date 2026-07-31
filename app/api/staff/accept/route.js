@@ -1,5 +1,4 @@
 // app/api/staff/accept/route.js
-
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabaseClient'
 
@@ -69,6 +68,7 @@ export async function POST(request) {
       .eq('id', staff.id)
 
     if (updateError) {
+      console.error('Update error:', updateError)
       return NextResponse.json(
         { error: 'Failed to accept invitation' },
         { status: 500 }
@@ -77,14 +77,13 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Invitation accepted!',
+      message: 'Invitation accepted successfully',
     })
-
   } catch (error) {
     console.error('Accept error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Server error' },
       { status: 500 }
     )
   }
-  }
+}
