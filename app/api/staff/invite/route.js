@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../../lib/supabaseClient'
-// Admin client (service role) – use for auth.users lookup
+
+// Admin client for checking auth.users
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -20,25 +23,11 @@ export async function POST(req) {
       )
     }
 
-    // 2. Get the session from the request cookies
-    // We'll use the regular supabase client, but we need to pass the cookie header.
-    // However, the supabase client imported from lib might not have the cookie.
-    // So we create a new client with the request's cookie.
-    const cookieHeader = req.headers.get('cookie') || ''
-    const supabaseWithCookie = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: {
-            Cookie: cookieHeader,
-          },
-        },
-      }
-    )
-
-    // Get the authenticated user using the client with the cookie
-    const { data: { user }, error: authError } = await supabaseWithCookie.auth.getUser()
+    // 2. Create Supabase client using cookies from the request
+    const supabaseWithAuth = createRouteHandlerClient({ cookies })
+    
+    // 3. Get the authenticated user
+    const { data: { user }, error: authError } = await supabaseWithAuth.auth.getUser()
 
     if (authError || !user) {
       console.error('Auth error:', authError)
@@ -48,7 +37,7 @@ export async function POST(req) {
       )
     }
 
-    // 3. Get the business owned by this user
+    // 4. Get the business owned by this user
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id')
@@ -62,7 +51,7 @@ export async function POST(req) {
       )
     }
 
-    // 4. Verify the user is the owner (additional check)
+    // 5. Verify the user is the owner
     if (business.owner_id !== user.id) {
       return NextResponse.json(
         { error: 'Only business owners can invite staff' },
@@ -70,7 +59,7 @@ export async function POST(req) {
       )
     }
 
-    // 5. Check if the email exists in auth.users (use admin client)
+    // 6. Check if the email exists in auth.users (use admin client)
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -86,7 +75,7 @@ export async function POST(req) {
 
     const userId = userData.id
 
-    // 6. Check if already a staff member
+    // 7. Check if already a staff member
     const { data: existing } = await supabase
       .from('staff')
       .select('id')
@@ -101,7 +90,7 @@ export async function POST(req) {
       )
     }
 
-    // 7. Insert staff record
+    // 8. Insert staff record
     const { error: insertError } = await supabase
       .from('staff')
       .insert({
