@@ -273,25 +273,8 @@ export default function DashboardLayout({ children }) {
           padding-top: 0.8rem;
           margin-top: 0.5rem;
         }
-        .sidebar .bottom .logout-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-          padding: 0.5rem 0.7rem;
-          border-radius: 6px;
-          background: none;
-          border: none;
-          color: #AE4A34;
-          font-size: 0.8rem;
-          font-weight: 500;
-          cursor: pointer;
-          width: 100%;
-          transition: background 0.15s ease;
-        }
-        .sidebar .bottom .logout-btn:hover {
-          background: rgba(174,74,52,0.15);
-        }
-        .sidebar .bottom a {
+        .sidebar .bottom a,
+        .sidebar .bottom button {
           display: flex;
           align-items: center;
           gap: 0.6rem;
@@ -302,10 +285,22 @@ export default function DashboardLayout({ children }) {
           font-size: 0.8rem;
           font-weight: 500;
           transition: background 0.15s ease;
+          background: none;
+          border: none;
+          width: 100%;
+          cursor: pointer;
+          text-align: left;
         }
-        .sidebar .bottom a:hover {
+        .sidebar .bottom a:hover,
+        .sidebar .bottom button:hover {
           background: rgba(255,255,255,0.06);
           color: #fff;
+        }
+        .sidebar .bottom .logout-btn {
+          color: #AE4A34;
+        }
+        .sidebar .bottom .logout-btn:hover {
+          background: rgba(174,74,52,0.15);
         }
         .main-content {
           flex: 1;
@@ -372,6 +367,7 @@ export default function DashboardLayout({ children }) {
         </div>
 
         <div className="bottom">
+          <a href="/dashboard/staff" onClick={handleNavClick}>👥 Staff</a>
           <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
           <a href="/dashboard/profile" onClick={handleNavClick}>⚙️ Profile</a>
           <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
@@ -383,4 +379,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-  }
+        }
