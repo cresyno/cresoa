@@ -1,9 +1,9 @@
 // app/api/staff/invite/route.js
 
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../lib/supabaseClient'
-import { isOwner, canAddStaff, getActiveStaffCount } from '../../../lib/staffAuth'
-import { getStaffLimit } from '../../../lib/planLimits'
+import { supabase } from '../../../../lib/supabaseClient'
+import { isOwner, canAddStaff, getActiveStaffCount } from '../../lib/staffAuth'
+import { getStaffLimit } from '../../../../lib/planLimits'
 
 export const dynamic = 'force-dynamic'
 
