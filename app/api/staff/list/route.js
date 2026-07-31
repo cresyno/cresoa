@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabaseClient'
-import { isOwner } from '../../../../../lib/staffAuth'
+import { isOwner } from '../../../../lib/staffAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,7 +56,7 @@ export async function GET(request) {
       .single()
 
     const plan = business?.plan || 'free'
-    const { getStaffLimit } = await import('../../../lib/planLimits')
+    const { getStaffLimit } = await import('../../../../lib/planLimits')
     const limit = getStaffLimit(plan)
 
     return NextResponse.json({
