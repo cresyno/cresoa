@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../../../lib/supabaseClient'
-import { isOwner, canPerformAction } from '../../../../../lib/staffAuth'
+import { supabase } from '../../../lib/supabaseClient'
 
 export default function StaffPage() {
   const router = useRouter()
@@ -12,8 +11,7 @@ export default function StaffPage() {
   const [role, setRole] = useState('staff')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
-  const [businessId, setBusinessId] = useState(null)
-  const [isOwnerCheck, setIsOwnerCheck] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -27,38 +25,35 @@ export default function StaffPage() {
         return
       }
 
-      // Fetch the user's business (assuming owner; we'll handle staff later)
-      const { data: businessData } = await supabase
+      // Fetch the user's business where they are owner
+      const { data: businessData, error: bizError } = await supabase
         .from('businesses')
         .select('id, owner_id')
         .eq('owner_id', user.id)
         .single()
 
-      if (!businessData) {
+      if (bizError || !businessData) {
+        setIsOwner(false)
         setLoading(false)
         return
       }
 
-      setBusinessId(businessData.id)
+      // User is owner of this business
+      setIsOwner(true)
 
-      // Check if the user is owner (using your existing function)
-      const owner = await isOwner(user.id, businessData.id)
-      setIsOwnerCheck(owner)
-
-      if (!owner) {
-        setLoading(false)
-        return // Access denied, we'll show a message
-      }
-
-      // Load staff
-      const { data: staffData } = await supabase
+      // Load staff for this business
+      const { data: staffData, error: staffError } = await supabase
         .from('staff')
         .select('*, users:user_id(email)')
         .eq('business_id', businessData.id)
 
-      setStaff(staffData || [])
+      if (staffError) {
+        console.error('Error loading staff:', staffError)
+      } else {
+        setStaff(staffData || [])
+      }
     } catch (err) {
-      console.error('Error loading data:', err)
+      console.error('Error:', err)
     } finally {
       setLoading(false)
     }
@@ -97,61 +92,61 @@ export default function StaffPage() {
   }
 
   if (loading) {
-    return <div className="p-6">Loading...</div>
+    return <div style={{ padding: '2rem' }}>Loading...</div>
   }
 
-  if (!isOwnerCheck) {
-    return <div className="p-6">Access Denied. Only business owners can manage staff.</div>
+  if (!isOwner) {
+    return <div style={{ padding: '2rem' }}>Access Denied. Only business owners can manage staff.</div>
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Staff Management</h1>
+    <div style={{ padding: '1.5rem' }}>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>Staff Management</h1>
 
-      <div className="mb-6 flex gap-4 items-center">
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email address"
-          className="border p-2 rounded"
+          style={{ border: '1px solid #ccc', padding: '0.5rem', borderRadius: '4px' }}
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="border p-2 rounded"
+          style={{ border: '1px solid #ccc', padding: '0.5rem', borderRadius: '4px' }}
         >
           <option value="staff">Staff</option>
           <option value="manager">Manager</option>
         </select>
         <button
           onClick={inviteStaff}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          style={{ background: '#1E3A5F', color: 'white', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
         >
           Invite
         </button>
       </div>
-      {message && <p className="text-sm mb-4">{message}</p>}
+      {message && <p style={{ marginBottom: '1rem' }}>{message}</p>}
 
-      <table className="w-full border-collapse">
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr className="bg-gray-100">
-            <th className="border p-2 text-left">Email</th>
-            <th className="border p-2 text-left">Role</th>
-            <th className="border p-2 text-left">Status</th>
-            <th className="border p-2 text-left">Actions</th>
+          <tr style={{ background: '#f0f0f0' }}>
+            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Email</th>
+            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Role</th>
+            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Status</th>
+            <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {staff.map((s) => (
-            <tr key={s.id} className="border-b">
-              <td className="p-2">{s.users?.email || 'Unknown'}</td>
-              <td className="p-2">{s.role}</td>
-              <td className="p-2">{s.status}</td>
-              <td className="p-2">
+            <tr key={s.id} style={{ borderBottom: '1px solid #ddd' }}>
+              <td style={{ padding: '8px' }}>{s.users?.email || 'Unknown'}</td>
+              <td style={{ padding: '8px' }}>{s.role}</td>
+              <td style={{ padding: '8px' }}>{s.status}</td>
+              <td style={{ padding: '8px' }}>
                 <button
                   onClick={() => removeStaff(s.id)}
-                  className="text-red-600 hover:text-red-800"
+                  style={{ color: 'red', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   Remove
                 </button>
@@ -160,7 +155,7 @@ export default function StaffPage() {
           ))}
           {staff.length === 0 && (
             <tr>
-              <td colSpan="4" className="p-4 text-center text-gray-500">
+              <td colSpan="4" style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
                 No staff members yet.
               </td>
             </tr>
