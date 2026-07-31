@@ -54,14 +54,15 @@ export async function POST(req) {
       )
     }
 
-    // 2. Get the user's business (they must be the owner)
-    const { data: business, error: bizError } = await supabase
+    // 2. ✅ Use supabaseWithToken to get the business (RLS will work)
+    const { data: business, error: bizError } = await supabaseWithToken
       .from('businesses')
       .select('id, owner_id, plan, name')
       .eq('owner_id', user.id)
       .single()
 
     if (bizError || !business) {
+      console.error('Business error:', bizError)
       return NextResponse.json(
         { error: 'Business not found' },
         { status: 404 }
@@ -79,7 +80,15 @@ export async function POST(req) {
     // 4. Check plan limit for staff accounts
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
-    const canAdd = await canAddStaff(business.id, business.plan || 'free')
+
+    // ✅ Use supabaseWithToken for counting active staff
+    const { count: activeStaffCount } = await supabaseWithToken
+      .from('staff')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', business.id)
+      .eq('status', 'active')
+
+    const canAdd = (activeStaffCount || 0) < maxStaff
 
     if (!canAdd) {
       return NextResponse.json(
@@ -88,7 +97,7 @@ export async function POST(req) {
       )
     }
 
-    // 5. Check if the email exists in auth.users (using admin client)
+    // 5. Check if the email exists in auth.users (using admin client – bypasses RLS)
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -104,8 +113,8 @@ export async function POST(req) {
 
     const userId = userData.id
 
-    // 6. Check if already a staff member
-    const { data: existing } = await supabase
+    // 6. ✅ Use supabaseWithToken to check existing staff
+    const { data: existing } = await supabaseWithToken
       .from('staff')
       .select('id, status')
       .eq('business_id', business.id)
@@ -127,8 +136,8 @@ export async function POST(req) {
       }
     }
 
-    // 7. Insert staff record
-    const { data: newStaff, error: insertError } = await supabase
+    // 7. ✅ Use supabaseWithToken to insert staff record
+    const { data: newStaff, error: insertError } = await supabaseWithToken
       .from('staff')
       .insert({
         business_id: business.id,
@@ -152,7 +161,6 @@ export async function POST(req) {
 
     // 8. Send email notification (non-blocking)
     try {
-      // ✅ Use the staff record ID as the token
       const staffId = newStaff.id
       const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${staffId}`
       await sendStaffInviteEmail(
@@ -163,7 +171,6 @@ export async function POST(req) {
       )
     } catch (emailErr) {
       console.error('Email error (non‑fatal):', emailErr)
-      // Don't fail the request – the invitation is already saved.
     }
 
     return NextResponse.json({
@@ -177,4 +184,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+  }
