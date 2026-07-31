@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
-// 将使用 useSearchParams 的逻辑提取到单独的组件中
 function AcceptInviteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -23,19 +22,22 @@ function AcceptInviteContent() {
 
     const accept = async () => {
       try {
-        // 1. Check if user is logged in
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        // ✅ Get the current session and access token
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
           // Redirect to login, then back here
           router.push(`/login?redirect=/accept-invite?token=${token}`)
           return
         }
 
-        // 2. Call the accept API
+        // ✅ Send the token with the request
         const res = await fetch('/api/staff/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ 
+            token, 
+            accessToken: session.access_token 
+          }),
         })
         const data = await res.json()
 
@@ -74,11 +76,10 @@ function AcceptInviteContent() {
   )
 }
 
-// 主页面组件用 Suspense 包裹
 export default function AcceptInvitePage() {
   return (
     <Suspense fallback={<div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
       <AcceptInviteContent />
     </Suspense>
   )
-          }
+  }
