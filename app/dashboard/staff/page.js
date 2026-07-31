@@ -57,7 +57,6 @@ export default function StaffPage() {
   }
 
   const inviteStaff = async () => {
-    // ✅ Client-side validation
     if (!email.trim()) {
       setMessage('Please enter an email address')
       return
@@ -65,9 +64,22 @@ export default function StaffPage() {
 
     setMessage('')
     try {
+      // ✅ Get access token
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+
+      if (!accessToken) {
+        setMessage('❌ You are not logged in. Please refresh and try again.')
+        return
+      }
+
       const res = await fetch('/api/staff/invite', {
         method: 'POST',
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ 
+          email, 
+          role,
+          accessToken // 👈 send the token
+        }),
         headers: { 'Content-Type': 'application/json' },
       })
       const data = await res.json()
@@ -171,4 +183,4 @@ export default function StaffPage() {
       </table>
     </div>
   )
-    }
+          }
