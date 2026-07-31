@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 function VerifyContent() {
@@ -8,10 +8,11 @@ function VerifyContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 
-  const [status, setStatus] = React.useState('verifying')
-  const [message, setMessage] = React.useState('')
+  const [status, setStatus] = useState('verifying')
+  const [message, setMessage] = useState('')
+  const [errorDetail, setErrorDetail] = useState('')
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!token) {
       setStatus('error')
       setMessage('No verification token found.')
@@ -22,21 +23,25 @@ function VerifyContent() {
       try {
         const res = await fetch('/api/auth/verify', {
           method: 'POST',
-          body: JSON.stringify({ token }),
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
         })
         const data = await res.json()
-        if (res.ok) {
-          setStatus('success')
-          setMessage('✅ Your email has been verified! You can now log in.')
-          setTimeout(() => router.push('/login'), 3000)
-        } else {
+
+        if (!res.ok) {
           setStatus('error')
-          setMessage(`❌ ${data.error || 'Verification failed.'}`)
+          setMessage(data.error || 'Verification failed.')
+          setErrorDetail(`Status: ${res.status} – ${JSON.stringify(data)}`)
+          return
         }
+
+        setStatus('success')
+        setMessage('✅ Your email has been verified! You can now log in.')
+        setTimeout(() => router.push('/login'), 3000)
       } catch (err) {
         setStatus('error')
         setMessage('Network error. Please try again.')
+        setErrorDetail(err.message)
       }
     }
 
@@ -44,7 +49,7 @@ function VerifyContent() {
   }, [token, router])
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
+    <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
       <h1>Verify Email</h1>
       {status === 'verifying' && <p>⏳ Verifying your email address...</p>}
       {status === 'success' && (
@@ -54,7 +59,17 @@ function VerifyContent() {
         </>
       )}
       {status === 'error' && (
-        <p style={{ color: 'red' }}>{message}</p>
+        <>
+          <p style={{ color: 'red' }}>{message}</p>
+          {errorDetail && (
+            <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', textAlign: 'left', fontSize: '0.8rem', overflow: 'auto' }}>
+              {errorDetail}
+            </pre>
+          )}
+          <button onClick={() => router.push('/login')} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: '4px' }}>
+            Go to Login
+          </button>
+        </>
       )}
     </div>
   )
@@ -62,12 +77,8 @@ function VerifyContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>Loading verification...</p>
-      </div>
-    }>
+    <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading verification...</div>}>
       <VerifyContent />
     </Suspense>
   )
-        }
+}
