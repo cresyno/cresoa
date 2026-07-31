@@ -10,7 +10,6 @@ const supabaseAdmin = createClient(
 
 export async function POST(req) {
   try {
-    // 1. Parse request body
     const body = await req.json()
     const { email, role } = body
 
@@ -21,11 +20,8 @@ export async function POST(req) {
       )
     }
 
-    // 2. Get the authenticated user from the request
-    // We'll use the cookie from the request to authenticate
+    // Get authenticated user via cookie
     const cookieHeader = req.headers.get('cookie') || ''
-    
-    // Create a supabase client with the request's cookie
     const supabaseWithAuth = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -48,7 +44,7 @@ export async function POST(req) {
       )
     }
 
-    // 3. Get the business owned by this user
+    // Get business
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id')
@@ -62,7 +58,6 @@ export async function POST(req) {
       )
     }
 
-    // 4. Verify the user is the owner
     if (business.owner_id !== user.id) {
       return NextResponse.json(
         { error: 'Only business owners can invite staff' },
@@ -70,7 +65,7 @@ export async function POST(req) {
       )
     }
 
-    // 5. Check if the email exists in auth.users (use admin client)
+    // Check if email exists
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -86,7 +81,7 @@ export async function POST(req) {
 
     const userId = userData.id
 
-    // 6. Check if already a staff member
+    // Check existing
     const { data: existing } = await supabase
       .from('staff')
       .select('id')
@@ -101,7 +96,7 @@ export async function POST(req) {
       )
     }
 
-    // 7. Insert staff record
+    // Insert
     const { error: insertError } = await supabase
       .from('staff')
       .insert({
