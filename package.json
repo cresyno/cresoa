@@ -1,18 +1,24 @@
-{
+
+  {
   "name": "cresoa-fashion",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
+  },
+  "dependencies": {
   },
 "dependencies": {
   "next": "14.2.35",
   "react": "^18",
   "react-dom": "^18",
   "@supabase/supabase-js": "^2.45.0",
-  "nodemailer": "^6.9.13"
+  "nodemailer": "^6.9.13",
   "jsonwebtoken": "^9.0.2"
-  }
+}
 }
