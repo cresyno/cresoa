@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../../../lib/supabaseClient'
+import { supabase } from '../../../../lib/supabaseClient'
 
 // Admin client for checking auth.users
 const supabaseAdmin = createClient(
@@ -23,10 +21,23 @@ export async function POST(req) {
       )
     }
 
-    // 2. Create Supabase client using cookies from the request
-    const supabaseWithAuth = createRouteHandlerClient({ cookies })
+    // 2. Get the authenticated user from the request
+    // We'll use the cookie from the request to authenticate
+    const cookieHeader = req.headers.get('cookie') || ''
     
-    // 3. Get the authenticated user
+    // Create a supabase client with the request's cookie
+    const supabaseWithAuth = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Cookie: cookieHeader,
+          },
+        },
+      }
+    )
+
     const { data: { user }, error: authError } = await supabaseWithAuth.auth.getUser()
 
     if (authError || !user) {
@@ -37,7 +48,7 @@ export async function POST(req) {
       )
     }
 
-    // 4. Get the business owned by this user
+    // 3. Get the business owned by this user
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id')
@@ -51,7 +62,7 @@ export async function POST(req) {
       )
     }
 
-    // 5. Verify the user is the owner
+    // 4. Verify the user is the owner
     if (business.owner_id !== user.id) {
       return NextResponse.json(
         { error: 'Only business owners can invite staff' },
@@ -59,7 +70,7 @@ export async function POST(req) {
       )
     }
 
-    // 6. Check if the email exists in auth.users (use admin client)
+    // 5. Check if the email exists in auth.users (use admin client)
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -75,7 +86,7 @@ export async function POST(req) {
 
     const userId = userData.id
 
-    // 7. Check if already a staff member
+    // 6. Check if already a staff member
     const { data: existing } = await supabase
       .from('staff')
       .select('id')
@@ -90,7 +101,7 @@ export async function POST(req) {
       )
     }
 
-    // 8. Insert staff record
+    // 7. Insert staff record
     const { error: insertError } = await supabase
       .from('staff')
       .insert({
