@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function VerifyEmailPage() {
+function VerifyContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 
-  const [status, setStatus] = useState('verifying')
-  const [message, setMessage] = useState('')
+  const [status, setStatus] = React.useState('verifying')
+  const [message, setMessage] = React.useState('')
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!token) {
       setStatus('error')
       setMessage('No verification token found.')
@@ -58,4 +58,16 @@ export default function VerifyEmailPage() {
       )}
     </div>
   )
-  }
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <p>Loading verification...</p>
+      </div>
+    }>
+      <VerifyContent />
+    </Suspense>
+  )
+        }
