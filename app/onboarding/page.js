@@ -47,102 +47,125 @@ export default function OnboardingPage() {
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
   const [profileMessage, setProfileMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('') // 👈 new: for errors
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      setUserId(user.id)
-
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('id, onboarding_completed, name, phone, sector')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (business?.onboarding_completed) {
-        router.push('/dashboard')
-        return
-      }
-
-      if (business) {
-        setBusinessId(business.id)
-        setBusinessName(business.name || '')
-        setPhone(business.phone || '')
-        setWhatsapp(business.phone || '')
-        if (business.sector) {
-          setSelectedSector(business.sector)
-          setStep('profile')
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
         }
-      }
+        setUserId(user.id)
 
-      const { data: catData } = await supabase
-        .from('business_categories')
-        .select('*')
-      setCategories(catData || [])
-      setLoading(false)
+        const { data: business, error } = await supabase
+          .from('businesses')
+          .select('id, onboarding_completed, name, phone, sector')
+          .eq('owner_id', user.id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          setErrorMessage('Error loading business: ' + error.message)
+        }
+
+        if (business?.onboarding_completed) {
+          router.push('/dashboard')
+          return
+        }
+
+        if (business) {
+          setBusinessId(business.id)
+          setBusinessName(business.name || '')
+          setPhone(business.phone || '')
+          setWhatsapp(business.phone || '')
+          if (business.sector) {
+            setSelectedSector(business.sector)
+            setStep('profile')
+          }
+        }
+
+        const { data: catData } = await supabase
+          .from('business_categories')
+          .select('*')
+        setCategories(catData || [])
+      } catch (err) {
+        setErrorMessage('Unexpected error: ' + err.message)
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [router])
 
   const handleSelectSector = async (sector, isActive) => {
     setSaving(true)
+    setErrorMessage('')
     setSelectedSector(sector)
 
-    if (!businessId) {
-      const { data: newBusiness, error } = await supabase
-        .from('businesses')
-        .insert({
-          owner_id: userId,
-          name: businessName || 'My Business',
-          sector: sector,
-          business_type: isActive ? 'Fashion Designer' : sector,
-          plan: 'free',
-          trial_starts_at: new Date().toISOString(),
-          trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select()
-        .single()
+    try {
+      if (!businessId) {
+        const { data: newBusiness, error } = await supabase
+          .from('businesses')
+          .insert({
+            owner_id: userId,
+            name: businessName || 'My Business',
+            sector: sector,
+            business_type: isActive ? 'Fashion Designer' : sector,
+            plan: 'free',
+            trial_starts_at: new Date().toISOString(),
+            trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .select()
+          .single()
 
-      if (error) {
-        console.error('Error creating business:', error)
+        if (error) {
+          setErrorMessage('Insert error: ' + error.message + ' (Details: ' + JSON.stringify(error) + ')')
+          setSaving(false)
+          return
+        }
+        setBusinessId(newBusiness.id)
+        setBusinessName(newBusiness.name || '')
+
+        if (isActive) {
+          setStep('profile')
+        } else {
+          setWaitlisted(true)
+        }
         setSaving(false)
         return
       }
-      setBusinessId(newBusiness.id)
-      setBusinessName(newBusiness.name || '')
 
+      const { error } = await supabase
+        .from('businesses')
+        .update({
+          sector: sector,
+          business_type: isActive ? 'Fashion Designer' : sector,
+        })
+        .eq('id', businessId)
+
+      if (error) {
+        setErrorMessage('Update error: ' + error.message)
+        setSaving(false)
+        return
+      }
+
+      setSaving(false)
       if (isActive) {
         setStep('profile')
       } else {
         setWaitlisted(true)
       }
+    } catch (err) {
+      setErrorMessage('Unexpected error: ' + err.message)
       setSaving(false)
-      return
-    }
-
-    await supabase
-      .from('businesses')
-      .update({
-        sector: sector,
-        business_type: isActive ? 'Fashion Designer' : sector,
-      })
-      .eq('id', businessId)
-
-    setSaving(false)
-    if (isActive) {
-      setStep('profile')
-    } else {
-      setWaitlisted(true)
     }
   }
 
   const handleSaveProfile = async (e) => {
     e.preventDefault()
     setProfileMessage('')
+    setErrorMessage('')
 
     const phoneDigits = phone.replace(/\D/g, '')
     if (!businessName.trim() || phoneDigits.length !== 11 || !location.trim()) {
@@ -152,52 +175,57 @@ export default function OnboardingPage() {
 
     setSaving(true)
 
-    if (!businessId) {
-      const { data: newBusiness, error } = await supabase
+    try {
+      if (!businessId) {
+        const { data: newBusiness, error } = await supabase
+          .from('businesses')
+          .insert({
+            owner_id: userId,
+            name: businessName.trim(),
+            phone: phoneDigits,
+            whatsapp: whatsapp ? whatsapp.replace(/\D/g, '') : phoneDigits,
+            location: location.trim(),
+            sector: selectedSector || 'Fashion & Custom Wear',
+            onboarding_completed: true,
+            plan: 'free',
+            trial_starts_at: new Date().toISOString(),
+            trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .select()
+          .single()
+
+        if (error) {
+          setProfileMessage('Insert error: ' + error.message + ' (Details: ' + JSON.stringify(error) + ')')
+          setSaving(false)
+          return
+        }
+        setBusinessId(newBusiness.id)
+        router.push('/dashboard')
+        return
+      }
+
+      const { error } = await supabase
         .from('businesses')
-        .insert({
-          owner_id: userId,
+        .update({
           name: businessName.trim(),
           phone: phoneDigits,
           whatsapp: whatsapp ? whatsapp.replace(/\D/g, '') : phoneDigits,
           location: location.trim(),
-          sector: selectedSector || 'Fashion & Custom Wear',
           onboarding_completed: true,
-          plan: 'free',
-          trial_starts_at: new Date().toISOString(),
-          trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
         })
-        .select()
-        .single()
+        .eq('id', businessId)
 
       if (error) {
-        setProfileMessage('Error: ' + error.message)
+        setProfileMessage('Update error: ' + error.message)
         setSaving(false)
         return
       }
-      setBusinessId(newBusiness.id)
+
       router.push('/dashboard')
-      return
-    }
-
-    const { error } = await supabase
-      .from('businesses')
-      .update({
-        name: businessName.trim(),
-        phone: phoneDigits,
-        whatsapp: whatsapp ? whatsapp.replace(/\D/g, '') : phoneDigits,
-        location: location.trim(),
-        onboarding_completed: true,
-      })
-      .eq('id', businessId)
-
-    if (error) {
-      setProfileMessage('Error: ' + error.message)
+    } catch (err) {
+      setProfileMessage('Unexpected error: ' + err.message)
       setSaving(false)
-      return
     }
-
-    router.push('/dashboard')
   }
 
   const handlePhoneChange = (e) => {
@@ -301,6 +329,7 @@ export default function OnboardingPage() {
         `}</style>
         <div className="cresoa-spinner"></div>
         <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Setting up your workspace...</p>
+        {errorMessage && <p style={{ color: 'red', fontSize: '0.8rem', marginTop: '0.5rem' }}>{errorMessage}</p>}
       </main>
     )
   }
@@ -345,6 +374,11 @@ export default function OnboardingPage() {
           <p className="animate-in-delay" style={{ color: '#6B6255', fontSize: '0.9rem', marginBottom: '1.2rem' }}>
             {selectedSector ? `Almost there, ${selectedSector} business owner!` : 'Just a few details before your dashboard is ready.'}
           </p>
+          {errorMessage && (
+            <div style={{ background: '#FEE', color: '#AE4A34', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+              ❌ {errorMessage}
+            </div>
+          )}
           <form onSubmit={handleSaveProfile} className="animate-in-delay" style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', border: '1px solid #e4d8c2', boxShadow: '0 4px 12px rgba(30,58,95,0.06)' }}>
             <div style={{ marginBottom: '1rem' }}>
               <label style={labelStyle}>Business name</label>
@@ -442,6 +476,11 @@ export default function OnboardingPage() {
             </p>
           )}
         </div>
+        {errorMessage && (
+          <div style={{ background: '#FEE', color: '#AE4A34', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', marginTop: '1rem', fontSize: '0.85rem' }}>
+            ❌ {errorMessage}
+          </div>
+        )}
         <div className="animate-in-delay" style={{ marginTop: '1.2rem' }}>
           {categories.map((c) => {
             const info = SECTOR_INFO[c.sector]
@@ -478,4 +517,4 @@ export default function OnboardingPage() {
       </div>
     </main>
   )
-                   }
+    }
