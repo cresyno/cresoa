@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../../lib/supabaseClient'
 
-// Admin client for checking auth.users
+// Admin client – needs SUPABASE_SERVICE_ROLE_KEY
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 export async function POST(req) {
   try {
     const body = await req.json()
-    const { email, role } = body
+    const { email, role, accessToken } = body
 
     if (!email || !role) {
       return NextResponse.json(
@@ -20,31 +20,37 @@ export async function POST(req) {
       )
     }
 
-    // Get authenticated user via cookie
-    const cookieHeader = req.headers.get('cookie') || ''
-    const supabaseWithAuth = createClient(
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'No access token provided. Please log in again.' },
+        { status: 401 }
+      )
+    }
+
+    // Use the token to get the user
+    const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         global: {
           headers: {
-            Cookie: cookieHeader,
+            Authorization: `Bearer ${accessToken}`,
           },
         },
       }
     )
 
-    const { data: { user }, error: authError } = await supabaseWithAuth.auth.getUser()
+    const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
 
     if (authError || !user) {
       console.error('Auth error:', authError)
       return NextResponse.json(
-        { error: 'Unauthorized – please log in' },
+        { error: 'Unauthorized – invalid token' },
         { status: 401 }
       )
     }
 
-    // Get business
+    // Get the business owned by this user
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('id, owner_id')
@@ -65,7 +71,7 @@ export async function POST(req) {
       )
     }
 
-    // Check if email exists
+    // Check if the email exists in auth.users
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -81,7 +87,7 @@ export async function POST(req) {
 
     const userId = userData.id
 
-    // Check existing
+    // Check if already staff
     const { data: existing } = await supabase
       .from('staff')
       .select('id')
@@ -96,7 +102,7 @@ export async function POST(req) {
       )
     }
 
-    // Insert
+    // Insert staff record
     const { error: insertError } = await supabase
       .from('staff')
       .insert({
@@ -127,4 +133,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+  }
