@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../lib/supabaseClient'
-import { isOwner } from '../../../lib/staffAuth'
+import { supabase } from '../../../../lib/supabaseClient'
+import { isOwner } from '../../../../lib/staffAuth'
 
 // Use admin client to check auth.users
 const supabaseAdmin = supabase.auth.admin // or create a separate client with service role
