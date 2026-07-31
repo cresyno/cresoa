@@ -1,10 +1,12 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
-export default function AcceptInvitePage() {
+// 将使用 useSearchParams 的逻辑提取到单独的组件中
+function AcceptInviteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -70,4 +72,13 @@ export default function AcceptInvitePage() {
       </div>
     </div>
   )
-                }
+}
+
+// 主页面组件用 Suspense 包裹
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
+      <AcceptInviteContent />
+    </Suspense>
+  )
+          }
