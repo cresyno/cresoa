@@ -12,6 +12,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [isOwner, setIsOwner] = useState(false)
+  const [businessId, setBusinessId] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -37,6 +38,7 @@ export default function StaffPage() {
         return
       }
 
+      setBusinessId(businessData.id)
       setIsOwner(true)
 
       const { data: staffData, error: staffError } = await supabase
@@ -64,7 +66,7 @@ export default function StaffPage() {
 
     setMessage('')
     try {
-      // ✅ Get access token
+      // Get access token
       const { data: { session } } = await supabase.auth.getSession()
       const accessToken = session?.access_token
 
@@ -75,11 +77,7 @@ export default function StaffPage() {
 
       const res = await fetch('/api/staff/invite', {
         method: 'POST',
-        body: JSON.stringify({ 
-          email, 
-          role,
-          accessToken // 👈 send the token
-        }),
+        body: JSON.stringify({ email, role, accessToken }),
         headers: { 'Content-Type': 'application/json' },
       })
       const data = await res.json()
@@ -183,4 +181,4 @@ export default function StaffPage() {
       </table>
     </div>
   )
-          }
+            }
