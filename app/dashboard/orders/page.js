@@ -6,117 +6,92 @@ import { supabase } from '../../../lib/supabaseClient'
 import UpgradeBanner from '../../../components/UpgradeBanner'
 import { getPlanLimits } from '../../../lib/planLimits'
 
+const ORDER_STATUSES = ['Order Placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+
 export default function OrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
-  const [loading, setLoading] = useState(true)
   const [business, setBusiness] = useState(null)
+  const [isOwner, setIsOwner] = useState(false)
   const [plan, setPlan] = useState('free')
-  const [orderCounts, setOrderCounts] = useState({
-    total: 0,
-    overdue: 0,
-    dueToday: 0,
-    ready: 0,
-    owing: 0,
-  })
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0)
 
   const loadOrders = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-    const { data: businessData } = await supabase
-      .from('businesses')
-      .select('id, plan')
-      .eq('owner_id', user.id)
-      .single()
+      const { data: businessData } = await supabase
+        .from('businesses')
+        .select('id, plan, owner_id')
+        .eq('owner_id', user.id)
+        .single()
 
-    if (!businessData) {
+      if (!businessData) {
+        setLoading(false)
+        return
+      }
+
+      setBusiness(businessData)
+      setPlan(businessData.plan || 'free')
+      setIsOwner(user.id === businessData.owner_id)
+
+      const { count: totalCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessData.id)
+      setTotalOrdersCount(totalCount || 0)
+
+      const { data: orderData, error } = await supabase
+        .from('orders')
+        .select('*, customers(name, phone)')
+        .eq('business_id', businessData.id)
+        .is('device_type', null) // only fashion orders
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error loading orders:', error)
+        setOrders([])
+      } else {
+        setOrders(orderData || [])
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      setOrders([])
+    } finally {
       setLoading(false)
-      return
     }
-
-    setBusiness(businessData)
-    setPlan(businessData.plan || 'free')
-
-    const { data: orderData } = await supabase
-      .from('orders')
-      .select('*, customers(name, phone)')
-      .eq('business_id', businessData.id)
-      .is('group_order_id', null) // individual orders only
-      .order('created_at', { ascending: false })
-
-    setOrders(orderData || [])
-    calculateStats(orderData || [])
-    setLoading(false)
-  }
-
-  const calculateStats = (orders) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString().split('T')[0]
-
-    const overdue = orders.filter(o => {
-      if (!o.due_date || o.current_status === 'Delivered') return false
-      const due = new Date(o.due_date)
-      due.setHours(0, 0, 0, 0)
-      return due < today
-    }).length
-
-    const dueToday = orders.filter(o =>
-      o.due_date === todayStr && o.current_status !== 'Delivered'
-    ).length
-
-    const ready = orders.filter(o =>
-      o.current_status === 'Ready'
-    ).length
-
-    const owing = orders.filter(o =>
-      (o.price - o.amount_paid) > 0
-    ).length
-
-    setOrderCounts({
-      total: orders.length,
-      overdue,
-      dueToday,
-      ready,
-      owing,
-    })
   }
 
   useEffect(() => {
     loadOrders()
   }, [])
 
-  // ---- Plan limit check ----
   const limits = getPlanLimits(plan)
-  const orderCount = orders.length
-  const canAddMore = orderCount < limits.orders
+  const canAddMore = totalOrdersCount < limits.orders
 
-  // ---- Filtering logic ----
-  const filteredOrders = orders
-    .filter((o) =>
-      o.title?.toLowerCase().includes(search.toLowerCase()) ||
-      (o.customers?.name || '').toLowerCase().includes(search.toLowerCase())
-    )
-    .filter((o) => {
-      if (filter === 'all') return true
-      if (filter === 'owing') return (o.price - o.amount_paid) > 0
-      if (filter === 'overdue') return isOverdue(o.due_date) && o.current_status !== 'Delivered'
-      if (filter === 'due_today') return isDueToday(o.due_date) && o.current_status !== 'Delivered'
-      if (filter === 'ready') return o.current_status === 'Ready'
-      if (filter === 'delivered') return o.current_status === 'Delivered'
-      if (filter === 'cutting') return o.current_status === 'Cutting'
-      if (filter === 'sewing') return o.current_status === 'Sewing'
-      if (filter === 'placed') return o.current_status === 'Order placed'
-      return true
-    })
+  const getStatusInfo = (status) => {
+    const map = {
+      'Order Placed': { label: 'Order Placed', color: '#6B6255', bg: '#F0EDE8' },
+      'Cutting': { label: 'Cutting', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Sewing': { label: 'Sewing', color: '#B4881E', bg: '#F6E9C8' },
+      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
+      'Delivered': { label: 'Delivered', color: '#4C7A5E', bg: '#DCEBE2' },
+    }
+    return map[status] || { label: status || 'Order Placed', color: '#6B6255', bg: '#F0EDE8' }
+  }
 
-  // Helper functions
+  const formatDate = (d) => {
+    if (!d) return ''
+    return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  }
+
   const isOverdue = (dueDate) => {
     if (!dueDate) return false
     const today = new Date()
@@ -126,31 +101,44 @@ export default function OrdersPage() {
     return due < today
   }
 
-  const isDueToday = (dueDate) => {
-    if (!dueDate) return false
-    const today = new Date().toISOString().split('T')[0]
-    return dueDate === today
-  }
-
-  const getStatusInfo = (status) => {
-    const map = {
-      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
-      'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
-      'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
-      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
+  const getDueDisplay = (dueDate) => {
+    if (!dueDate) return <span style={{ color: '#C8C0B5', fontSize: '0.7rem' }}>No deadline</span>
+    if (isOverdue(dueDate)) {
+      return (
+        <span style={{ color: '#AE4A34', fontWeight: '700', textTransform: 'uppercase' }}>
+          ⚠️ OVERDUE
+        </span>
+      )
     }
-    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
+    return <span style={{ color: '#6B6255' }}>Due {formatDate(dueDate)}</span>
   }
 
-  const getOrderName = (order) => order?.title || 'Order'
+  const deleteOrder = async (id) => {
+    const confirmed = window.confirm('Delete this order? This cannot be undone.')
+    if (!confirmed) return
+
+    await supabase.from('orders').delete().eq('id', id)
+    loadOrders()
+  }
+
+  const filteredOrders = orders
+    .filter(o => {
+      const searchTerm = search.toLowerCase()
+      const customerName = o.customers?.name?.toLowerCase() || ''
+      const title = o.title?.toLowerCase() || ''
+      return customerName.includes(searchTerm) || title.includes(searchTerm)
+    })
+    .filter(o => {
+      if (filter === 'all') return true
+      return o.current_status === filter
+    })
 
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
-          .cresoa-spinner {
+          .spinner {
             width: 40px; height: 40px;
             border: 4px solid #e4d8c2;
             border-top: 4px solid #1E3A5F;
@@ -158,9 +146,8 @@ export default function OrdersPage() {
             animation: spin 0.8s linear infinite;
           }
         `}</style>
-        <div className="cresoa-spinner"></div>
-        <p style={{ color: '#6B6255', fontSize: '0.85rem', marginTop: '1rem' }}>Loading orders...</p>
-      </main>
+        <div className="spinner"></div>
+      </div>
     )
   }
 
@@ -170,49 +157,26 @@ export default function OrdersPage() {
         .stat-card {
           background: #fff;
           border-radius: 10px;
-          padding: 0.6rem 0.4rem;
+          padding: 0.7rem 0.5rem;
           border: 1px solid #E8E0D5;
           text-align: center;
           flex: 1;
-          min-width: 50px;
+          min-width: 60px;
         }
         .stat-card .value {
           font-size: 1.1rem;
           font-weight: 700;
           margin: 0;
         }
-        .stat-card .value.red { color: #AE4A34; }
-        .stat-card .value.green { color: #4C7A5E; }
         .stat-card .value.navy { color: #1E3A5F; }
+        .stat-card .value.gold { color: #C79A2B; }
+        .stat-card .value.green { color: #4C7A5E; }
+        .stat-card .value.red { color: #AE4A34; }
         .stat-card .label {
           color: #6B6255;
           font-size: 0.6rem;
           margin: 0.1rem 0 0;
         }
-        .filter-chip {
-          padding: 0.3rem 0.7rem;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          white-space: nowrap;
-        }
-        .filter-chip:hover { border-color: #C79A2B; }
-        .filter-chip.active {
-          background: #1E3A5F;
-          border-color: #1E3A5F;
-          color: #fff;
-        }
-        .filter-chip .count {
-          font-weight: 400;
-          opacity: 0.7;
-          margin-left: 0.2rem;
-        }
-        .filter-chip.active .count { opacity: 0.8; }
         .order-card {
           background: #fff;
           border-radius: 12px;
@@ -256,10 +220,91 @@ export default function OrdersPage() {
           font-weight: 700;
           font-size: 0.85rem;
           color: #AE4A34;
-          margin-right: 0.5rem;
           white-space: nowrap;
         }
         .order-card .balance.paid { color: #4C7A5E; }
+        .order-status-badge {
+          display: inline-block;
+          padding: 0.15rem 0.6rem;
+          border-radius: 20px;
+          font-size: 0.65rem;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+        }
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.7rem;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+        }
+        .section-header h1 {
+          color: #1E3A5F;
+          font-size: 1.2rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .section-header .count {
+          color: #6B6255;
+          font-size: 0.8rem;
+          font-weight: 400;
+        }
+        .search-bar {
+          width: 100%;
+          padding: 0.6rem 0.9rem;
+          border-radius: 10px;
+          border: 1px solid #E8E0D5;
+          font-size: 0.9rem;
+          background: #fff;
+          box-sizing: border-box;
+          color: #2B2620;
+          transition: border-color 0.2s ease;
+        }
+        .search-bar:focus { outline: none; border-color: #C79A2B; }
+        .filter-chip {
+          padding: 0.3rem 0.7rem;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          border: 1px solid #E8E0D5;
+          background: #fff;
+          color: #1E3A5F;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          white-space: nowrap;
+        }
+        .filter-chip:hover { border-color: #C79A2B; }
+        .filter-chip.active {
+          background: #1E3A5F;
+          border-color: #1E3A5F;
+          color: #fff;
+        }
+        .filter-chip .count {
+          font-weight: 400;
+          opacity: 0.7;
+          margin-left: 0.2rem;
+        }
+        .filter-chip.active .count { opacity: 0.8; }
+        .filters-row {
+          display: flex;
+          gap: 0.4rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+          overflow-x: auto;
+          padding-bottom: 0.2rem;
+        }
+        .empty-state {
+          background: #fff;
+          border-radius: 12px;
+          padding: 2rem 1.5rem;
+          border: 1px solid #E8E0D5;
+          text-align: center;
+          color: #6B6255;
+          font-size: 0.9rem;
+        }
+        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
         .order-actions {
           display: flex;
           gap: 0.3rem;
@@ -283,98 +328,38 @@ export default function OrdersPage() {
           min-height: 28px;
         }
         .order-actions .btn:hover { background: #F5EFE2; }
-        .order-actions .btn-view {
-          background: #F5EFE2;
-          border-color: #D6D0C5;
-        }
-        .order-actions .btn-call {
-          background: #F6E9C8;
-          border-color: #C79A2B;
-          font-weight: 700;
-        }
-        .order-actions .btn-settle {
-          background: #4C7A5E;
-          border-color: #4C7A5E;
-          color: #fff;
-        }
-        .order-actions .btn-settle:hover { background: #3A5F4A; }
+        .order-actions .btn-view { background: #F5EFE2; border-color: #D6D0C5; }
         .order-actions .btn-edit {
           background: #1E3A5F;
           border-color: #1E3A5F;
           color: #fff;
         }
         .order-actions .btn-edit:hover { background: #0F1E30; }
-        .order-actions .btn-advance {
-          background: #C79A2B;
-          border-color: #C79A2B;
-          color: #1E3A5F;
-        }
-        .order-actions .btn-advance:hover { background: #B4881E; }
-        .order-actions .btn-advance:disabled { opacity: 0.5; cursor: not-allowed; }
-        .search-bar {
-          width: 100%;
-          padding: 0.6rem 0.9rem;
-          border-radius: 10px;
-          border: 1px solid #E8E0D5;
-          font-size: 0.9rem;
+        .order-actions .btn-delete {
           background: #fff;
-          box-sizing: border-box;
-          color: #2B2620;
-          transition: border-color 0.2s ease;
+          border-color: #AE4A34;
+          color: #AE4A34;
         }
-        .search-bar:focus { outline: none; border-color: #C79A2B; }
-        .empty-state {
-          background: #fff;
-          border-radius: 12px;
-          padding: 2rem 1.5rem;
-          border: 1px solid #E8E0D5;
-          text-align: center;
-          color: #6B6255;
-          font-size: 0.9rem;
-        }
-        .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .order-actions .btn-delete:hover { background: #F1DBD3; }
         .stats-row {
           display: flex;
           gap: 0.4rem;
-          margin-bottom: 1rem;
+          margin-bottom: 1.2rem;
           flex-wrap: wrap;
         }
-        .filters-row {
-          display: flex;
-          gap: 0.4rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-          overflow-x: auto;
-          padding-bottom: 0.2rem;
-          -webkit-overflow-scrolling: touch;
-        }
-        .back-link {
-          background: none;
-          border: none;
-          color: #1E3A5F;
-          font-size: 0.85rem;
-          padding: 0;
-          margin-bottom: 1rem;
-          cursor: pointer;
-        }
-        .back-link:hover { text-decoration: underline; }
         .header-row {
           display: flex;
           align-items: center;
-          gap: 0.8rem;
+          justify-content: space-between;
           margin-bottom: 0.8rem;
           flex-wrap: wrap;
+          gap: 0.5rem;
         }
         .header-row h1 {
           color: #1E3A5F;
           font-size: 1.3rem;
           font-weight: 700;
           margin: 0;
-        }
-        .header-row .count {
-          color: #6B6255;
-          font-size: 0.8rem;
-          font-weight: 400;
         }
         .order-count-badge {
           background: #E8E0D5;
@@ -384,23 +369,7 @@ export default function OrdersPage() {
           font-size: 0.7rem;
           font-weight: 600;
         }
-        .action-btn {
-          padding: 0.6rem 1rem;
-          border-radius: 8px;
-          font-size: 0.8rem;
-          font-weight: 600;
-          text-decoration: none;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          border: none;
-          cursor: pointer;
-          transition: transform 0.1s ease;
-        }
-        .action-btn:active { transform: scale(0.97); }
         .add-btn {
-          background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F;
           padding: 0.5rem 1rem;
           border-radius: 8px;
           font-size: 0.8rem;
@@ -414,20 +383,6 @@ export default function OrdersPage() {
           transition: transform 0.1s ease;
         }
         .add-btn:active { transform: scale(0.97); }
-        .add-btn:disabled {
-          background: #E8E0D5;
-          color: #6B6255;
-          cursor: default;
-        }
-        .order-status-badge {
-          display: inline-block;
-          padding: 0.15rem 0.6rem;
-          border-radius: 20px;
-          font-size: 0.65rem;
-          font-weight: 600;
-          letter-spacing: 0.3px;
-          text-transform: uppercase;
-        }
         @media (max-width: 420px) {
           .order-card .row { flex-direction: column; align-items: stretch; }
           .order-actions { justify-content: flex-start; margin-top: 0.3rem; }
@@ -438,18 +393,14 @@ export default function OrdersPage() {
         }
       `}</style>
 
-      <button className="back-link" onClick={() => router.push('/dashboard')}>
-        ← Back to dashboard
-      </button>
-
       <div className="header-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <h1>All Orders</h1>
+          <h1>📋 Orders</h1>
           <span className="order-count-badge">{orders.length}</span>
         </div>
         <a
           href={canAddMore ? "/dashboard/orders/new" : "#"}
-          className={`add-btn ${!canAddMore ? 'add-btn-disabled' : ''}`}
+          className="add-btn"
           style={{
             background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
             color: canAddMore ? '#1E3A5F' : '#6B6255',
@@ -462,15 +413,14 @@ export default function OrdersPage() {
             }
           }}
         >
-          {canAddMore ? '📋 + New Order' : '🔒 New Order (Upgrade)'}
+          {canAddMore ? '+ New Order' : '🔒 New Order (Upgrade)'}
         </a>
       </div>
 
-      {/* ===== UPGRADE BANNER ===== */}
       {!canAddMore && (
         <UpgradeBanner
           resource="orders"
-          currentCount={orderCount}
+          currentCount={totalOrdersCount}
           limit={limits.orders}
           plan={plan}
         />
@@ -478,24 +428,20 @@ export default function OrdersPage() {
 
       <div className="stats-row">
         <div className="stat-card">
-          <p className="value navy">{orderCounts.total}</p>
-          <p className="label">Total</p>
+          <p className="value navy">{orders.length}</p>
+          <p className="label">📋 Total</p>
         </div>
         <div className="stat-card">
-          <p className="value red">{orderCounts.overdue}</p>
-          <p className="label">Overdue</p>
+          <p className="value gold">{orders.filter(o => o.current_status !== 'Delivered').length}</p>
+          <p className="label">🔄 Active</p>
         </div>
         <div className="stat-card">
-          <p className="value navy">{orderCounts.dueToday}</p>
-          <p className="label">Due Today</p>
+          <p className="value green">{orders.filter(o => o.current_status === 'Ready').length}</p>
+          <p className="label">✅ Ready</p>
         </div>
         <div className="stat-card">
-          <p className="value green">{orderCounts.ready}</p>
-          <p className="label">Ready</p>
-        </div>
-        <div className="stat-card">
-          <p className="value red">{orderCounts.owing}</p>
-          <p className="label">Owing</p>
+          <p className="value red">{orders.filter(o => isOverdue(o.due_date)).length}</p>
+          <p className="label">⚠️ Overdue</p>
         </div>
       </div>
 
@@ -504,42 +450,24 @@ export default function OrdersPage() {
         className="search-bar"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="🔍 Search by item or customer..."
+        placeholder="🔍 Search by customer or order..."
         style={{ marginBottom: '0.8rem' }}
       />
 
       <div className="filters-row">
-        {['all', 'owing', 'overdue', 'due_today', 'ready', 'delivered', 'cutting', 'sewing', 'placed'].map((f) => {
-          const labels = {
-            all: 'All',
-            owing: 'Owing',
-            overdue: 'Overdue',
-            due_today: 'Due Today',
-            ready: 'Ready',
-            delivered: 'Delivered',
-            cutting: 'Cutting',
-            sewing: 'Sewing',
-            placed: 'Placed',
-          }
-          const counts = {
-            all: orderCounts.total,
-            owing: orderCounts.owing,
-            overdue: orderCounts.overdue,
-            due_today: orderCounts.dueToday,
-            ready: orderCounts.ready,
-            delivered: orders.filter(o => o.current_status === 'Delivered').length,
-            cutting: orders.filter(o => o.current_status === 'Cutting').length,
-            sewing: orders.filter(o => o.current_status === 'Sewing').length,
-            placed: orders.filter(o => o.current_status === 'Order placed').length,
-          }
+        {[
+          { key: 'all', label: 'All' },
+          ...ORDER_STATUSES.map(s => ({ key: s, label: s })),
+        ].map((f) => {
+          const count = f.key === 'all' ? orders.length : orders.filter(o => o.current_status === f.key).length
           return (
             <button
-              key={f}
-              className={`filter-chip ${filter === f ? 'active' : ''}`}
-              onClick={() => setFilter(f)}
+              key={f.key}
+              className={`filter-chip ${filter === f.key ? 'active' : ''}`}
+              onClick={() => setFilter(f.key)}
             >
-              {labels[f]}
-              <span className="count">({counts[f]})</span>
+              {f.label}
+              <span className="count">({count})</span>
             </button>
           )
         })}
@@ -547,7 +475,7 @@ export default function OrdersPage() {
 
       {filteredOrders.length === 0 ? (
         <div className="empty-state">
-          <div className="icon">📭</div>
+          <div className="icon">📋</div>
           <p>
             {search || filter !== 'all' ? (
               <>No orders match your search or filter.</>
@@ -557,21 +485,16 @@ export default function OrdersPage() {
           </p>
         </div>
       ) : (
-        filteredOrders.map((o) => {
-          const status = getStatusInfo(o.current_status)
-          const orderName = getOrderName(o)
-          const phone = o.customers?.phone
-          const balance = o.price - o.amount_paid
-          const stages = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
-          const currentIndex = stages.indexOf(o.current_status)
-          const isLastStage = currentIndex === stages.length - 1
+        filteredOrders.map((order) => {
+          const status = getStatusInfo(order.current_status)
+          const balance = order.price - order.amount_paid
 
           return (
-            <div key={o.id} className="order-card">
+            <div key={order.id} className="order-card">
               <div className="row">
                 <div className="info">
                   <p className="name">
-                    {orderName}
+                    {order.title || 'Order'}
                     <span
                       className="order-status-badge"
                       style={{ background: status.bg, color: status.color }}
@@ -580,9 +503,15 @@ export default function OrdersPage() {
                     </span>
                   </p>
                   <p className="meta">
-                    <span>{o.customers?.name || 'No customer'}</span>
+                    <span>{order.customers?.name || 'No customer'}</span>
                     <span>·</span>
-                    {o.due_date ? `Due ${new Date(o.due_date).toLocaleDateString('en-GB')}` : 'No deadline'}
+                    {getDueDisplay(order.due_date)}
+                    {order.group_order_id && (
+                      <>
+                        <span>·</span>
+                        <span>👥 Group</span>
+                      </>
+                    )}
                   </p>
                 </div>
 
@@ -591,29 +520,11 @@ export default function OrdersPage() {
                     {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
                   </span>
                   <div className="order-actions">
-                    <a href={`/dashboard/orders/${o.id}`} className="btn btn-view">👁️</a>
-                    {phone && <a href={`tel:${phone}`} className="btn btn-call">📞</a>}
-                    {balance > 0 && <button className="btn btn-settle" onClick={() => alert('Settle payment')}>💰</button>}
-                    <a href={`/dashboard/orders/${o.id}?edit=true`} className="btn btn-edit">✏️</a>
-                    {!isLastStage && (
-                      <button
-                        className="btn btn-advance"
-                        onClick={() => {
-                          // Advance status
-                          const nextIndex = currentIndex + 1
-                          if (nextIndex < stages.length) {
-                            supabase
-                              .from('orders')
-                              .update({ current_status: stages[nextIndex] })
-                              .eq('id', o.id)
-                              .then(() => loadOrders())
-                          }
-                        }}
-                       >
-                        → {stages[currentIndex + 1]}
-                      </button>
+                    <a href={`/dashboard/orders/${order.id}`} className="btn btn-view">👁️ View</a>
+                    <a href={`/dashboard/orders/${order.id}/edit`} className="btn btn-edit">✏️ Edit</a>
+                    {isOwner && (
+                      <button className="btn btn-delete" onClick={() => deleteOrder(order.id)}>🗑️</button>
                     )}
-                    {isLastStage && <button className="btn" disabled style={{ opacity: 0.4 }}>✓ Done</button>}
                   </div>
                 </div>
               </div>
@@ -623,4 +534,4 @@ export default function OrdersPage() {
       )}
     </main>
   )
-        }
+}
