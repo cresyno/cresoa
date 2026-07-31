@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../lib/supabaseClient'
-
+import { supabase } from '../../../../lib/supabaseClient'
 // Admin client (service role) – use for auth.users lookup
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
