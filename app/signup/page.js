@@ -55,25 +55,40 @@ export default function SignUpPage() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { business_name: name },
-      },
-    })
+    try {
+      // ✅ Call our custom signup API instead of Supabase directly
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          businessName: name, // the business owner name
+        }),
+      })
 
-    if (error) {
-      setMessage('Error: ' + error.message)
+      const data = await res.json()
+
+      if (res.ok) {
+        setMessage('🎉 Account created! Check your email to verify, then log in.')
+        setTimeout(() => {
+          router.push('/login')
+        }, 3000) // give user time to read the message
+      } else {
+        setMessage('❌ ' + (data.error || 'Signup failed. Please try again.'))
+      }
+    } catch (err) {
+      console.error('Signup error:', err)
+      setMessage('❌ Network error. Please check your connection.')
+    } finally {
       setLoading(false)
-      return
     }
-
-    setMessage('🎉 Account created! Check your email to verify, then log in.')
-    setTimeout(() => {
-      router.push('/login')
-    }, 2000)
   }
+
+  // ... keep all the UI and helper functions exactly as they were (eyeIcon, etc.) ...
+
+  // I'll paste the entire return block for completeness – it's unchanged except the message handling.
+  // The rest is identical.
 
   const eyeIcon = (visible) => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -277,4 +292,4 @@ export default function SignUpPage() {
       </div>
     </main>
   )
-}
+        }
