@@ -1,9 +1,11 @@
-// app/dashboard/settings/beta/page.js
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
+
+// 👇 Only this email can access the beta dashboard
+const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
 
 export default function BetaManagementPage() {
   const router = useRouter()
@@ -11,47 +13,60 @@ export default function BetaManagementPage() {
   const [loading, setLoading] = useState(false)
   const [invites, setInvites] = useState([])
   const [message, setMessage] = useState('')
-  const [isOwner, setIsOwner] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [debugError, setDebugError] = useState('')
 
   useEffect(() => {
-    checkOwnerAndLoad()
+    checkAdminAndLoad()
   }, [])
 
-  const checkOwnerAndLoad = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+  const checkAdminAndLoad = async () => {
+    try {
+      setDebugError('')
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-    const { data: business, error } = await supabase
-      .from('businesses')
-      .select('owner_id')
-      .eq('owner_id', user.id)
-      .single()
+      if (userError || !user) {
+        setDebugError('❌ Not logged in. Please log in first.')
+        setFetching(false)
+        return
+      }
 
-    if (!business || error) {
-      setIsOwner(false)
+      // ✅ Only the admin email can proceed
+      if (user.email !== ADMIN_EMAIL) {
+        setDebugError('❌ Access Denied. You are not authorized to manage beta invites.')
+        setIsAdmin(false)
+        setFetching(false)
+        return
+      }
+
+      setIsAdmin(true)
+      await loadBetaUsers()
+    } catch (err) {
+      setDebugError('❌ Unexpected error: ' + err.message)
+    } finally {
       setFetching(false)
-      return
     }
-
-    setIsOwner(true)
-    await loadBetaUsers()
-    setFetching(false)
   }
 
   const loadBetaUsers = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setDebugError('❌ No session found')
+        return
+      }
 
-    const res = await fetch(`/api/beta/list?accessToken=${session.access_token}`)
-    const data = await res.json()
-    if (res.ok) {
-      setInvites(data.data || [])
-    } else {
-      console.error('Failed to load beta users:', data.error)
+      const res = await fetch(`/api/beta/list?accessToken=${session.access_token}`)
+      const data = await res.json()
+
+      if (res.ok) {
+        setInvites(data.data || [])
+      } else {
+        setDebugError(`❌ API error: ${data.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      setDebugError('❌ Failed to load beta users: ' + err.message)
     }
   }
 
@@ -113,13 +128,32 @@ export default function BetaManagementPage() {
   }
 
   if (fetching) {
-    return <div style={{ padding: '2rem' }}>Loading...</div>
+    return (
+      <div style={{ padding: '2rem' }}>
+        <p>Loading...</p>
+        {debugError && <p style={{ color: '#AE4A34' }}>{debugError}</p>}
+      </div>
+    )
   }
 
-  if (!isOwner) {
+  if (debugError) {
+    return (
+      <div style={{ padding: '2rem', color: '#AE4A34', maxWidth: '600px', margin: '0 auto' }}>
+        <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>⚠️ Error</h2>
+        <p style={{ background: '#FEE', padding: '1rem', borderRadius: '8px', border: '1px solid #f5c6cb' }}>
+          {debugError}
+        </p>
+        <p style={{ fontSize: '0.85rem', color: '#6B6255', marginTop: '1rem' }}>
+          Try logging out and logging back in, or contact support.
+        </p>
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: '#AE4A34' }}>
-        ❌ Access Denied. Only business owners can manage beta users.
+        ❌ Access Denied. Only the Cresoa admin can manage beta users.
       </div>
     )
   }
