@@ -2,8 +2,9 @@
 
 'use client'
 
+import { Suspense } from 'react'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation' // ✅ added useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 
@@ -31,9 +32,9 @@ const SECTOR_INFO = {
   },
 }
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter()
-  const searchParams = useSearchParams() // ✅ added
+  const searchParams = useSearchParams()
 
   const [categories, setCategories] = useState([])
   const [businessId, setBusinessId] = useState(null)
@@ -51,7 +52,7 @@ export default function OnboardingPage() {
   const [profileMessage, setProfileMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
-  // ✅ Detect beta flag from URL
+  // Detect beta flag from URL
   const isBeta = searchParams.get('beta') === 'true'
   const betaExpiry = isBeta ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() : null
 
@@ -111,7 +112,6 @@ export default function OnboardingPage() {
 
     try {
       if (!businessId) {
-        // ✅ Create business with beta plan if applicable
         const { data: newBusiness, error } = await supabase
           .from('businesses')
           .insert({
@@ -187,7 +187,6 @@ export default function OnboardingPage() {
 
     try {
       if (!businessId) {
-        // ✅ Profile creation with beta plan
         const { data: newBusiness, error } = await supabase
           .from('businesses')
           .insert({
@@ -529,4 +528,17 @@ export default function OnboardingPage() {
       </div>
     </main>
   )
-    }
+}
+
+// ✅ Main export with Suspense boundary
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#6B6255' }}>Loading...</p>
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
+  )
+                   }
