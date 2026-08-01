@@ -392,8 +392,15 @@ export default function DashboardLayout({ children }) {
 
         <div className="bottom">
   <a href="/dashboard/staff" onClick={handleNavClick}>👥 Staff</a>
-  <a href="/dashboard/settings/beta" onClick={handleNavClick}>🧪 Beta</a>  {/* ← add this line */}
   <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
+
+  {/* ✅ Add this new link – only if user hasn't applied */}
+  {business && !business.has_applied_for_beta && (
+    <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
+      🧪 Apply for Beta
+    </a>
+  )}
+
   <a href="/dashboard/profile" onClick={handleNavClick}>⚙️ Profile</a>
   <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
 </div>
