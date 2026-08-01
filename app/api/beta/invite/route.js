@@ -1,8 +1,9 @@
 // app/api/beta/invite/route.js
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../../lib/supabaseClient'
 import { sendBetaInviteEmail } from '../../../../lib/email'
+
+const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
 
 export async function POST(req) {
   try {
@@ -33,22 +34,17 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get the business (owner only)
-    const { data: business, error: bizError } = await supabaseWithToken
-      .from('businesses')
-      .select('id, name, owner_id')
-      .eq('owner_id', user.id)
-      .single()
-
-    if (bizError || !business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    // ✅ Only the admin can invite
+    if (user.email !== ADMIN_EMAIL) {
+      return NextResponse.json({ error: 'Forbidden – only admin can invite' }, { status: 403 })
     }
+
+    // No business check – global beta invites
 
     // Check if already invited
     const { data: existing } = await supabaseWithToken
       .from('beta_invites')
       .select('status')
-      .eq('business_id', business.id)
       .eq('email', email)
       .maybeSingle()
 
@@ -67,15 +63,15 @@ export async function POST(req) {
       }
     }
 
-    // Create the beta invite
+    // Create the beta invite (business_id is optional now, we'll set it to null)
     const { data: invite, error: insertError } = await supabaseWithToken
       .from('beta_invites')
       .insert({
-        business_id: business.id,
         email: email,
         invited_by: user.id,
         invited_at: new Date().toISOString(),
         status: 'pending',
+        // business_id is not required – we'll allow null
       })
       .select()
       .single()
@@ -93,13 +89,12 @@ export async function POST(req) {
       const acceptLink = `https://cresoa.vercel.app/accept-beta?token=${invite.id}`
       await sendBetaInviteEmail(
         email,
-        user.email || 'The business owner',
-        business.name || 'your business',
+        user.email || 'The Cresoa admin',
+        'Cresoa Beta Program',
         acceptLink
       )
     } catch (emailErr) {
       console.error('Email error (non‑fatal):', emailErr)
-      // We don't fail the request – the invite is already created.
     }
 
     return NextResponse.json({
@@ -113,4 +108,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-      }
+}
