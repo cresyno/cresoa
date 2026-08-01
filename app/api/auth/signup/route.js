@@ -39,10 +39,10 @@ export async function POST(req) {
 
     const userId = data.user.id
 
-    // 2. Generate verification token
+    // 2. Generate verification token (JWT)
     const token = signVerificationToken(userId)
 
-    // 3. Build the verification link
+    // 3. ✅ Build the verification link – CORRECT endpoint
     const verificationLink = `https://cresoa.vercel.app/verify-email?token=${token}`
 
     // 4. Send verification email (using Gmail SMTP)
@@ -60,4 +60,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+      }
