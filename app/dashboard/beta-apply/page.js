@@ -12,6 +12,7 @@ export default function BetaApplyPage() {
   const [message, setMessage] = useState('')
   const [user, setUser] = useState(null)
   const [business, setBusiness] = useState(null)
+  const [debug, setDebug] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -29,10 +30,12 @@ export default function BetaApplyPage() {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError || !user) {
+        setDebug('No user found, redirecting to login')
         router.push('/login')
         return
       }
       setUser(user)
+      setDebug(`User found: ${user.email}`)
 
       const { data: business, error: bizError } = await supabase
         .from('businesses')
@@ -40,21 +43,22 @@ export default function BetaApplyPage() {
         .eq('owner_id', user.id)
         .single()
 
-      // ✅ If no business or error, redirect to onboarding
       if (bizError || !business) {
+        setDebug(`Business query error: ${bizError?.message || 'No business found'}`)
         console.error('Business error:', bizError)
-        router.push('/onboarding')
+        // ⚠️ Do NOT redirect yet – show the debug info first
+        setLoading(false)
         return
       }
 
-      // ✅ Verify the user is the owner
+      setDebug(`Business found: ${business.name}, owner_id: ${business.owner_id}`)
+
       if (business.owner_id !== user.id) {
         setError('Only business owners can apply for the beta.')
         setLoading(false)
         return
       }
 
-      // ✅ If already applied, redirect to dashboard
       if (business.has_applied_for_beta) {
         router.push('/dashboard')
         return
@@ -69,9 +73,11 @@ export default function BetaApplyPage() {
         business_type: business.sector || '',
         why: '',
       })
+      setDebug(`Form data set: ${JSON.stringify(formData)}`)
     } catch (err) {
       console.error('Load error:', err)
       setError('Failed to load your data. Please try again.')
+      setDebug(`Catch error: ${err.message}`)
     } finally {
       setLoading(false)
     }
@@ -88,7 +94,6 @@ export default function BetaApplyPage() {
       return
     }
 
-    // Insert application
     const { error: insertError } = await supabase
       .from('beta_applications')
       .insert({
@@ -108,7 +113,6 @@ export default function BetaApplyPage() {
       return
     }
 
-    // Mark business as applied
     const { error: updateError } = await supabase
       .from('businesses')
       .update({ has_applied_for_beta: true })
@@ -116,7 +120,6 @@ export default function BetaApplyPage() {
 
     if (updateError) {
       console.error('Update error:', updateError)
-      // Continue anyway – application is already saved.
     }
 
     setMessage('✅ Application submitted! We’ll review it and get back to you soon.')
@@ -127,13 +130,26 @@ export default function BetaApplyPage() {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p>Loading...</p>
+        <pre style={{ background: '#f0f0f0', padding: '0.5rem', fontSize: '0.7rem', textAlign: 'left' }}>{debug}</pre>
       </div>
     )
   }
 
+  // Show debug at the top
+  const showDebug = () => (
+    <details style={{ background: '#f8f8f8', padding: '0.5rem', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.7rem' }}>
+      <summary>🔍 Debug Info</summary>
+      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{debug}</pre>
+      <div>User: {user?.email}</div>
+      <div>Business: {business?.name}</div>
+      <div>Has applied: {business?.has_applied_for_beta}</div>
+    </details>
+  )
+
   if (error) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: '#D9534F' }}>
+        {showDebug()}
         <p>{error}</p>
         <button onClick={() => router.push('/dashboard')} className="btn-secondary">
           Go to Dashboard
@@ -146,6 +162,7 @@ export default function BetaApplyPage() {
   if (message && message.includes('✅')) {
     return (
       <div style={{ maxWidth: '550px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
+        {showDebug()}
         <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🎉</div>
         <h1 style={{ color: '#0F2B4A' }}>Application Received!</h1>
         <p style={{ color: '#8A8A8A', marginBottom: '1.5rem' }}>
@@ -187,6 +204,7 @@ export default function BetaApplyPage() {
 
   return (
     <div style={{ maxWidth: '550px', margin: '0 auto', padding: '2rem 1rem' }}>
+      {showDebug()}
       <h1 style={{ color: '#0F2B4A', fontSize: '1.3rem' }}>🧪 Apply for Beta Access</h1>
       <p style={{ color: '#8A8A8A', marginBottom: '1.5rem' }}>
         Join the Cresoa beta – free access for early users. We’ll review your application and get back to you.
