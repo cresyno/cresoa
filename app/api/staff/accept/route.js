@@ -22,7 +22,7 @@ export async function POST(request) {
       )
     }
 
-    // Create a Supabase client with the provided access token
+    // Authenticate with the provided access token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -35,7 +35,6 @@ export async function POST(request) {
       }
     )
 
-    // Get the user from the token
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
 
     if (authError || !user) {
@@ -46,12 +45,11 @@ export async function POST(request) {
       )
     }
 
-    // Find the staff record by token and email (matching logged-in user's email)
+    // Find the staff record by token (staff.id) – no email column needed
     const { data: staff, error } = await supabaseWithToken
       .from('staff')
       .select('*')
       .eq('id', token)
-      .eq('email', user.email)
       .single()
 
     if (error || !staff) {
@@ -76,6 +74,14 @@ export async function POST(request) {
     if (staff.status === 'active') {
       return NextResponse.json(
         { error: 'Invitation already accepted' },
+        { status: 400 }
+      )
+    }
+
+    // Ensure this invitation hasn't been claimed by another user
+    if (staff.user_id && staff.user_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Invitation already claimed by another user' },
         { status: 400 }
       )
     }
