@@ -2,16 +2,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
   try {
     const { token, accessToken } = await request.json()
+
+    console.log('📥 Accept request:', { token, hasAccessToken: !!accessToken })
 
     if (!token) {
       return NextResponse.json(
@@ -27,7 +24,7 @@ export async function POST(request) {
       )
     }
 
-    // 1. Get the logged‑in user's email from the token
+    // Authenticate
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -43,14 +40,22 @@ export async function POST(request) {
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
 
     if (authError || !user) {
-      console.error('Auth error:', authError)
+      console.error('❌ Auth error:', authError)
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // 2. Find the staff record using admin client (bypass RLS)
+    console.log('👤 User authenticated:', { userId: user.id, email: user.email })
+
+    // Create admin client to bypass RLS
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+
+    // Find the staff record by token
     const { data: staff, error: findError } = await supabaseAdmin
       .from('staff')
       .select('*')
@@ -58,22 +63,16 @@ export async function POST(request) {
       .single()
 
     if (findError || !staff) {
-      console.error('Staff not found:', findError)
+      console.error('❌ Staff not found:', findError)
       return NextResponse.json(
         { error: 'Invalid invitation – record not found' },
         { status: 404 }
       )
     }
 
-    // 3. Verify the email matches the logged‑in user's email
-    if (staff.email !== user.email) {
-      return NextResponse.json(
-        { error: `This invitation was sent to ${staff.email}, but you are logged in as ${user.email}. Please log in with the correct account.` },
-        { status: 403 }
-      )
-    }
+    console.log('📋 Staff found:', { id: staff.id, email: staff.email, status: staff.status })
 
-    // 4. Check expiry
+    // Check expiry
     const invitedAt = new Date(staff.invited_at)
     const now = new Date()
     const diffDays = (now - invitedAt) / (1000 * 60 * 60 * 24)
@@ -91,7 +90,7 @@ export async function POST(request) {
       )
     }
 
-    // 5. Update the record using admin client (bypass RLS)
+    // Update the record
     const { error: updateError } = await supabaseAdmin
       .from('staff')
       .update({
@@ -102,22 +101,24 @@ export async function POST(request) {
       .eq('id', staff.id)
 
     if (updateError) {
-      console.error('Update error:', updateError)
+      console.error('❌ Update error:', updateError)
       return NextResponse.json(
         { error: 'Failed to accept invitation' },
         { status: 500 }
       )
     }
 
+    console.log('✅ Staff record updated successfully')
+
     return NextResponse.json({
       success: true,
       message: 'Invitation accepted successfully',
     })
   } catch (error) {
-    console.error('Accept error:', error)
+    console.error('❌ Accept error:', error)
     return NextResponse.json(
       { error: 'Server error: ' + error.message },
       { status: 500 }
     )
   }
-}
+         }
