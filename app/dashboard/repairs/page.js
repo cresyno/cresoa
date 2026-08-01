@@ -55,7 +55,6 @@ export default function RepairsDashboardPage() {
     setBusiness(businessData)
     setPlan(businessData.plan || 'free')
 
-    // Count total orders (for limit check)
     const { count: totalCount } = await supabase
       .from('orders')
       .select('*', { count: 'exact', head: true })
@@ -120,7 +119,6 @@ export default function RepairsDashboardPage() {
 
     setStats({ total, active, awaitingParts, ready, received, diagnosing, awaitingApproval, repairing, testing, overdue, totalOwing, dueToday, dueTomorrow })
 
-    // Ready jobs for pickup
     const readyJobsList = jobData?.filter(j => j.current_status === 'Ready') || []
     setReadyJobs(readyJobsList)
 
@@ -236,7 +234,6 @@ export default function RepairsDashboardPage() {
   const limits = getPlanLimits(plan)
   const canAddMore = totalOrdersCount < limits.orders
 
-  // Pipeline status filter mapping
   const statusFilterMap = {
     'Received': 'received',
     'Diagnosing': 'diagnosing',
@@ -247,8 +244,24 @@ export default function RepairsDashboardPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem', paddingBottom: '3rem' }}>
+    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.2rem 1rem', paddingBottom: '3rem' }}>
       <style>{`
+        /* ===== GLASS CARD ===== */
+        .glass-card {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(30, 58, 95, 0.06);
+          padding: 0.8rem 1rem;
+          transition: all 0.25s ease;
+        }
+        .glass-card:hover {
+          box-shadow: 0 12px 40px rgba(30, 58, 95, 0.1);
+          transform: translateY(-2px);
+        }
+        /* ===== HEADER ===== */
         .header-top {
           display: flex;
           justify-content: space-between;
@@ -262,12 +275,13 @@ export default function RepairsDashboardPage() {
         }
         .header-brand .greeting {
           color: #2B2620;
-          font-size: 0.8rem;
+          font-size: 0.7rem;
           margin: 0;
+          font-weight: 500;
         }
         .header-brand .business-name {
           color: #1E3A5F;
-          font-size: 1.2rem;
+          font-size: 1.1rem;
           font-weight: 700;
           margin: 0;
         }
@@ -277,11 +291,43 @@ export default function RepairsDashboardPage() {
           color: #1E3A5F;
           padding: 0.05rem 0.5rem;
           border-radius: 10px;
-          font-size: 0.55rem;
+          font-size: 0.5rem;
           font-weight: 600;
           margin-left: 0.3rem;
         }
-
+        /* ===== REVENUE BAR ===== */
+        .revenue-bar {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.6rem;
+          margin-bottom: 1.2rem;
+        }
+        .revenue-item {
+          background: #fff;
+          border-radius: 12px;
+          padding: 0.6rem 0.8rem;
+          text-align: center;
+          border: 1px solid #E8E0D5;
+          box-shadow: 0 2px 8px rgba(30,58,95,0.04);
+        }
+        .revenue-item span {
+          display: block;
+          font-size: 0.55rem;
+          color: #6B6255;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          font-weight: 600;
+        }
+        .revenue-item strong {
+          display: block;
+          font-size: 1.1rem;
+          color: #1E3A5F;
+          margin-top: 0.1rem;
+        }
+        .revenue-item .color-gold strong { color: #C79A2B; }
+        .revenue-item .color-red strong { color: #AE4A34; }
+        .revenue-item .color-green strong { color: #4C7A5E; }
+        /* ===== STATS ===== */
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
@@ -290,19 +336,19 @@ export default function RepairsDashboardPage() {
         }
         .stat-card {
           background: #fff;
-          border-radius: 10px;
+          border-radius: 12px;
           padding: 0.6rem 0.3rem;
           border: 1px solid #E8E0D5;
           text-align: center;
-          box-shadow: 0 2px 4px rgba(30,58,95,0.04);
+          box-shadow: 0 2px 8px rgba(30,58,95,0.04);
           text-decoration: none;
-          transition: all 0.15s ease;
+          transition: all 0.2s ease;
           cursor: pointer;
         }
         .stat-card:hover {
           border-color: #C79A2B;
-          box-shadow: 0 4px 12px rgba(199,154,43,0.1);
-          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(199,154,43,0.12);
+          transform: translateY(-3px);
         }
         .stat-card .number {
           font-size: 1.1rem;
@@ -322,7 +368,7 @@ export default function RepairsDashboardPage() {
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
-
+        /* ===== PIPELINE ===== */
         .pipeline-section {
           margin-bottom: 1.2rem;
           overflow-x: auto;
@@ -338,18 +384,21 @@ export default function RepairsDashboardPage() {
         }
         .pipeline-item {
           flex: 0 0 auto;
-          min-width: 70px;
+          min-width: 65px;
           background: #fff;
-          border-radius: 8px;
+          border-radius: 10px;
           padding: 0.4rem 0.5rem;
           border: 1px solid #E8E0D5;
           text-align: center;
           cursor: pointer;
-          transition: all 0.15s ease;
+          transition: all 0.2s ease;
           text-decoration: none;
+          box-shadow: 0 2px 8px rgba(30,58,95,0.03);
         }
         .pipeline-item:hover {
           border-color: #C79A2B;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(199,154,43,0.10);
         }
         .pipeline-item .icon { font-size: 0.8rem; display: block; }
         .pipeline-item .count {
@@ -359,13 +408,13 @@ export default function RepairsDashboardPage() {
           margin: 0;
         }
         .pipeline-item .label {
-          font-size: 0.5rem;
+          font-size: 0.45rem;
           color: #6B6255;
           margin: 0;
           text-transform: uppercase;
           letter-spacing: 0.3px;
         }
-
+        /* ===== ALERTS ===== */
         .alert-strip {
           display: flex;
           gap: 0.4rem;
@@ -376,24 +425,25 @@ export default function RepairsDashboardPage() {
           flex: 1;
           min-width: 70px;
           padding: 0.4rem 0.5rem;
-          border-radius: 8px;
+          border-radius: 10px;
           text-align: center;
-          font-size: 0.65rem;
+          font-size: 0.6rem;
           font-weight: 600;
           cursor: pointer;
           text-decoration: none;
-          transition: all 0.15s ease;
+          transition: all 0.2s ease;
+          border: 1px solid transparent;
         }
-        .alert-item:hover { opacity: 0.8; }
+        .alert-item:hover { opacity: 0.85; transform: scale(0.97); }
         .alert-item .count {
-          font-size: 0.95rem;
+          font-size: 0.9rem;
           font-weight: 800;
           display: block;
         }
-        .alert-item.overdue { background: #F1DBD3; color: #AE4A34; }
-        .alert-item.awaiting_parts { background: #F6E9C8; color: #B4881E; }
-        .alert-item.ready { background: #DCEBE2; color: #4C7A5E; }
-
+        .alert-item.overdue { background: #F1DBD3; color: #AE4A34; border-color: #AE4A34; }
+        .alert-item.awaiting_parts { background: #F6E9C8; color: #B4881E; border-color: #B4881E; }
+        .alert-item.ready { background: #DCEBE2; color: #4C7A5E; border-color: #4C7A5E; }
+        /* ===== QUICK ACTIONS ===== */
         .quick-actions {
           display: flex;
           gap: 0.4rem;
@@ -402,7 +452,7 @@ export default function RepairsDashboardPage() {
         }
         .action-btn {
           padding: 0.5rem 0.9rem;
-          border-radius: 8px;
+          border-radius: 10px;
           font-size: 0.75rem;
           font-weight: 600;
           text-decoration: none;
@@ -411,15 +461,16 @@ export default function RepairsDashboardPage() {
           gap: 0.3rem;
           border: none;
           cursor: pointer;
-          transition: transform 0.1s ease;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(30,58,95,0.06);
         }
-        .action-btn:active { transform: scale(0.97); }
+        .action-btn:active { transform: scale(0.95); }
         .action-btn-primary {
           background: linear-gradient(135deg, #C79A2B, #B4881E);
           color: #1E3A5F;
-          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
+          box-shadow: 0 4px 14px rgba(199,154,43,0.25);
         }
-        .action-btn-primary:hover { box-shadow: 0 6px 20px rgba(199,154,43,0.4); }
+        .action-btn-primary:hover { box-shadow: 0 6px 24px rgba(199,154,43,0.35); transform: translateY(-1px); }
         .action-btn-secondary {
           background: #1E3A5F;
           color: #fff;
@@ -430,8 +481,8 @@ export default function RepairsDashboardPage() {
           color: #1E3A5F;
           border: 1px solid #E8E0D5;
         }
-        .action-btn-outline:hover { border-color: #C79A2B; }
-
+        .action-btn-outline:hover { border-color: #C79A2B; background: #FBF8F0; }
+        /* ===== SECTION HEADER ===== */
         .section-header {
           display: flex;
           justify-content: space-between;
@@ -451,19 +502,20 @@ export default function RepairsDashboardPage() {
           text-decoration: none;
         }
         .section-header a:hover { text-decoration: underline; }
-
+        /* ===== JOB CARD ===== */
         .job-card {
           background: #fff;
-          border-radius: 12px;
+          border-radius: 14px;
           padding: 0.8rem 1rem;
           border: 1px solid #E8E0D5;
-          margin-bottom: 0.5rem;
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-          box-shadow: 0 2px 4px rgba(30,58,95,0.03);
+          margin-bottom: 0.6rem;
+          transition: all 0.25s ease;
+          box-shadow: 0 2px 8px rgba(30,58,95,0.03);
         }
         .job-card:hover {
           border-color: #C79A2B;
-          box-shadow: 0 4px 12px rgba(199,154,43,0.08);
+          box-shadow: 0 6px 20px rgba(199,154,43,0.08);
+          transform: translateY(-2px);
         }
         .job-card .top-row {
           display: flex;
@@ -476,6 +528,16 @@ export default function RepairsDashboardPage() {
           color: #1E3A5F;
           font-size: 0.9rem;
           margin: 0;
+        }
+        .job-card .deposit-badge {
+          display: inline-block;
+          background: #F6E9C8;
+          color: #1E3A5F;
+          font-size: 0.5rem;
+          font-weight: 600;
+          padding: 0.05rem 0.4rem;
+          border-radius: 10px;
+          margin-left: 0.3rem;
         }
         .job-card .status-badge {
           display: inline-block;
@@ -542,11 +604,11 @@ export default function RepairsDashboardPage() {
           font-size: 0.6rem;
           font-weight: 600;
           text-decoration: none;
-          border: 1px solid #E8E0D5;
+    border: 1px solid #E8E0D5;
           background: #fff;
           color: #1E3A5F;
           cursor: pointer;
-          transition: all 0.1s ease;
+          transition: all 0.15s ease;
           display: inline-flex;
           align-items: center;
           gap: 0.2rem;
@@ -564,21 +626,21 @@ export default function RepairsDashboardPage() {
           color: #6B6255;
           font-size: 0.55rem;
         }
-
+        /* ===== CUSTOMER ROW ===== */
         .customer-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 0.6rem 0.9rem;
           background: #fff;
-          border-radius: 8px;
+          border-radius: 10px;
           border: 1px solid #E8E0D5;
           text-decoration: none;
           margin-bottom: 0.4rem;
-          transition: border-color 0.15s ease;
-          box-shadow: 0 1px 3px rgba(30,58,95,0.03);
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(30,58,95,0.02);
         }
-        .customer-row:hover { border-color: #C79A2B; }
+        .customer-row:hover { border-color: #C79A2B; box-shadow: 0 4px 12px rgba(199,154,43,0.08); }
         .customer-row .name {
           color: #1E3A5F;
           font-weight: 600;
@@ -597,7 +659,7 @@ export default function RepairsDashboardPage() {
           margin-top: 0.1rem;
         }
         .customer-row .badge {
-          font-size: 0.55rem;
+          font-size: 0.5rem;
           font-weight: 600;
           padding: 0.05rem 0.4rem;
           border-radius: 10px;
@@ -609,25 +671,34 @@ export default function RepairsDashboardPage() {
           color: #AE4A34;
         }
         .customer-row .arrow { color: #C79A2B; font-size: 0.7rem; }
-
+        /* ===== EMPTY STATE ===== */
         .empty-state {
           background: #fff;
-          border-radius: 12px;
+          border-radius: 14px;
           padding: 1.5rem;
           border: 1px solid #E8E0D5;
           text-align: center;
           color: #6B6255;
-          box-shadow: 0 2px 4px rgba(30,58,95,0.03);
+          box-shadow: 0 2px 8px rgba(30,58,95,0.03);
         }
         .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
-        empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
+        .empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
         .empty-state p { margin: 0 0 0.6rem; font-size: 0.8rem; }
-        .empty-state .btn { display: inline-block; padding: 0.4rem 1rem; border-radius: 8px; background: linear-gradient(135deg, #C79A2B, #B4881E); color: #1E3A5F; font-weight: 600; text-decoration: none; font-size: 0.8rem; }
-
+        .empty-state .btn {
+          display: inline-block;
+          padding: 0.4rem 1rem;
+          border-radius: 8px;
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+          color: #1E3A5F;
+          font-weight: 600;
+          text-decoration: none;
+          font-size: 0.8rem;
+        }
+        /* ===== RED ALERT ===== */
         .red-alert {
           background: #F1DBD3;
           border: 1px solid #AE4A34;
-          border-radius: 8px;
+          border-radius: 10px;
           padding: 0.5rem 0.8rem;
           margin-bottom: 1rem;
           color: #AE4A34;
@@ -638,13 +709,14 @@ export default function RepairsDashboardPage() {
           gap: 0.4rem;
           flex-wrap: wrap;
         }
+        /* ===== READY PICKUP ===== */
         .ready-pickup-section {
           margin-bottom: 1.5rem;
         }
         .ready-pickup-section .ready-banner {
-          background: #DCEBE2;
+          background: linear-gradient(135deg, #DCEBE2, #B8D4C5);
           border: 1px solid #4C7A5E;
-          border-radius: 8px;
+          border-radius: 10px;
           padding: 0.5rem 0.8rem;
           margin-bottom: 0.5rem;
           display: flex;
@@ -665,16 +737,16 @@ export default function RepairsDashboardPage() {
           border-radius: 20px;
           font-size: 0.7rem;
         }
-
+        /* ===== RESPONSIVE ===== */
         @media (max-width: 480px) {
-          .stats-grid {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.3rem;
-          }
+          .revenue-bar { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+          .revenue-item { padding: 0.4rem 0.5rem; }
+          .revenue-item strong { font-size: 0.9rem; }
+          .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.3rem; }
           .stat-card { padding: 0.4rem 0.2rem; }
           .stat-card .number { font-size: 0.9rem; }
           .stat-card .label { font-size: 0.4rem; }
-          .pipeline-item { min-width: 55px; padding: 0.3rem 0.4rem; }
+          .pipeline-item { min-width: 50px; padding: 0.3rem 0.4rem; }
           .pipeline-item .count { font-size: 0.7rem; }
           .pipeline-item .label { font-size: 0.4rem; }
           .job-card .top-row { flex-wrap: wrap; }
@@ -685,14 +757,21 @@ export default function RepairsDashboardPage() {
             font-size: 0.65rem;
             padding: 0.4rem 0.5rem;
           }
-          .alert-item { min-width: 55px; padding: 0.3rem 0.4rem; font-size: 0.55rem; }
-          .alert-item .count { font-size: 0.8rem; }
+          .alert-item { min-width: 50px; padding: 0.3rem 0.4rem; font-size: 0.5rem; }
+          .alert-item .count { font-size: 0.75rem; }
           .customer-row { flex-wrap: wrap; gap: 0.3rem; }
           .ready-pickup-section .ready-banner { flex-direction: column; align-items: stretch; }
         }
+        /* ===== HOVER ANIMATION ===== */
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up { animation: fadeUp 0.4s ease-out both; }
       `}</style>
 
-      <div className="header-top">
+      {/* ===== HEADER ===== */}
+      <div className="header-top animate-fade-up">
         <div className="header-brand">
           <LetterLogo name={business?.name} size={40} />
           <div>
@@ -705,10 +784,27 @@ export default function RepairsDashboardPage() {
         </div>
       </div>
 
-      {/* Feedback Banner */}
+  {/* Feedback Banner */}
       {business && <FeedbackBanner business={business} />}
-      {/* ===== STATS (clickable) ===== */}
-      <div className="stats-grid">
+
+      {/* ===== REVENUE BAR (NEW) ===== */}
+      <div className="revenue-bar animate-fade-up" style={{ animationDelay: '0.05s' }}>
+        <div className="revenue-item color-gold">
+          <span>💰 Total Revenue</span>
+          <strong>₦{jobs.reduce((sum, j) => sum + j.amount_paid, 0).toLocaleString()}</strong>
+        </div>
+        <div className="revenue-item color-red">
+          <span>⏳ Outstanding</span>
+          <strong>₦{stats.totalOwing.toLocaleString()}</strong>
+        </div>
+        <div className="revenue-item color-green">
+          <span>✅ Completed</span>
+          <strong>{jobs.filter(j => j.current_status === 'Completed' || j.current_status === 'Delivered').length}</strong>
+        </div>
+      </div>
+
+      {/* ===== STATS ===== */}
+      <div className="stats-grid animate-fade-up" style={{ animationDelay: '0.1s' }}>
         <a href="/dashboard/repairs/jobs" className="stat-card">
           <p className="number navy">{stats.total}</p>
           <p className="label">Total Jobs</p>
@@ -719,20 +815,20 @@ export default function RepairsDashboardPage() {
         </a>
         <a href="/dashboard/repairs/jobs?filter=awaiting_parts" className="stat-card">
           <p className="number red">{stats.awaitingParts}</p>
-          <p className="label">Awaiting Parts</p>
+          <p className="label">Parts</p>
         </a>
         <a href="/dashboard/repairs/jobs?filter=ready" className="stat-card">
           <p className="number green">{stats.ready}</p>
-          <p className="label">Ready for Pickup</p>
+          <p className="label">Ready</p>
         </a>
-        <a href="/dashboard/repairs/jobs?filter=owing" className="stat-card">
-          <p className="number red">₦{stats.totalOwing.toLocaleString()}</p>
-          <p className="label">Outstanding</p>
+        <a href="/dashboard/repairs/jobs?filter=overdue" className="stat-card">
+          <p className="number red">{stats.overdue}</p>
+          <p className="label">Overdue</p>
         </a>
       </div>
 
       {/* ===== PIPELINE ===== */}
-      <div className="pipeline-section">
+      <div className="pipeline-section animate-fade-up" style={{ animationDelay: '0.15s' }}>
         <div className="pipeline-scroll">
           {[
             { key: 'Received', label: 'Received', count: stats.received, icon: '📥' },
@@ -757,14 +853,14 @@ export default function RepairsDashboardPage() {
 
       {/* ===== ALERTS ===== */}
       {readyOverdueAlerts.length > 0 && (
-        <div className="red-alert">
+        <div className="red-alert animate-fade-up" style={{ animationDelay: '0.2s' }}>
           <span>🚨</span>
           <span>{readyOverdueAlerts.length} job{readyOverdueAlerts.length > 1 ? 's' : ''} ready for over 7 days — waiting on customer!</span>
         </div>
       )}
 
       {alerts.length > 0 && (
-        <div className="alert-strip">
+        <div className="alert-strip animate-fade-up" style={{ animationDelay: '0.2s' }}>
           {alerts.map((alert, i) => (
             <a
               key={i}
@@ -779,15 +875,13 @@ export default function RepairsDashboardPage() {
       )}
 
       {/* ===== QUICK ACTIONS ===== */}
-      <div className="quick-actions">
+      <div className="quick-actions animate-fade-up" style={{ animationDelay: '0.25s' }}>
         <a
           href={canAddMore ? "/dashboard/repairs/jobs/new" : "#"}
-          className="action-btn"
+          className="action-btn action-btn-primary"
           style={{
-            background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
-            color: canAddMore ? '#1E3A5F' : '#6B6255',
+            opacity: canAddMore ? 1 : 0.6,
             cursor: canAddMore ? 'pointer' : 'default',
-            boxShadow: canAddMore ? '0 4px 14px rgba(199,154,43,0.3)' : 'none',
           }}
           onClick={(e) => {
             if (!canAddMore) {
@@ -809,7 +903,7 @@ export default function RepairsDashboardPage() {
       {/* ===== RECENT JOBS ===== */}
       <div style={{ marginBottom: '1.5rem' }}>
         <div className="section-header">
-          <h2>Recent Jobs</h2>
+          <h2>📋 Recent Jobs</h2>
           <a href="/dashboard/repairs/jobs">View all →</a>
         </div>
 
@@ -821,7 +915,7 @@ export default function RepairsDashboardPage() {
             <a href="/dashboard/repairs/jobs/new" className="btn">Create First Job</a>
           </div>
         ) : (
-          previewJobs.map((job) => {
+          previewJobs.map((job, idx) => {
             const status = getStatusInfo(job.current_status)
             const device = getDeviceDisplay(job)
             const balance = job.price - job.amount_paid
@@ -832,12 +926,12 @@ export default function RepairsDashboardPage() {
             const phone = job.customers?.phone || ''
 
             return (
-              <div key={job.id} className="job-card">
+              <div key={job.id} className="job-card animate-fade-up" style={{ animationDelay: `${0.3 + idx * 0.05}s` }}>
                 <div className="top-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p className="device">
                       {device}
-                      {deposit > 0 && <span className="deposit-badge" style={{ display: 'inline-block', background: '#F6E9C8', color: '#1E3A5F', fontSize: '0.55rem', fontWeight: '600', padding: '0.05rem 0.4rem', borderRadius: '10px', marginLeft: '0.3rem' }}>Deposit: ₦{deposit.toLocaleString()}</span>}
+                      {deposit > 0 && <span className="deposit-badge">Deposit: ₦{deposit.toLocaleString()}</span>}
                     </p>
                     <p className="customer">
                       {job.customers?.name || 'No customer'}
@@ -919,7 +1013,7 @@ export default function RepairsDashboardPage() {
 
       {/* ===== READY FOR PICKUP ===== */}
       {readyJobs.length > 0 && (
-        <div className="ready-pickup-section">
+        <div className="ready-pickup-section animate-fade-up" style={{ animationDelay: '0.4s' }}>
           <div className="ready-banner">
             <span className="label">🔔 {readyJobs.length} repair{readyJobs.length > 1 ? 's' : ''} ready for pickup</span>
             <span className="count">Ready</span>
@@ -931,7 +1025,7 @@ export default function RepairsDashboardPage() {
             const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
 
             return (
-              <div key={job.id} className="job-card" style={{ borderColor: '#4C7A5E' }}>
+              <div key={job.id} className="job-card" style={{ borderColor: '#4C7A5E', borderWidth: '2px' }}>
                 <div className="top-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p className="device">{device}</p>
@@ -971,7 +1065,7 @@ export default function RepairsDashboardPage() {
 
           {readyJobs.length > 3 && (
             <a
-              href="/dashboard/repairs/jobs?filter=ready"
+           href="/dashboard/repairs/jobs?filter=ready"
               style={{
                 display: 'block',
                 textAlign: 'center',
@@ -979,6 +1073,7 @@ export default function RepairsDashboardPage() {
                 color: '#6B6255',
                 marginTop: '0.3rem',
                 textDecoration: 'none',
+                fontWeight: '500',
               }}
             >
               + {readyJobs.length - 3} more ready for pickup
@@ -995,7 +1090,7 @@ export default function RepairsDashboardPage() {
         </div>
 
         {awaitingPartsJobs.length === 0 ? (
-          <div className="empty-state" style={{ padding: '1.2rem' }}>
+          <div className="empty-state" style={{ padding: '1.2rem', background: '#F8F6F2' }}>
             <span className="icon" style={{ fontSize: '1.5rem' }}>✅</span>
             <p style={{ margin: 0, fontSize: '0.8rem' }}>All parts available. No jobs awaiting parts.</p>
           </div>
@@ -1010,13 +1105,14 @@ export default function RepairsDashboardPage() {
                 key={job.id}
                 className="job-card"
                 onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
+                style={{ cursor: 'pointer' }}
               >
                 <div className="top-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p className="device">{device}</p>
                     <p className="customer">{job.customers?.name || 'No customer'}</p>
-                    <p className="issue" style={{ fontStyle: 'normal', color: '#B4881E' }}>
-                      Part: {partNames}
+                    <p className="issue" style={{ fontStyle: 'normal', color: '#B4881E', fontWeight: '500' }}>
+                      🧩 Part: {partNames}
                     </p>
                   </div>
                   <span className="status-badge" style={{ background: '#F6E9C8', color: '#B4881E' }}>
@@ -1032,7 +1128,7 @@ export default function RepairsDashboardPage() {
       {/* ===== RECENT CUSTOMERS ===== */}
       <div>
         <div className="section-header">
-          <h2>Recent Customers</h2>
+          <h2>👤 Recent Customers</h2>
           <a href="/dashboard/customers">View all →</a>
         </div>
 
@@ -1042,13 +1138,13 @@ export default function RepairsDashboardPage() {
             <p style={{ margin: 0, fontSize: '0.8rem' }}>No customers yet. Add your first customer to start tracking repairs.</p>
           </div>
         ) : (
-          previewCustomers.map((c) => {
+          previewCustomers.map((c, idx) => {
             const customerJobs = jobs.filter(j => j.customer_id === c.id)
             const activeJobs = customerJobs.filter(j => j.current_status !== 'Completed' && j.current_status !== 'Delivered')
             const totalOwing = customerJobs.reduce((sum, j) => sum + Math.max(0, j.price - j.amount_paid), 0)
 
             return (
-              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row">
+              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row animate-fade-up" style={{ animationDelay: `${0.5 + idx * 0.05}s` }}>
                 <div>
                   <p className="name">{c.name}</p>
                   <p className="phone">{c.phone || 'No phone'}</p>
@@ -1069,4 +1165,4 @@ export default function RepairsDashboardPage() {
       </div>
     </main>
   )
-}
+                }
