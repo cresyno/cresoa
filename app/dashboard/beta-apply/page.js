@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabaseClient'
 export default function BetaApplyPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [user, setUser] = useState(null)
@@ -25,40 +26,55 @@ export default function BetaApplyPage() {
   }, [])
 
   const loadData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        router.push('/login')
+        return
+      }
+      setUser(user)
+
+      const { data: business, error: bizError } = await supabase
+        .from('businesses')
+        .select('id, name, phone, sector, has_applied_for_beta, owner_id')
+        .eq('owner_id', user.id)
+        .single()
+
+      // ✅ If no business or error, redirect to onboarding
+      if (bizError || !business) {
+        console.error('Business error:', bizError)
+        router.push('/onboarding')
+        return
+      }
+
+      // ✅ Verify the user is the owner
+      if (business.owner_id !== user.id) {
+        setError('Only business owners can apply for the beta.')
+        setLoading(false)
+        return
+      }
+
+      // ✅ If already applied, redirect to dashboard
+      if (business.has_applied_for_beta) {
+        router.push('/dashboard')
+        return
+      }
+
+      setBusiness(business)
+      setFormData({
+        name: user.user_metadata?.business_name || '',
+        email: user.email || '',
+        phone: business.phone || '',
+        business_name: business.name || '',
+        business_type: business.sector || '',
+        why: '',
+      })
+    } catch (err) {
+      console.error('Load error:', err)
+      setError('Failed to load your data. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setUser(user)
-
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('id, name, phone, sector, has_applied_for_beta')
-      .eq('owner_id', user.id)
-      .single()
-
-    if (!business) {
-      router.push('/onboarding')
-      return
-    }
-
-    // ✅ If already applied, redirect to dashboard
-    if (business.has_applied_for_beta) {
-      router.push('/dashboard')
-      return
-    }
-
-    setBusiness(business)
-    setFormData({
-      name: user.user_metadata?.business_name || '',
-      email: user.email || '',
-      phone: business.phone || '',
-      business_name: business.name || '',
-      business_type: business.sector || '',
-      why: '',
-    })
-    setLoading(false)
   }
 
   const handleSubmit = async (e) => {
@@ -72,11 +88,10 @@ export default function BetaApplyPage() {
       return
     }
 
-    // ✅ Insert application
+    // Insert application
     const { error: insertError } = await supabase
       .from('beta_applications')
       .insert({
-        user_id: user.id,
         business_id: business.id,
         name: formData.name,
         email: formData.email,
@@ -84,7 +99,6 @@ export default function BetaApplyPage() {
         business_name: formData.business_name,
         business_type: formData.business_type,
         reason: formData.why,
-        status: 'pending',
       })
 
     if (insertError) {
@@ -94,7 +108,7 @@ export default function BetaApplyPage() {
       return
     }
 
-    // ✅ Mark business as applied
+    // Mark business as applied
     const { error: updateError } = await supabase
       .from('businesses')
       .update({ has_applied_for_beta: true })
@@ -117,11 +131,10 @@ export default function BetaApplyPage() {
     )
   }
 
-  // If already applied, this page shouldn't render, but just in case.
-  if (business?.has_applied_for_beta) {
+  if (error) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p>You’ve already applied for the beta. We’ll contact you soon.</p>
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#D9534F' }}>
+        <p>{error}</p>
         <button onClick={() => router.push('/dashboard')} className="btn-secondary">
           Go to Dashboard
         </button>
@@ -293,4 +306,4 @@ export default function BetaApplyPage() {
       </form>
     </div>
   )
-      }
+    }
