@@ -273,7 +273,7 @@ export default function SignUpPage() {
 
           <button
             type="submit"
-            disabled={loading || !isFormValid}
+            disabled={loading}
             className="btn-primary"
           >
             {loading ? 'Creating account...' : 'Create account'}
