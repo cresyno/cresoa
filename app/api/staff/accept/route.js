@@ -2,6 +2,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
+
 export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
@@ -22,7 +27,7 @@ export async function POST(request) {
       )
     }
 
-    // Authenticate with the provided access token
+    // 1. Get the logged‑in user's email from the token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -45,22 +50,30 @@ export async function POST(request) {
       )
     }
 
-    // Find the staff record by token (staff.id) – no email column needed
-    const { data: staff, error } = await supabaseWithToken
+    // 2. Find the staff record using admin client (bypass RLS)
+    const { data: staff, error: findError } = await supabaseAdmin
       .from('staff')
       .select('*')
       .eq('id', token)
       .single()
 
-    if (error || !staff) {
-      console.error('Staff not found:', error)
+    if (findError || !staff) {
+      console.error('Staff not found:', findError)
       return NextResponse.json(
-        { error: 'Invalid invitation' },
+        { error: 'Invalid invitation – record not found' },
         { status: 404 }
       )
     }
 
-    // Check expiry (7 days)
+    // 3. Verify the email matches the logged‑in user's email
+    if (staff.email !== user.email) {
+      return NextResponse.json(
+        { error: `This invitation was sent to ${staff.email}, but you are logged in as ${user.email}. Please log in with the correct account.` },
+        { status: 403 }
+      )
+    }
+
+    // 4. Check expiry
     const invitedAt = new Date(staff.invited_at)
     const now = new Date()
     const diffDays = (now - invitedAt) / (1000 * 60 * 60 * 24)
@@ -78,16 +91,8 @@ export async function POST(request) {
       )
     }
 
-    // Ensure this invitation hasn't been claimed by another user
-    if (staff.user_id && staff.user_id !== user.id) {
-      return NextResponse.json(
-        { error: 'Invitation already claimed by another user' },
-        { status: 400 }
-      )
-    }
-
-    // Update: set status to active, accepted_at, and link user_id
-    const { error: updateError } = await supabaseWithToken
+    // 5. Update the record using admin client (bypass RLS)
+    const { error: updateError } = await supabaseAdmin
       .from('staff')
       .update({
         status: 'active',
@@ -111,7 +116,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Accept error:', error)
     return NextResponse.json(
-      { error: 'Server error' },
+      { error: 'Server error: ' + error.message },
       { status: 500 }
     )
   }
