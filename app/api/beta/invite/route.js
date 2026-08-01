@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js'
 import { sendBetaInviteEmail } from '../../../../lib/email'
 
 const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function POST(req) {
   try {
@@ -16,7 +20,7 @@ export async function POST(req) {
       )
     }
 
-    // Authenticate the user via token
+    // Authenticate
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -34,15 +38,12 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ✅ Only the admin can invite
     if (user.email !== ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Forbidden – only admin can invite' }, { status: 403 })
     }
 
-    // No business check – global beta invites
-
-    // Check if already invited
-    const { data: existing } = await supabaseWithToken
+    // Check if already invited (using admin client)
+    const { data: existing } = await supabaseAdmin
       .from('beta_invites')
       .select('status')
       .eq('email', email)
@@ -63,15 +64,14 @@ export async function POST(req) {
       }
     }
 
-    // Create the beta invite (business_id is optional now, we'll set it to null)
-    const { data: invite, error: insertError } = await supabaseWithToken
+    // Create the beta invite (admin client)
+    const { data: invite, error: insertError } = await supabaseAdmin
       .from('beta_invites')
       .insert({
         email: email,
         invited_by: user.id,
         invited_at: new Date().toISOString(),
         status: 'pending',
-        // business_id is not required – we'll allow null
       })
       .select()
       .single()
@@ -108,4 +108,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+        }
