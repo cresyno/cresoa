@@ -13,33 +13,13 @@ export default function RepairsDashboardPage() {
   const [jobs, setJobs] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    awaitingParts: 0,
-    ready: 0,
-    received: 0,
-    diagnosing: 0,
-    awaitingApproval: 0,
-    repairing: 0,
-    testing: 0,
-    overdue: 0,
-    totalOwing: 0,
-    dueToday: 0,
-    dueTomorrow: 0,
-  })
-  const [alerts, setAlerts] = useState([])
-  const [readyOverdueAlerts, setReadyOverdueAlerts] = useState([])
-  const [readyJobs, setReadyJobs] = useState([])
+  const [stats, setStats] = useState({})
   const [totalOrdersCount, setTotalOrdersCount] = useState(0)
   const [plan, setPlan] = useState('free')
 
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    if (!user) { router.push('/login'); return }
 
     const { data: businessData } = await supabase
       .from('businesses')
@@ -47,10 +27,7 @@ export default function RepairsDashboardPage() {
       .eq('owner_id', user.id)
       .single()
 
-    if (!businessData) {
-      router.push('/onboarding')
-      return
-    }
+    if (!businessData) { router.push('/onboarding'); return }
 
     setBusiness(businessData)
     setPlan(businessData.plan || 'free')
@@ -80,16 +57,10 @@ export default function RepairsDashboardPage() {
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
     const todayStr = today.toISOString().split('T')[0]
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
 
     const total = jobData?.length || 0
-    const active = jobData?.filter(j => 
-      j.current_status !== 'Completed' && j.current_status !== 'Delivered'
-    ).length || 0
+    const active = jobData?.filter(j => j.current_status !== 'Completed' && j.current_status !== 'Delivered').length || 0
     const awaitingParts = jobData?.filter(j => j.current_status === 'Awaiting Parts').length || 0
     const ready = jobData?.filter(j => j.current_status === 'Ready').length || 0
     const received = jobData?.filter(j => j.current_status === 'Received').length || 0
@@ -105,65 +76,42 @@ export default function RepairsDashboardPage() {
       return due < today
     }).length || 0
 
-    const dueToday = jobData?.filter(j => {
-      if (!j.due_date || j.current_status === 'Delivered' || j.current_status === 'Completed') return false
-      return j.due_date === todayStr
-    }).length || 0
-
-    const dueTomorrow = jobData?.filter(j => {
-      if (!j.due_date || j.current_status === 'Delivered' || j.current_status === 'Completed') return false
-      return j.due_date === tomorrowStr
-    }).length || 0
-
     const totalOwing = jobData?.reduce((sum, j) => sum + Math.max(0, j.price - j.amount_paid), 0) || 0
 
-    setStats({ total, active, awaitingParts, ready, received, diagnosing, awaitingApproval, repairing, testing, overdue, totalOwing, dueToday, dueTomorrow })
+    const totalRevenue = jobData?.reduce((sum, j) => sum + j.amount_paid, 0) || 0
 
-    const readyJobsList = jobData?.filter(j => j.current_status === 'Ready') || []
-    setReadyJobs(readyJobsList)
+    const readyForPickup = jobData?.filter(j => j.current_status === 'Ready') || []
 
-    const newAlerts = []
-    if (overdue > 0) newAlerts.push({ type: 'overdue', message: `${overdue} job${overdue > 1 ? 's' : ''} overdue`, count: overdue })
-    if (awaitingParts > 0) newAlerts.push({ type: 'awaiting_parts', message: `${awaitingParts} job${awaitingParts > 1 ? 's' : ''} awaiting parts`, count: awaitingParts })
-    if (ready > 0) newAlerts.push({ type: 'ready', message: `${ready} job${ready > 1 ? 's' : ''} ready for pickup`, count: ready })
-    setAlerts(newAlerts)
-
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const longReady = jobData?.filter(j => j.current_status === 'Ready' && new Date(j.updated_at || j.created_at) < sevenDaysAgo) || []
-    setReadyOverdueAlerts(longReady)
+    setStats({
+      total, active, awaitingParts, ready, received, diagnosing, awaitingApproval,
+      repairing, testing, overdue, totalOwing, totalRevenue, readyForPickup
+    })
 
     setLoading(false)
   }
 
-  useEffect(() => {
-    loadDashboard()
-  }, [])
+  useEffect(() => { loadDashboard() }, [])
 
   const getStatusInfo = (status) => {
     const map = {
-      'Received': { label: 'Received', color: '#6B6255', bg: '#F0EDE8' },
-      'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' },
-      'Awaiting Approval': { label: 'Awaiting Approval', color: '#B4881E', bg: '#F6E9C8' },
-      'Awaiting Parts': { label: 'Awaiting Parts', color: '#B4881E', bg: '#F6E9C8' },
-      'Repairing': { label: 'Repairing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Testing': { label: 'Testing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready': { label: 'Ready for Pickup', color: '#4C7A5E', bg: '#DCEBE2' },
-      'Completed': { label: 'Completed', color: '#4C7A5E', bg: '#DCEBE2' },
-      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
+      'Received': { label: 'Received', color: '#6B6255', bg: '#F0EDE8', icon: '📥' },
+      'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8', icon: '🔍' },
+      'Awaiting Approval': { label: 'Awaiting Approval', color: '#B4881E', bg: '#F6E9C8', icon: '⏳' },
+      'Awaiting Parts': { label: 'Awaiting Parts', color: '#B4881E', bg: '#F6E9C8', icon: '🧩' },
+      'Repairing': { label: 'Repairing', color: '#1E3A5F', bg: '#D6E0EB', icon: '🔧' },
+      'Testing': { label: 'Testing', color: '#1E3A5F', bg: '#D6E0EB', icon: '🧪' },
+      'Ready': { label: 'Ready for Pickup', color: '#4C7A5E', bg: '#DCEBE2', icon: '✅' },
+      'Completed': { label: 'Completed', color: '#4C7A5E', bg: '#DCEBE2', icon: '✔️' },
+      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5', icon: '📦' },
     }
-    return map[status] || { label: status || 'Received', color: '#6B6255', bg: '#F0EDE8' }
+    return map[status] || { label: status || 'Received', color: '#6B6255', bg: '#F0EDE8', icon: '📌' }
   }
 
   const getDeviceDisplay = (job) => {
     let type = job.device_type || ''
     let model = job.device_model || ''
-    if (type && model.toLowerCase().startsWith(type.toLowerCase())) {
-      return model
-    }
-    if (type && model) {
-      return `${type} ${model}`
-    }
+    if (type && model.toLowerCase().startsWith(type.toLowerCase())) return model
+    if (type && model) return `${type} ${model}`
     if (type) return type
     return job.title || 'Device'
   }
@@ -171,6 +119,10 @@ export default function RepairsDashboardPage() {
   const formatDate = (d) => {
     if (!d) return ''
     return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  }
+
+  const formatCurrency = (amount) => {
+    return '₦' + amount.toLocaleString()
   }
 
   const isOverdue = (dueDate) => {
@@ -182,987 +134,379 @@ export default function RepairsDashboardPage() {
     return due < today
   }
 
-  const isToday = (dueDate) => {
-    if (!dueDate) return false
-    const today = new Date().toISOString().split('T')[0]
-    return dueDate === today
-  }
-
-  const isTomorrow = (dueDate) => {
-    if (!dueDate) return false
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
-    return dueDate === tomorrowStr
-  }
-
-  const getDueDisplay = (dueDate) => {
-    if (!dueDate) return null
-    if (isOverdue(dueDate)) return { label: '⚠️ Overdue', color: '#AE4A34' }
-    if (isToday(dueDate)) return { label: '📅 Due today', color: '#C79A2B' }
-    if (isTomorrow(dueDate)) return { label: '📅 Due tomorrow', color: '#1E3A5F' }
-    return { label: `Due ${formatDate(dueDate)}`, color: '#6B6255' }
-  }
-
-  const formatPhone = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
-  }
+  const limits = getPlanLimits(plan)
+  const canAddMore = totalOrdersCount < limits.orders
 
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
-          .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #e4d8c2;
-            border-top: 4px solid #1E3A5F;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-          }
+          .spinner { width: 40px; height: 40px; border: 4px solid #e4d8c2; border-top: 4px solid #1E3A5F; border-radius: 50%; animation: spin 0.8s linear infinite; }
         `}</style>
         <div className="spinner"></div>
       </div>
     )
   }
 
-  const previewJobs = jobs.slice(0, 5)
-  const previewCustomers = customers.slice(0, 5)
-  const awaitingPartsJobs = jobs.filter(j => j.current_status === 'Awaiting Parts').slice(0, 5)
-
-  const limits = getPlanLimits(plan)
-  const canAddMore = totalOrdersCount < limits.orders
-
-  const statusFilterMap = {
-    'Received': 'received',
-    'Diagnosing': 'diagnosing',
-    'Awaiting Approval': 'awaiting_approval',
-    'Repairing': 'repairing',
-    'Testing': 'testing',
-    'Ready': 'ready',
-  }
+  const previewJobs = jobs.slice(0, 6)
+  const previewCustomers = customers.slice(0, 6)
+  const readyJobs = stats.readyForPickup || []
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.2rem 1rem', paddingBottom: '3rem' }}>
+    <div style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1rem' }}>
+
+      {/* ====== GLOBAL STYLES ====== */}
       <style>{`
-        /* ===== GLASS CARD ===== */
-        .glass-card {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          border-radius: 16px;
-          box-shadow: 0 8px 32px rgba(30, 58, 95, 0.06);
-          padding: 0.8rem 1rem;
-          transition: all 0.25s ease;
-        }
-        .glass-card:hover {
-          box-shadow: 0 12px 40px rgba(30, 58, 95, 0.1);
-          transform: translateY(-2px);
-        }
-        /* ===== HEADER ===== */
-        .header-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.2rem;
-        }
-        .header-brand {
-          display: flex;
-          align-items: center;
-          gap: 0.7rem;
-        }
-        .header-brand .greeting {
-          color: #2B2620;
-          font-size: 0.7rem;
-          margin: 0;
-          font-weight: 500;
-        }
-        .header-brand .business-name {
-          color: #1E3A5F;
-          font-size: 1.1rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .header-brand .badge {
-          display: inline-block;
-          background: #F6E9C8;
-          color: #1E3A5F;
-          padding: 0.05rem 0.5rem;
-          border-radius: 10px;
-          font-size: 0.5rem;
-          font-weight: 600;
-          margin-left: 0.3rem;
-        }
-        /* ===== REVENUE BAR ===== */
-        .revenue-bar {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0.6rem;
-          margin-bottom: 1.2rem;
-        }
-        .revenue-item {
-          background: #fff;
-          border-radius: 12px;
-          padding: 0.6rem 0.8rem;
-          text-align: center;
-          border: 1px solid #E8E0D5;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.04);
-        }
-        .revenue-item span {
-          display: block;
-          font-size: 0.55rem;
-          color: #6B6255;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-          font-weight: 600;
-        }
-        .revenue-item strong {
-          display: block;
-          font-size: 1.1rem;
-          color: #1E3A5F;
-          margin-top: 0.1rem;
-        }
-        .revenue-item .color-gold strong { color: #C79A2B; }
-        .revenue-item .color-red strong { color: #AE4A34; }
-        .revenue-item .color-green strong { color: #4C7A5E; }
-        /* ===== STATS ===== */
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 0.4rem;
-          margin-bottom: 1rem;
-        }
-        .stat-card {
-          background: #fff;
-          border-radius: 12px;
-          padding: 0.6rem 0.3rem;
-          border: 1px solid #E8E0D5;
-          text-align: center;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.04);
-          text-decoration: none;
-          transition: all 0.2s ease;
-          cursor: pointer;
-        }
-        .stat-card:hover {
-          border-color: #C79A2B;
-          box-shadow: 0 6px 20px rgba(199,154,43,0.12);
-          transform: translateY(-3px);
-        }
-        .stat-card .number {
-          font-size: 1.1rem;
-          font-weight: 700;
-          margin: 0;
-          line-height: 1.2;
-        }
-        .stat-card .number.navy { color: #1E3A5F; }
-        .stat-card .number.gold { color: #C79A2B; }
-        .stat-card .number.red { color: #AE4A34; }
-        .stat-card .number.green { color: #4C7A5E; }
-        .stat-card .number.purple { color: #6C5B7B; }
-        .stat-card .label {
-          color: #6B6255;
-          font-size: 0.5rem;
-          margin: 0.1rem 0 0;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-        }
-        /* ===== PIPELINE ===== */
-        .pipeline-section {
-          margin-bottom: 1.2rem;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: none;
-        }
-        .pipeline-section::-webkit-scrollbar { display: none; }
-        .pipeline-scroll {
-          display: flex;
-          gap: 0.4rem;
-          padding: 0.2rem 0;
-          min-width: max-content;
-        }
-        .pipeline-item {
-          flex: 0 0 auto;
-          min-width: 65px;
-          background: #fff;
-          border-radius: 10px;
-          padding: 0.4rem 0.5rem;
-          border: 1px solid #E8E0D5;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          text-decoration: none;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.03);
-        }
-        .pipeline-item:hover {
-          border-color: #C79A2B;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(199,154,43,0.10);
-        }
-        .pipeline-item .icon { font-size: 0.8rem; display: block; }
-        .pipeline-item .count {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #1E3A5F;
-          margin: 0;
-        }
-        .pipeline-item .label {
-          font-size: 0.45rem;
-          color: #6B6255;
-          margin: 0;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-        }
-        /* ===== ALERTS ===== */
-        .alert-strip {
-          display: flex;
-          gap: 0.4rem;
-          flex-wrap: wrap;
-          margin-bottom: 1rem;
-        }
-        .alert-item {
-          flex: 1;
-          min-width: 70px;
-          padding: 0.4rem 0.5rem;
-          border-radius: 10px;
-          text-align: center;
-          font-size: 0.6rem;
-          font-weight: 600;
-          cursor: pointer;
-          text-decoration: none;
-          transition: all 0.2s ease;
-          border: 1px solid transparent;
-        }
-        .alert-item:hover { opacity: 0.85; transform: scale(0.97); }
-        .alert-item .count {
-          font-size: 0.9rem;
-          font-weight: 800;
-          display: block;
-        }
-        .alert-item.overdue { background: #F1DBD3; color: #AE4A34; border-color: #AE4A34; }
-        .alert-item.awaiting_parts { background: #F6E9C8; color: #B4881E; border-color: #B4881E; }
-        .alert-item.ready { background: #DCEBE2; color: #4C7A5E; border-color: #4C7A5E; }
-        /* ===== QUICK ACTIONS ===== */
-        .quick-actions {
-          display: flex;
-          gap: 0.4rem;
-          flex-wrap: wrap;
-          margin-bottom: 1.5rem;
-        }
-        .action-btn {
-          padding: 0.5rem 0.9rem;
-          border-radius: 10px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          text-decoration: none;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.3rem;
-          border: none;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.06);
-        }
-        .action-btn:active { transform: scale(0.95); }
-        .action-btn-primary {
-          background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F;
-          box-shadow: 0 4px 14px rgba(199,154,43,0.25);
-        }
-        .action-btn-primary:hover { box-shadow: 0 6px 24px rgba(199,154,43,0.35); transform: translateY(-1px); }
-        .action-btn-secondary {
-          background: #1E3A5F;
-          color: #fff;
-        }
-        .action-btn-secondary:hover { background: #0F1E30; }
-        .action-btn-outline {
-          background: #fff;
-          color: #1E3A5F;
-          border: 1px solid #E8E0D5;
-        }
-        .action-btn-outline:hover { border-color: #C79A2B; background: #FBF8F0; }
-        /* ===== SECTION HEADER ===== */
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.5rem;
-        }
-        .section-header h2 {
-          color: #1E3A5F;
-          font-size: 0.95rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .section-header a {
-          color: #6B6255;
-          font-size: 0.7rem;
-          font-weight: 500;
-          text-decoration: none;
-        }
-        .section-header a:hover { text-decoration: underline; }
-        /* ===== JOB CARD ===== */
-        .job-card {
-          background: #fff;
-          border-radius: 14px;
-          padding: 0.8rem 1rem;
-          border: 1px solid #E8E0D5;
-          margin-bottom: 0.6rem;
-          transition: all 0.25s ease;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.03);
-        }
-        .job-card:hover {
-          border-color: #C79A2B;
-          box-shadow: 0 6px 20px rgba(199,154,43,0.08);
-          transform: translateY(-2px);
-        }
-        .job-card .top-row {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 0.5rem;
-        }
-        .job-card .device {
-          font-weight: 600;
-          color: #1E3A5F;
-          font-size: 0.9rem;
-          margin: 0;
-        }
-        .job-card .deposit-badge {
-          display: inline-block;
-          background: #F6E9C8;
-          color: #1E3A5F;
-          font-size: 0.5rem;
-          font-weight: 600;
-          padding: 0.05rem 0.4rem;
-          border-radius: 10px;
-          margin-left: 0.3rem;
-        }
-        .job-card .status-badge {
-          display: inline-block;
-          padding: 0.1rem 0.5rem;
-          border-radius: 20px;
-          font-size: 0.55rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-          flex-shrink: 0;
-        }
-        .job-card .customer {
-          color: #6B6255;
-          font-size: 0.75rem;
-          margin: 0.1rem 0 0;
-        }
-        .job-card .customer .phone {
-          color: #A89888;
-        }
-        .job-card .issue {
-          color: #6B6255;
-          font-size: 0.7rem;
-          margin: 0.1rem 0 0;
-          font-style: italic;
-        }
-        .job-card .divider {
-          border: none;
-          border-top: 1px solid #F0EDE8;
-          margin: 0.4rem 0;
-        }
-        .job-card .details-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.3rem 0.8rem;
-          align-items: center;
-        }
-        .job-card .details-row .price {
-          font-size: 0.75rem;
-          color: #6B6255;
-        }
-        .job-card .details-row .price strong { color: #1E3A5F; }
-        .job-card .details-row .balance {
-          font-weight: 700;
-          font-size: 0.8rem;
-          color: #AE4A34;
-        }
-        .job-card .details-row .balance.paid { color: #4C7A5E; }
-        .job-card .details-row .due {
-          font-size: 0.7rem;
-          font-weight: 600;
-        }
-        .job-card .details-row .due.overdue { color: #AE4A34; }
-        .job-card .details-row .due.today { color: #C79A2B; }
-        .job-card .details-row .due.tomorrow { color: #1E3A5F; }
-        .job-card .bottom-actions {
-          display: flex;
-          gap: 0.3rem;
-          margin-top: 0.4rem;
-          flex-wrap: wrap;
-        }
-        .job-card .bottom-actions .btn {
-          padding: 0.2rem 0.6rem;
-          border-radius: 6px;
-          font-size: 0.6rem;
-          font-weight: 600;
-          text-decoration: none;
-    border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.2rem;
-        }
-        .job-card .bottom-actions .btn:hover { background: #F5EFE2; }
-        .job-card .bottom-actions .btn-whatsapp {
-          background: #25D366;
-          border-color: #25D366;
-          color: #fff;
-        }
-        .job-card .bottom-actions .btn-whatsapp:hover { background: #1DA851; }
-        .job-card .bottom-actions .btn-add-deadline {
-          background: #f0edE8;
-          border-color: #D6D0C5;
-          color: #6B6255;
-          font-size: 0.55rem;
-        }
-        /* ===== CUSTOMER ROW ===== */
-        .customer-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.6rem 0.9rem;
-          background: #fff;
-          border-radius: 10px;
-          border: 1px solid #E8E0D5;
-          text-decoration: none;
-          margin-bottom: 0.4rem;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 4px rgba(30,58,95,0.02);
-        }
-        .customer-row:hover { border-color: #C79A2B; box-shadow: 0 4px 12px rgba(199,154,43,0.08); }
-        .customer-row .name {
-          color: #1E3A5F;
-          font-weight: 600;
-          font-size: 0.85rem;
-          margin: 0;
-        }
-        .customer-row .phone {
-          color: #6B6255;
-          font-size: 0.7rem;
-          margin: 0;
-        }
-        .customer-row .badges {
-          display: flex;
-          gap: 0.3rem;
-          flex-wrap: wrap;
-          margin-top: 0.1rem;
-        }
-        .customer-row .badge {
-          font-size: 0.5rem;
-          font-weight: 600;
-          padding: 0.05rem 0.4rem;
-          border-radius: 10px;
-          background: #F6E9C8;
-          color: #1E3A5F;
-        }
-        .customer-row .badge.owing {
-          background: #F1DBD3;
-          color: #AE4A34;
-        }
-        .customer-row .arrow { color: #C79A2B; font-size: 0.7rem; }
-        /* ===== EMPTY STATE ===== */
-        .empty-state {
-          background: #fff;
-          border-radius: 14px;
-          padding: 1.5rem;
-          border: 1px solid #E8E0D5;
-          text-align: center;
-          color: #6B6255;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.03);
-        }
-        .empty-state .icon { font-size: 2rem; display: block; margin-bottom: 0.3rem; }
-        .empty-state h4 { color: #1E3A5F; font-size: 1rem; margin: 0 0 0.2rem; }
-        .empty-state p { margin: 0 0 0.6rem; font-size: 0.8rem; }
-        .empty-state .btn {
-          display: inline-block;
-          padding: 0.4rem 1rem;
-          border-radius: 8px;
-          background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F;
-          font-weight: 600;
-          text-decoration: none;
-          font-size: 0.8rem;
-        }
-        /* ===== RED ALERT ===== */
-        .red-alert {
-          background: #F1DBD3;
-          border: 1px solid #AE4A34;
-          border-radius: 10px;
-          padding: 0.5rem 0.8rem;
-          margin-bottom: 1rem;
-          color: #AE4A34;
-          font-weight: 600;
-          font-size: 0.75rem;
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          flex-wrap: wrap;
-        }
-        /* ===== READY PICKUP ===== */
-        .ready-pickup-section {
-          margin-bottom: 1.5rem;
-        }
-        .ready-pickup-section .ready-banner {
-          background: linear-gradient(135deg, #DCEBE2, #B8D4C5);
-          border: 1px solid #4C7A5E;
-          border-radius: 10px;
-          padding: 0.5rem 0.8rem;
-          margin-bottom: 0.5rem;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 0.3rem;
-        }
-        .ready-pickup-section .ready-banner .label {
-          font-weight: 700;
-          color: #1E3A5F;
-          font-size: 0.85rem;
-        }
-        .ready-pickup-section .ready-banner .count {
-          background: #4C7A5E;
-          color: #fff;
-          padding: 0.1rem 0.5rem;
-          border-radius: 20px;
-          font-size: 0.7rem;
-        }
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 480px) {
-          .revenue-bar { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-          .revenue-item { padding: 0.4rem 0.5rem; }
-          .revenue-item strong { font-size: 0.9rem; }
-          .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.3rem; }
-          .stat-card { padding: 0.4rem 0.2rem; }
-          .stat-card .number { font-size: 0.9rem; }
-          .stat-card .label { font-size: 0.4rem; }
-          .pipeline-item { min-width: 50px; padding: 0.3rem 0.4rem; }
-          .pipeline-item .count { font-size: 0.7rem; }
-          .pipeline-item .label { font-size: 0.4rem; }
-          .job-card .top-row { flex-wrap: wrap; }
-          .job-card .details-row { gap: 0.2rem 0.5rem; }
-          .quick-actions .action-btn {
-            flex: 1;
-            justify-content: center;
-            font-size: 0.65rem;
-            padding: 0.4rem 0.5rem;
-          }
-          .alert-item { min-width: 50px; padding: 0.3rem 0.4rem; font-size: 0.5rem; }
-          .alert-item .count { font-size: 0.75rem; }
-          .customer-row { flex-wrap: wrap; gap: 0.3rem; }
-          .ready-pickup-section .ready-banner { flex-direction: column; align-items: stretch; }
-        }
-        /* ===== HOVER ANIMATION ===== */
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(10px); }
+          from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-up { animation: fadeUp 0.4s ease-out both; }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        .animate-in { animation: fadeUp 0.5s ease-out both; }
+        .delay-1 { animation-delay: 0.05s; }
+        .delay-2 { animation-delay: 0.1s; }
+        .delay-3 { animation-delay: 0.15s; }
+        .delay-4 { animation-delay: 0.2s; }
+        .delay-5 { animation-delay: 0.25s; }
+        .delay-6 { animation-delay: 0.3s; }
+
+        .glass-card {
+          background: rgba(255,255,255,0.75);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(30,58,95,0.06);
+          transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .glass-card:hover {
+          box-shadow: 0 12px 48px rgba(30,58,95,0.12);
+          transform: translateY(-4px) scale(1.01);
+        }
+
+        .status-dot {
+          display: inline-block;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          margin-right: 0.3rem;
+        }
+        .status-dot.overdue { background: #AE4A34; animation: pulse 1.5s infinite; }
+        .status-dot.ready { background: #4C7A5E; }
+        .status-dot.active { background: #C79A2B; }
+        .status-dot.completed { background: #6B6255; }
+
+        .gradient-primary {
+          background: linear-gradient(135deg, #1E3A5F, #0F1E30);
+        }
+        .gradient-gold {
+          background: linear-gradient(135deg, #C79A2B, #B4881E);
+        }
+        .gradient-green {
+          background: linear-gradient(135deg, #4C7A5E, #2E4A3E);
+        }
+        .gradient-red {
+          background: linear-gradient(135deg, #AE4A34, #7A3222);
+        }
       `}</style>
 
-      {/* ===== HEADER ===== */}
-      <div className="header-top animate-fade-up">
-        <div className="header-brand">
-          <LetterLogo name={business?.name} size={40} />
+      {/* ====== HEADER ====== */}
+      <div className="animate-in delay-1" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <LetterLogo name={business?.name} size={48} />
           <div>
-            <p className="greeting">Welcome back,</p>
-            <p className="business-name">
-              {business ? business.name : 'Your business'}
-              <span className="badge">🔧 Repairs</span>
-            </p>
+            <h1 style={{ color: '#1E3A5F', fontSize: '1.3rem', fontWeight: '700', margin: 0, lineHeight: 1.2 }}>
+              {business?.name || 'Your Business'}
+            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ background: '#F6E9C8', color: '#1E3A5F', fontSize: '0.6rem', fontWeight: '600', padding: '0.05rem 0.5rem', borderRadius: '10px' }}>
+                🔧 Repairs
+              </span>
+              <span style={{ fontSize: '0.6rem', color: '#6B6255' }}>
+                {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '0.7rem', color: '#6B6255' }}>Total Revenue</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#1E3A5F' }}>
+            {formatCurrency(stats.totalRevenue || 0)}
           </div>
         </div>
       </div>
 
-  {/* Feedback Banner */}
+      {/* Feedback Banner */}
       {business && <FeedbackBanner business={business} />}
 
-      {/* ===== REVENUE BAR (NEW) ===== */}
-      <div className="revenue-bar animate-fade-up" style={{ animationDelay: '0.05s' }}>
-        <div className="revenue-item color-gold">
-          <span>💰 Total Revenue</span>
-          <strong>₦{jobs.reduce((sum, j) => sum + j.amount_paid, 0).toLocaleString()}</strong>
+      {/* ====== REVENUE ROW ====== */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem', marginBottom: '1.2rem' }}>
+        <div className="glass-card animate-in delay-2" style={{ padding: '0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Today</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#1E3A5F' }}>
+            {formatCurrency(jobs.filter(j => {
+              const d = new Date(j.created_at)
+              const today = new Date()
+              return d.toDateString() === today.toDateString()
+            }).reduce((sum, j) => sum + j.amount_paid, 0))}
+          </div>
         </div>
-        <div className="revenue-item color-red">
-          <span>⏳ Outstanding</span>
-          <strong>₦{stats.totalOwing.toLocaleString()}</strong>
+        <div className="glass-card animate-in delay-3" style={{ padding: '0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📊 This Week</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#C79A2B' }}>
+            {formatCurrency(jobs.filter(j => {
+              const d = new Date(j.created_at)
+              const now = new Date()
+              const startOfWeek = new Date(now)
+              startOfWeek.setDate(now.getDate() - now.getDay())
+              return d >= startOfWeek
+            }).reduce((sum, j) => sum + j.amount_paid, 0))}
+          </div>
         </div>
-        <div className="revenue-item color-green">
-          <span>✅ Completed</span>
-          <strong>{jobs.filter(j => j.current_status === 'Completed' || j.current_status === 'Delivered').length}</strong>
+        <div className="glass-card animate-in delay-4" style={{ padding: '0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📈 This Month</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#4C7A5E' }}>
+            {formatCurrency(jobs.filter(j => {
+              const d = new Date(j.created_at)
+              const now = new Date()
+              return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+            }).reduce((sum, j) => sum + j.amount_paid, 0))}
+          </div>
         </div>
       </div>
 
-      {/* ===== STATS ===== */}
-      <div className="stats-grid animate-fade-up" style={{ animationDelay: '0.1s' }}>
-        <a href="/dashboard/repairs/jobs" className="stat-card">
-          <p className="number navy">{stats.total}</p>
-          <p className="label">Total Jobs</p>
+      {/* ====== KPI GRID ====== */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem', marginBottom: '1.2rem' }}>
+        <a href="/dashboard/repairs/jobs" className="glass-card animate-in delay-3" style={{ padding: '0.6rem 0.4rem', textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#1E3A5F' }}>{stats.total || 0}</div>
+          <div style={{ fontSize: '0.5rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Jobs</div>
         </a>
-        <a href="/dashboard/repairs/jobs?filter=active" className="stat-card">
-          <p className="number gold">{stats.active}</p>
-          <p className="label">Active</p>
+        <a href="/dashboard/repairs/jobs?filter=active" className="glass-card animate-in delay-4" style={{ padding: '0.6rem 0.4rem', textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#C79A2B' }}>{stats.active || 0}</div>
+          <div style={{ fontSize: '0.5rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Active</div>
         </a>
-        <a href="/dashboard/repairs/jobs?filter=awaiting_parts" className="stat-card">
-          <p className="number red">{stats.awaitingParts}</p>
-          <p className="label">Parts</p>
+        <a href="/dashboard/repairs/jobs?filter=awaiting_parts" className="glass-card animate-in delay-5" style={{ padding: '0.6rem 0.4rem', textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#AE4A34' }}>{stats.awaitingParts || 0}</div>
+          <div style={{ fontSize: '0.5rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Parts</div>
         </a>
-        <a href="/dashboard/repairs/jobs?filter=ready" className="stat-card">
-          <p className="number green">{stats.ready}</p>
-          <p className="label">Ready</p>
+        <a href="/dashboard/repairs/jobs?filter=ready" className="glass-card animate-in delay-6" style={{ padding: '0.6rem 0.4rem', textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#4C7A5E' }}>{stats.ready || 0}</div>
+          <div style={{ fontSize: '0.5rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Ready</div>
         </a>
-        <a href="/dashboard/repairs/jobs?filter=overdue" className="stat-card">
-          <p className="number red">{stats.overdue}</p>
-          <p className="label">Overdue</p>
+        <a href="/dashboard/repairs/jobs?filter=overdue" className="glass-card animate-in delay-6" style={{ padding: '0.6rem 0.4rem', textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#AE4A34' }}>{stats.overdue || 0}</div>
+          <div style={{ fontSize: '0.5rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Overdue</div>
+        </a>
+        <a href="/dashboard/repairs/jobs?filter=owing" className="glass-card animate-in delay-6" style={{ padding: '0.6rem 0.4rem', textAlign: 'center', textDecoration: 'none', cursor: 'pointer' }}>
+          <div style={{ fontSize: '1rem', fontWeight: '700', color: '#AE4A34' }}>{formatCurrency(stats.totalOwing || 0)}</div>
+          <div style={{ fontSize: '0.5rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Owing</div>
         </a>
       </div>
 
-      {/* ===== PIPELINE ===== */}
-      <div className="pipeline-section animate-fade-up" style={{ animationDelay: '0.15s' }}>
-        <div className="pipeline-scroll">
+      {/* ====== PIPELINE FLOW (Kanban-style) ====== */}
+      <div style={{ background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', borderRadius: '16px', padding: '0.8rem', marginBottom: '1.2rem', border: '1px solid rgba(255,255,255,0.2)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#1E3A5F' }}>📊 Pipeline</span>
+          <span style={{ fontSize: '0.6rem', color: '#6B6255' }}>{stats.active || 0} active jobs</span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.3rem', overflowX: 'auto', paddingBottom: '0.3rem' }}>
           {[
-            { key: 'Received', label: 'Received', count: stats.received, icon: '📥' },
-            { key: 'Diagnosing', label: 'Diagnosing', count: stats.diagnosing, icon: '🔍' },
-            { key: 'Awaiting Approval', label: 'Awaiting Approval', count: stats.awaitingApproval, icon: '⏳' },
-            { key: 'Repairing', label: 'Repairing', count: stats.repairing, icon: '🔧' },
-            { key: 'Testing', label: 'Testing', count: stats.testing, icon: '🧪' },
-            { key: 'Ready', label: 'Ready for Pickup', count: stats.ready, icon: '✅' },
+            { key: 'Received', label: 'Received', count: stats.received || 0, icon: '📥', color: '#6B6255' },
+            { key: 'Diagnosing', label: 'Diagnosing', count: stats.diagnosing || 0, icon: '🔍', color: '#6B6255' },
+            { key: 'Awaiting Approval', label: 'Approval', count: stats.awaitingApproval || 0, icon: '⏳', color: '#B4881E' },
+            { key: 'Repairing', label: 'Repairing', count: stats.repairing || 0, icon: '🔧', color: '#1E3A5F' },
+            { key: 'Testing', label: 'Testing', count: stats.testing || 0, icon: '🧪', color: '#1E3A5F' },
+            { key: 'Ready', label: 'Ready', count: stats.ready || 0, icon: '✅', color: '#4C7A5E' },
           ].map((stage) => (
             <a
               key={stage.key}
               href={`/dashboard/repairs/jobs?filter=${stage.key.toLowerCase().replace(' ', '_')}`}
-              className="pipeline-item"
+              style={{
+                flex: '0 0 auto',
+                minWidth: '60px',
+                background: 'rgba(255,255,255,0.7)',
+                borderRadius: '10px',
+                padding: '0.4rem 0.5rem',
+                textAlign: 'center',
+                textDecoration: 'none',
+                border: `1px solid ${stage.count > 0 ? stage.color : '#E8E0D5'}`,
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+              }}
             >
-              <span className="icon">{stage.icon}</span>
-              <p className="count">{stage.count}</p>
-              <p className="label">{stage.label}</p>
+              <div style={{ fontSize: '0.8rem' }}>{stage.icon}</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: '700', color: stage.count > 0 ? stage.color : '#6B6255' }}>
+                {stage.count}
+              </div>
+              <div style={{ fontSize: '0.4rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                {stage.label}
+              </div>
             </a>
           ))}
         </div>
       </div>
 
-      {/* ===== ALERTS ===== */}
-      {readyOverdueAlerts.length > 0 && (
-        <div className="red-alert animate-fade-up" style={{ animationDelay: '0.2s' }}>
-          <span>🚨</span>
-          <span>{readyOverdueAlerts.length} job{readyOverdueAlerts.length > 1 ? 's' : ''} ready for over 7 days — waiting on customer!</span>
-        </div>
-      )}
-
-      {alerts.length > 0 && (
-        <div className="alert-strip animate-fade-up" style={{ animationDelay: '0.2s' }}>
-          {alerts.map((alert, i) => (
-            <a
-              key={i}
-              href={`/dashboard/repairs/jobs?filter=${alert.type}`}
-              className={`alert-item ${alert.type}`}
-            >
-              <span className="count">{alert.count}</span>
-              {alert.message}
-            </a>
-          ))}
-        </div>
-      )}
-
-      {/* ===== QUICK ACTIONS ===== */}
-      <div className="quick-actions animate-fade-up" style={{ animationDelay: '0.25s' }}>
+      {/* ====== QUICK ACTIONS ====== */}
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
         <a
           href={canAddMore ? "/dashboard/repairs/jobs/new" : "#"}
-          className="action-btn action-btn-primary"
           style={{
-            opacity: canAddMore ? 1 : 0.6,
+            padding: '0.6rem 1.2rem',
+            borderRadius: '12px',
+            background: canAddMore ? 'linear-gradient(135deg, #C79A2B, #B4881E)' : '#E8E0D5',
+            color: canAddMore ? '#1E3A5F' : '#6B6255',
+            fontWeight: '700',
+            textDecoration: 'none',
+            fontSize: '0.8rem',
+            boxShadow: canAddMore ? '0 4px 16px rgba(199,154,43,0.3)' : 'none',
             cursor: canAddMore ? 'pointer' : 'default',
+            flex: 1,
+            textAlign: 'center',
           }}
           onClick={(e) => {
-            if (!canAddMore) {
-              e.preventDefault()
-              router.push('/dashboard/subscription')
-            }
+            if (!canAddMore) { e.preventDefault(); router.push('/dashboard/subscription') }
           }}
         >
-          {canAddMore ? '🔧 + New Repair Job' : '🔒 New Job (Upgrade)'}
+          {canAddMore ? '🔧 New Repair Job' : '🔒 Upgrade to Add Jobs'}
         </a>
-        <a href="/dashboard/customers/new" className="action-btn action-btn-secondary">
+        <a href="/dashboard/customers/new" style={{ padding: '0.6rem 1.2rem', borderRadius: '12px', background: '#1E3A5F', color: '#fff', fontWeight: '600', textDecoration: 'none', fontSize: '0.8rem', flex: 1, textAlign: 'center' }}>
           👤 + Customer
         </a>
-        <a href="/dashboard/repairs/parts" className="action-btn action-btn-outline">
+        <a href="/dashboard/repairs/parts" style={{ padding: '0.6rem 1.2rem', borderRadius: '12px', background: '#fff', color: '#1E3A5F', fontWeight: '600', textDecoration: 'none', fontSize: '0.8rem', border: '1px solid #E8E0D5', flex: 1, textAlign: 'center' }}>
           📦 Parts
         </a>
       </div>
 
-      {/* ===== RECENT JOBS ===== */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div className="section-header">
-          <h2>📋 Recent Jobs</h2>
-          <a href="/dashboard/repairs/jobs">View all →</a>
-        </div>
-
-        {jobs.length === 0 ? (
-          <div className="empty-state">
-            <span className="icon">🔧</span>
-            <h4>No repair jobs yet</h4>
-            <p>Create your first repair job and start tracking it from diagnosis to pickup.</p>
-            <a href="/dashboard/repairs/jobs/new" className="btn">Create First Job</a>
-          </div>
-        ) : (
-          previewJobs.map((job, idx) => {
-            const status = getStatusInfo(job.current_status)
-            const device = getDeviceDisplay(job)
-            const balance = job.price - job.amount_paid
-            const isOverdueStatus = isOverdue(job.due_date) && job.current_status !== 'Delivered' && job.current_status !== 'Completed'
-            const deposit = job.amount_paid || 0
-            const issue = job.customer_notes || ''
-            const dueInfo = getDueDisplay(job.due_date)
-            const phone = job.customers?.phone || ''
-
-            return (
-              <div key={job.id} className="job-card animate-fade-up" style={{ animationDelay: `${0.3 + idx * 0.05}s` }}>
-                <div className="top-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="device">
-                      {device}
-                      {deposit > 0 && <span className="deposit-badge">Deposit: ₦{deposit.toLocaleString()}</span>}
-                    </p>
-                    <p className="customer">
-                      {job.customers?.name || 'No customer'}
-                      {phone && <span className="phone"> · {phone}</span>}
-                    </p>
-                    {issue && <p className="issue">Issue: {issue}</p>}
-                  </div>
-                  <span
-                    className="status-badge"
-                    style={{
-                      background: isOverdueStatus ? '#F1DBD3' : status.bg,
-                      color: isOverdueStatus ? '#AE4A34' : status.color,
-                    }}
-                  >
-                    {isOverdueStatus ? '⚠️ Overdue' : status.label}
-                  </span>
-                </div>
-
-                <hr className="divider" />
-
-                <div className="details-row">
-                  <span className="price">
-                    <strong>₦{job.price.toLocaleString()}</strong> total
-                  </span>
-                  {deposit > 0 && (
-                    <span className="price">Deposit ₦{deposit.toLocaleString()}</span>
-                  )}
-                  <span className={`balance ${balance <= 0 ? 'paid' : ''}`}>
-                    {balance > 0 ? `Balance ₦${balance.toLocaleString()}` : '✓ Paid in full'}
-                  </span>
-                </div>
-
-                <div className="details-row" style={{ marginTop: '0.2rem' }}>
-                  {dueInfo ? (
-                    <span className={`due ${dueInfo.color === '#AE4A34' ? 'overdue' : dueInfo.color === '#C79A2B' ? 'today' : dueInfo.color === '#1E3A5F' ? 'tomorrow' : ''}`}>
-                      {dueInfo.label}
-                    </span>
-                  ) : (
-                    <span className="due" style={{ color: '#A89888' }}>
-                      No deadline
-                      <a
-                        href={`/dashboard/repairs/jobs/${job.id}/edit`}
-                        style={{ marginLeft: '0.4rem', color: '#1E3A5F', textDecoration: 'underline', fontSize: '0.6rem' }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        + Add
-                      </a>
-                    </span>
-                  )}
-                </div>
-
-                <div className="bottom-actions">
-                  <a
-                    href={`/dashboard/repairs/jobs/${job.id}`}
-                    className="btn"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    👁️ View Job
-                  </a>
-                  {phone && (
-                    <button
-                      className="btn btn-whatsapp"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
-                        const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ${status.label}. ${job.due_date ? `Expected by ${formatDate(job.due_date)}.` : ''}`
-                        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
-                      }}
-                    >
-                      💬 WhatsApp
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* ===== READY FOR PICKUP ===== */}
+      {/* ====== READY FOR PICKUP ====== */}
       {readyJobs.length > 0 && (
-        <div className="ready-pickup-section animate-fade-up" style={{ animationDelay: '0.4s' }}>
-          <div className="ready-banner">
-            <span className="label">🔔 {readyJobs.length} repair{readyJobs.length > 1 ? 's' : ''} ready for pickup</span>
-            <span className="count">Ready</span>
+        <div style={{ marginBottom: '1.2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '0.9rem', color: '#1E3A5F', margin: 0 }}>🔔 Ready for Pickup</h2>
+            <a href="/dashboard/repairs/jobs?filter=ready" style={{ fontSize: '0.7rem', color: '#6B6255', textDecoration: 'none' }}>View all →</a>
           </div>
-
-          {readyJobs.slice(0, 3).map((job) => {
-            const device = getDeviceDisplay(job)
-            const phone = job.customers?.phone || ''
-            const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
-
-            return (
-              <div key={job.id} className="job-card" style={{ borderColor: '#4C7A5E', borderWidth: '2px' }}>
-                <div className="top-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="device">{device}</p>
-                    <p className="customer">
-                      {job.customers?.name || 'No customer'}
-                      {phone && <span className="phone"> · {phone}</span>}
-                    </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.5rem' }}>
+            {readyJobs.slice(0, 4).map((job) => {
+              const phone = job.customers?.phone || ''
+              const formattedPhone = phone.startsWith('0') ? '234' + phone.slice(1) : phone
+              const device = getDeviceDisplay(job)
+              return (
+                <div key={job.id} className="glass-card" style={{ padding: '0.7rem', border: '2px solid #4C7A5E' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#1E3A5F', fontSize: '0.85rem' }}>{device}</div>
+  <div style={{ fontSize: '0.7rem', color: '#6B6255' }}>{job.customers?.name || 'No customer'}</div>
+                    </div>
+                    <span style={{ background: '#DCEBE2', color: '#4C7A5E', fontSize: '0.5rem', fontWeight: '600', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>✅ Ready</span>
                   </div>
-                  <span className="status-badge" style={{ background: '#DCEBE2', color: '#4C7A5E' }}>
-                    ✅ Ready
-                  </span>
+                  <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.4rem' }}>
+                    <a href={`/dashboard/repairs/jobs/${job.id}`} style={{ fontSize: '0.6rem', color: '#1E3A5F', textDecoration: 'underline' }}>View</a>
+                    {phone && (
+                      <button
+                        onClick={() => {
+                          const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ready for pickup!`
+                          window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
+                        }}
+                        style={{ fontSize: '0.6rem', color: '#25D366', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        💬 WhatsApp
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="bottom-actions">
-                  <a
-                    href={`/dashboard/repairs/jobs/${job.id}`}
-                    className="btn"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    👁️ View
-                  </a>
-                  {phone && (
-                    <button
-                      className="btn btn-whatsapp"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const msg = `Hi ${job.customers?.name || ''}, your ${device} repair is ready for pickup!`
-                        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank')
-                      }}
-                    >
-                      💬 Notify Customer
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-
-          {readyJobs.length > 3 && (
-            <a
-           href="/dashboard/repairs/jobs?filter=ready"
-              style={{
-                display: 'block',
-                textAlign: 'center',
-                fontSize: '0.75rem',
-                color: '#6B6255',
-                marginTop: '0.3rem',
-                textDecoration: 'none',
-                fontWeight: '500',
-              }}
-            >
-              + {readyJobs.length - 3} more ready for pickup
-            </a>
-          )}
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* ===== PARTS NEEDED ===== */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div className="section-header">
-          <h2>🔩 Parts Needed</h2>
-          <a href="/dashboard/repairs/parts">View inventory →</a>
-        </div>
-
-        {awaitingPartsJobs.length === 0 ? (
-          <div className="empty-state" style={{ padding: '1.2rem', background: '#F8F6F2' }}>
-            <span className="icon" style={{ fontSize: '1.5rem' }}>✅</span>
-            <p style={{ margin: 0, fontSize: '0.8rem' }}>All parts available. No jobs awaiting parts.</p>
+      {/* ====== RECENT JOBS & CUSTOMERS ====== */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+        {/* Recent Jobs */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '0.85rem', color: '#1E3A5F', margin: 0 }}>📋 Recent Jobs</h2>
+            <a href="/dashboard/repairs/jobs" style={{ fontSize: '0.65rem', color: '#6B6255', textDecoration: 'none' }}>View all →</a>
           </div>
-        ) : (
-          awaitingPartsJobs.map((job) => {
-            const device = getDeviceDisplay(job)
-            const partNames = job.parts_used && job.parts_used.length > 0
-              ? job.parts_used.map(p => p.name).join(', ')
-              : 'Unknown part'
-            return (
-              <div
-                key={job.id}
-                className="job-card"
-                onClick={() => router.push(`/dashboard/repairs/jobs/${job.id}`)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="top-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="device">{device}</p>
-                    <p className="customer">{job.customers?.name || 'No customer'}</p>
-                    <p className="issue" style={{ fontStyle: 'normal', color: '#B4881E', fontWeight: '500' }}>
-                      🧩 Part: {partNames}
-                    </p>
+          {jobs.length === 0 ? (
+            <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>🔧</div>
+              <div style={{ fontSize: '0.8rem', color: '#6B6255' }}>No repair jobs yet</div>
+              <a href="/dashboard/repairs/jobs/new" style={{ fontSize: '0.7rem', color: '#C79A2B', textDecoration: 'none', fontWeight: '600' }}>Create first job →</a>
+            </div>
+          ) : (
+            previewJobs.map((job, idx) => {
+              const status = getStatusInfo(job.current_status)
+              const device = getDeviceDisplay(job)
+              const isOverdueStatus = isOverdue(job.due_date) && job.current_status !== 'Delivered' && job.current_status !== 'Completed'
+              return (
+                <a key={job.id} href={`/dashboard/repairs/jobs/${job.id}`} style={{ textDecoration: 'none' }}>
+                  <div className="glass-card" style={{ padding: '0.5rem 0.7rem', marginBottom: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#1E3A5F', fontSize: '0.8rem' }}>{device}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#6B6255' }}>{job.customers?.name || 'No customer'}</div>
+                    </div>
+                    <span style={{
+                      background: isOverdueStatus ? '#F1DBD3' : status.bg,
+                      color: isOverdueStatus ? '#AE4A34' : status.color,
+                      fontSize: '0.5rem',
+                      fontWeight: '600',
+                      padding: '0.1rem 0.4rem',
+                      borderRadius: '10px',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {isOverdueStatus ? '⚠️ Overdue' : status.label}
+                    </span>
                   </div>
-                  <span className="status-badge" style={{ background: '#F6E9C8', color: '#B4881E' }}>
-                    ⏳ Awaiting Parts
-                  </span>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* ===== RECENT CUSTOMERS ===== */}
-      <div>
-        <div className="section-header">
-          <h2>👤 Recent Customers</h2>
-          <a href="/dashboard/customers">View all →</a>
+                </a>
+              )
+            })
+          )}
         </div>
 
-        {customers.length === 0 ? (
-          <div className="empty-state" style={{ padding: '1.2rem' }}>
-            <span className="icon" style={{ fontSize: '1.5rem' }}>👤</span>
-            <p style={{ margin: 0, fontSize: '0.8rem' }}>No customers yet. Add your first customer to start tracking repairs.</p>
+        {/* Recent Customers */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '0.85rem', color: '#1E3A5F', margin: 0 }}>👤 Recent Customers</h2>
+            <a href="/dashboard/customers" style={{ fontSize: '0.65rem', color: '#6B6255', textDecoration: 'none' }}>View all →</a>
           </div>
-        ) : (
-          previewCustomers.map((c, idx) => {
-            const customerJobs = jobs.filter(j => j.customer_id === c.id)
-            const activeJobs = customerJobs.filter(j => j.current_status !== 'Completed' && j.current_status !== 'Delivered')
-            const totalOwing = customerJobs.reduce((sum, j) => sum + Math.max(0, j.price - j.amount_paid), 0)
-
-            return (
-              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row animate-fade-up" style={{ animationDelay: `${0.5 + idx * 0.05}s` }}>
-                <div>
-                  <p className="name">{c.name}</p>
-                  <p className="phone">{c.phone || 'No phone'}</p>
-                  <div className="badges">
+          {customers.length === 0 ? (
+            <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.3rem' }}>👤</div>
+              <div style={{ fontSize: '0.8rem', color: '#6B6255' }}>No customers yet</div>
+              <a href="/dashboard/customers/new" style={{ fontSize: '0.7rem', color: '#C79A2B', textDecoration: 'none', fontWeight: '600' }}>Add first customer →</a>
+            </div>
+          ) : (
+            previewCustomers.map((c, idx) => {
+              const customerJobs = jobs.filter(j => j.customer_id === c.id)
+              const activeJobs = customerJobs.filter(j => j.current_status !== 'Completed' && j.current_status !== 'Delivered')
+              return (
+                <a key={c.id} href={`/dashboard/customers/${c.id}`} style={{ textDecoration: 'none' }}>
+                  <div className="glass-card" style={{ padding: '0.5rem 0.7rem', marginBottom: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#1E3A5F', fontSize: '0.8rem' }}>{c.name}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#6B6255' }}>{c.phone || 'No phone'}</div>
+                    </div>
                     {activeJobs.length > 0 && (
-                      <span className="badge">{activeJobs.length} active repair{activeJobs.length > 1 ? 's' : ''}</span>
-                    )}
-                    {totalOwing > 0 && (
-                      <span className="badge owing">₦{totalOwing.toLocaleString()} owing</span>
+                      <span style={{ background: '#F6E9C8', color: '#1E3A5F', fontSize: '0.5rem', fontWeight: '600', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>
+                        {activeJobs.length} job{activeJobs.length > 1 ? 's' : ''}
+                      </span>
                     )}
                   </div>
-                </div>
-                <span className="arrow">→</span>
-              </a>
-            )
-          })
-        )}
+                </a>
+              )
+            })
+          )}
+        </div>
       </div>
-    </main>
+
+      {/* ====== FOOTER ====== */}
+      <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.6rem', color: '#C8C0B5' }}>
+        Cresoa Repairs · {new Date().getFullYear()}
+      </div>
+    </div>
   )
-                }
+                          }
