@@ -125,4 +125,4 @@ export async function POST(req) {
     console.error('Beta accept error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-                    }
+           }
