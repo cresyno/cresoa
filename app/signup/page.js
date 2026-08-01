@@ -260,21 +260,34 @@ export default function SignUpPage() {
           </div>
 
           {/* Terms */}
-          <div style={{ marginBottom: '1.2rem' }}>
-  <label className="checkbox-container" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+<div style={{ marginBottom: '1.2rem' }}>
+  <label
+    className="checkbox-container"
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      cursor: 'pointer',
+    }}
+    onClick={(e) => {
+      // Prevent the click from bubbling to the input (which might cause double toggle)
+      e.preventDefault();
+      // Toggle the state directly
+      setAgreedToTerms(!agreedToTerms);
+    }}
+  >
     <input
       type="checkbox"
       checked={agreedToTerms}
-      onChange={(e) => {
-        console.log('Checkbox clicked, new value:', e.target.checked);
-        setAgreedToTerms(e.target.checked);
-      }}
-      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+      // Remove onChange – we use the label's onClick
+      onChange={() => {}} // dummy to avoid React warning
+      style={{ width: '18px', height: '18px', cursor: 'pointer', pointerEvents: 'none' }}
     />
-    <span>I agree to the <a href="/terms" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>Terms of Service</a> and <a href="/privacy" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>Privacy Policy</a></span>
+    <span>
+      I agree to the <a href="/terms" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>Terms of Service</a> and <a href="/privacy" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>Privacy Policy</a>
+    </span>
   </label>
-  {/* Temporary debug – remove after fixing */}
-  <p style={{ fontSize: '0.7rem', color: '#999' }}>Debug: agreedToTerms = {String(agreedToTerms)}</p>
+  {/* Optional: remove debug line after fix */}
 </div>
 
           <button
