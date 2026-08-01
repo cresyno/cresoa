@@ -1,7 +1,6 @@
 // app/api/staff/accept/route.js
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../../lib/supabaseClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +22,7 @@ export async function POST(request) {
       )
     }
 
-    // ✅ Authenticate using the provided access token
+    // Create a Supabase client with the provided access token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -36,6 +35,7 @@ export async function POST(request) {
       }
     )
 
+    // Get the user from the token
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
 
     if (authError || !user) {
