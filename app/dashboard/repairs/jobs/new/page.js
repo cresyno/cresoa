@@ -55,173 +55,171 @@ export default function NewRepairJobPage() {
 
   // Step wizard
   const [step, setStep] = useState(1) // 1: Customer, 2: Device, 3: Pricing
+const load = async () => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) { router.push('/login'); return }
 
-  const load = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+  const { data: businessData } = await supabase
+    .from('businesses')
+    .select('id, plan')
+    .eq('owner_id', user.id)
+    .single()
 
-    const { data: businessData } = await supabase
-      .from('businesses')
-      .select('id, plan')
-      .eq('owner_id', user.id)
-      .single()
+  if (!businessData) { router.push('/onboarding'); return }
 
-    if (!businessData) { router.push('/onboarding'); return }
+  setBusinessId(businessData.id)
+  setBusiness(businessData)
+  setPlan(businessData.plan || 'free')
 
-    setBusinessId(businessData.id)
-    setBusiness(businessData)
-    setPlan(businessData.plan || 'free')
+  const { count } = await supabase
+    .from('orders')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', businessData.id)
+  setCurrentOrderCount(count || 0)
 
-    const { count } = await supabase
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
-      .eq('business_id', businessData.id)
-    setCurrentOrderCount(count || 0)
+  const { data: customerData } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('business_id', businessData.id)
+    .order('name', { ascending: true })
 
-    const { data: customerData } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('business_id', businessData.id)
-      .order('name', { ascending: true })
+  setCustomers(customerData || [])
+  setLoading(false)
+}
 
-    setCustomers(customerData || [])
-    setLoading(false)
-  }
+useEffect(() => { load() }, [])
 
-  useEffect(() => { load() }, [])
+const addPart = () => {
+  if (!partName.trim() || !partCost) return
+  const costNum = Number(partCost)
+  const qty = Number(partQuantity) || 1
+  setParts([...parts, { name: partName.trim(), quantity: qty, cost: costNum, total: costNum * qty }])
+  setPartName('')
+  setPartQuantity(1)
+  setPartCost('')
+}
 
-  const addPart = () => {
-    if (!partName.trim() || !partCost) return
-    const costNum = Number(partCost)
-    const qty = Number(partQuantity) || 1
-    setParts([...parts, { name: partName.trim(), quantity: qty, cost: costNum, total: costNum * qty }])
-    setPartName('')
-    setPartQuantity(1)
-    setPartCost('')
-  }
+const removePart = (index) => {
+  setParts(parts.filter((_, i) => i !== index))
+}
 
-  const removePart = (index) => {
-    setParts(parts.filter((_, i) => i !== index))
-  }
+const handleCreateCustomer = async (e) => {
+  e.preventDefault()
+  setCreatingCustomer(true)
+  setMessage('')
+  const phoneDigits = newCustomerPhone.replace(/\D/g, '')
+  if (!newCustomerName.trim()) { setMessage('Please enter the customer name.'); setCreatingCustomer(false); return }
+  if (phoneDigits.length !== 11) { setMessage('Phone number must be 11 digits.'); setCreatingCustomer(false); return }
 
-  const handleCreateCustomer = async (e) => {
-    e.preventDefault()
-    setCreatingCustomer(true)
-    setMessage('')
-    const phoneDigits = newCustomerPhone.replace(/\D/g, '')
-    if (!newCustomerName.trim()) { setMessage('Please enter the customer name.'); setCreatingCustomer(false); return }
-    if (phoneDigits.length !== 11) { setMessage('Phone number must be 11 digits.'); setCreatingCustomer(false); return }
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .insert({ business_id: businessId, name: newCustomerName.trim(), phone: phoneDigits })
+    .select()
+    .single()
 
-    const { data: customer, error } = await supabase
-      .from('customers')
-      .insert({ business_id: businessId, name: newCustomerName.trim(), phone: phoneDigits })
-      .select()
-      .single()
+  if (error) { setMessage('Error creating customer: ' + error.message); setCreatingCustomer(false); return }
 
-    if (error) { setMessage('Error creating customer: ' + error.message); setCreatingCustomer(false); return }
+  setCustomers([...customers, customer])
+  setCustomerId(customer.id)
+  setNewCustomerName('')
+  setNewCustomerPhone('')
+  setShowNewCustomer(false)
+  setCreatingCustomer(false)
+  showToast('✅ Customer created!', '#2E7D5E')
+}
 
-    setCustomers([...customers, customer])
-    setCustomerId(customer.id)
-    setNewCustomerName('')
-    setNewCustomerPhone('')
-    setShowNewCustomer(false)
-    setCreatingCustomer(false)
-    showToast('✅ Customer created!', '#2E7D5E')
-  }
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setMessage('')
+  setSaving(true)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setMessage('')
-    setSaving(true)
-
-    if (!customerId) { setMessage('Please select a customer.'); setSaving(false); return }
-    const limits = getPlanLimits(plan)
-    if (currentOrderCount >= limits.orders) {
-      setMessage(`❌ You've reached the limit of ${limits.orders} orders on your Free plan. Please upgrade.`)
-      setSaving(false)
-      return
-    }
-    if (!deviceType.trim()) { setMessage('Please enter the device type.'); setSaving(false); return }
-    if (!issueDescription.trim()) { setMessage('Please describe the issue.'); setSaving(false); return }
-    if (!price || Number(price) <= 0) { setMessage('Please enter a valid price.'); setSaving(false); return }
-
-    const priceNum = Number(price)
-    const depositNum = Number(deposit) || 0
-    const trackingToken = crypto.randomUUID()
-
-    const { data: job, error } = await supabase
-      .from('orders')
-      .insert({
-        business_id: businessId,
-        customer_id: customerId,
-        title: `${deviceType} ${deviceModel || 'Repair'}`,
-        device_type: deviceType.trim(),
-        device_model: deviceModel.trim(),
-        serial_number: serialNumber.trim(),
-        device_condition: deviceCondition.trim(),
-        device_color: deviceColor.trim(),
-        customer_notes: issueDescription.trim(),
-        price: priceNum,
-        amount_paid: depositNum,
-        estimated_repair_time: Number(estimatedTime) || null,
-        due_date: dueDate || null,
-        current_status: status,
-        tracking_token: trackingToken,
-        parts_used: parts.length > 0 ? parts : null,
-      })
-      .select()
-      .single()
-
-    if (error) { setMessage('Error: ' + error.message); setSaving(false); return }
-
-    showToast('✅ Repair job created!', '#2E7D5E')
-    setSaving(false)
-    setTimeout(() => router.push(`/dashboard/repairs/jobs/${job.id}`), 800)
-  }
-
-  const canGoNext = () => {
-    if (step === 1) return !!customerId
-    if (step === 2) return deviceType.trim() && issueDescription.trim()
-    return true
-  }
-
-  const goNext = () => {
-    if (step === 1 && !customerId) { setMessage('Please select a customer.'); return }
-    if (step === 2 && !deviceType.trim()) { setMessage('Please enter device type.'); return }
-    if (step === 2 && !issueDescription.trim()) { setMessage('Please describe the issue.'); return }
-    setMessage('')
-    setStep(step + 1)
-  }
-
-  const goBack = () => { setStep(step - 1); setMessage('') }
-
+  if (!customerId) { setMessage('Please select a customer.'); setSaving(false); return }
   const limits = getPlanLimits(plan)
-  const canAddMore = currentOrderCount < limits.orders
-  const totalPartsCost = parts.reduce((sum, p) => sum + p.total, 0)
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .spinner { width: 40px; height: 40px; border: 4px solid #e4d8c2; border-top: 4px solid #0F2B4A; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        `}</style>
-        <div className="spinner"></div>
-      </div>
-    )
+  if (currentOrderCount >= limits.orders) {
+    setMessage(`❌ You've reached the limit of ${limits.orders} orders on your Free plan. Please upgrade.`)
+    setSaving(false)
+    return
   }
+  if (!deviceType.trim()) { setMessage('Please enter the device type.'); setSaving(false); return }
+  if (!issueDescription.trim()) { setMessage('Please describe the issue.'); setSaving(false); return }
+  if (!price || Number(price) <= 0) { setMessage('Please enter a valid price.'); setSaving(false); return }
 
-  const inputStyle = {
-    width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #E5E0D8', fontSize: '0.95rem',
-    background: '#fff', boxSizing: 'border-box', color: '#1A1A1A',
-    transition: 'border-color 0.2s ease',
-  }
-  const labelStyle = {
-    display: 'block', color: '#0F2B4A', marginBottom: '0.3rem',
-    fontSize: '0.85rem', fontWeight: '600',
-  }
+  const priceNum = Number(price)
+  const depositNum = Number(deposit) || 0
+  const trackingToken = crypto.randomUUID()
 
+  const { data: job, error } = await supabase
+    .from('orders')
+    .insert({
+      business_id: businessId,
+      customer_id: customerId,
+      title: `${deviceType} ${deviceModel || 'Repair'}`,
+      device_type: deviceType.trim(),
+      device_model: deviceModel.trim(),
+      serial_number: serialNumber.trim(),
+      device_condition: deviceCondition.trim(),
+      device_color: deviceColor.trim(),
+      customer_notes: issueDescription.trim(),
+      price: priceNum,
+      amount_paid: depositNum,
+      estimated_repair_time: Number(estimatedTime) || null,
+      due_date: dueDate || null,
+      current_status: status,
+      tracking_token: trackingToken,
+      parts_used: parts.length > 0 ? parts : null,
+    })
+    .select()
+    .single()
+
+  if (error) { setMessage('Error: ' + error.message); setSaving(false); return }
+
+  showToast('✅ Repair job created!', '#2E7D5E')
+  setSaving(false)
+  setTimeout(() => router.push(`/dashboard/repairs/jobs/${job.id}`), 800)
+}
+
+const canGoNext = () => {
+  if (step === 1) return !!customerId
+  if (step === 2) return deviceType.trim() && issueDescription.trim()
+  return true
+}
+
+const goNext = () => {
+  if (step === 1 && !customerId) { setMessage('Please select a customer.'); return }
+  if (step === 2 && !deviceType.trim()) { setMessage('Please enter device type.'); return }
+  if (step === 2 && !issueDescription.trim()) { setMessage('Please describe the issue.'); return }
+  setMessage('')
+  setStep(step + 1)
+}
+
+const goBack = () => { setStep(step - 1); setMessage('') }
+
+const limits = getPlanLimits(plan)
+const canAddMore = currentOrderCount < limits.orders
+const totalPartsCost = parts.reduce((sum, p) => sum + p.total, 0)
+
+if (loading) {
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e4d8c2; border-top: 4px solid #0F2B4A; border-radius: 50%; animation: spin 0.8s linear infinite; }
+      `}</style>
+      <div className="spinner"></div>
+    </div>
+  )
+}
+
+const inputStyle = {
+  width: '100%', padding: '0.7rem', borderRadius: '8px',
+  border: '1px solid #E5E0D8', fontSize: '0.95rem',
+  background: '#fff', boxSizing: 'border-box', color: '#1A1A1A',
+  transition: 'border-color 0.2s ease',
+}
+const labelStyle = {
+  display: 'block', color: '#0F2B4A', marginBottom: '0.3rem',
+  fontSize: '0.85rem', fontWeight: '600',
+}
   return (
     <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{`
@@ -489,8 +487,7 @@ export default function NewRepairJobPage() {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button type="button" className="btn-secondary" onClick={goBack}>← Back</button>
-                <button type="button" className="btn-primary" onClick={goNext} disabled={!deviceType.trim() || !issueDescription.trim()}>Next →</
-            issueDescription.trim()}>Next →</button>
+                <button type="button" className="btn-primary" onClick={goNext} disabled={!deviceType.trim() || !issueDescription.trim()}>Next →</button>
               </div>
             </div>
           )}
@@ -563,4 +560,4 @@ export default function NewRepairJobPage() {
       </div>
     </div>
   )
-            }
+          }
