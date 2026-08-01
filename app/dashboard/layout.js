@@ -41,12 +41,36 @@ export default function DashboardLayout({ children }) {
           return
         }
 
+        // 1. Check if the user owns a business
         let { data: businessData } = await supabase
           .from('businesses')
           .select('*')
           .eq('owner_id', user.id)
           .single()
 
+        // 2. If not owner, check if they are active staff
+        if (!businessData) {
+          const { data: staffData } = await supabase
+            .from('staff')
+            .select('business_id')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .maybeSingle()
+
+          if (staffData) {
+            const { data: staffBusiness } = await supabase
+              .from('businesses')
+              .select('*')
+              .eq('id', staffData.business_id)
+              .single()
+
+            if (staffBusiness) {
+              businessData = staffBusiness
+            }
+          }
+        }
+
+        // 3. If still no business, redirect to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -379,4 +403,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-                }
+  }
