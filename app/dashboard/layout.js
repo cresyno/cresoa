@@ -391,11 +391,12 @@ export default function DashboardLayout({ children }) {
         </div>
 
         <div className="bottom">
-          <a href="/dashboard/staff" onClick={handleNavClick}>👥 Staff</a>
-          <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
-          <a href="/dashboard/profile" onClick={handleNavClick}>⚙️ Profile</a>
-          <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
-        </div>
+  <a href="/dashboard/staff" onClick={handleNavClick}>👥 Staff</a>
+  <a href="/dashboard/settings/beta" onClick={handleNavClick}>🧪 Beta</a>  {/* ← add this line */}
+  <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
+  <a href="/dashboard/profile" onClick={handleNavClick}>⚙️ Profile</a>
+  <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
+</div>
       </div>
 
       <div className="main-content">
