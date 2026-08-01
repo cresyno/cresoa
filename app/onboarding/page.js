@@ -52,9 +52,9 @@ function OnboardingContent() {
   const [profileMessage, setProfileMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
-  // Detect beta flag from URL
-  const isBeta = searchParams.get('beta') === 'true'
-  const betaExpiry = isBeta ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() : null
+  // 🔥 Check if user has an accepted beta invite
+  const [isBetaUser, setIsBetaUser] = useState(false)
+  const [betaExpiry, setBetaExpiry] = useState(null)
 
   useEffect(() => {
     const load = async () => {
@@ -65,6 +65,26 @@ function OnboardingContent() {
           return
         }
         setUserId(user.id)
+
+        // ✅ Check if this email has an accepted beta invite
+        const { data: betaInvite, error: betaError } = await supabase
+          .from('beta_invites')
+          .select('status')
+          .eq('email', user.email)
+          .eq('status', 'accepted')
+          .maybeSingle()
+
+        if (betaInvite && !betaError) {
+          setIsBetaUser(true)
+          setBetaExpiry(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString())
+        } else {
+          // Fallback to URL flag
+          const isBetaFromUrl = searchParams.get('beta') === 'true'
+          if (isBetaFromUrl) {
+            setIsBetaUser(true)
+            setBetaExpiry(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString())
+          }
+        }
 
         const { data: business, error } = await supabase
           .from('businesses')
@@ -103,7 +123,7 @@ function OnboardingContent() {
       }
     }
     load()
-  }, [router])
+  }, [router, searchParams])
 
   const handleSelectSector = async (sector, isActive) => {
     setSaving(true)
@@ -119,8 +139,8 @@ function OnboardingContent() {
             name: businessName || 'My Business',
             sector: sector,
             business_type: isActive ? 'Fashion Designer' : sector,
-            plan: isBeta ? 'beta' : 'free',
-            beta_expires_at: isBeta ? betaExpiry : null,
+            plan: isBetaUser ? 'beta' : 'free',
+            beta_expires_at: isBetaUser ? betaExpiry : null,
             trial_starts_at: new Date().toISOString(),
             trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
           })
@@ -149,8 +169,8 @@ function OnboardingContent() {
         .update({
           sector: sector,
           business_type: isActive ? 'Fashion Designer' : sector,
-          plan: isBeta ? 'beta' : 'free',
-          beta_expires_at: isBeta ? betaExpiry : null,
+          plan: isBetaUser ? 'beta' : 'free',
+          beta_expires_at: isBetaUser ? betaExpiry : null,
         })
         .eq('id', businessId)
 
@@ -197,8 +217,8 @@ function OnboardingContent() {
             location: location.trim(),
             sector: selectedSector || 'Fashion & Custom Wear',
             onboarding_completed: true,
-            plan: isBeta ? 'beta' : 'free',
-            beta_expires_at: isBeta ? betaExpiry : null,
+            plan: isBetaUser ? 'beta' : 'free',
+            beta_expires_at: isBetaUser ? betaExpiry : null,
             trial_starts_at: new Date().toISOString(),
             trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
           })
@@ -530,7 +550,6 @@ function OnboardingContent() {
   )
 }
 
-// ✅ Main export with Suspense boundary
 export default function OnboardingPage() {
   return (
     <Suspense fallback={
@@ -541,4 +560,4 @@ export default function OnboardingPage() {
       <OnboardingContent />
     </Suspense>
   )
-                   }
+  }
