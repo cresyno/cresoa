@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function GET(req) {
   try {
@@ -13,6 +17,7 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Access token required' }, { status: 401 })
     }
 
+    // Authenticate the user to verify identity
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -35,10 +40,10 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Fetch all beta invites (global, no business filter)
-    const { data: invites, error } = await supabaseWithToken
+    // ✅ Use admin client to bypass RLS
+    const { data: invites, error } = await supabaseAdmin
       .from('beta_invites')
-      .select('*, invited_by(email)')
+      .select('*')
       .order('invited_at', { ascending: false })
 
     if (error) {
