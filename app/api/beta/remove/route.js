@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function DELETE(req) {
   try {
@@ -12,6 +16,7 @@ export async function DELETE(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Authenticate
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -29,13 +34,12 @@ export async function DELETE(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // ✅ Only admin can remove
     if (user.email !== ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Delete the invite (global, no business check)
-    const { error: deleteError } = await supabaseWithToken
+    // ✅ Use admin client to bypass RLS
+    const { error: deleteError } = await supabaseAdmin
       .from('beta_invites')
       .delete()
       .eq('id', inviteId)
