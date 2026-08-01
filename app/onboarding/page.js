@@ -3,7 +3,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation' // ✅ added useSearchParams
 import { supabase } from '../../lib/supabaseClient'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 
@@ -33,6 +33,8 @@ const SECTOR_INFO = {
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams() // ✅ added
+
   const [categories, setCategories] = useState([])
   const [businessId, setBusinessId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -47,7 +49,11 @@ export default function OnboardingPage() {
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
   const [profileMessage, setProfileMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('') // 👈 new: for errors
+  const [errorMessage, setErrorMessage] = useState('')
+
+  // ✅ Detect beta flag from URL
+  const isBeta = searchParams.get('beta') === 'true'
+  const betaExpiry = isBeta ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() : null
 
   useEffect(() => {
     const load = async () => {
@@ -105,6 +111,7 @@ export default function OnboardingPage() {
 
     try {
       if (!businessId) {
+        // ✅ Create business with beta plan if applicable
         const { data: newBusiness, error } = await supabase
           .from('businesses')
           .insert({
@@ -112,7 +119,8 @@ export default function OnboardingPage() {
             name: businessName || 'My Business',
             sector: sector,
             business_type: isActive ? 'Fashion Designer' : sector,
-            plan: 'free',
+            plan: isBeta ? 'beta' : 'free',
+            beta_expires_at: isBeta ? betaExpiry : null,
             trial_starts_at: new Date().toISOString(),
             trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
           })
@@ -141,6 +149,8 @@ export default function OnboardingPage() {
         .update({
           sector: sector,
           business_type: isActive ? 'Fashion Designer' : sector,
+          plan: isBeta ? 'beta' : 'free',
+          beta_expires_at: isBeta ? betaExpiry : null,
         })
         .eq('id', businessId)
 
@@ -177,6 +187,7 @@ export default function OnboardingPage() {
 
     try {
       if (!businessId) {
+        // ✅ Profile creation with beta plan
         const { data: newBusiness, error } = await supabase
           .from('businesses')
           .insert({
@@ -187,7 +198,8 @@ export default function OnboardingPage() {
             location: location.trim(),
             sector: selectedSector || 'Fashion & Custom Wear',
             onboarding_completed: true,
-            plan: 'free',
+            plan: isBeta ? 'beta' : 'free',
+            beta_expires_at: isBeta ? betaExpiry : null,
             trial_starts_at: new Date().toISOString(),
             trial_ends_at: new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
           })
