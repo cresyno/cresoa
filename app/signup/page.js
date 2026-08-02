@@ -70,12 +70,14 @@ export default function SignUpPage() {
       const data = await res.json()
 
       if (res.ok) {
-        setMessage('🎉 Account created! Check your email to verify, then log in.')
-        setTimeout(() => {
-          router.push('/login')
-        }, 3000) // give user time to read the message
-      } else {
-        setMessage('❌ ' + (data.error || 'Signup failed. Please try again.'))
+  setMessage(
+    '🎉 Account created! Please check your email (and spam folder) to verify your address. ' +
+    'Then log in. 💡 If you find it in spam, mark it as "Not spam" to ensure you receive future emails.'
+  )
+  setLoading(false)
+  // Do NOT auto-redirect – user stays on signup page and clicks login manually
+} else {
+  setMessage('❌ ' + (data.error || 'Signup failed. Please try again.'))
       }
     } catch (err) {
       console.error('Signup error:', err)
