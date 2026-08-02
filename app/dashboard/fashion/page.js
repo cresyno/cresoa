@@ -38,6 +38,7 @@ export default function FashionDashboardPage() {
 
   const modalRef = useRef(null)
 
+  // ─── Load Dashboard ───
   const loadDashboard = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -114,6 +115,7 @@ export default function FashionDashboardPage() {
     loadDashboard()
   }, [])
 
+  // Click outside to close modals
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (modalRef.current && !modalRef.current.contains(e.target)) {
@@ -125,6 +127,7 @@ export default function FashionDashboardPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // ─── Handlers ───
   const toggleGroup = (groupId) => {
     setExpandedGroups((prev) =>
       prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
@@ -214,13 +217,14 @@ export default function FashionDashboardPage() {
 
   const canCreateGroup = business ? isFeatureAvailable(business.plan || 'free', 'groups') : false
 
+  // ─── Helper Functions ───
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8', icon: '📋' },
-      'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8', icon: '✂️' },
-      'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB', icon: '🧵' },
-      'Ready': { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2', icon: '✅' },
-      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5', icon: '📦' },
+      'Cutting':      { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8', icon: '✂️' },
+      'Sewing':       { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB', icon: '🧵' },
+      'Ready':        { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2', icon: '✅' },
+      'Delivered':    { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5', icon: '📦' },
     }
     return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8', icon: '📋' }
   }
@@ -243,7 +247,7 @@ export default function FashionDashboardPage() {
   }
 
   const getDueDisplay = (dueDate) => {
-    if (!dueDate) return { label: 'No deadline', color: '#C8C0B5' }
+    if (!dueDate) return { label: '—', color: '#C8C0B5' }
     if (isOverdue(dueDate)) return { label: '⚠️ Overdue', color: '#D9534F' }
     return { label: `Due ${new Date(dueDate).toLocaleDateString('en-GB')}`, color: '#8A8A8A' }
   }
@@ -264,7 +268,7 @@ export default function FashionDashboardPage() {
     return filtered
   }
 
-  // Derived stats
+  // ─── Derived Stats ───
   const previewCustomers = customers.slice(0, 5)
   const previewOrders = soloOrders.slice(0, 5)
   const allGroupOrders = groups.flatMap((g) => g.orders)
@@ -302,6 +306,17 @@ export default function FashionDashboardPage() {
 
   const filteredPreviewOrders = getFilteredOrders(previewOrders)
 
+  // ─── Business Health Score ───
+  const healthScore = (() => {
+    let score = 100
+    if (overdueCount > 0) score -= overdueCount * 5
+    if (totalBalanceOwed > 0) score -= 5
+    if (customers.length === 0) score -= 10
+    if (totalOrders === 0) score -= 10
+    return Math.max(0, Math.min(100, score))
+  })()
+
+  // ─── Loading / Deactivated ───
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -320,40 +335,41 @@ export default function FashionDashboardPage() {
     )
   }
 
-  // ---------- JSX starts here ----------
+  // ─── Return ───
   return (
     <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem 1rem', paddingBottom: '5rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
 <style>{`
-  /* ===== CARDS ===== */
+  /* ─── CARD GLASS ─── */
   .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); border-radius: 16px; box-shadow: 0 4px 16px rgba(15,43,74,0.06); transition: all 0.25s ease; }
   .glass:hover { box-shadow: 0 8px 32px rgba(15,43,74,0.1); transform: translateY(-2px); }
+
   .stat-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); border-radius: 14px; padding: 0.7rem 0.4rem; text-align: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(15,43,74,0.04); text-decoration: none; }
   .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15,43,74,0.08); border-color: #D4A52A; }
-  .stat-card .value { font-size: 1.3rem; font-weight: 700; margin: 0; }
+  .stat-card .value { font-size: 1.4rem; font-weight: 700; margin: 0; }
   .stat-card .value.navy { color: #0F2B4A; }
   .stat-card .value.red { color: #D9534F; }
   .stat-card .value.green { color: #2E7D5E; }
   .stat-card .value.gold { color: #D4A52A; }
   .stat-card .label { color: #8A8A8A; font-size: 0.6rem; margin: 0.1rem 0 0; text-transform: uppercase; letter-spacing: 0.3px; }
 
-  .action-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid #E5E0D8; border-radius: 14px; padding: 1rem; text-align: center; text-decoration: none; transition: all 0.2s; box-shadow: 0 2px 8px rgba(15,43,74,0.04); flex: 1; min-width: 100px; }
+  .action-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid #E5E0D8; border-radius: 14px; padding: 0.8rem; text-align: center; text-decoration: none; transition: all 0.2s; box-shadow: 0 2px 8px rgba(15,43,74,0.04); flex: 1; min-width: 80px; }
   .action-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(15,43,74,0.08); border-color: #D4A52A; }
   .action-card .icon { font-size: 1.8rem; display: block; margin-bottom: 0.2rem; }
   .action-card .label { font-size: 0.7rem; font-weight: 600; color: #0F2B4A; }
 
-  .order-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); border: 1px solid #E5E0D8; border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 0.6rem; transition: all 0.2s; }
+  .order-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); border: 1px solid #E5E0D8; border-radius: 14px; padding: 1rem 1.2rem; margin-bottom: 0.8rem; transition: all 0.2s; }
   .order-card:hover { border-color: #D4A52A; box-shadow: 0 4px 16px rgba(15,43,74,0.06); }
-  .order-card .top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
-  .order-card .customer { font-weight: 600; color: #0F2B4A; font-size: 0.95rem; }
-  .order-card .item { font-size: 0.8rem; color: #8A8A8A; }
-  .order-card .status-badge { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.6rem; border-radius: 20px; font-size: 0.65rem; font-weight: 600; }
-  .order-card .due { font-size: 0.7rem; font-weight: 600; }
-  .order-card .balance { font-weight: 700; font-size: 0.9rem; margin-right: 0.5rem; }
+  .order-card .top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
+  .order-card .customer { font-weight: 600; color: #0F2B4A; font-size: 1rem; }
+  .order-card .item { font-size: 0.85rem; color: #8A8A8A; }
+  .order-card .status-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .order-card .due { font-size: 0.75rem; font-weight: 500; }
+  .order-card .balance { font-weight: 700; font-size: 1rem; margin-right: 0.5rem; }
   .order-card .balance.positive { color: #D9534F; }
   .order-card .balance.zero { color: #2E7D5E; }
-  .order-card .actions { display: flex; gap: 0.3rem; margin-top: 0.4rem; flex-wrap: wrap; }
+  .order-card .actions { display: flex; gap: 0.4rem; margin-top: 0.3rem; flex-wrap: wrap; }
 
-  .btn-sm { padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; border: 1px solid #E5E0D8; background: #fff; color: #0F2B4A; cursor: pointer; transition: all 0.15s; }
+  .btn-sm { padding: 0.3rem 0.7rem; border-radius: 8px; font-size: 0.75rem; font-weight: 600; border: 1px solid #E5E0D8; background: #fff; color: #0F2B4A; cursor: pointer; transition: all 0.15s; min-height: 32px; min-width: 32px; display: inline-flex; align-items: center; justify-content: center; }
   .btn-sm:hover { background: #F8F6F2; }
   .btn-sm.primary { background: #0F2B4A; color: #fff; border-color: #0F2B4A; }
   .btn-sm.success { background: #2E7D5E; color: #fff; border-color: #2E7D5E; }
@@ -361,7 +377,7 @@ export default function FashionDashboardPage() {
 
   .section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
   .section-title h3 { color: #0F2B4A; font-size: 1.1rem; font-weight: 700; margin: 0; }
-  .section-title a { color: #8A8A8A; font-size: 0.75rem; text-decoration: none; border-bottom: 1px solid transparent; }
+  .section-title a { color: #8A8A8A; fontSize: 0.75rem; text-decoration: none; border-bottom: 1px solid transparent; }
   .section-title a:hover { border-bottom-color: #8A8A8A; }
 
   .empty-state { background: rgba(255,255,255,0.5); backdrop-filter: blur(8px); border-radius: 14px; padding: 2rem 1rem; border: 1px solid #E5E0D8; text-align: center; color: #8A8A8A; }
@@ -381,11 +397,17 @@ export default function FashionDashboardPage() {
   .input:focus { outline:none; border-color:#D4A52A; }
   .select { width:100%; padding:0.7rem; border-radius:8px; border:1px solid #E5E0D8; background:rgba(255,255,255,0.7); backdrop-filter:blur(4px); font-size:0.95rem; }
 
+  /* ─── Health Card ─── */
+  .health-card { background: linear-gradient(135deg, #0F2B4A, #1A3F66); border-radius: 16px; padding: 1rem; color: #fff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+  .health-card .score { font-size: 2rem; font-weight: 700; }
+  .health-card .label { font-size: 0.75rem; opacity: 0.8; }
+
   @media (max-width:480px) {
-    .stat-card .value { font-size:1rem; }
-    .action-card { min-width:60px; padding:0.6rem; }
-    .order-card .top { flex-direction:column; gap:0.3rem; }
-    .order-card .actions { justify-content:flex-start; }
+    .stat-card .value { font-size: 1rem; }
+    .action-card { min-width: 60px; padding: 0.6rem; }
+    .order-card .top { flex-direction: column; align-items: stretch; }
+    .order-card .actions { justify-content: flex-start; }
+    .health-card { flex-direction: column; align-items: stretch; text-align: center; }
   }
 `}</style>
 
@@ -403,26 +425,42 @@ export default function FashionDashboardPage() {
   </div>
   <div style={{ textAlign: 'right', fontSize: '0.7rem', color: '#8A8A8A' }}>
     <div>{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
-    <div style={{ fontWeight: '700', color: '#0F2B4A', fontSize: '1rem' }}>₦{todayRevenue.toLocaleString()}</div>
+    <div style={{ fontWeight: '700', color: '#0F2B4A', fontSize: '1rem' }}>₦{todayRevenue > 0 ? todayRevenue.toLocaleString() : '0'}</div>
   </div>
 </div>
 
 {/* Feedback banner */}
 {business && <FeedbackBanner business={business} />}
 
+{/* ─── BUSINESS HEALTH SCORE ─── */}
+<div className="health-card" style={{ marginBottom: '1.2rem' }}>
+  <div>
+    <div className="label">Business Health</div>
+    <div className="score">{healthScore}<span style={{ fontSize: '1rem', opacity: 0.7 }}>/100</span></div>
+  </div>
+  <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+    <div><span style={{ opacity: 0.7 }}>✅ On‑time:</span> {totalOrders > 0 ? Math.round((1 - overdueCount / totalOrders) * 100) : 100}%</div>
+    <div><span style={{ opacity: 0.7 }}>👥 Customers:</span> {customers.length}</div>
+    <div><span style={{ opacity: 0.7 }}>📦 Active:</span> {allActiveOrders.filter(o => o.current_status !== 'Delivered').length}</div>
+  </div>
+</div>
+
 {/* ─── REVENUE BAR ─── */}
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.5rem', marginBottom: '1.2rem' }}>
   <div className="glass" style={{ padding: '0.6rem', textAlign: 'center', borderTop: '3px solid #D4A52A' }}>
     <div style={{ fontSize: '0.55rem', color: '#8A8A8A', textTransform: 'uppercase' }}>Today</div>
-    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F2B4A' }}>₦{todayRevenue.toLocaleString()}</div>
+    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F2B4A' }}>₦{todayRevenue > 0 ? todayRevenue.toLocaleString() : '0'}</div>
+    <div style={{ fontSize: '0.55rem', color: todayRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{todayRevenue > 0 ? '📈' : '—'}</div>
   </div>
   <div className="glass" style={{ padding: '0.6rem', textAlign: 'center', borderTop: '3px solid #D9534F' }}>
     <div style={{ fontSize: '0.55rem', color: '#8A8A8A', textTransform: 'uppercase' }}>This Week</div>
-    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F2B4A' }}>₦{weekRevenue.toLocaleString()}</div>
+    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F2B4A' }}>₦{weekRevenue > 0 ? weekRevenue.toLocaleString() : '0'}</div>
+    <div style={{ fontSize: '0.55rem', color: weekRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{weekRevenue > 0 ? '📈' : '—'}</div>
   </div>
   <div className="glass" style={{ padding: '0.6rem', textAlign: 'center', borderTop: '3px solid #2E7D5E' }}>
     <div style={{ fontSize: '0.55rem', color: '#8A8A8A', textTransform: 'uppercase' }}>This Month</div>
-    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F2B4A' }}>₦{monthRevenue.toLocaleString()}</div>
+    <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0F2B4A' }}>₦{monthRevenue > 0 ? monthRevenue.toLocaleString() : '0'}</div>
+    <div style={{ fontSize: '0.55rem', color: monthRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{monthRevenue > 0 ? '📈' : '—'}</div>
   </div>
 </div>
 
@@ -431,7 +469,7 @@ export default function FashionDashboardPage() {
   <a href="/dashboard/customers" className="stat-card"><p className="value navy">{customers.length}</p><p className="label">Customers</p></a>
   <a href="/dashboard/orders" className="stat-card"><p className="value navy">{totalOrders}</p><p className="label">Orders</p></a>
   <button onClick={toggleOwingFilter} className="stat-card" style={{ border: showOwingOnly ? '2px solid #D9534F' : '' }}>
-    <p className={`value ${totalBalanceOwed > 0 ? 'red' : 'green'}`}>₦{totalBalanceOwed.toLocaleString()}</p>
+    <p className={`value ${totalBalanceOwed > 0 ? 'red' : 'green'}`}>₦{totalBalanceOwed > 0 ? totalBalanceOwed.toLocaleString() : '0'}</p>
     <p className="label">{showOwingOnly ? '🔴 Filtered' : 'Owed'}</p>
   </button>
   <a href="/dashboard/orders?filter=ready" className="stat-card"><p className="value green">{readyCount}</p><p className="label">Ready</p></a>
@@ -456,7 +494,7 @@ export default function FashionDashboardPage() {
   </a>
   <a href="/dashboard/reminders" className="action-card"><span className="icon">🔔</span><span className="label">Reminders</span></a>
 </div>
-      {/* ─── TODAY'S ACTIVITY ─── */}
+      {/* ─── RECENT ORDERS ─── */}
       <div style={{ marginBottom: '1.8rem' }}>
         <div className="section-title">
           <h3>📋 Recent Orders</h3>
@@ -475,20 +513,26 @@ export default function FashionDashboardPage() {
             return (
               <div key={o.id} className="order-card">
                 <div className="top">
-                  <div>
-                    <div className="customer">{o.customers?.name || 'No customer'} <span style={{ fontSize:'0.7rem', color:'#8A8A8A' }}>· {getOrderName(o)}</span></div>
-                    <div style={{ display:'flex', gap:'0.3rem', flexWrap:'wrap', marginTop:'0.2rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="customer">{o.customers?.name || 'No customer'} <span style={{ fontSize:'0.8rem', color:'#8A8A8A' }}>· {getOrderName(o)}</span></div>
+                    <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', marginTop:'0.3rem' }}>
                       <span className="status-badge" style={{ background: status.bg, color: status.color }}><span style={{ marginRight:'0.2rem' }}>{status.icon}</span>{status.label}</span>
                       <span className="due" style={{ color: due.color }}>{due.label}</span>
                     </div>
                   </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:'0.3rem' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'0.3rem', flexShrink:0 }}>
                     <span className={`balance ${balance > 0 ? 'positive' : 'zero'}`}>{balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}</span>
                     <div className="actions">
                       <a href={`/dashboard/orders/${o.id}`} className="btn-sm">👁️</a>
                       {o.customers?.phone && <a href={`tel:${o.customers.phone}`} className="btn-sm">📞</a>}
                       {balance > 0 && <button className="btn-sm success" onClick={() => openSettleModal(o)}>💰</button>}
                       <a href={`/dashboard/orders/${o.id}?edit=true`} className="btn-sm primary">✏️</a>
+                      <button className="btn-sm warning" onClick={() => {
+                        if (o.customers?.phone) {
+                          const msg = `Hi ${o.customers?.name || ''}, your order ${getOrderName(o)} is ${status.label}.`
+                          window.open(`https://wa.me/${o.customers.phone}?text=${encodeURIComponent(msg)}`, '_blank')
+                        }
+                      }}>💬</button>
                     </div>
                   </div>
                 </div>
@@ -516,18 +560,23 @@ export default function FashionDashboardPage() {
             const hasVisible = filteredOrders.length > 0
             if (showOwingOnly && !hasVisible) return null
             const combinedBalance = filteredOrders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
+            const progress = g.orders.length > 0 ? (g.orders.filter(o => o.current_status === 'Delivered').length / g.orders.length) * 100 : 0
+
             return (
               <div key={g.id} className="glass" style={{ padding: '1rem', marginBottom: '1rem', border: isExpanded ? '2px solid #D4A52A' : '1px solid #E5E0D8' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', cursor:'pointer' }} onClick={() => toggleGroup(g.id)}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', alignItems:'center' }}>
                       <strong style={{ color:'#0F2B4A' }}>{g.group_name}</strong>
                       <span style={{ fontSize:'0.7rem', color:'#8A8A8A' }}>{g.orders.length} members</span>
                       {combinedBalance > 0 && <span style={{ fontSize:'0.6rem', background:'#F1DBD3', color:'#D9534F', padding:'0.1rem 0.4rem', borderRadius:'10px' }}>₦{combinedBalance.toLocaleString()}</span>}
                     </div>
                     <div style={{ fontSize:'0.75rem', color:'#8A8A8A' }}>Coordinator: {g.customers?.name || 'Unnamed'}</div>
+                    <div style={{ marginTop:'0.3rem', background:'#E5E0D8', borderRadius:'10px', height:'6px', overflow:'hidden' }}>
+                      <div style={{ width: `${progress}%`, background: '#2E7D5E', height: '100%', borderRadius: '10px', transition: 'width 0.3s ease' }} />
+                    </div>
                   </div>
-                  <span style={{ fontSize:'0.7rem', color:'#8A8A8A' }}>{isExpanded ? '▲' : '▼'}</span>
+                  <span style={{ fontSize:'0.7rem', color:'#8A8A8A', marginLeft:'0.5rem' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
                 {isExpanded && hasVisible && (
                   <div style={{ marginTop:'0.8rem', borderTop:'1px solid #E5E0D8', paddingTop:'0.8rem' }}>
@@ -536,7 +585,7 @@ export default function FashionDashboardPage() {
                       const due = getDueDisplay(o.due_date)
                       const balance = o.price - o.amount_paid
                       return (
-                        <div key={o.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.3rem 0', borderBottom:'1px solid #F0EDE8' }}>
+                        <div key={o.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.4rem 0', borderBottom:'1px solid #F0EDE8' }}>
                           <div style={{ flex:1 }}>
                             <div style={{ fontWeight:'600', color:'#0F2B4A', fontSize:'0.85rem' }}>{o.customers?.name || 'No customer'}</div>
                             <div style={{ fontSize:'0.7rem', color:'#8A8A8A', display:'flex', gap:'0.3rem', flexWrap:'wrap' }}>
@@ -580,7 +629,7 @@ export default function FashionDashboardPage() {
                   {c.phone && <div style={{ fontSize:'0.7rem', color:'#8A8A8A' }}>{c.phone}</div>}
                 </div>
                 <div style={{ textAlign:'right', fontSize:'0.7rem', color:'#8A8A8A' }}>
-                  <div>₦{totalSpent.toLocaleString()}</div>
+                  <div>₦{totalSpent > 0 ? totalSpent.toLocaleString() : '0'}</div>
                   <div>Last: {lastOrder}</div>
                 </div>
               </a>
@@ -589,7 +638,7 @@ export default function FashionDashboardPage() {
         )}
       </div>
 
-      {/* ─── FAB ─── */}
+      {/* ─── FLOATING ACTION BUTTON ─── */}
       <button className="fab" onClick={() => setShowQuickOrder(true)}>+</button>
 
       {/* ─── QUICK ORDER MODAL ─── */}
@@ -658,4 +707,4 @@ export default function FashionDashboardPage() {
       <div style={{ marginTop:'2rem', textAlign:'center', fontSize:'0.6rem', color:'#C8C0B5' }}>Cresoa Fashion · {new Date().getFullYear()}</div>
     </div>
   )
-          }
+                  }
