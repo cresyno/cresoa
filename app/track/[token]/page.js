@@ -1,29 +1,28 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-export default function TrackPage({ params }) {
-  const router = useRouter()
+export default function TrackPage() {
+  const params = useParams()
+  const token = params?.token
+
   const [order, setOrder] = useState(null)
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    if (!token) {
+      setError(true)
+      setLoading(false)
+      return
+    }
+
     const load = async () => {
-      const { token } = await params
-
-      if (!token) {
-        setError(true)
-        setLoading(false)
-        return
-      }
-
-      // Fetch order by tracking token
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*, customers(name, phone)')
@@ -31,6 +30,7 @@ export default function TrackPage({ params }) {
         .single()
 
       if (orderError || !orderData) {
+        console.error('Order error:', orderError)
         setError(true)
         setLoading(false)
         return
@@ -38,7 +38,6 @@ export default function TrackPage({ params }) {
 
       setOrder(orderData)
 
-      // Fetch business info
       const { data: businessData } = await supabase
         .from('businesses')
         .select('name, phone, whatsapp, location')
@@ -50,9 +49,8 @@ export default function TrackPage({ params }) {
     }
 
     load()
-  }, [params])
+  }, [token])
 
-  // Get status info
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Order Placed', emoji: '📋', color: '#6B6255', bg: '#F0EDE8' },
@@ -284,7 +282,6 @@ export default function TrackPage({ params }) {
         }
       `}</style>
 
-      {/* ===== HEADER ===== */}
       <div className="header">
         <h1 className="business-name">
           {business?.name || 'Business'} <span>✦</span>
@@ -292,7 +289,6 @@ export default function TrackPage({ params }) {
         <p className="tagline">Track your order status</p>
       </div>
 
-      {/* ===== ORDER CARD ===== */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <h2 style={{ color: '#1E3A5F', fontSize: '1.2rem', margin: 0, fontWeight: '700' }}>
@@ -310,7 +306,6 @@ export default function TrackPage({ params }) {
           {order.customers?.name || 'Customer'}
         </p>
 
-        {/* ===== TIMELINE ===== */}
         <div className="timeline">
           <div
             className="line-done"
@@ -337,7 +332,6 @@ export default function TrackPage({ params }) {
         </div>
       </div>
 
-      {/* ===== DETAILS CARD ===== */}
       <div className="card">
         <div className="row">
           <span className="label">Order</span>
@@ -369,7 +363,6 @@ export default function TrackPage({ params }) {
         </div>
       </div>
 
-      {/* ===== CONTACT CARD ===== */}
       {(business?.whatsapp || business?.phone) && (
         <div className="card" style={{ textAlign: 'center' }}>
           <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>
@@ -391,7 +384,6 @@ export default function TrackPage({ params }) {
         </div>
       )}
 
-      {/* ===== FOOTER ===== */}
       <div className="footer">
         Powered by <span style={{ fontWeight: '600', color: '#1E3A5F' }}>Cresoa</span>
         <span style={{ margin: '0 0.3rem' }}>·</span>
