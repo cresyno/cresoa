@@ -672,73 +672,79 @@ export default function HomePage() {
       </section>
 
       {/* =========================================================
-          8. PRICING
-          ========================================================= */}
-      <section id="pricing" className="container" style={{ padding: '3rem 1.5rem' }}>
-        <div className="section-title">
-          <h2>Simple, transparent pricing</h2>
-          <p>Start free, pay only when you're ready to grow.</p>
-        </div>
-        <div className="pricing-grid">
-          {/* Free */}
-          <div className="pricing-card">
-            <p className="plan-name">Free</p>
-            <div className="price">₦0</div>
-            <p className="description">Perfect for getting started</p>
-            <ul>
-              <li><span className="check">✓</span> 20 customers</li>
-              <li><span className="check">✓</span> 50 orders</li>
-              <li><span className="check">✓</span> Basic order tracking</li>
-              <li><span className="cross">✗</span> Staff accounts</li>
-              <li><span className="cross">✗</span> WhatsApp integration</li>
-              <li><span className="cross">✗</span> Customer tracking links</li>
-            </ul>
-            <Link href="/signup" className="btn btn-outline-dark" style={{ width: '100%' }}>
-              Start for Free
-            </Link>
-          </div>
+    8. PRICING
+    ========================================================= */}
+<section id="pricing" className="container" style={{ padding: '3rem 1.5rem' }}>
+  <div className="section-title">
+    <h2>Simple, transparent pricing</h2>
+    <p>Start free, pay only when you're ready to grow.</p>
+  </div>
+  <div className="pricing-grid">
+    {/* Free */}
+    <div className="pricing-card">
+      <p className="plan-name">Free</p>
+      <div className="price">₦0</div>
+      <p className="description">Perfect for getting started</p>
+      <ul>
+        <li><span className="check">✓</span> 20 customers</li>
+        <li><span className="check">✓</span> 50 orders</li>
+        <li><span className="check">✓</span> Basic order tracking</li>
+        <li><span className="cross">✗</span> Staff accounts</li>
+        <li><span className="cross">✗</span> WhatsApp integration</li>
+        <li><span className="cross">✗</span> Customer tracking links</li>
+      </ul>
+      <Link href="/signup" className="btn btn-outline-dark" style={{ width: '100%' }}>
+        Start for Free
+      </Link>
+    </div>
 
-          {/* Starter — Popular */}
-          <div className="pricing-card popular">
-            <div className="popular-badge">Most Popular</div>
-            <p className="plan-name">Starter</p>
-            <div className="price">₦3,000 <span>/month</span></div>
-            <p className="description">For growing businesses</p>
-            <ul>
-              <li><span className="check">✓</span> Unlimited customers</li>
-              <li><span className="check">✓</span> Unlimited orders</li>
-              <li><span className="check">✓</span> 2 staff accounts</li>
-              <li><span className="check">✓</span> WhatsApp integration</li>
-              <li><span className="check">✓</span> Customer tracking links</li>
-              <li><span className="check">✓</span> Group / Aso‑Ebi orders</li>
-            </ul>
-            <Link href="/signup" className="btn btn-primary" style={{ width: '100%' }}>
-              Start Free Trial
-            </Link>
-            <p style={{ fontSize: '0.65rem', color: '#8A8A8A', marginTop: '0.5rem' }}>
-              14‑day free trial · No credit card required
-            </p>
-          </div>
+    {/* Starter — Popular */}
+    <div className="pricing-card popular">
+      <div className="popular-badge">Most Popular</div>
+      <p className="plan-name">Starter</p>
+      <div className="price">₦3,000 <span>/month</span></div>
+      <p className="description">For growing businesses</p>
+      <ul>
+        <li><span className="check">✓</span> Unlimited customers</li>
+        <li><span className="check">✓</span> Unlimited orders</li>
+        <li><span className="check">✓</span> 2 staff accounts</li>
+        <li><span className="check">✓</span> WhatsApp integration</li>
+        <li><span className="check">✓</span> Customer tracking links</li>
+        <li><span className="check">✓</span> Group / Aso‑Ebi orders</li>
+      </ul>
+      <Link href="/signup" className="btn btn-primary" style={{ width: '100%' }}>
+        Start Free Trial
+      </Link>
+      <p style={{ fontSize: '0.65rem', color: '#8A8A8A', marginTop: '0.5rem' }}>
+        14‑day free trial · No credit card required
+      </p>
+    </div>
 
-          {/* Pro */}
-          <div className="pricing-card">
-            <p className="plan-name">Pro</p>
-            <div className="price">₦8,000 <span>/month</span></div>
-            <p className="description">For established businesses</p>
-            <ul>
-            <Link href="/signup" className="btn btn-secondary" style={{ width: '100%' }}>
-              Start Free Trial
-            </Link>
-            <p style={{ fontSize: '0.65rem', color: '#8A8A8A', marginTop: '0.5rem' }}>
-              14‑day free trial · No credit card required
-            </p>
-          </div>
-        </div>
-        <p style={{ textAlign: 'center', color: '#8A8A8A', fontSize: '0.8rem', marginTop: '1.5rem' }}>
-          All plans include a 14‑day free trial. Cancel anytime.
-        </p>
-      </section>
-
+    {/* Pro */}
+    <div className="pricing-card">
+      <p className="plan-name">Pro</p>
+      <div className="price">₦8,000 <span>/month</span></div>
+      <p className="description">For established businesses</p>
+      <ul>
+        <li><span className="check">✓</span> Everything in Starter</li>
+        <li><span className="check">✓</span> 10 staff accounts</li>
+        <li><span className="check">✓</span> Advanced analytics</li>
+        <li><span className="check">✓</span> Data export (Excel/PDF)</li>
+        <li><span className="check">✓</span> API access</li>
+        <li><span className="check">✓</span> Priority support</li>
+      </ul>
+      <Link href="/signup" className="btn btn-secondary" style={{ width: '100%' }}>
+        Start Free Trial
+      </Link>
+      <p style={{ fontSize: '0.65rem', color: '#8A8A8A', marginTop: '0.5rem' }}>
+        14‑day free trial · No credit card required
+      </p>
+    </div>
+  </div>
+  <p style={{ textAlign: 'center', color: '#8A8A8A', fontSize: '0.8rem', marginTop: '1.5rem' }}>
+    All plans include a 14‑day free trial. Cancel anytime.
+  </p>
+</section>
       {/* =========================================================
           9. EARLY ACCESS / BETA APPLY CTA
           ========================================================= */}
