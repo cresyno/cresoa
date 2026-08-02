@@ -45,7 +45,7 @@ export default function TrackPage() {
 
       setOrder(orderData)
 
-      // Fetch business info and determine industry
+      // Fetch business details (including contact info)
       const { data: businessData } = await supabase
         .from('businesses')
         .select('name, phone, whatsapp, location, sector')
@@ -54,7 +54,7 @@ export default function TrackPage() {
 
       setBusiness(businessData)
 
-      // Determine industry
+      // Detect industry
       let detectedIndustry = 'default'
       if (businessData) {
         const sector = businessData.sector || ''
@@ -73,7 +73,7 @@ export default function TrackPage() {
     load()
   }, [token])
 
-  // Helper: get status info with emoji and colour
+  // Helper: status info
   const getStatusInfo = (status, industry) => {
     const map = {
       // Fashion
@@ -125,13 +125,12 @@ export default function TrackPage() {
     )
   }
 
-  // Prepare data for rendering
   const status = getStatusInfo(order.current_status, industry)
   const currentIndex = stages.indexOf(order.current_status)
   const balance = order.price - order.amount_paid
   const isRepairs = industry === 'repairs'
+  const hasContact = business?.phone || business?.whatsapp
 
-  // We'll now render the UI in part 2
   return (
     <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem 1rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`
@@ -158,6 +157,31 @@ export default function TrackPage() {
           margin: 0;
         }
         .business-name span { color: #D4A52A; }
+        .business-contact {
+          display: flex;
+          justify-content: center;
+          gap: 0.8rem;
+          margin-top: 0.3rem;
+          flex-wrap: wrap;
+        }
+        .business-contact a {
+          color: #0F2B4A;
+          font-size: 0.75rem;
+          text-decoration: none;
+          background: rgba(255,255,255,0.5);
+          padding: 0.2rem 0.8rem;
+          border-radius: 20px;
+          border: 1px solid #E5E0D8;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+        .business-contact a:hover { background: #fff; }
+        .business-location {
+          color: #8A8A8A;
+          font-size: 0.7rem;
+          margin-top: 0.2rem;
+        }
         .tagline {
           color: #8A8A8A;
           font-size: 0.75rem;
@@ -285,12 +309,22 @@ export default function TrackPage() {
           padding-top: 1rem;
         }
         .footer strong { color: #0F2B4A; }
+        .device-info {
+          background: rgba(255,255,255,0.3);
+          border-radius: 8px;
+          padding: 0.5rem 0.8rem;
+          margin-top: 0.2rem;
+          font-size: 0.85rem;
+          color: #0F2B4A;
+          display: inline-block;
+        }
         @media (max-width: 480px) {
           .glass { padding: 1rem; }
           .status-dot .dot { width: 28px; height: 28px; font-size: 0.7rem; }
           .status-dot .label { font-size: 0.5rem; max-width: 40px; }
           .timeline .line-done { top: 14px; }
           .timeline::before { top: 14px; }
+          .business-contact a { font-size: 0.65rem; padding: 0.15rem 0.6rem; }
         }
       `}</style>
 
@@ -300,6 +334,24 @@ export default function TrackPage() {
           {business?.name || 'Business'} <span>✦</span>
         </h1>
         <p className="tagline">Track your {isRepairs ? 'repair' : 'order'} status</p>
+        {/* Business Contact Info */}
+        {hasContact && (
+          <div className="business-contact">
+            {business.phone && (
+              <a href={`tel:${business.phone}`}>
+                📞 Call {business.phone}
+              </a>
+            )}
+            {business.whatsapp && (
+              <a href={`https://wa.me/${formatPhone(business.whatsapp)}`} target="_blank" rel="noopener noreferrer">
+                💬 WhatsApp
+              </a>
+            )}
+          </div>
+        )}
+        {business?.location && (
+          <div className="business-location">📍 {business.location}</div>
+        )}
       </div>
 
       {/* ─── ORDER CARD ─── */}
@@ -313,6 +365,14 @@ export default function TrackPage() {
             {status.emoji} {status.label}
           </span>
         </div>
+
+        {/* Show device info for repairs */}
+        {isRepairs && order.device_type && (
+          <div className="device-info">
+            📱 {order.device_type} {order.device_model || ''}
+            {order.serial_number && ` · SN: ${order.serial_number}`}
+          </div>
+        )}
 
         {/* Timeline */}
         <div className="timeline">
@@ -357,7 +417,7 @@ export default function TrackPage() {
             <span className="detail-value">{formatDate(order.due_date)}</span>
           </div>
         )}
-        {order.device_type && (
+        {isRepairs && order.device_type && (
           <div className="detail-row">
             <span className="detail-label">Device</span>
             <span className="detail-value">{order.device_type} {order.device_model || ''}</span>
@@ -379,25 +439,20 @@ export default function TrackPage() {
         </div>
       </div>
 
-      {/* ─── CONTACT ─── */}
-      {(business?.whatsapp || business?.phone) && (
+      {/* ─── CONTACT (if business has WhatsApp) ─── */}
+      {business?.whatsapp && (
         <div className="glass" style={{ textAlign: 'center' }}>
           <p style={{ color: '#8A8A8A', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>
             Have questions? Contact the business
           </p>
           <a
-            href={`https://wa.me/${formatPhone(business.whatsapp || business.phone)}`}
+            href={`https://wa.me/${formatPhone(business.whatsapp)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-whatsapp"
           >
             💬 Message on WhatsApp
           </a>
-          {business?.phone && (
-            <p style={{ color: '#8A8A8A', fontSize: '0.75rem', marginTop: '0.5rem' }}>
-              Or call: <a href={`tel:${business.phone}`} style={{ color: '#0F2B4A', fontWeight: '600', textDecoration: 'none' }}>{business.phone}</a>
-            </p>
-          )}
         </div>
       )}
 
@@ -407,4 +462,4 @@ export default function TrackPage() {
       </div>
     </div>
   )
-                  }
+          }
