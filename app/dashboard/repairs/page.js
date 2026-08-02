@@ -525,7 +525,7 @@ export default function RepairsDashboardPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <h2 style={{ fontSize: '0.85rem', color: '#0F2B4A', margin: 0 }}>👤 Recent Customers</h2>
-            <a href="/dashboard/customers" style={{ fontSize: '0.65rem', color: '#8A8A8A', textDecoration: 'none' }}>View all →</a>
+            <a href="/dashboard/repairs/customers" style={{ fontSize: '0.65rem', color: '#8A8A8A', textDecoration: 'none' }}>View all →</a>
           </div>
           {customers.length === 0 ? (
             <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
