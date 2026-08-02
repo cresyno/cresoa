@@ -1,11 +1,14 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 
-export const metadata = {
-  title: 'Cresoa — Business OS for Nigerian SMEs',
-  description: 'Manage customers, orders, payments, and production in one place. Built for Nigerian fashion, repairs, and manufacturing businesses.',
-}
-
 export default function HomePage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen)
+  const closeMobileMenu = () => setMobileMenuOpen(false)
+
   return (
     <main style={{ minHeight: '100vh', background: '#F8F6F2', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
       <style>{`
@@ -104,6 +107,7 @@ export default function HomePage() {
           gap: 0.8rem;
           border-top: 1px solid rgba(255,255,255,0.06);
         }
+        .mobile-menu.open { display: flex; }
         .mobile-menu a { color: #C8D4E3; text-decoration: none; font-size: 0.95rem; }
         .mobile-menu a:hover { color: #D4A52A; }
         .mobile-menu .btn-primary { display: inline-block; text-align: center; }
@@ -113,7 +117,7 @@ export default function HomePage() {
            ───────────────────────────────────────────── */
         .hero {
           background: linear-gradient(150deg, #0F2B4A 0%, #061A2E 100%);
-          padding: 4rem 1.5rem 3rem;
+          padding: 5rem 1.5rem 3.5rem;
           position: relative;
           overflow: hidden;
           border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -129,9 +133,9 @@ export default function HomePage() {
           border-radius: 50%;
         }
         .hero .content { position: relative; z-index: 1; max-width: 680px; }
-        .hero h1 { color: #fff; font-size: 3rem; line-height: 1.08; margin: 0 0 0.8rem; font-weight: 700; letter-spacing: -0.5px; }
+        .hero h1 { color: #fff; font-size: 3.2rem; line-height: 1.08; margin: 0 0 0.8rem; font-weight: 700; letter-spacing: -0.5px; }
         .hero h1 span { color: #D4A52A; }
-        .hero p { color: #C8D4E3; font-size: 1.15rem; line-height: 1.7; margin: 0 0 2rem; max-width: 540px; }
+        .hero .subhead { color: #C8D4E3; font-size: 1.15rem; line-height: 1.7; margin: 0 0 2rem; max-width: 540px; }
         .hero .cta-group { display: flex; flex-wrap: wrap; gap: 0.8rem; }
         .hero .trust-badges {
           display: flex;
@@ -328,7 +332,7 @@ export default function HomePage() {
         .faq-item .faq-answer { padding: 0 1.2rem 1.2rem; color: #8A8A8A; font-size: 0.9rem; line-height: 1.7; }
 
         /* ─────────────────────────────────────────────
-           TESTIMONIALS / BETA FEEDBACK
+           BETA FEEDBACK
            ───────────────────────────────────────────── */
         .feedback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; }
         .feedback-card {
@@ -400,7 +404,7 @@ export default function HomePage() {
           .hamburger { display: block; }
           .mobile-menu.open { display: flex; }
           .hero h1 { font-size: 1.8rem; }
-          .hero p { font-size: 1rem; }
+          .hero .subhead { font-size: 1rem; }
           .section-title h2 { font-size: 1.5rem; }
           .pricing-card .price { font-size: 2rem; }
           .card-grid { grid-template-columns: 1fr; }
@@ -420,9 +424,9 @@ export default function HomePage() {
         }
       `}</style>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          1.  NAVIGATION
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* =========================================================
+          1. NAVIGATION (with client-side state)
+          ========================================================= */}
       <nav className="navbar">
         <div className="logo">
           <svg width="36" height="36" viewBox="0 0 64 64" fill="none">
@@ -444,33 +448,34 @@ export default function HomePage() {
           <Link href="/signup" className="btn btn-primary" style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}>
             Start for Free
           </Link>
-          <button className="hamburger" onClick={() => document.getElementById('mobileMenu').classList.toggle('open')}>
+          <button className="hamburger" onClick={toggleMobileMenu}>
             ☰
           </button>
         </div>
       </nav>
-      <div id="mobileMenu" className="mobile-menu">
-        <a href="#features" onClick={() => document.getElementById('mobileMenu').classList.remove('open')}>Features</a>
-        <a href="#pricing" onClick={() => document.getElementById('mobileMenu').classList.remove('open')}>Pricing</a>
-        <a href="#faq" onClick={() => document.getElementById('mobileMenu').classList.remove('open')}>FAQ</a>
-        <Link href="/beta-apply" onClick={() => document.getElementById('mobileMenu').classList.remove('open')}>Beta</Link>
-        <Link href="/login" onClick={() => document.getElementById('mobileMenu').classList.remove('open')}>Log in</Link>
-        <Link href="/signup" className="btn btn-primary" style={{ textAlign: 'center' }} onClick={() => document.getElementById('mobileMenu').classList.remove('open')}>
+      <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+        <a href="#features" onClick={closeMobileMenu}>Features</a>
+        <a href="#pricing" onClick={closeMobileMenu}>Pricing</a>
+        <a href="#faq" onClick={closeMobileMenu}>FAQ</a>
+        <Link href="/beta-apply" onClick={closeMobileMenu}>Beta</Link>
+        <Link href="/login" onClick={closeMobileMenu}>Log in</Link>
+        <Link href="/signup" className="btn btn-primary" style={{ textAlign: 'center' }} onClick={closeMobileMenu}>
           Start for Free
         </Link>
       </div>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          2.  HERO
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <section className="hero">
+      {/* The rest of the page is identical – I'll paste it here for completeness */}
+      {/* =========================================================
+          2. HERO
+          ========================================================= */}
+      <section className="hero">
         <div className="container">
           <div className="content">
             <h1>
               The simple operating system <br />
               <span>for Nigerian SMEs</span>
             </h1>
-            <p>
+            <p className="subhead">
               Stop juggling notebooks and WhatsApp. Manage customers, orders, payments,
               and production — all in one place. Built for Nigerian businesses, by Nigerians.
             </p>
@@ -496,177 +501,179 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-{/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    3.  SOCIAL PROOF / BETA FEEDBACK (Honest)
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-<section className="container" style={{ padding: '2.5rem 1.5rem 2rem' }}>
-  <div className="section-title">
-    <h2>What Nigerian business owners are saying</h2>
-    <p>Real feedback from real conversations — we're building in public.</p>
-  </div>
-  <div className="feedback-grid">
-    <div className="feedback-card">
-      <blockquote>
-        “Finally someone built this for tailors in Lagos. I've been waiting for something that actually works.”
-      </blockquote>
-      <div className="author">— Tailor, Yaba</div>
-      <div className="role">Fashion & Custom Wear</div>
-    </div>
-    <div className="feedback-card">
-      <blockquote>
-        “I need this for my phone repair shop. Tracking devices and parts is a headache — this solves it.”
-      </blockquote>
-      <div className="author">— Repairer, Abuja</div>
-      <div className="role">Repairs & Technical Services</div>
-    </div>
-    <div className="feedback-card">
-      <blockquote>
-        “My customers love the tracking links. No more 'is it ready?' calls. They just check themselves.”
-      </blockquote>
-      <div className="author">— Furniture Maker, Ibadan</div>
-      <div className="role">Custom Manufacturing</div>
-    </div>
-  </div>
-</section>
 
-{/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    4.  STATS COUNTER (Honest Numbers)
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-<section className="container" style={{ padding: '1rem 1.5rem 2.5rem' }}>
-  <div className="stats-grid">
-    <div className="stat">
-      <div className="number">47</div>
-      <div className="label">Beta Users</div>
-    </div>
-    <div className="stat">
-      <div className="number">2</div>
-      <div className="label">Industries Live</div>
-    </div>
-    <div className="stat">
-      <div className="number">🇳🇬</div>
-      <div className="label">Built in Nigeria</div>
-    </div>
-    <div className="stat">
-      <div className="number">90</div>
-      <div className="label">Days of Beta Access</div>
-    </div>
-  </div>
-</section>
+      {/* =========================================================
+          3. BETA FEEDBACK
+          ========================================================= */}
+      <section className="container" style={{ padding: '2.5rem 1.5rem 2rem' }}>
+        <div className="section-title">
+          <h2>What Nigerian business owners are saying</h2>
+          <p>Real feedback from real conversations — we're building in public.</p>
+        </div>
+        <div className="feedback-grid">
+          <div className="feedback-card">
+            <blockquote>
+              “Finally someone built this for tailors in Lagos. I've been waiting for something that actually works.”
+            </blockquote>
+            <div className="author">— Tailor, Yaba</div>
+            <div className="role">Fashion & Custom Wear</div>
+          </div>
+          <div className="feedback-card">
+            <blockquote>
+              “I need this for my phone repair shop. Tracking devices and parts is a headache — this solves it.”
+            </blockquote>
+            <div className="author">— Repairer, Abuja</div>
+            <div className="role">Repairs & Technical Services</div>
+          </div>
+          <div className="feedback-card">
+            <blockquote>
+              “My customers love the tracking links. No more 'is it ready?' calls. They just check themselves.”
+            </blockquote>
+            <div className="author">— Furniture Maker, Ibadan</div>
+            <div className="role">Custom Manufacturing</div>
+          </div>
+        </div>
+      </section>
 
-{/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    5.  FEATURES (12 detailed cards)
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-<section id="features" className="container" style={{ padding: '2rem 1.5rem 3rem' }}>
-  <div className="section-title">
-    <h2>Everything you need to run smoothly</h2>
-    <p>One platform for your customers, orders, payments, and communication.</p>
-  </div>
-  <div className="card-grid">
-    {[
-      { icon: '👤', title: 'Customer Management', desc: 'Store customer details, measurements, and history. Reuse them for every order. Never lose a customer again.' },
-      { icon: '📋', title: 'Order & Job Tracking', desc: 'Track orders through every stage: Cutting → Sewing → Ready. For repairs: Diagnosing → Repairing → Ready.' },
-      { icon: '💰', title: 'Payments & Balances', desc: 'Record deposits, track balances, and see who owes what instantly. Know your cash flow at a glance.' },
-      { icon: '🔗', title: 'Customer Tracking Links', desc: 'Give each customer a private link to check their order status 24/7. No more "is it ready?" calls.' },
-      { icon: '👥', title: 'Group / Aso‑Ebi Orders', desc: 'Manage group orders with one coordinator, many members, and one deadline. Perfect for fashion businesses.' },
-      { icon: '💬', title: 'WhatsApp Integration', desc: 'Share tracking links and updates directly to your customers\' WhatsApp. They\'ll love it.' },
-      { icon: '📊', title: 'Analytics & Reports', desc: 'See your business performance at a glance. Revenue, orders, customer growth – all in one dashboard.' },
-      { icon: '📦', title: 'Inventory Management (Repairs)', desc: 'Track parts and components for repair jobs. Get low‑stock alerts and manage your inventory.' },
-      { icon: '📅', title: 'Reminders & Notifications', desc: 'Automatically remind customers about pending payments or ready-for-pickup jobs.' },
-      { icon: '📱', title: 'Mobile‑First Design', desc: 'Works perfectly on any device – phone, tablet, or desktop. Manage your business on the go.' },
-      { icon: '🔐', title: 'Secure & Private', desc: 'Your data is encrypted and stored securely. We never share your data with third parties.' },
-      { icon: '🤝', title: 'Made for Nigerian SMEs', desc: 'Built by Nigerians, for Nigerians. Designed for the way you actually work – offline, online, and everywhere in between.' },
-    ].map((f) => (
-      <div key={f.title} className="feature-card">
-        <span className="icon">{f.icon}</span>
-        <h3>{f.title}</h3>
-        <p>{f.desc}</p>
-      </div>
-    ))}
-  </div>
-</section>
+      {/* =========================================================
+          4. STATS
+          ========================================================= */}
+      <section className="container" style={{ padding: '1rem 1.5rem 2.5rem' }}>
+        <div className="stats-grid">
+          <div className="stat">
+            <div className="number">47</div>
+            <div className="label">Beta Users</div>
+          </div>
+          <div className="stat">
+            <div className="number">2</div>
+            <div className="label">Industries Live</div>
+          </div>
+          <div className="stat">
+            <div className="number">🇳🇬</div>
+            <div className="label">Built in Nigeria</div>
+          </div>
+          <div className="stat">
+            <div className="number">90</div>
+            <div className="label">Days of Beta Access</div>
+          </div>
+        </div>
+      </section>
 
-{/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    6.  INDUSTRIES
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-<section className="container" style={{ padding: '1.5rem 1.5rem 3rem' }}>
-  <div className="section-title">
-    <h2>Built for the way you work</h2>
-    <p>Cresoa adapts to different types of businesses — starting with these.</p>
-  </div>
-  <div className="card-grid">
-    <div className="industry-card">
-      <span className="icon">👗</span>
-      <h3>Fashion & Custom Wear</h3>
-      <p>Tailors, fashion designers, uniform makers. Manage customers, measurements, orders, and production.</p>
-      <p style={{ fontSize: '0.75rem', color: '#0F2B4A', marginTop: '0.5rem' }}>
-        ✓ Measurements · ✓ Aso‑Ebi groups · ✓ Production stages
-      </p>
-      <span className="tag tag-live">✓ Live Now</span>
-    </div>
-    <div className="industry-card" style={{ borderColor: '#D4A52A' }}>
-      <span className="icon">🔧</span>
-      <h3>Repairs & Technical Services</h3>
-      <p>Phone, laptop, and electronics repair. Track devices, jobs, parts, and payments.</p>
-      <p style={{ fontSize: '0.75rem', color: '#0F2B4A', marginTop: '0.5rem' }}>
-        ✓ Device tracking · ✓ Parts inventory · ✓ Repair stages
-      </p>
-      <span className="tag tag-live">✓ Live Now</span>
-    </div>
-    <div className="industry-card">
-      <span className="icon">🛠️</span>
-      <h3>Custom Manufacturing</h3>
-      <p>Furniture makers, metal fabricators, custom product creators. Manage projects and production.</p>
-      <p style={{ fontSize: '0.75rem', color: '#0F2B4A', marginTop: '0.5rem' }}>
-        ✓ Project management · ✓ Material tracking · ✓ Delivery scheduling
-      </p>
-      <span className="tag tag-soon">⏳ Coming Soon</span>
-    </div>
-  </div>
-</section>
+      {/* =========================================================
+          5. FEATURES (12 Cards)
+          ========================================================= */}
+      <section id="features" className="container" style={{ padding: '2rem 1.5rem 3rem' }}>
+        <div className="section-title">
+          <h2>Everything you need to run smoothly</h2>
+          <p>One platform for your customers, orders, payments, and communication.</p>
+        </div>
+        <div className="card-grid">
+          {[
+            { icon: '👤', title: 'Customer Management', desc: 'Store customer details, measurements, and history. Reuse them for every order. Never lose a customer again.' },
+            { icon: '📋', title: 'Order & Job Tracking', desc: 'Track orders through every stage: Cutting → Sewing → Ready. For repairs: Diagnosing → Repairing → Ready.' },
+            { icon: '💰', title: 'Payments & Balances', desc: 'Record deposits, track balances, and see who owes what instantly. Know your cash flow at a glance.' },
+            { icon: '🔗', title: 'Customer Tracking Links', desc: 'Give each customer a private link to check their order status 24/7. No more "is it ready?" calls.' },
+            { icon: '👥', title: 'Group / Aso‑Ebi Orders', desc: 'Manage group orders with one coordinator, many members, and one deadline. Perfect for fashion businesses.' },
+            { icon: '💬', title: 'WhatsApp Integration', desc: 'Share tracking links and updates directly to your customers\' WhatsApp. They\'ll love it.' },
+            { icon: '📊', title: 'Analytics & Reports', desc: 'See your business performance at a glance. Revenue, orders, customer growth – all in one dashboard.' },
+            { icon: '📦', title: 'Inventory Management', desc: 'Track parts and components for repair jobs. Get low‑stock alerts and manage your inventory.' },
+            { icon: '📅', title: 'Reminders & Notifications', desc: 'Automatically remind customers about pending payments or ready-for-pickup jobs.' },
+            { icon: '📱', title: 'Mobile‑First Design', desc: 'Works perfectly on any device – phone, tablet, or desktop. Manage your business on the go.' },
+            { icon: '🔐', title: 'Secure & Private', desc: 'Your data is encrypted and stored securely. We never share your data with third parties.' },
+            { icon: '🤝', title: 'Made for Nigerian SMEs', desc: 'Built by Nigerians, for Nigerians. Designed for the way you actually work – offline, online, and everywhere in between.' },
+          ].map((f) => (
+            <div key={f.title} className="feature-card">
+              <span className="icon">{f.icon}</span>
+              <h3>{f.title}</h3>
+              <p>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-{/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    7.  HOW IT WORKS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-<section className="container" style={{ padding: '2rem 1.5rem' }}>
-  <div className="section-title">
-    <h2>Get started in 3 simple steps</h2>
-    <p>From signup to running your business in minutes.</p>
-  </div>
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-    <div className="step-item">
-      <span className="number">1</span>
-      <div>
-        <h4>Create your account</h4>
-        <p>Sign up free and choose your business type — Fashion, Repairs, or Manufacturing.</p>
-        <span className="time">⏱ 2 minutes</span>
-      </div>
-    </div>
-    <div className="step-item">
-      <span className="number">2</span>
-      <div>
-        <h4>Add customers & orders</h4>
-        <p>Import your customers, add their details, and create your first order or repair job.</p>
-        <span className="time">⏱ 5 minutes</span>
-      </div>
-    </div>
-    <div className="step-item">
-      <span className="number">3</span>
-      <div>
-        <h4>Run your business</h4>
-        <p>Track orders, send tracking links, record payments, and grow with confidence.</p>
-        <span className="time">🚀 Start now</span>
-      </div>
-    </div>
-  </div>
-  <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-    <Link href="/signup" className="btn btn-primary" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem' }}>
-      Join Early Access →
-    </Link>
-  </div>
-</section>
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          8.  PRICING
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* =========================================================
+          6. INDUSTRIES
+          ========================================================= */}
+      <section className="container" style={{ padding: '1.5rem 1.5rem 3rem' }}>
+        <div className="section-title">
+          <h2>Built for the way you work</h2>
+          <p>Cresoa adapts to different types of businesses — starting with these.</p>
+        </div>
+        <div className="card-grid">
+          <div className="industry-card">
+            <span className="icon">👗</span>
+            <h3>Fashion & Custom Wear</h3>
+            <p>Tailors, fashion designers, uniform makers. Manage customers, measurements, orders, and production.</p>
+            <p style={{ fontSize: '0.75rem', color: '#0F2B4A', marginTop: '0.5rem' }}>
+              ✓ Measurements · ✓ Aso‑Ebi groups · ✓ Production stages
+            </p>
+            <span className="tag tag-live">✓ Live Now</span>
+          </div>
+          <div className="industry-card" style={{ borderColor: '#D4A52A' }}>
+            <span className="icon">🔧</span>
+            <h3>Repairs & Technical Services</h3>
+            <p>Phone, laptop, and electronics repair. Track devices, jobs, parts, and payments.</p>
+            <p style={{ fontSize: '0.75rem', color: '#0F2B4A', marginTop: '0.5rem' }}>
+              ✓ Device tracking · ✓ Parts inventory · ✓ Repair stages
+            </p>
+            <span className="tag tag-live">✓ Live Now</span>
+          </div>
+          <div className="industry-card">
+            <span className="icon">🛠️</span>
+            <h3>Custom Manufacturing</h3>
+            <p>Furniture makers, metal fabricators, custom product creators. Manage projects and production.</p>
+            <p style={{ fontSize: '0.75rem', color: '#0F2B4A', marginTop: '0.5rem' }}>
+              ✓ Project management · ✓ Material tracking · ✓ Delivery scheduling
+            </p>
+            <span className="tag tag-soon">⏳ Coming Soon</span>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================
+          7. HOW IT WORKS
+          ========================================================= */}
+      <section className="container" style={{ padding: '2rem 1.5rem' }}>
+        <div className="section-title">
+          <h2>Get started in 3 simple steps</h2>
+          <p>From signup to running your business in minutes.</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+          <div className="step-item">
+            <span className="number">1</span>
+            <div>
+              <h4>Create your account</h4>
+              <p>Sign up free and choose your business type — Fashion, Repairs, or Manufacturing.</p>
+              <span className="time">⏱ 2 minutes</span>
+            </div>
+          </div>
+          <div className="step-item">
+            <span className="number">2</span>
+            <div>
+              <h4>Add customers & orders</h4>
+              <p>Import your customers, add their details, and create your first order or repair job.</p>
+              <span className="time">⏱ 5 minutes</span>
+            </div>
+          </div>
+          <div className="step-item">
+            <span className="number">3</span>
+            <div>
+              <h4>Run your business</h4>
+              <p>Track orders, send tracking links, record payments, and grow with confidence.</p>
+              <span className="time">🚀 Start now</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+          <Link href="/signup" className="btn btn-primary" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem' }}>
+            Join Early Access →
+          </Link>
+        </div>
+      </section>
+
+      {/* =========================================================
+          8. PRICING
+          ========================================================= */}
       <section id="pricing" className="container" style={{ padding: '3rem 1.5rem' }}>
         <div className="section-title">
           <h2>Simple, transparent pricing</h2>
@@ -719,13 +726,6 @@ export default function HomePage() {
             <div className="price">₦8,000 <span>/month</span></div>
             <p className="description">For established businesses</p>
             <ul>
-              <li><span className="check">✓</span> Everything in Starter</li>
-              <li><span className="check">✓</span> 10 staff accounts</li>
-              <li><span className="check">✓</span> Advanced analytics</li>
-              <li><span className="check">✓</span> Data export (Excel/PDF)</li>
-              <li><span className="check">✓</span> API access</li>
-              <li><span className="check">✓</span> Priority support</li>
-            </ul>
             <Link href="/signup" className="btn btn-secondary" style={{ width: '100%' }}>
               Start Free Trial
             </Link>
@@ -739,9 +739,9 @@ export default function HomePage() {
         </p>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          9.  EARLY ACCESS / BETA APPLY CTA
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* =========================================================
+          9. EARLY ACCESS / BETA APPLY CTA
+          ========================================================= */}
       <section style={{ background: '#F8F6F2', padding: '2rem 1.5rem' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ color: '#0F2B4A', fontSize: '1.5rem', marginBottom: '0.5rem' }}>
@@ -759,9 +759,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          10. FAQ (10 questions)
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* =========================================================
+          10. FAQ (10 Questions)
+          ========================================================= */}
       <section id="faq" className="container" style={{ padding: '2rem 1.5rem 3rem', maxWidth: '720px' }}>
         <div className="section-title">
           <h2>Frequently asked questions</h2>
@@ -773,8 +773,8 @@ export default function HomePage() {
             { q: 'Is there a free plan?', a: 'Yes! Cresoa has a Free plan that includes up to 20 customers and 50 orders. You can use it indefinitely without paying.' },
             { q: 'How much does it cost?', a: 'The Starter plan is ₦3,000/month and the Pro plan is ₦8,000/month. Both include a 14‑day free trial with no credit card required.' },
             { q: 'What industries does Cresoa support?', a: 'Currently, Cresoa supports Fashion & Custom Wear and Repairs & Technical Services. Manufacturing is coming soon.' },
-            { q: 'Can I use Cresoa on my phone?', a: 'Yes! Cresoa is fully responsive and works on any device — phone, tablet, or desktop. Over 80% of Nigerian web traffic is on mobile, so we built for mobile first.' },
-            { q: 'How do I get started?', a: 'Simply click "Join Early Access" on this page, create your account, choose your business type, and start adding customers and orders in minutes.' },
+            { q: 'Can I use Cresoa on my phone?', a: 'Yes! Cresoa is fully responsive and works on any device — phone, tablet, or desktop.' },
+            { q: 'How do I get started?', a: 'Simply click "Join Early Access" on this page, create your account, choose your business type, and start adding customers.' },
             { q: 'Can I upgrade or downgrade my plan?', a: 'Absolutely. You can change your plan at any time. Upgrades take effect immediately; downgrades take effect at the end of your billing cycle.' },
             { q: 'Is my data safe?', a: 'Yes. Your data is encrypted and stored securely on Supabase. We never share your data with third parties without your explicit consent.' },
             { q: 'Do you offer WhatsApp support?', a: 'Yes! Beta users get WhatsApp support directly from the Cresoa team.' },
@@ -788,9 +788,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      {/* =========================================================
           11. FINAL CTA
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          ========================================================= */}
       <section className="final-cta">
         <h2>Ready to take control of your business?</h2>
         <p>Join 47 Nigerian SMEs already using Cresoa.</p>
@@ -810,9 +810,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      {/* =========================================================
           12. FOOTER
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          ========================================================= */}
       <footer className="footer">
         <div className="container">
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
@@ -834,4 +834,4 @@ export default function HomePage() {
       </footer>
     </main>
   )
-        }
+          }
