@@ -455,19 +455,19 @@ export default function DashboardLayout({ children }) {
 
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
-          <LetterLogo name={business?.name} size={32} />
-          <div>
-            <div className="name">Cresoa</div>
-            <div className="sub">
-              {business?.name || 'Your business'}
-              <span className="badge">{getIndustryBadge()}</span>
-              <br />
-              <span className={`plan-badge ${business?.plan === 'beta' ? 'beta' : ''}`}>
-                {business?.plan || 'Free'}
-              </span>
-            </div>
-          </div>
-        </div>
+  <Logo variant="primary" size="medium" />
+  <div>
+    <div className="name">Cresoa</div>
+    <div className="sub">
+      {business?.name || 'Your business'}
+      <span className="badge">{getIndustryBadge()}</span>
+      <br />
+      <span className={`plan-badge ${business?.plan === 'beta' ? 'beta' : ''}`}>
+        {business?.plan || 'Free'}
+      </span>
+    </div>
+  </div>
+</div>
 
         <div className="nav" data-tour="sidebar-nav">
           {currentNavItems.map((item) => (
