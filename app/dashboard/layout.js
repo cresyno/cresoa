@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import LetterLogo from '../../components/LetterLogo'
+import Logo from '../../components/Logo'
 import { getPlan, FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import OnboardingTour from '../../components/OnboardingTour' // 👈 NEW
 
