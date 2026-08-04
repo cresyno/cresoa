@@ -3,7 +3,7 @@ import { sendWhatsAppMessage } from '../../../lib/whatsapp'
 
 export async function GET() {
   // 👇 REPLACE WITH YOUR ACTUAL PHONE NUMBER
-  const yourPhoneNumber = '2349049209780'
+  const yourPhoneNumber = '2349164971382'
   
   const result = await sendWhatsAppMessage(
     yourPhoneNumber,
