@@ -2,12 +2,12 @@
 import { sendWhatsAppMessage } from '../../../lib/whatsapp'
 
 export async function GET() {
-  // Replace with your own phone number (with country code)
-  const yourPhoneNumber = '2349049209780' // 👈 YOUR PHONE NUMBER
+  // 👇 REPLACE WITH YOUR ACTUAL PHONE NUMBER
+  const yourPhoneNumber = '2349049209780'
   
   const result = await sendWhatsAppMessage(
     yourPhoneNumber,
-    '🎯 *Test Message from Cresoa!*\n\nThis is a production test from your WhatsApp integration.\n\n✅ It works perfectly!'
+    '🎯 *Cresoa WhatsApp Test*\n\nThis is a production test message.\n\n✅ Your WhatsApp integration is working!'
   )
   
   return Response.json(result)
