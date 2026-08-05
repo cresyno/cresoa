@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
-import OnboardingTour from '../../components/OnboardingTour'
+
 
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
