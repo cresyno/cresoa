@@ -22,7 +22,7 @@ export async function POST(req) {
       )
     }
 
-    // Find the staff record by token (and ensure it's pending)
+    // Find the staff record by invite_token and status = 'pending'
     const { data: staff, error: findError } = await supabase
       .from('staff')
       .select('*')
