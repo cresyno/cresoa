@@ -80,24 +80,29 @@ export async function POST(req) {
       )
     }
 
-    // ✅ 4. Check if user exists using RPC function
-    const { data: userId, error: rpcError } = await supabaseWithToken
-      .rpc('check_user_exists', { user_email: email })
+    // ✅ 4. Check if user exists using the authenticated client (not admin)
+    const { data: userData, error: userError } = await supabaseWithToken
+      .from('auth.users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
 
-    if (rpcError) {
-      console.error('RPC error:', rpcError)
+    if (userError) {
+      console.error('User lookup error:', userError)
       return NextResponse.json(
-        { error: 'Error checking user: ' + rpcError.message },
+        { error: 'Error checking user: ' + userError.message },
         { status: 500 }
       )
     }
 
-    if (!userId) {
+    if (!userData) {
       return NextResponse.json(
         { error: 'User not found. They must sign up first.' },
         { status: 404 }
       )
     }
+
+    const userId = userData.id
 
     // 5. Check if already staff
     const { data: existing } = await supabaseWithToken
@@ -180,4 +185,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+        }
