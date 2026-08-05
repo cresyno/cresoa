@@ -91,11 +91,16 @@ export async function POST(req) {
       )
     }
 
-    // ✅ 5. Check if the email exists in auth.users using admin API
-    const { data: userData, error: userLookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
+    // ✅ 5. Check if the email exists in auth.users using schema('auth')
+    const { data: userData, error: userLookupError } = await supabaseAdmin
+      .schema('auth')
+      .from('users')
+      .select('id')
+      .ilike('email', email)
+      .maybeSingle()
 
     if (userLookupError) {
-      console.error('Admin API error:', userLookupError)
+      console.error('Admin client error:', userLookupError)
       return NextResponse.json(
         { error: 'Database error while checking user: ' + userLookupError.message },
         { status: 500 }
