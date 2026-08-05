@@ -5,7 +5,7 @@ import { supabase } from '../../../../lib/supabaseClient'
 import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
-// ✅ Admin client – bypasses RLS
+// Admin client – bypasses RLS for insert
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -25,12 +25,12 @@ export async function POST(req) {
 
     if (!accessToken) {
       return NextResponse.json(
-        { error: 'No access token provided. Please log in again.' },
+        { error: 'No access token provided' },
         { status: 401 }
       )
     }
 
-    // 1. Authenticate the user via token
+    // 1. Authenticate the user
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -45,14 +45,10 @@ export async function POST(req) {
 
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
     if (authError || !user) {
-      console.error('Auth error:', authError)
-      return NextResponse.json(
-        { error: 'Unauthorized – invalid token' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Get the user's business (they must be the owner)
+    // 2. Get the business (owner only)
     const { data: business, error: bizError } = await supabaseWithToken
       .from('businesses')
       .select('id, owner_id, plan, name')
@@ -60,20 +56,14 @@ export async function POST(req) {
       .single()
 
     if (bizError || !business) {
-      return NextResponse.json(
-        { error: 'Business not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
     if (business.owner_id !== user.id) {
-      return NextResponse.json(
-        { error: 'Only business owners can invite staff' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Only owners can invite' }, { status: 403 })
     }
 
-    // 3. Check plan limit for staff accounts
+    // 3. Check plan limit
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
 
@@ -83,47 +73,21 @@ export async function POST(req) {
       .eq('business_id', business.id)
       .eq('status', 'active')
 
-    if ((activeStaffCount || 0) >= maxStaff) {
+    if ((activeStaffCount || 0) >= maxStaff && maxStaff > 0) {
       return NextResponse.json(
-        { error: `Your plan allows a maximum of ${maxStaff} staff members. Please upgrade to add more.` },
+        { error: `Your plan allows a maximum of ${maxStaff} staff members.` },
         { status: 403 }
       )
     }
 
-    // ✅ 4. Check if user exists using the RPC function (bypasses RLS)
-    let userId = null
-    
-    try {
-      const { data: result, error: rpcError } = await supabaseWithToken
-        .rpc('check_user_exists', { user_email: email })
-      
-      if (rpcError) {
-        console.error('RPC error:', rpcError)
-        // Fallback: try to find user directly from auth.users using admin client
-        const { data: userData, error: adminError } = await supabaseAdmin
-          .from('auth.users')
-          .select('id')
-          .ilike('email', email)
-          .maybeSingle()
-        
-        if (adminError) {
-          console.error('Admin fallback error:', adminError)
-          return NextResponse.json(
-            { error: 'Unable to verify user. Please ensure SUPABASE_SERVICE_ROLE_KEY is set correctly.' },
-            { status: 500 }
-          )
-        }
-        
-        if (userData) {
-          userId = userData.id
-        }
-      } else if (result) {
-        userId = result
-      }
-    } catch (err) {
-      console.error('User check error:', err)
+    // ✅ 4. Check if user exists using RPC function
+    const { data: userId, error: rpcError } = await supabaseWithToken
+      .rpc('check_user_exists', { user_email: email })
+
+    if (rpcError) {
+      console.error('RPC error:', rpcError)
       return NextResponse.json(
-        { error: 'Error checking user existence' },
+        { error: 'Error checking user: ' + rpcError.message },
         { status: 500 }
       )
     }
@@ -135,7 +99,7 @@ export async function POST(req) {
       )
     }
 
-    // 5. Check if already a staff member
+    // 5. Check if already staff
     const { data: existing } = await supabaseWithToken
       .from('staff')
       .select('id, status')
@@ -158,11 +122,11 @@ export async function POST(req) {
       }
     }
 
-    // 6. Generate invite token
+    // 6. Generate token
     const inviteToken = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    // ✅ 7. INSERT USING ADMIN CLIENT (BYPASSES RLS)
+    // ✅ 7. Insert using admin client (bypasses RLS)
     const { data: newStaff, error: insertError } = await supabaseAdmin
       .from('staff')
       .insert({
@@ -192,7 +156,7 @@ export async function POST(req) {
       )
     }
 
-    // 8. Send email notification
+    // 8. Send email
     try {
       const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
       await sendStaffInviteEmail(
@@ -202,13 +166,12 @@ export async function POST(req) {
         acceptLink
       )
     } catch (emailErr) {
-      console.error('Email error (non‑fatal):', emailErr)
+      console.error('Email error:', emailErr)
     }
 
     return NextResponse.json({
       success: true,
       message: `✅ Invitation sent to ${email}!`,
-      staffId: newStaff.id,
     })
   } catch (error) {
     console.error('Invite error:', error)
@@ -217,4 +180,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-        }
+}
