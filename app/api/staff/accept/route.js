@@ -1,9 +1,8 @@
 // app/api/staff/accept/route.js
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { supabase } from '../../../../lib/supabaseClient'
 
-// ✅ Admin client – bypasses RLS
+// Admin client – bypasses RLS
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -11,7 +10,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(req) {
   try {
-    const { token } = await req.json()
+    const { token, accessToken } = await req.json()
 
     if (!token) {
       return NextResponse.json(
@@ -20,18 +19,37 @@ export async function POST(req) {
       )
     }
 
-    // ✅ Get the user from the session (using the default supabase client)
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      console.error('Auth error:', authError)
+    if (!accessToken) {
       return NextResponse.json(
-        { error: 'Unauthorized – please log in' },
+        { error: 'No access token provided' },
         { status: 401 }
       )
     }
 
-    // ✅ Find the staff record by token (use admin client to bypass RLS)
+    // ✅ Authenticate the user using the access token
+    const supabaseWithToken = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      }
+    )
+
+    const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
+
+    if (authError || !user) {
+      console.error('Auth error:', authError)
+      return NextResponse.json(
+        { error: 'Unauthorized – invalid token' },
+        { status: 401 }
+      )
+    }
+
+    // ✅ Find the staff record using admin client (bypass RLS)
     const { data: staff, error: findError } = await supabaseAdmin
       .from('staff')
       .select('*')
@@ -59,7 +77,7 @@ export async function POST(req) {
       )
     }
 
-    // ✅ Update the staff record (using admin client to bypass RLS)
+    // ✅ Update the staff record using admin client (bypass RLS)
     const { error: updateError } = await supabaseAdmin
       .from('staff')
       .update({
