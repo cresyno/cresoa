@@ -17,7 +17,6 @@ export default function DashboardLayout({ children }) {
   const [showTour, setShowTour] = useState(false)
   const [theme, setTheme] = useState('light')
 
-  // Toggle theme
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
@@ -25,7 +24,6 @@ export default function DashboardLayout({ children }) {
     localStorage.setItem('cresoa-theme', newTheme)
   }
 
-  // Load theme from localStorage on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('cresoa-theme')
     if (savedTheme) {
@@ -41,7 +39,7 @@ export default function DashboardLayout({ children }) {
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
     { name: 'Orders', path: '/dashboard/orders', icon: '📋' },
     { name: 'Customers', path: '/dashboard/customers', icon: '👤' },
-    { name: 'Groups', path: '/dashboard/groups/new', icon: '👥' },
+    { name: 'Group Orders', path: '/dashboard/groups/new', icon: '👥' },
     { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
   ]
 
@@ -97,7 +95,6 @@ export default function DashboardLayout({ children }) {
           return
         }
 
-        // Check if user hasn't completed the tour
         if (!businessData.has_completed_onboarding) {
           setShowTour(true)
         }
@@ -181,13 +178,13 @@ export default function DashboardLayout({ children }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100vh', background: '#F7F5F0' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner {
             width: 40px; height: 40px;
-            border: 4px solid #e4d8c2;
-            border-top: 4px solid #1E3A5F;
+            border: 4px solid #E5E0D8;
+            border-top: 4px solid #0F2B4A;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
           }
@@ -197,62 +194,14 @@ export default function DashboardLayout({ children }) {
     )
   }
 
-  // ─── Premium Sidebar Styles ───
-  // I'll keep the styles embedded in the JSX for clarity.
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F5F0' }}>
       <style>{`
-        /* ─── Premium Sidebar Styles ─── */
-        :root {
-          --sidebar-width: 240px;
-          --sidebar-bg: linear-gradient(180deg, #0F2B4A 0%, #1A3F66 100%);
-          --sidebar-text: #C8D4E3;
-          --sidebar-active: #D4A52A;
-          --sidebar-hover: rgba(255,255,255,0.06);
-          --sidebar-border: rgba(255,255,255,0.08);
-        }
-        [data-theme="dark"] {
-          --sidebar-bg: linear-gradient(180deg, #0A0A1A 0%, #1A1A2E 100%);
-          --sidebar-text: #B0B0C0;
-          --sidebar-active: #D4A52A;
-          --sidebar-hover: rgba(255,255,255,0.04);
-          --sidebar-border: rgba(255,255,255,0.04);
-        }
-
-        /* Hamburger */
-        .hamburger {
-          position: fixed;
-          top: 1rem;
-          left: 1rem;
-          z-index: 1001;
-          background: var(--color-primary);
-          border: none;
-          color: #fff;
-          font-size: 1.5rem;
-          padding: 0.3rem 0.6rem;
-          border-radius: 8px;
-          cursor: pointer;
-          display: none;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        .hamburger:hover { opacity: 0.8; }
-        .overlay {
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.4);
-          z-index: 999;
-        }
-        .overlay.open { display: block; }
-
-        /* Sidebar */
+        /* ─── SIDEBAR ─── */
         .sidebar {
-          width: var(--sidebar-width);
+          width: 240px;
           min-height: 100vh;
-          background: var(--sidebar-bg);
+          background: #0A1628;
           padding: 1.2rem 0.8rem;
           flex-shrink: 0;
           position: sticky;
@@ -262,19 +211,18 @@ export default function DashboardLayout({ children }) {
           transition: transform 0.3s ease;
           display: flex;
           flex-direction: column;
-          border-right: 1px solid var(--sidebar-border);
+          border-right: 1px solid rgba(255,255,255,0.04);
         }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-track { background: transparent; }
-        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+        .sidebar::-webkit-scrollbar { width: 3px; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 
         .sidebar .brand {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding-bottom: 1.2rem;
-          border-bottom: 1px solid var(--sidebar-border);
-          margin-bottom: 1.2rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          margin-bottom: 1rem;
         }
         .sidebar .brand .logo-text {
           color: #fff;
@@ -283,89 +231,92 @@ export default function DashboardLayout({ children }) {
           font-family: 'Fraunces', serif;
         }
         .sidebar .brand .sub {
-          color: var(--sidebar-text);
-          font-size: 0.55rem;
-          opacity: 0.7;
+          color: #8899AA;
+          font-size: 0.5rem;
           line-height: 1.4;
         }
-        .sidebar .brand .badge {
+        .sidebar .brand .sub .badge {
           display: inline-block;
           background: rgba(212,165,42,0.15);
           color: #D4A52A;
           padding: 0.05rem 0.4rem;
-          border-radius: 8px;
-          font-size: 0.5rem;
+          border-radius: 4px;
+          font-size: 0.45rem;
           font-weight: 600;
-          margin-left: 0.3rem;
+          margin-left: 0.2rem;
         }
-        .sidebar .brand .plan-badge {
+        .sidebar .brand .sub .plan {
           display: inline-block;
           background: #4C7A5E;
           color: #fff;
           padding: 0.05rem 0.4rem;
-          border-radius: 8px;
-          font-size: 0.5rem;
+          border-radius: 4px;
+          font-size: 0.45rem;
           font-weight: 600;
           text-transform: uppercase;
         }
-        .sidebar .brand .plan-badge.beta {
+        .sidebar .brand .sub .plan.beta {
           background: #1E3A5F;
           color: #C79A2B;
         }
 
-        .sidebar .nav {
-          display: flex;
-          flex-direction: column;
-          gap: 0.15rem;
-          flex: 1;
+        .sidebar .nav-section {
+          margin-bottom: 0.8rem;
         }
-        .sidebar .nav a {
+        .sidebar .nav-section .section-label {
+          color: rgba(255,255,255,0.2);
+          font-size: 0.55rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 0.2rem 0.7rem;
+          margin-bottom: 0.2rem;
+          font-weight: 600;
+        }
+        .sidebar .nav-section a {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding: 0.5rem 0.7rem;
-          border-radius: 8px;
-          color: var(--sidebar-text);
+          padding: 0.4rem 0.7rem;
+          border-radius: 6px;
+          color: #8899AA;
           text-decoration: none;
           font-size: 0.8rem;
           font-weight: 500;
-          transition: all 0.2s ease;
+          transition: all 0.15s ease;
         }
-        .sidebar .nav a:hover {
-          background: var(--sidebar-hover);
+        .sidebar .nav-section a:hover {
+          background: rgba(255,255,255,0.04);
           color: #fff;
-          transform: translateX(4px);
         }
-        .sidebar .nav a.active {
-          background: rgba(212,165,42,0.12);
+        .sidebar .nav-section a.active {
+          background: rgba(212,165,42,0.08);
           color: #D4A52A;
           font-weight: 600;
-          box-shadow: inset 3px 0 0 #D4A52A;
         }
-        .sidebar .nav a .icon {
-          font-size: 1rem;
-          width: 22px;
+        .sidebar .nav-section a .icon {
+          font-size: 0.9rem;
+          width: 20px;
           text-align: center;
           flex-shrink: 0;
         }
 
         .sidebar .bottom {
-          border-top: 1px solid var(--sidebar-border);
-          padding-top: 0.8rem;
-          margin-top: 0.5rem;
+          margin-top: auto;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          padding-top: 0.6rem;
         }
         .sidebar .bottom a,
         .sidebar .bottom button {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding: 0.5rem 0.7rem;
-          border-radius: 8px;
-          color: var(--sidebar-text);
+          padding: 0.4rem 0.7rem;
+          border-radius: 6px;
+          color: #8899AA;
           text-decoration: none;
           font-size: 0.8rem;
           font-weight: 500;
-          transition: all 0.2s ease;
+          transition: all 0.15s ease;
           background: none;
           border: none;
           width: 100%;
@@ -374,24 +325,51 @@ export default function DashboardLayout({ children }) {
         }
         .sidebar .bottom a:hover,
         .sidebar .bottom button:hover {
-          background: var(--sidebar-hover);
+          background: rgba(255,255,255,0.04);
           color: #fff;
-          transform: translateX(4px);
         }
-        .sidebar .bottom .logout-btn {
+        .sidebar .bottom .logout {
           color: #D9534F;
         }
-        .sidebar .bottom .logout-btn:hover {
-          background: rgba(217,83,79,0.12);
+        .sidebar .bottom .logout:hover {
+          background: rgba(217,83,79,0.08);
           color: #D9534F;
         }
         .sidebar .bottom .theme-btn {
           color: #D4A52A;
         }
         .sidebar .bottom .theme-btn:hover {
-          background: rgba(212,165,42,0.08);
+          background: rgba(212,165,42,0.06);
           color: #D4A52A;
         }
+
+        .hamburger {
+          position: fixed;
+          top: 0.8rem;
+          left: 0.8rem;
+          z-index: 1001;
+          background: #0F2B4A;
+          border: none;
+          color: #fff;
+          font-size: 1.3rem;
+          padding: 0.2rem 0.5rem;
+          border-radius: 6px;
+          cursor: pointer;
+          display: none;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .hamburger:hover { background: #1A3F66; }
+        .overlay {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.3);
+          z-index: 999;
+        }
+        .overlay.open { display: block; }
 
         .main-content {
           flex: 1;
@@ -402,34 +380,30 @@ export default function DashboardLayout({ children }) {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0.8rem 1.2rem;
-          background: var(--color-card);
-          border-bottom: 1px solid var(--color-border);
-          box-shadow: var(--shadow);
+          padding: 0.4rem 1.2rem;
+          background: #fff;
+          border-bottom: 1px solid #E5E0D8;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.02);
         }
-        .dashboard-header .right {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
+        .dashboard-header .date {
+          font-size: 0.7rem;
+          color: #8A8A8A;
         }
         .beta-btn {
           display: inline-flex;
           align-items: center;
-          gap: 0.4rem;
-          padding: 0.3rem 0.8rem;
-          border-radius: 20px;
+          gap: 0.3rem;
+          padding: 0.2rem 0.7rem;
+          border-radius: 16px;
           background: linear-gradient(135deg, #D4A52A, #C79A2B);
           color: #0F2B4A;
           font-weight: 700;
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           text-decoration: none;
-          box-shadow: 0 2px 12px rgba(212,165,42,0.3);
-          border: none;
-          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(212,165,42,0.2);
           transition: transform 0.1s ease;
         }
         .beta-btn:hover { transform: scale(1.02); }
-        .beta-btn:active { transform: scale(0.98); }
 
         @media (min-width: 769px) {
           .hamburger { display: none !important; }
@@ -450,8 +424,7 @@ export default function DashboardLayout({ children }) {
           }
           .sidebar.open { transform: translateX(0); }
           .overlay.open { display: block; }
-          .main-content { padding-top: 3.5rem; }
-          .dashboard-header { flex-wrap: wrap; gap: 0.5rem; }
+          .main-content { padding-top: 3rem; }
         }
       `}</style>
 
@@ -460,7 +433,6 @@ export default function DashboardLayout({ children }) {
       </button>
 
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
-
       {/* ─── SIDEBAR ─── */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
@@ -471,14 +443,16 @@ export default function DashboardLayout({ children }) {
               {business?.name || 'Your business'}
               <span className="badge">{getIndustryBadge()}</span>
               <br />
-              <span className={`plan-badge ${business?.plan === 'beta' ? 'beta' : ''}`}>
+              <span className={`plan ${business?.plan === 'beta' ? 'beta' : ''}`}>
                 {business?.plan || 'Free'}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="nav">
+        {/* ─── BUSINESS ─── */}
+        <div className="nav-section">
+          <div className="section-label">Business</div>
           {currentNavItems.map((item) => (
             <a
               key={item.path}
@@ -492,52 +466,61 @@ export default function DashboardLayout({ children }) {
           ))}
         </div>
 
-        <div className="bottom">
-          <a href="/dashboard/staff" onClick={handleNavClick}>👥 Staff</a>
-          <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
+        {/* ─── TEAM & SETTINGS ─── */}
+        <div className="nav-section">
+          <div className="section-label">Team</div>
+          <a href="/dashboard/staff" onClick={handleNavClick}>
+            <span className="icon">👥</span> Team & Staff
+          </a>
+        </div>
 
+        <div className="nav-section">
+          <div className="section-label">Settings</div>
+          <a href="/dashboard/subscription" onClick={handleNavClick}>
+            <span className="icon">💳</span> Billing & Plan
+          </a>
           {business && !business.has_applied_for_beta && (
             <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
-              🧪 Apply for Beta
+              <span className="icon">🧪</span> Join Beta Program
             </a>
           )}
-
           {business && (business.plan === 'pro' || business.plan === 'beta') && (
             <a href="/dashboard/settings/tracking" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
-              🎨 Tracking Page
+              <span className="icon">🎨</span> Order Tracking Page
             </a>
           )}
-
-          <a href="/dashboard/profile" onClick={handleNavClick}>⚙️ Profile</a>
+          <a href="/dashboard/profile" onClick={handleNavClick}>
+            <span className="icon">⚙️</span> Profile & Settings
+          </a>
           <button className="theme-btn" onClick={toggleTheme}>
-            {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+            <span className="icon">{theme === 'light' ? '🌙' : '☀️'}</span>
+            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </button>
-          <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
+        </div>
+
+        {/* ─── BOTTOM ─── */}
+        <div className="bottom">
+          <button className="logout" onClick={handleLogout}>
+            <span className="icon">🚪</span> Logout
+          </button>
         </div>
       </div>
 
       <div className="main-content">
-        {/* ─── DASHBOARD HEADER ─── */}
-        <div className="dashboard-header" data-tour="dashboard-header">
-          <div className="left">
-            {/* No heading – removed for cleaner UX */}
-          </div>
-          <div className="right">
+        <div className="dashboard-header">
+          <div></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {business && !business.has_applied_for_beta && (
-              <a href="/dashboard/beta-apply" className="beta-btn">
-                🧪 Apply for Beta
-              </a>
+              <a href="/dashboard/beta-apply" className="beta-btn">🧪 Join Beta</a>
             )}
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            <span className="date">
               {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
             </span>
           </div>
         </div>
-
         {children}
       </div>
 
-      {/* Onboarding Tour */}
       {showTour && (
         <OnboardingTour
           onComplete={async () => {
