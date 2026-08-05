@@ -2,11 +2,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../../lib/supabaseClient'
-import { isOwner } from '../../../../lib/staffAuth'
 import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
-// Admin client – must have SUPABASE_SERVICE_ROLE_KEY in environment
+// Admin client – needs SUPABASE_SERVICE_ROLE_KEY
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -95,11 +94,11 @@ export async function POST(req) {
     }
 
     // 5. ✅ Check if the email exists in auth.users (using admin client)
-    //    Use ILIKE for case‑insensitive search, and maybeSingle() to avoid errors
+    //    CORRECT table reference: 'auth.users', NOT 'public.auth.users'
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
-      .ilike('email', email) // case‑insensitive
+      .ilike('email', email)
       .maybeSingle()
 
     if (userLookupError) {
@@ -111,7 +110,6 @@ export async function POST(req) {
     }
 
     if (!userData) {
-      // The email doesn't exist in auth.users
       return NextResponse.json(
         { error: 'User not found. They must sign up first.' },
         { status: 404 }
@@ -183,7 +181,6 @@ export async function POST(req) {
       )
     } catch (emailErr) {
       console.error('Email error (non‑fatal):', emailErr)
-      // Don't fail the request – the invitation is already saved.
     }
 
     return NextResponse.json({
