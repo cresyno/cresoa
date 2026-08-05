@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
-// ─── Component that uses useSearchParams ───
 function AcceptInviteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -23,15 +22,15 @@ function AcceptInviteContent() {
 
     const accept = async () => {
       try {
-        // 1. Get current user
+        // 1. Check if user is logged in
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-          const redirect = `/accept-invite?token=${token}`
-          router.push(`/login?redirect=${encodeURIComponent(redirect)}`)
+          // Redirect to login, then back here
+          router.push(`/login?redirect=${encodeURIComponent(`/accept-invite?token=${token}`)}`)
           return
         }
 
-        // 2. Call accept API
+        // 2. Call the accept API
         const res = await fetch('/api/staff/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -39,7 +38,6 @@ function AcceptInviteContent() {
         })
 
         const data = await res.json()
-
         if (res.ok) {
           setStatus('success')
           setMessage('✅ Invitation accepted! You now have access to the business.')
@@ -58,7 +56,6 @@ function AcceptInviteContent() {
     accept()
   }, [token, router])
 
-  // ─── Render ───
   if (status === 'loading') {
     return (
       <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -95,7 +92,6 @@ function AcceptInviteContent() {
   )
 }
 
-// ─── Main page with Suspense boundary ───
 export default function AcceptInvitePage() {
   return (
     <Suspense fallback={
@@ -106,4 +102,4 @@ export default function AcceptInvitePage() {
       <AcceptInviteContent />
     </Suspense>
   )
-      }
+          }
