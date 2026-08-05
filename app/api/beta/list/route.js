@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic' 
+
 const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
