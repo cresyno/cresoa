@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../lib/supabaseClient'
-import Logo from '../components/Logo'
-import { FREE_TRIAL_DAYS } from '../lib/planLimits'
-import BusinessSwitcher from '../components/BusinessSwitcher'
+import Logo from '../../components/Logo'
+import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
+import BusinessSwitcher from '../../components/BusinessSwitcher'
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
