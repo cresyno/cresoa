@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
+import BusinessSwitcher from '../../components/BusinessSwitcher' // Added Business Switcher
 
 
 // ─── Helper: page‑specific header content ───
@@ -40,10 +41,16 @@ function getPageHeader(pathname, business, stats) {
       subtitle: `${stats?.dueToday || 0} due today · ${stats?.overdue || 0} overdue`
     }
   }
-  if (pathname.startsWith('/dashboard/staff')) {
+  if (pathname.startsWith('/dashboard/staff') || pathname.startsWith('/dashboard/members')) {
     return {
       title: '👥 Team & Staff',
       subtitle: 'Manage your team members'
+    }
+  }
+  if (pathname.startsWith('/dashboard/activity')) {
+    return {
+      title: '📜 Activity Logs',
+      subtitle: 'Monitor business actions and audit trails'
     }
   }
   if (pathname.startsWith('/dashboard/subscription')) {
@@ -82,7 +89,6 @@ export default function DashboardLayout({ children }) {
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [showTour, setShowTour] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
 
@@ -138,7 +144,7 @@ export default function DashboardLayout({ children }) {
         let businessData = null
 
         // 1. Check if user owns a business
-        const { data: ownedBusiness, error: ownerError } = await supabase
+        const { data: ownedBusiness } = await supabase
           .from('businesses')
           .select('*')
           .eq('owner_id', user.id)
@@ -146,56 +152,55 @@ export default function DashboardLayout({ children }) {
 
         if (ownedBusiness) {
           businessData = ownedBusiness
-          console.log('✅ User is owner of business:', businessData.name)
         }
 
-        // 2. If not owner, check if they are active staff
+        // 2. If not owner, check memberships table
         if (!businessData) {
-          console.log('🔍 Checking if user is staff...')
-          
-          const { data: staffData, error: staffError } = await supabase
+          const { data: membershipData } = await supabase
+            .from('memberships')
+            .select('business_id, role')
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          if (membershipData) {
+            const { data: memberBusiness } = await supabase
+              .from('businesses')
+              .select('*')
+              .eq('id', membershipData.business_id)
+              .maybeSingle()
+
+            if (memberBusiness) {
+              businessData = memberBusiness
+            }
+          }
+        }
+
+        // 3. Fallback: check old staff table for legacy compatibility if needed
+        if (!businessData) {
+          const { data: staffData } = await supabase
             .from('staff')
-            .select('business_id, status, role')
+            .select('business_id, status')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .maybeSingle()
 
-          if (staffError) {
-            console.error('Staff error:', staffError)
-          }
-
           if (staffData) {
-            console.log('✅ Staff record found:', staffData)
-            
-            const { data: staffBusiness, error: bizError } = await supabase
+            const { data: staffBusiness } = await supabase
               .from('businesses')
               .select('*')
               .eq('id', staffData.business_id)
               .maybeSingle()
 
-            if (bizError) {
-              console.error('Business fetch error:', bizError)
-            }
-
             if (staffBusiness) {
               businessData = staffBusiness
-              console.log('✅ Business loaded for staff:', businessData.name)
             }
           }
         }
 
-        // 3. If still no business, redirect to onboarding
+        // 4. If still no business, redirect to onboarding
         if (!businessData) {
-          console.log('❌ No business found, redirecting to onboarding')
           router.push('/onboarding')
           return
-        }
-
-        console.log('✅ Final business loaded:', businessData.name)
-
-        // Check tour
-        if (!businessData.has_completed_onboarding) {
-          setShowTour(true)
         }
 
         // ─── BETA EXPIRY CHECK ───
@@ -226,12 +231,7 @@ export default function DashboardLayout({ children }) {
         }
 
         const now = new Date()
-        const trialEnd = new Date(businessData.trial_ends_at)
-        if (trialEnd < now && businessData.plan === 'free') {
-          // trial expired, keep free
-        }
-
-        if (businessData.plan !== 'free' && businessData.plan !== 'beta') {
+        if (businessData.plan !== 'free' && businessData.plan !== 'beta' && businessData.subscription_expires_at) {
           const expiresAt = new Date(businessData.subscription_expires_at)
           if (expiresAt < now) {
             await supabase
@@ -397,7 +397,7 @@ export default function DashboardLayout({ children }) {
         .overlay.open { display: block; }
 
         .sidebar {
-          width: 240px;
+          width: 260px;
           min-height: 100vh;
           background: #0A1628;
           padding: 1.2rem 0.8rem;
@@ -419,9 +419,9 @@ export default function DashboardLayout({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding-bottom: 1rem;
+          padding-bottom: 0.8rem;
           border-bottom: 1px solid rgba(255,255,255,0.06);
-          margin-bottom: 1rem;
+          margin-bottom: 0.8rem;
         }
         .sidebar .brand .logo-text {
           color: #fff;
@@ -641,10 +641,21 @@ export default function DashboardLayout({ children }) {
               <span className="badge">{getIndustryBadge()}</span>
               <br />
               <span className={`plan ${business?.plan === 'beta' ? 'beta' : ''}`}>
-                       {business?.plan || 'Free'}
+                {business?.plan || 'Free'}
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Embedded Business Switcher */}
+        <div style={{ marginBottom: '1rem' }}>
+          <BusinessSwitcher 
+            currentBusinessId={business?.id} 
+            onSwitch={(newBusinessId) => {
+              // Reload page or force state update to switch workspace context seamlessly
+              window.location.reload()
+            }} 
+          />
         </div>
 
         <div className="nav-section">
@@ -661,11 +672,13 @@ export default function DashboardLayout({ children }) {
             </a>
           ))}
         </div>
-
-        <div className="nav-section">
-          <div className="section-label">Team</div>
-          <a href="/dashboard/staff" onClick={handleNavClick}>
+<div className="nav-section">
+          <div className="section-label">Team & Activity</div>
+          <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
             <span className="icon">👥</span> Team & Staff
+          </a>
+          <a href="/dashboard/activity" className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
+            <span className="icon">📜</span> Activity Logs
           </a>
         </div>
 
@@ -688,8 +701,7 @@ export default function DashboardLayout({ children }) {
             <span className="icon">⚙️</span> Profile & Settings
           </a>
         </div>
-
-        <div className="bottom">
+<div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}>
             <span className="icon">{theme === 'light' ? '🌙' : '☀️'}</span>
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
@@ -721,30 +733,13 @@ export default function DashboardLayout({ children }) {
             </span>
           </div>
         </div>
-
-        <div className="page-header">
+<div className="page-header">
           <h1>{header.title}</h1>
           <p>{header.subtitle}</p>
         </div>
 
         {children}
       </div>
-
-      {showTour && (
-        <OnboardingTour
-          onComplete={async () => {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-              await fetch('/api/onboarding/complete', {
-                method: 'POST',
-                body: JSON.stringify({ accessToken: session.access_token }),
-                headers: { 'Content-Type': 'application/json' },
-              })
-            }
-            setShowTour(false)
-          }}
-        />
-      )}
     </div>
   )
-                }
+              }
