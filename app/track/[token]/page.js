@@ -16,6 +16,7 @@ export default function TrackPage() {
   const token = params?.token
 
   const [order, setOrder] = useState(null)
+  const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -30,50 +31,58 @@ export default function TrackPage() {
     }
 
     const load = async () => {
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('*, customers(name, phone)')
-        .eq('tracking_token', token)
-        .single()
+      try {
+        // 1. Fetch the order by tracking token
+        const { data: orderData, error: orderError } = await supabase
+          .from('orders')
+          .select('*, customers(name, phone)')
+          .eq('tracking_token', token)
+          .single()
 
-      if (orderError || !orderData) {
-        console.error('Order error:', orderError)
+        if (orderError || !orderData) {
+          console.error('Order error:', orderError)
+          setError(true)
+          setLoading(false)
+          return
+        }
+
+        setOrder(orderData)
+        if (orderData.customers) setCustomer(orderData.customers)
+
+        // 2. Fetch the business details (including customisation settings)
+        const { data: businessData } = await supabase
+          .from('businesses')
+          .select('name, phone, whatsapp, location, sector, plan, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message')
+          .eq('id', orderData.business_id)
+          .single()
+
+        setBusiness(businessData)
+
+        // 3. Detect industry (Fashion vs Repairs)
+        let detectedIndustry = 'default'
+        if (businessData) {
+          const sector = businessData.sector || ''
+          if (sector.toLowerCase().includes('fashion') || sector.toLowerCase().includes('wear')) {
+            detectedIndustry = 'fashion'
+          } else if (sector.toLowerCase().includes('repair') || sector.toLowerCase().includes('technical')) {
+            detectedIndustry = 'repairs'
+          }
+        }
+        setIndustry(detectedIndustry)
+        setStages(STAGES_BY_INDUSTRY[detectedIndustry] || STAGES_BY_INDUSTRY.default)
+
+        setLoading(false)
+      } catch (err) {
+        console.error('Load error:', err)
         setError(true)
         setLoading(false)
-        return
       }
-
-      setOrder(orderData)
-
-      // Fetch business details (including contact info)
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('name, phone, whatsapp, location, sector')
-        .eq('id', orderData.business_id)
-        .single()
-
-      setBusiness(businessData)
-
-      // Detect industry
-      let detectedIndustry = 'default'
-      if (businessData) {
-        const sector = businessData.sector || ''
-        if (sector.toLowerCase().includes('fashion') || sector.toLowerCase().includes('wear')) {
-          detectedIndustry = 'fashion'
-        } else if (sector.toLowerCase().includes('repair') || sector.toLowerCase().includes('technical')) {
-          detectedIndustry = 'repairs'
-        }
-      }
-      setIndustry(detectedIndustry)
-      setStages(STAGES_BY_INDUSTRY[detectedIndustry] || STAGES_BY_INDUSTRY.default)
-
-      setLoading(false)
     }
 
     load()
   }, [token])
 
-  // Helper: status info
+  // Helper: status info with emoji and colour
   const getStatusInfo = (status, industry) => {
     const map = {
       // Fashion
@@ -104,6 +113,7 @@ export default function TrackPage() {
     return phone.startsWith('0') ? '234' + phone.slice(1) : phone
   }
 
+  // Loading state
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -113,7 +123,7 @@ export default function TrackPage() {
     )
   }
 
-  if (error) {
+  if (error || !order) {
     return (
       <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
         <div style={{ background: '#fff', borderRadius: '16px', padding: '2rem', maxWidth: '400px', border: '1px solid #E5E0D8' }}>
@@ -125,14 +135,24 @@ export default function TrackPage() {
     )
   }
 
+  // --- Determine customisation settings (Pro/Beta only) ---
+  const isProOrBeta = business?.plan === 'pro' || business?.plan === 'beta'
+  const primaryColor = isProOrBeta && business?.tracking_primary_color ? business.tracking_primary_color : '#D4A52A'
+  const bgColor = isProOrBeta && business?.tracking_bg_color ? business.tracking_bg_color : '#F8F6F2'
+  const logoUrl = isProOrBeta ? business?.tracking_logo_url : null
+  const welcomeMsg = isProOrBeta ? business?.tracking_welcome_message : null
+  const footerMsg = isProOrBeta ? business?.tracking_footer_message : null
+
   const status = getStatusInfo(order.current_status, industry)
   const currentIndex = stages.indexOf(order.current_status)
   const balance = order.price - order.amount_paid
   const isRepairs = industry === 'repairs'
   const hasContact = business?.phone || business?.whatsapp
+  const statusColor = status.color
 
+  // We'll now render the UI in part 3b.
   return (
-    <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem 1rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: bgColor, padding: '1.2rem 1rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`
         .glass {
           background: rgba(255,255,255,0.7);
@@ -156,168 +176,36 @@ export default function TrackPage() {
           font-weight: 700;
           margin: 0;
         }
-        .business-name span { color: #D4A52A; }
-        .business-contact {
-          display: flex;
-          justify-content: center;
-          gap: 0.8rem;
-          margin-top: 0.3rem;
-          flex-wrap: wrap;
-        }
-        .business-contact a {
-          color: #0F2B4A;
-          font-size: 0.75rem;
-          text-decoration: none;
-          background: rgba(255,255,255,0.5);
-          padding: 0.2rem 0.8rem;
-          border-radius: 20px;
-          border: 1px solid #E5E0D8;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.3rem;
-        }
+        .business-name span { color: ${primaryColor}; }
+        .tagline { color: #8A8A8A; font-size: 0.75rem; margin: 0.2rem 0 0; }
+        .business-contact { display: flex; justify-content: center; gap: 0.8rem; margin-top: 0.3rem; flex-wrap: wrap; }
+        .business-contact a { color: #0F2B4A; font-size: 0.75rem; text-decoration: none; background: rgba(255,255,255,0.5); padding: 0.2rem 0.8rem; border-radius: 20px; border: 1px solid #E5E0D8; display: inline-flex; align-items: center; gap: 0.3rem; }
         .business-contact a:hover { background: #fff; }
-        .business-location {
-          color: #8A8A8A;
-          font-size: 0.7rem;
-          margin-top: 0.2rem;
-        }
-        .tagline {
-          color: #8A8A8A;
-          font-size: 0.75rem;
-          margin: 0.2rem 0 0;
-        }
-        .order-title {
-          color: #0F2B4A;
-          font-size: 1.2rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .order-customer {
-          color: #8A8A8A;
-          font-size: 0.9rem;
-          margin: 0.2rem 0 1rem;
-        }
-        .status-badge {
-          display: inline-block;
-          padding: 0.2rem 0.8rem;
-          border-radius: 20px;
-          font-size: 0.8rem;
-          font-weight: 600;
-        }
-        .timeline {
-          display: flex;
-          justify-content: space-between;
-          position: relative;
-          padding: 0.5rem 0;
-          margin: 0.5rem 0 1rem;
-        }
-        .timeline::before {
-          content: '';
-          position: absolute;
-          top: 16px;
-          left: 5%;
-          right: 5%;
-          height: 2px;
-          background: #E5E0D8;
-          z-index: 0;
-        }
-        .timeline .line-done {
-          position: absolute;
-          top: 16px;
-          left: 5%;
-          height: 2px;
-          background: #2E7D5E;
-          z-index: 0;
-          transition: width 0.5s ease;
-        }
-        .status-dot {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          flex: 1;
-          position: relative;
-          z-index: 1;
-        }
-        .status-dot .dot {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: 3px solid #E5E0D8;
-          background: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.8rem;
-          transition: all 0.3s ease;
-        }
-        .status-dot .dot.active {
-          border-color: #D4A52A;
-          background: #D4A52A;
-          color: #0F2B4A;
-        }
-        .status-dot .dot.done {
-          border-color: #2E7D5E;
-          background: #2E7D5E;
-          color: #fff;
-        }
-        .status-dot .label {
-          font-size: 0.55rem;
-          color: #8A8A8A;
-          text-align: center;
-          margin-top: 0.3rem;
-          max-width: 50px;
-          line-height: 1.2;
-        }
-        .status-dot .label.active {
-          color: #0F2B4A;
-          font-weight: 600;
-        }
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.4rem 0;
-          border-bottom: 1px solid #F0EDE8;
-        }
+        .business-location { color: #8A8A8A; font-size: 0.7rem; margin-top: 0.2rem; }
+        .order-title { color: #0F2B4A; font-size: 1.2rem; font-weight: 700; margin: 0; }
+        .order-customer { color: #8A8A8A; font-size: 0.9rem; margin: 0.2rem 0 1rem; }
+        .status-badge { display: inline-block; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background: ${status.bg}; color: ${statusColor}; }
+        .timeline { display: flex; justify-content: space-between; position: relative; padding: 0.5rem 0; margin: 0.5rem 0 1rem; }
+        .timeline::before { content: ''; position: absolute; top: 16px; left: 5%; right: 5%; height: 2px; background: #E5E0D8; z-index: 0; }
+        .timeline .line-done { position: absolute; top: 16px; left: 5%; height: 2px; background: #2E7D5E; z-index: 0; transition: width 0.5s ease; }
+        .status-dot { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; z-index: 1; }
+        .status-dot .dot { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #E5E0D8; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; transition: all 0.3s ease; }
+        .status-dot .dot.active { border-color: ${primaryColor}; background: ${primaryColor}; color: #0F2B4A; }
+        .status-dot .dot.done { border-color: #2E7D5E; background: #2E7D5E; color: #fff; }
+        .status-dot .label { font-size: 0.55rem; color: #8A8A8A; text-align: center; margin-top: 0.3rem; max-width: 50px; line-height: 1.2; }
+        .status-dot .label.active { color: #0F2B4A; font-weight: 600; }
+        .detail-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #F0EDE8; }
         .detail-row:last-child { border-bottom: none; }
         .detail-label { color: #8A8A8A; font-size: 0.85rem; }
         .detail-value { font-weight: 600; color: #0F2B4A; font-size: 0.85rem; text-align: right; }
-        .detail-value.gold { color: #D4A52A; }
+        .detail-value.gold { color: ${primaryColor}; }
         .detail-value.positive { color: #D9534F; }
         .detail-value.zero { color: #2E7D5E; }
-        .btn-whatsapp {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.6rem 1.2rem;
-          border-radius: 8px;
-          background: #25D366;
-          color: #fff;
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 0.9rem;
-          transition: transform 0.1s ease;
-          border: none;
-          cursor: pointer;
-        }
+        .btn-whatsapp { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 8px; background: #25D366; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: transform 0.1s ease; border: none; cursor: pointer; }
         .btn-whatsapp:hover { transform: scale(1.02); }
         .btn-whatsapp:active { transform: scale(0.97); }
-        .footer {
-          text-align: center;
-          color: #C8C0B5;
-          font-size: 0.7rem;
-          padding-top: 1rem;
-        }
+        .footer { text-align: center; color: #C8C0B5; font-size: 0.7rem; padding-top: 1rem; }
         .footer strong { color: #0F2B4A; }
-        .device-info {
-          background: rgba(255,255,255,0.3);
-          border-radius: 8px;
-          padding: 0.5rem 0.8rem;
-          margin-top: 0.2rem;
-          font-size: 0.85rem;
-          color: #0F2B4A;
-          display: inline-block;
-        }
         @media (max-width: 480px) {
           .glass { padding: 1rem; }
           .status-dot .dot { width: 28px; height: 28px; font-size: 0.7rem; }
@@ -330,11 +218,15 @@ export default function TrackPage() {
 
       {/* ─── HEADER ─── */}
       <div className="glass glass-header">
+        {logoUrl && (
+          <img src={logoUrl} alt="Business logo" style={{ maxHeight: '60px', marginBottom: '0.5rem' }} />
+        )}
         <h1 className="business-name">
           {business?.name || 'Business'} <span>✦</span>
         </h1>
-        <p className="tagline">Track your {isRepairs ? 'repair' : 'order'} status</p>
-        {/* Business Contact Info */}
+        <p className="tagline">
+          {welcomeMsg || `Track your ${isRepairs ? 'repair' : 'order'} status`}
+        </p>
         {hasContact && (
           <div className="business-contact">
             {business.phone && (
@@ -359,22 +251,20 @@ export default function TrackPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.3rem' }}>
           <div>
             <h2 className="order-title">{order.title || 'Order'}</h2>
-            <p className="order-customer">{order.customers?.name || 'Customer'}</p>
+            <p className="order-customer">{customer?.name || 'Customer'}</p>
           </div>
           <span className="status-badge" style={{ background: status.bg, color: status.color }}>
             {status.emoji} {status.label}
           </span>
         </div>
 
-        {/* Show device info for repairs */}
         {isRepairs && order.device_type && (
-          <div className="device-info">
+          <div style={{ background: 'rgba(255,255,255,0.3)', borderRadius: '8px', padding: '0.4rem 0.8rem', marginTop: '0.2rem', fontSize: '0.85rem', color: '#0F2B4A', display: 'inline-block' }}>
             📱 {order.device_type} {order.device_model || ''}
             {order.serial_number && ` · SN: ${order.serial_number}`}
           </div>
         )}
 
-        {/* Timeline */}
         <div className="timeline">
           <div
             className="line-done"
@@ -439,7 +329,7 @@ export default function TrackPage() {
         </div>
       </div>
 
-      {/* ─── CONTACT (if business has WhatsApp) ─── */}
+      {/* ─── CONTACT ─── */}
       {business?.whatsapp && (
         <div className="glass" style={{ textAlign: 'center' }}>
           <p style={{ color: '#8A8A8A', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>
@@ -456,10 +346,17 @@ export default function TrackPage() {
         </div>
       )}
 
-      {/* ─── FOOTER ─── */}
+      {/* ─── CUSTOM FOOTER MESSAGE ─── */}
+      {footerMsg && (
+        <div className="glass" style={{ textAlign: 'center', padding: '1rem' }}>
+          <p style={{ color: '#8A8A8A', fontSize: '0.8rem', margin: 0 }}>{footerMsg}</p>
+        </div>
+      )}
+
+      {/* ─── POWERED BY ─── */}
       <div className="footer">
-        Powered by <strong>Cresoa</strong> · Built for Nigerian businesses
+        Powered by <a href="/" style={{ color: '#0F2B4A', fontWeight: '600', textDecoration: 'none' }}>Cresoa</a> · Built for Nigerian businesses
       </div>
     </div>
   )
-          }
+              }
