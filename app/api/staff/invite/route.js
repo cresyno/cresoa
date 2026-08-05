@@ -5,7 +5,7 @@ import { supabase } from '../../../../lib/supabaseClient'
 import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
-// Admin client – bypasses RLS for insert
+// Admin client – bypasses RLS for insert and auth checks
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -80,104 +80,109 @@ export async function POST(req) {
       )
     }
 
-    // ✅ 4. Check if user exists using the authenticated client (not admin)
-    const { data: userData, error: userError } = await supabaseWithToken
-      .from('auth.users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
-
-    if (userError) {
-      console.error('User lookup error:', userError)
-      return NextResponse.json(
-        { error: 'Error checking user: ' + userError.message },
-        { status: 500 }
-      )
-    }
-
-    if (!userData) {
-      return NextResponse.json(
-        { error: 'User not found. They must sign up first.' },
-        { status: 404 }
-      )
-    }
-
-    const userId = userData.id
-
-    // 5. Check if already staff
-    const { data: existing } = await supabaseWithToken
-      .from('staff')
-      .select('id, status')
-      .eq('business_id', business.id)
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (existing) {
-      if (existing.status === 'pending') {
-        return NextResponse.json(
-          { error: `Invitation already sent to ${email}` },
-          { status: 400 }
-        )
-      }
-      if (existing.status === 'active') {
-        return NextResponse.json(
-          { error: `${email} is already a staff member` },
-          { status: 400 }
-        )
-      }
-    }
-
-    // 6. Generate token
-    const inviteToken = crypto.randomUUID()
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-
-    // ✅ 7. Insert using admin client (bypasses RLS)
-    const { data: newStaff, error: insertError } = await supabaseAdmin
-      .from('staff')
-      .insert({
-        business_id: business.id,
-        user_id: userId,
-        email: email,
-        role: role,
-        status: 'pending',
-        invited_by: user.id,
-        invited_at: new Date().toISOString(),
-        invite_token: inviteToken,
-        expires_at: expiresAt,
-      })
-      .select()
-      .single()
-
-    if (insertError) {
-      console.error('Insert error:', insertError)
-      return NextResponse.json(
-        { 
-          error: 'Failed to invite staff', 
-          details: insertError.message,
-          code: insertError.code,
-          hint: insertError.hint
-        },
-        { status: 500 }
-      )
-    }
-
-    // 8. Send email
+    // ✅ 4. Check if user exists using Supabase Admin API
     try {
-      const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
-      await sendStaffInviteEmail(
-        email,
-        user.email || 'The business owner',
-        business.name || 'your business',
-        acceptLink
-      )
-    } catch (emailErr) {
-      console.error('Email error:', emailErr)
-    }
+      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
+      
+      if (userError) {
+        console.error('Admin API error:', userError)
+        return NextResponse.json(
+          { error: 'Error checking user: ' + userError.message },
+          { status: 500 }
+        )
+      }
 
-    return NextResponse.json({
-      success: true,
-      message: `✅ Invitation sent to ${email}!`,
-    })
+      if (!userData || !userData.user) {
+        return NextResponse.json(
+          { error: 'User not found. They must sign up first.' },
+          { status: 404 }
+        )
+      }
+
+      const userId = userData.user.id
+
+      // 5. Check if already staff
+      const { data: existing } = await supabaseWithToken
+        .from('staff')
+        .select('id, status')
+        .eq('business_id', business.id)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (existing) {
+        if (existing.status === 'pending') {
+          return NextResponse.json(
+            { error: `Invitation already sent to ${email}` },
+            { status: 400 }
+          )
+        }
+        if (existing.status === 'active') {
+          return NextResponse.json(
+            { error: `${email} is already a staff member` },
+            { status: 400 }
+          )
+        }
+      }
+
+      // 6. Generate token
+      const inviteToken = crypto.randomUUID()
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+      // ✅ 7. Insert using admin client (bypasses RLS)
+      const { data: newStaff, error: insertError } = await supabaseAdmin
+        .from('staff')
+        .insert({
+          business_id: business.id,
+          user_id: userId,
+          email: email,
+          role: role,
+          status: 'pending',
+          invited_by: user.id,
+          invited_at: new Date().toISOString(),
+          invite_token: inviteToken,
+          expires_at: expiresAt,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        return NextResponse.json(
+          { 
+            error: 'Failed to invite staff', 
+            details: insertError.message,
+            code: insertError.code,
+            hint: insertError.hint
+          },
+          { status: 500 }
+        )
+      }
+
+      // 8. Send email
+      try {
+        const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
+        await sendStaffInviteEmail(
+          email,
+          user.email || 'The business owner',
+          business.name || 'your business',
+          acceptLink
+        )
+      } catch (emailErr) {
+        console.error('Email error:', emailErr)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `✅ Invitation sent to ${email}!`,
+      })
+
+    } catch (adminError) {
+      console.error('Admin API error:', adminError)
+      return NextResponse.json(
+        { error: 'Unable to verify user. Please ensure SUPABASE_SERVICE_ROLE_KEY is set correctly.' },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error('Invite error:', error)
     return NextResponse.json(
@@ -185,4 +190,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-        }
+}
