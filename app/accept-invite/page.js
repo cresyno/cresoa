@@ -1,17 +1,17 @@
 'use client'
 
-import { Suspense } from 'react'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
-function AcceptInviteContent() {
+export default function AcceptInvitePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('')
+  const [debug, setDebug] = useState('')
 
   useEffect(() => {
     if (!token) {
@@ -22,64 +22,83 @@ function AcceptInviteContent() {
 
     const accept = async () => {
       try {
-        // ✅ Get the current session and access token
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          // Redirect to login, then back here
-          router.push(`/login?redirect=/accept-invite?token=${token}`)
+        // 1. Get the current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+          // Not logged in – redirect to login with return URL
+          const redirect = `/accept-invite?token=${token}`
+          router.push(`/login?redirect=${encodeURIComponent(redirect)}`)
           return
         }
 
-        // ✅ Send the token with the request
+        // 2. Validate the token via API (or directly)
+        // We'll call an API to handle the update
         const res = await fetch('/api/staff/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            token, 
-            accessToken: session.access_token 
-          }),
+          body: JSON.stringify({ token }),
         })
+
         const data = await res.json()
 
         if (res.ok) {
           setStatus('success')
           setMessage('✅ Invitation accepted! You now have access to the business.')
-          setTimeout(() => router.push('/dashboard'), 3000)
+          setTimeout(() => router.push('/dashboard'), 2000)
         } else {
           setStatus('error')
           setMessage(`❌ ${data.error || 'Failed to accept invitation'}`)
+          setDebug(JSON.stringify(data, null, 2))
         }
       } catch (err) {
+        console.error('Accept error:', err)
         setStatus('error')
         setMessage('❌ Network error. Please try again.')
+        setDebug(err.message)
       }
     }
 
     accept()
   }, [token, router])
 
+  // Render
+  if (status === 'loading') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p>Processing your invitation...</p>
+      </div>
+    )
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ background: '#fff', borderRadius: '14px', padding: '2rem', maxWidth: '400px', width: '100%', textAlign: 'center', border: '1px solid #E8E0D5' }}>
-        <h1 style={{ color: '#1E3A5F', fontSize: '1.5rem', marginBottom: '1rem' }}>Invitation</h1>
-        {status === 'loading' && <p>⏳ Processing your invitation...</p>}
-        {status === 'success' && <p style={{ color: '#4C7A5E' }}>{message}</p>}
-        {status === 'error' && <p style={{ color: '#AE4A34' }}>{message}</p>}
-        {status === 'success' && <p style={{ fontSize: '0.9rem', color: '#6B6255' }}>Redirecting to dashboard...</p>}
-        {status === 'error' && (
-          <button onClick={() => router.push('/dashboard')} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-            Go to Dashboard
-          </button>
+    <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '2.5rem', maxWidth: '420px', border: '1px solid #E5E0D8' }}>
+        {status === 'success' ? (
+          <>
+            <div style={{ fontSize: '3rem' }}>🎉</div>
+            <h2 style={{ color: '#0F2B4A' }}>Accepted!</h2>
+            <p style={{ color: '#8A8A8A' }}>{message}</p>
+            <p style={{ fontSize: '0.8rem', color: '#8A8A8A' }}>Redirecting to dashboard...</p>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: '3rem' }}>❌</div>
+            <h2 style={{ color: '#D9534F' }}>Error</h2>
+            <p style={{ color: '#8A8A8A' }}>{message}</p>
+            {debug && (
+              <pre style={{ background: '#f0f0f0', padding: '0.5rem', borderRadius: '4px', fontSize: '0.7rem', textAlign: 'left', maxWidth: '100%', overflow: 'auto' }}>
+                {debug}
+              </pre>
+            )}
+            <button
+              onClick={() => router.push('/dashboard')}
+              style={{ marginTop: '1rem', padding: '0.6rem 1.2rem', background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Go to Dashboard
+            </button>
+          </>
         )}
       </div>
     </div>
   )
-}
-
-export default function AcceptInvitePage() {
-  return (
-    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
-      <AcceptInviteContent />
-    </Suspense>
-  )
-  }
+      }
