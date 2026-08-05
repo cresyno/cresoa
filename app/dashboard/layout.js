@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
-import BusinessSwitcher from '../../components/BusinessSwitcher' // Added Business Switcher
+import BusinessSwitcher from '../components/BusinessSwitcher'// Added Business Switcher
 
 
 // ─── Helper: page‑specific header content ───
