@@ -1,6 +1,13 @@
 // app/api/staff/accept/route.js
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../../lib/supabaseClient'
+
+// ✅ Admin client – bypasses RLS
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function POST(req) {
   try {
@@ -13,17 +20,19 @@ export async function POST(req) {
       )
     }
 
-    // Get current user
+    // ✅ Get the user from the session (using the default supabase client)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+
     if (authError || !user) {
+      console.error('Auth error:', authError)
       return NextResponse.json(
         { error: 'Unauthorized – please log in' },
         { status: 401 }
       )
     }
 
-    // Find the staff record by invite_token and status = 'pending'
-    const { data: staff, error: findError } = await supabase
+    // ✅ Find the staff record by token (use admin client to bypass RLS)
+    const { data: staff, error: findError } = await supabaseAdmin
       .from('staff')
       .select('*')
       .eq('invite_token', token)
@@ -31,6 +40,7 @@ export async function POST(req) {
       .single()
 
     if (findError || !staff) {
+      console.error('Staff not found:', findError)
       return NextResponse.json(
         { error: 'Invalid or expired invitation' },
         { status: 404 }
@@ -39,8 +49,7 @@ export async function POST(req) {
 
     // Check expiry
     if (staff.expires_at && new Date(staff.expires_at) < new Date()) {
-      // Mark as expired
-      await supabase
+      await supabaseAdmin
         .from('staff')
         .update({ status: 'expired' })
         .eq('id', staff.id)
@@ -50,8 +59,8 @@ export async function POST(req) {
       )
     }
 
-    // Update staff record: link user, activate, set accepted_at
-    const { error: updateError } = await supabase
+    // ✅ Update the staff record (using admin client to bypass RLS)
+    const { error: updateError } = await supabaseAdmin
       .from('staff')
       .update({
         user_id: user.id,
