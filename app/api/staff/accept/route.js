@@ -1,14 +1,10 @@
 // app/api/staff/accept/route.js
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../../../../lib/supabaseClient'
 
-export const dynamic = 'force-dynamic'
-
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const { token, accessToken } = await request.json()
-
-    console.log('📥 Accept request:', { token, hasAccessToken: !!accessToken })
+    const { token } = await req.json()
 
     if (!token) {
       return NextResponse.json(
@@ -17,108 +13,70 @@ export async function POST(request) {
       )
     }
 
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: 'No access token provided' },
-        { status: 401 }
-      )
-    }
-
-    // Authenticate
-    const supabaseWithToken = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      }
-    )
-
-    const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
-
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      console.error('❌ Auth error:', authError)
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized – please log in' },
         { status: 401 }
       )
     }
 
-    console.log('👤 User authenticated:', { userId: user.id, email: user.email })
-
-    // Create admin client to bypass RLS
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    )
-
-    // Find the staff record by token
-    const { data: staff, error: findError } = await supabaseAdmin
+    // Find the staff record by token (and ensure it's pending)
+    const { data: staff, error: findError } = await supabase
       .from('staff')
       .select('*')
-      .eq('id', token)
+      .eq('invite_token', token)
+      .eq('status', 'pending')
       .single()
 
     if (findError || !staff) {
-      console.error('❌ Staff not found:', findError)
       return NextResponse.json(
-        { error: 'Invalid invitation – record not found' },
+        { error: 'Invalid or expired invitation' },
         { status: 404 }
       )
     }
 
-    console.log('📋 Staff found:', { id: staff.id, email: staff.email, status: staff.status })
-
     // Check expiry
-    const invitedAt = new Date(staff.invited_at)
-    const now = new Date()
-    const diffDays = (now - invitedAt) / (1000 * 60 * 60 * 24)
-    if (diffDays > 7) {
+    if (staff.expires_at && new Date(staff.expires_at) < new Date()) {
+      // Mark as expired
+      await supabase
+        .from('staff')
+        .update({ status: 'expired' })
+        .eq('id', staff.id)
       return NextResponse.json(
         { error: 'Invitation has expired' },
         { status: 400 }
       )
     }
 
-    if (staff.status === 'active') {
-      return NextResponse.json(
-        { error: 'Invitation already accepted' },
-        { status: 400 }
-      )
-    }
-
-    // Update the record
-    const { error: updateError } = await supabaseAdmin
+    // Update staff record: link user, activate, set accepted_at
+    const { error: updateError } = await supabase
       .from('staff')
       .update({
+        user_id: user.id,
         status: 'active',
         accepted_at: new Date().toISOString(),
-        user_id: user.id,
       })
       .eq('id', staff.id)
 
     if (updateError) {
-      console.error('❌ Update error:', updateError)
+      console.error('Update error:', updateError)
       return NextResponse.json(
         { error: 'Failed to accept invitation' },
         { status: 500 }
       )
     }
 
-    console.log('✅ Staff record updated successfully')
-
     return NextResponse.json({
       success: true,
       message: 'Invitation accepted successfully',
     })
   } catch (error) {
-    console.error('❌ Accept error:', error)
+    console.error('Accept error:', error)
     return NextResponse.json(
-      { error: 'Server error: ' + error.message },
+      { error: 'Server error' },
       { status: 500 }
     )
   }
-         }
+}
