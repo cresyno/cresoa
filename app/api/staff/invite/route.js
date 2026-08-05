@@ -5,6 +5,12 @@ import { supabase } from '../../../../lib/supabaseClient'
 import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
+// ✅ Admin client – bypasses RLS
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
+
 export async function POST(req) {
   try {
     const body = await req.json()
@@ -24,6 +30,7 @@ export async function POST(req) {
       )
     }
 
+    // 1. Authenticate the user via token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -38,12 +45,14 @@ export async function POST(req) {
 
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
     if (authError || !user) {
+      console.error('Auth error:', authError)
       return NextResponse.json(
         { error: 'Unauthorized – invalid token' },
         { status: 401 }
       )
     }
 
+    // 2. Get the user's business (they must be the owner)
     const { data: business, error: bizError } = await supabaseWithToken
       .from('businesses')
       .select('id, owner_id, plan, name')
@@ -64,7 +73,7 @@ export async function POST(req) {
       )
     }
 
-    // Check plan limit
+    // 3. Check plan limit for staff accounts
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
 
@@ -81,13 +90,40 @@ export async function POST(req) {
       )
     }
 
-    // Check if user exists
-    const { data: userId, error: rpcError } = await supabaseWithToken
-      .rpc('check_user_exists', { user_email: email })
-
-    if (rpcError) {
+    // ✅ 4. Check if user exists using the RPC function (bypasses RLS)
+    let userId = null
+    
+    try {
+      const { data: result, error: rpcError } = await supabaseWithToken
+        .rpc('check_user_exists', { user_email: email })
+      
+      if (rpcError) {
+        console.error('RPC error:', rpcError)
+        // Fallback: try to find user directly from auth.users using admin client
+        const { data: userData, error: adminError } = await supabaseAdmin
+          .from('auth.users')
+          .select('id')
+          .ilike('email', email)
+          .maybeSingle()
+        
+        if (adminError) {
+          console.error('Admin fallback error:', adminError)
+          return NextResponse.json(
+            { error: 'Unable to verify user. Please ensure SUPABASE_SERVICE_ROLE_KEY is set correctly.' },
+            { status: 500 }
+          )
+        }
+        
+        if (userData) {
+          userId = userData.id
+        }
+      } else if (result) {
+        userId = result
+      }
+    } catch (err) {
+      console.error('User check error:', err)
       return NextResponse.json(
-        { error: 'Database error while checking user: ' + rpcError.message },
+        { error: 'Error checking user existence' },
         { status: 500 }
       )
     }
@@ -99,7 +135,7 @@ export async function POST(req) {
       )
     }
 
-    // Check if already staff
+    // 5. Check if already a staff member
     const { data: existing } = await supabaseWithToken
       .from('staff')
       .select('id, status')
@@ -122,33 +158,29 @@ export async function POST(req) {
       }
     }
 
-    // ✅ Generate token
+    // 6. Generate invite token
     const inviteToken = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    // ✅ Insert with detailed error logging
-    const insertData = {
-      business_id: business.id,
-      user_id: userId,
-      email: email,
-      role: role,
-      status: 'pending',
-      invited_by: user.id,
-      invited_at: new Date().toISOString(),
-      invite_token: inviteToken,
-      expires_at: expiresAt,
-    }
-
-    console.log('📝 Inserting staff record:', insertData)
-
-    const { data: newStaff, error: insertError } = await supabaseWithToken
+    // ✅ 7. INSERT USING ADMIN CLIENT (BYPASSES RLS)
+    const { data: newStaff, error: insertError } = await supabaseAdmin
       .from('staff')
-      .insert(insertData)
+      .insert({
+        business_id: business.id,
+        user_id: userId,
+        email: email,
+        role: role,
+        status: 'pending',
+        invited_by: user.id,
+        invited_at: new Date().toISOString(),
+        invite_token: inviteToken,
+        expires_at: expiresAt,
+      })
       .select()
       .single()
 
     if (insertError) {
-      console.error('❌ Insert error DETAILS:', insertError)
+      console.error('Insert error:', insertError)
       return NextResponse.json(
         { 
           error: 'Failed to invite staff', 
@@ -160,9 +192,7 @@ export async function POST(req) {
       )
     }
 
-    console.log('✅ Staff record created:', newStaff)
-
-    // Send email
+    // 8. Send email notification
     try {
       const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
       await sendStaffInviteEmail(
@@ -178,6 +208,7 @@ export async function POST(req) {
     return NextResponse.json({
       success: true,
       message: `✅ Invitation sent to ${email}!`,
+      staffId: newStaff.id,
     })
   } catch (error) {
     console.error('Invite error:', error)
@@ -186,4 +217,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-}
+        }
