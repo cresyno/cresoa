@@ -16,6 +16,9 @@ export async function POST(req) {
     const body = await req.json()
     const { email, role, accessToken } = body
 
+    // 🔍 Log the request
+    console.log('📥 Invite request:', { email, role, hasToken: !!accessToken })
+
     if (!email || !role) {
       return NextResponse.json(
         { error: 'Email and role are required' },
@@ -45,8 +48,10 @@ export async function POST(req) {
 
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
     if (authError || !user) {
+      console.error('❌ Auth error:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    console.log('✅ User authenticated:', user.email)
 
     // 2. Get the business (owner only)
     const { data: business, error: bizError } = await supabaseWithToken
@@ -56,8 +61,10 @@ export async function POST(req) {
       .single()
 
     if (bizError || !business) {
+      console.error('❌ Business error:', bizError)
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
+    console.log('✅ Business found:', business.name)
 
     if (business.owner_id !== user.id) {
       return NextResponse.json({ error: 'Only owners can invite' }, { status: 403 })
@@ -72,6 +79,7 @@ export async function POST(req) {
       .select('*', { count: 'exact', head: true })
       .eq('business_id', business.id)
       .eq('status', 'active')
+    console.log('📊 Active staff count:', activeStaffCount, 'Max:', maxStaff)
 
     if ((activeStaffCount || 0) >= maxStaff && maxStaff > 0) {
       return NextResponse.json(
@@ -80,12 +88,13 @@ export async function POST(req) {
       )
     }
 
-    // ✅ 4. Check if user exists using RPC function (works 100%)
+    // ✅ 4. Check if user exists using RPC function
+    console.log('🔍 Checking user existence via RPC:', email)
     const { data: userId, error: rpcError } = await supabaseWithToken
       .rpc('check_user_exists', { user_email: email })
 
     if (rpcError) {
-      console.error('RPC error:', rpcError)
+      console.error('❌ RPC error:', rpcError)
       return NextResponse.json(
         { error: 'Error checking user: ' + rpcError.message },
         { status: 500 }
@@ -93,11 +102,13 @@ export async function POST(req) {
     }
 
     if (!userId) {
+      console.log('❌ User not found:', email)
       return NextResponse.json(
         { error: 'User not found. They must sign up first.' },
         { status: 404 }
       )
     }
+    console.log('✅ User found, ID:', userId)
 
     // 5. Check if already staff
     const { data: existing } = await supabaseWithToken
@@ -108,6 +119,7 @@ export async function POST(req) {
       .maybeSingle()
 
     if (existing) {
+      console.log('⚠️ Existing staff record:', existing.status)
       if (existing.status === 'pending') {
         return NextResponse.json(
           { error: `Invitation already sent to ${email}` },
@@ -126,7 +138,8 @@ export async function POST(req) {
     const inviteToken = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    // ✅ 7. Insert using admin client (bypasses RLS)
+    // 7. Insert using admin client
+    console.log('📝 Inserting staff record...')
     const { data: newStaff, error: insertError } = await supabaseAdmin
       .from('staff')
       .insert({
@@ -144,7 +157,7 @@ export async function POST(req) {
       .single()
 
     if (insertError) {
-      console.error('Insert error:', insertError)
+      console.error('❌ Insert error:', insertError)
       return NextResponse.json(
         { 
           error: 'Failed to invite staff', 
@@ -155,6 +168,7 @@ export async function POST(req) {
         { status: 500 }
       )
     }
+    console.log('✅ Staff record created:', newStaff.id)
 
     // 8. Send email
     try {
@@ -165,8 +179,9 @@ export async function POST(req) {
         business.name || 'your business',
         acceptLink
       )
+      console.log('✅ Email sent to:', email)
     } catch (emailErr) {
-      console.error('Email error:', emailErr)
+      console.error('❌ Email error:', emailErr)
     }
 
     return NextResponse.json({
@@ -174,10 +189,10 @@ export async function POST(req) {
       message: `✅ Invitation sent to ${email}!`,
     })
   } catch (error) {
-    console.error('Invite error:', error)
+    console.error('❌ Invite error:', error)
     return NextResponse.json(
       { error: 'Server error: ' + error.message },
       { status: 500 }
     )
   }
-        }
+          }
