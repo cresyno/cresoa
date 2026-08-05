@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient'; // Adjust path to supabase client if needed
+import { supabase } from '../../lib/supabaseClient'; // Adjust path to supabase client if needed
 
 export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
   const [businesses, setBusinesses] = useState([]);
