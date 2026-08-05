@@ -24,7 +24,6 @@ export async function POST(req) {
       )
     }
 
-    // 1. Authenticate the user via token
     const supabaseWithToken = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -39,14 +38,12 @@ export async function POST(req) {
 
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
     if (authError || !user) {
-      console.error('Auth error:', authError)
       return NextResponse.json(
         { error: 'Unauthorized – invalid token' },
         { status: 401 }
       )
     }
 
-    // 2. Get the user's business (they must be the owner)
     const { data: business, error: bizError } = await supabaseWithToken
       .from('businesses')
       .select('id, owner_id, plan, name')
@@ -67,7 +64,7 @@ export async function POST(req) {
       )
     }
 
-    // 3. Check plan limit for staff accounts
+    // Check plan limit
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
 
@@ -84,12 +81,11 @@ export async function POST(req) {
       )
     }
 
-    // ✅ 4. Check if the email exists using the RPC function
+    // Check if user exists
     const { data: userId, error: rpcError } = await supabaseWithToken
       .rpc('check_user_exists', { user_email: email })
 
     if (rpcError) {
-      console.error('RPC error:', rpcError)
       return NextResponse.json(
         { error: 'Database error while checking user: ' + rpcError.message },
         { status: 500 }
@@ -103,7 +99,7 @@ export async function POST(req) {
       )
     }
 
-    // 5. Check if already a staff member
+    // Check if already staff
     const { data: existing } = await supabaseWithToken
       .from('staff')
       .select('id, status')
@@ -126,36 +122,47 @@ export async function POST(req) {
       }
     }
 
-    // 6. Generate invite token and expiry (7 days)
+    // ✅ Generate token
     const inviteToken = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    // 7. Insert staff record
+    // ✅ Insert with detailed error logging
+    const insertData = {
+      business_id: business.id,
+      user_id: userId,
+      email: email,
+      role: role,
+      status: 'pending',
+      invited_by: user.id,
+      invited_at: new Date().toISOString(),
+      invite_token: inviteToken,
+      expires_at: expiresAt,
+    }
+
+    console.log('📝 Inserting staff record:', insertData)
+
     const { data: newStaff, error: insertError } = await supabaseWithToken
       .from('staff')
-      .insert({
-        business_id: business.id,
-        user_id: userId,
-        email: email,
-        role: role,
-        status: 'pending',
-        invited_by: user.id,
-        invited_at: new Date().toISOString(),
-        invite_token: inviteToken,
-        expires_at: expiresAt,
-      })
+      .insert(insertData)
       .select()
       .single()
 
     if (insertError) {
-      console.error('Insert error:', insertError)
+      console.error('❌ Insert error DETAILS:', insertError)
       return NextResponse.json(
-        { error: 'Failed to invite staff' },
+        { 
+          error: 'Failed to invite staff', 
+          details: insertError.message,
+          code: insertError.code,
+          hint: insertError.hint
+        },
         { status: 500 }
       )
     }
 
-    // 8. Send email notification (non-blocking)
+    console.log('✅ Staff record created:', newStaff)
+
+    // Send email
     try {
       const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
       await sendStaffInviteEmail(
@@ -170,7 +177,7 @@ export async function POST(req) {
 
     return NextResponse.json({
       success: true,
-      message: `✅ Invitation sent to ${email}! They will receive an email with instructions.`,
+      message: `✅ Invitation sent to ${email}!`,
     })
   } catch (error) {
     console.error('Invite error:', error)
