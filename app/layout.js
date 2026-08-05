@@ -11,6 +11,7 @@ export default function RootLayout({ children }) {
   const isTrackingPage = pathname?.startsWith('/track/')
   const [theme, setTheme] = useState('light')
 
+  // Load theme from localStorage on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('cresoa-theme')
     if (savedTheme) {
@@ -76,6 +77,8 @@ export default function RootLayout({ children }) {
             background: var(--color-bg);
             color: var(--color-text);
             transition: background 0.3s ease, color 0.3s ease;
+            margin: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
           }
 
           .support-float {
