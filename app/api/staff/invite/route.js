@@ -2,11 +2,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../../lib/supabaseClient'
-import { isOwner, canAddStaff } from '../../../../lib/staffAuth'
-import { getPlanLimits } from '../../../../lib/planLimits' // ✅ ADD THIS IMPORT
+import { isOwner } from '../../../../lib/staffAuth'
+import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
-// Admin client (service role) – needed to check auth.users
+// Admin client – must have SUPABASE_SERVICE_ROLE_KEY in environment
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -80,7 +80,6 @@ export async function POST(req) {
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
 
-    // Get current active staff count
     const { count: activeStaffCount } = await supabaseWithToken
       .from('staff')
       .select('*', { count: 'exact', head: true })
@@ -88,7 +87,6 @@ export async function POST(req) {
       .eq('status', 'active')
 
     const canAdd = (activeStaffCount || 0) < maxStaff
-
     if (!canAdd) {
       return NextResponse.json(
         { error: `Your plan allows a maximum of ${maxStaff} staff members. Please upgrade to add more.` },
@@ -96,14 +94,24 @@ export async function POST(req) {
       )
     }
 
-    // 5. Check if the email exists in auth.users (using admin client)
+    // 5. ✅ Check if the email exists in auth.users (using admin client)
+    //    Use ILIKE for case‑insensitive search, and maybeSingle() to avoid errors
     const { data: userData, error: userLookupError } = await supabaseAdmin
       .from('auth.users')
       .select('id')
-      .eq('email', email)
-      .single()
+      .ilike('email', email) // case‑insensitive
+      .maybeSingle()
 
-    if (userLookupError || !userData) {
+    if (userLookupError) {
+      console.error('Admin client error:', userLookupError)
+      return NextResponse.json(
+        { error: 'Database error while checking user: ' + userLookupError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!userData) {
+      // The email doesn't exist in auth.users
       return NextResponse.json(
         { error: 'User not found. They must sign up first.' },
         { status: 404 }
@@ -189,4 +197,4 @@ export async function POST(req) {
       { status: 500 }
     )
   }
-        }
+}
