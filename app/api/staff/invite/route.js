@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../../lib/supabaseClient'
 import { isOwner, canAddStaff } from '../../../../lib/staffAuth'
-import { getPlanLimits } from '../../../../lib/planLimits'
+import { getPlanLimits } from '../../../../lib/planLimits' // ✅ ADD THIS IMPORT
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
 // Admin client (service role) – needed to check auth.users
@@ -79,7 +79,15 @@ export async function POST(req) {
     // 4. Check plan limit for staff accounts
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
-    const canAdd = await canAddStaff(business.id, business.plan || 'free')
+
+    // Get current active staff count
+    const { count: activeStaffCount } = await supabaseWithToken
+      .from('staff')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', business.id)
+      .eq('status', 'active')
+
+    const canAdd = (activeStaffCount || 0) < maxStaff
 
     if (!canAdd) {
       return NextResponse.json(
