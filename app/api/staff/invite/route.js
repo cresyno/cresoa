@@ -5,12 +5,6 @@ import { supabase } from '../../../../lib/supabaseClient'
 import { getPlanLimits } from '../../../../lib/planLimits'
 import { sendStaffInviteEmail } from '../../../../lib/email'
 
-// Admin client – needs SUPABASE_SERVICE_ROLE_KEY
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
 export async function POST(req) {
   try {
     const body = await req.json()
@@ -90,43 +84,16 @@ export async function POST(req) {
       )
     }
 
-    // 4. Check if the email exists in auth.users
-    let userId = null
-    let lookupError = null
+    // ✅ 4. Check if the email exists using the RPC function
+    const { data: userId, error: rpcError } = await supabaseWithToken
+      .rpc('check_user_exists', { user_email: email })
 
-    // Try with admin API first
-    try {
-      const { data: userData, error: adminError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
-      if (adminError) {
-        console.error('Admin API error:', adminError)
-        lookupError = adminError
-      } else if (userData && userData.user) {
-        userId = userData.user.id
-      }
-    } catch (err) {
-      console.error('Admin API exception:', err)
-      lookupError = err
-    }
-
-    // If admin API failed, fallback to direct query on auth.users
-    if (!userId) {
-      const { data: userData, error: queryError } = await supabaseAdmin
-        .from('auth.users')
-        .select('id')
-        .ilike('email', email)
-        .maybeSingle()
-
-      if (queryError) {
-        console.error('Fallback query error:', queryError)
-        // Provide a helpful error message
-        return NextResponse.json(
-          { error: 'Unable to verify user. Please ensure SUPABASE_SERVICE_ROLE_KEY is set correctly and try again.' },
-          { status: 500 }
-        )
-      }
-      if (userData) {
-        userId = userData.id
-      }
+    if (rpcError) {
+      console.error('RPC error:', rpcError)
+      return NextResponse.json(
+        { error: 'Database error while checking user: ' + rpcError.message },
+        { status: 500 }
+      )
     }
 
     if (!userId) {
