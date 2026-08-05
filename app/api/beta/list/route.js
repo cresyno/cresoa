@@ -1,109 +1,60 @@
-'use client'
+// app/api/beta/list/route.js
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-import { Suspense } from 'react'
-import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
+export const dynamic = 'force-dynamic' // 👈 Required to prevent static generation
 
-// ─── Component that uses useSearchParams ───
-function AcceptInviteContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const token = searchParams.get('token')
+const ADMIN_EMAIL = 'taiwoabraham640@gmail.com'
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
-  const [status, setStatus] = useState('loading')
-  const [message, setMessage] = useState('')
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const accessToken = searchParams.get('accessToken')
 
-  useEffect(() => {
-    if (!token) {
-      setStatus('error')
-      setMessage('❌ No invitation token found.')
-      return
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Access token required' }, { status: 401 })
     }
 
-    const accept = async () => {
-      try {
-        // 1. Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError || !user) {
-          const redirect = `/accept-invite?token=${token}`
-          router.push(`/login?redirect=${encodeURIComponent(redirect)}`)
-          return
-        }
-
-        // 2. Call accept API
-        const res = await fetch('/api/staff/accept', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })
-
-        const data = await res.json()
-
-        if (res.ok) {
-          setStatus('success')
-          setMessage('✅ Invitation accepted! You now have access to the business.')
-          setTimeout(() => router.push('/dashboard'), 2000)
-        } else {
-          setStatus('error')
-          setMessage(`❌ ${data.error || 'Failed to accept invitation'}`)
-        }
-      } catch (err) {
-        console.error('Accept error:', err)
-        setStatus('error')
-        setMessage('❌ Network error. Please try again.')
+    // Authenticate the user
+    const supabaseWithToken = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
       }
+    )
+
+    const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    accept()
-  }, [token, router])
+    if (user.email !== ADMIN_EMAIL) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
-  // ─── Render ───
-  if (status === 'loading') {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p>Processing your invitation...</p>
-      </div>
-    )
+    // Use admin client to bypass RLS
+    const { data: invites, error } = await supabaseAdmin
+      .from('beta_invites')
+      .select('*')
+      .order('invited_at', { ascending: false })
+
+    if (error) {
+      console.error('List error:', error)
+      return NextResponse.json({ error: 'Failed to fetch beta users' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, data: invites })
+  } catch (error) {
+    console.error('Beta list error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '2.5rem', maxWidth: '420px', border: '1px solid #E5E0D8' }}>
-        {status === 'success' ? (
-          <>
-            <div style={{ fontSize: '3rem' }}>🎉</div>
-            <h2 style={{ color: '#0F2B4A' }}>Accepted!</h2>
-            <p style={{ color: '#8A8A8A' }}>{message}</p>
-            <p style={{ fontSize: '0.8rem', color: '#8A8A8A' }}>Redirecting to dashboard...</p>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: '3rem' }}>❌</div>
-            <h2 style={{ color: '#D9534F' }}>Error</h2>
-            <p style={{ color: '#8A8A8A' }}>{message}</p>
-            <button
-              onClick={() => router.push('/dashboard')}
-              style={{ marginTop: '1rem', padding: '0.6rem 1.2rem', background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-            >
-              Go to Dashboard
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Main page with Suspense boundary ───
-export default function AcceptInvitePage() {
-  return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p>Loading invitation...</p>
-      </div>
-    }>
-      <AcceptInviteContent />
-    </Suspense>
-  )
 }
