@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabaseClient'
 import LetterLogo from '../../components/LetterLogo'
 import Logo from '../../components/Logo'
 import { getPlan, FREE_TRIAL_DAYS } from '../../lib/planLimits'
-import OnboardingTour from '../../components/OnboardingTour' // 👈 NEW
+import OnboardingTour from '../../components/OnboardingTour'
 
 export default function DashboardLayout({ children }) {
   const router = useRouter()
@@ -14,8 +14,8 @@ export default function DashboardLayout({ children }) {
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [showTour, setShowTour] = useState(false) // 👈 NEW
-  const [theme, setTheme] = useState('light') // 👈 NEW
+  const [showTour, setShowTour] = useState(false)
+  const [theme, setTheme] = useState('light')
 
   // Toggle theme
   const toggleTheme = () => {
@@ -97,12 +97,12 @@ export default function DashboardLayout({ children }) {
           return
         }
 
-        // 👇 NEW: Check if user hasn't completed the tour
+        // Check if user hasn't completed the tour
         if (!businessData.has_completed_onboarding) {
           setShowTour(true)
         }
 
-        // 🔥 BETA EXPIRY CHECK
+        // BETA EXPIRY CHECK
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
@@ -197,35 +197,29 @@ export default function DashboardLayout({ children }) {
     )
   }
 
+  // ─── Premium Sidebar Styles ───
+  // I'll keep the styles embedded in the JSX for clarity.
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
+        /* ─── Premium Sidebar Styles ─── */
         :root {
-          --color-bg: #F8F6F2;
-          --color-card: #FFFFFF;
-          --color-text: #1A1A1A;
-          --color-text-muted: #8A8A8A;
-          --color-border: #E5E0D8;
-          --color-primary: #0F2B4A;
-          --color-accent: #D4A52A;
-          --color-success: #2E7D5E;
-          --color-danger: #D9534F;
-          --shadow: 0 4px 16px rgba(15,43,74,0.06);
+          --sidebar-width: 240px;
+          --sidebar-bg: linear-gradient(180deg, #0F2B4A 0%, #1A3F66 100%);
+          --sidebar-text: #C8D4E3;
+          --sidebar-active: #D4A52A;
+          --sidebar-hover: rgba(255,255,255,0.06);
+          --sidebar-border: rgba(255,255,255,0.08);
         }
-
         [data-theme="dark"] {
-          --color-bg: #1A1A2E;
-          --color-card: #2A2A3E;
-          --color-text: #E8E8E8;
-          --color-text-muted: #AAAAAA;
-          --color-border: #3A3A4E;
-          --color-primary: #D4A52A;
-          --color-accent: #D4A52A;
-          --color-success: #2E7D5E;
-          --color-danger: #D9534F;
-          --shadow: 0 4px 16px rgba(0,0,0,0.3);
+          --sidebar-bg: linear-gradient(180deg, #0A0A1A 0%, #1A1A2E 100%);
+          --sidebar-text: #B0B0C0;
+          --sidebar-active: #D4A52A;
+          --sidebar-hover: rgba(255,255,255,0.04);
+          --sidebar-border: rgba(255,255,255,0.04);
         }
 
+        /* Hamburger */
         .hamburger {
           position: fixed;
           top: 1rem;
@@ -253,10 +247,12 @@ export default function DashboardLayout({ children }) {
           z-index: 999;
         }
         .overlay.open { display: block; }
+
+        /* Sidebar */
         .sidebar {
-          width: 220px;
+          width: var(--sidebar-width);
           min-height: 100vh;
-          background: linear-gradient(180deg, #0F2B4A 0%, #1A3F66 100%);
+          background: var(--sidebar-bg);
           padding: 1.2rem 0.8rem;
           flex-shrink: 0;
           position: sticky;
@@ -264,25 +260,33 @@ export default function DashboardLayout({ children }) {
           height: 100vh;
           overflow-y: auto;
           transition: transform 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          border-right: 1px solid var(--sidebar-border);
         }
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
         .sidebar .brand {
           display: flex;
           align-items: center;
           gap: 0.6rem;
           padding-bottom: 1.2rem;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
+          border-bottom: 1px solid var(--sidebar-border);
           margin-bottom: 1.2rem;
         }
-        .sidebar .brand .name {
+        .sidebar .brand .logo-text {
           color: #fff;
           font-size: 1rem;
           font-weight: 700;
           font-family: 'Fraunces', serif;
         }
         .sidebar .brand .sub {
-          color: #A0B4C9;
+          color: var(--sidebar-text);
           font-size: 0.55rem;
           opacity: 0.7;
+          line-height: 1.4;
         }
         .sidebar .brand .badge {
           display: inline-block;
@@ -294,7 +298,7 @@ export default function DashboardLayout({ children }) {
           font-weight: 600;
           margin-left: 0.3rem;
         }
-        .sidebar .plan-badge {
+        .sidebar .brand .plan-badge {
           display: inline-block;
           background: #4C7A5E;
           color: #fff;
@@ -302,46 +306,51 @@ export default function DashboardLayout({ children }) {
           border-radius: 8px;
           font-size: 0.5rem;
           font-weight: 600;
-          margin-left: 0.3rem;
           text-transform: uppercase;
         }
-        .sidebar .plan-badge.beta {
+        .sidebar .brand .plan-badge.beta {
           background: #1E3A5F;
           color: #C79A2B;
         }
+
         .sidebar .nav {
           display: flex;
           flex-direction: column;
           gap: 0.15rem;
+          flex: 1;
         }
         .sidebar .nav a {
           display: flex;
           align-items: center;
           gap: 0.6rem;
           padding: 0.5rem 0.7rem;
-          border-radius: 6px;
-          color: #C8D4E3;
+          border-radius: 8px;
+          color: var(--sidebar-text);
           text-decoration: none;
           font-size: 0.8rem;
           font-weight: 500;
-          transition: background 0.15s ease;
+          transition: all 0.2s ease;
         }
         .sidebar .nav a:hover {
-          background: rgba(255,255,255,0.06);
+          background: var(--sidebar-hover);
           color: #fff;
+          transform: translateX(4px);
         }
         .sidebar .nav a.active {
-          background: rgba(212,165,42,0.15);
+          background: rgba(212,165,42,0.12);
           color: #D4A52A;
           font-weight: 600;
+          box-shadow: inset 3px 0 0 #D4A52A;
         }
         .sidebar .nav a .icon {
           font-size: 1rem;
           width: 22px;
           text-align: center;
+          flex-shrink: 0;
         }
+
         .sidebar .bottom {
-          border-top: 1px solid rgba(255,255,255,0.08);
+          border-top: 1px solid var(--sidebar-border);
           padding-top: 0.8rem;
           margin-top: 0.5rem;
         }
@@ -351,12 +360,12 @@ export default function DashboardLayout({ children }) {
           align-items: center;
           gap: 0.6rem;
           padding: 0.5rem 0.7rem;
-          border-radius: 6px;
-          color: #C8D4E3;
+          border-radius: 8px;
+          color: var(--sidebar-text);
           text-decoration: none;
           font-size: 0.8rem;
           font-weight: 500;
-          transition: background 0.15s ease;
+          transition: all 0.2s ease;
           background: none;
           border: none;
           width: 100%;
@@ -365,21 +374,25 @@ export default function DashboardLayout({ children }) {
         }
         .sidebar .bottom a:hover,
         .sidebar .bottom button:hover {
-          background: rgba(255,255,255,0.06);
+          background: var(--sidebar-hover);
           color: #fff;
+          transform: translateX(4px);
         }
         .sidebar .bottom .logout-btn {
           color: #D9534F;
         }
         .sidebar .bottom .logout-btn:hover {
-          background: rgba(217,83,79,0.15);
+          background: rgba(217,83,79,0.12);
+          color: #D9534F;
         }
         .sidebar .bottom .theme-btn {
           color: #D4A52A;
         }
         .sidebar .bottom .theme-btn:hover {
-          background: rgba(212,165,42,0.1);
+          background: rgba(212,165,42,0.08);
+          color: #D4A52A;
         }
+
         .main-content {
           flex: 1;
           min-width: 0;
@@ -393,11 +406,6 @@ export default function DashboardLayout({ children }) {
           background: var(--color-card);
           border-bottom: 1px solid var(--color-border);
           box-shadow: var(--shadow);
-        }
-        .dashboard-header .left {
-          display: flex;
-          align-items: center;
-          gap: 0.8rem;
         }
         .dashboard-header .right {
           display: flex;
@@ -453,23 +461,24 @@ export default function DashboardLayout({ children }) {
 
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
+      {/* ─── SIDEBAR ─── */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
-  <Logo variant="primary" size="medium" />
-  <div>
-    <div className="name">Cresoa</div>
-    <div className="sub">
-      {business?.name || 'Your business'}
-      <span className="badge">{getIndustryBadge()}</span>
-      <br />
-      <span className={`plan-badge ${business?.plan === 'beta' ? 'beta' : ''}`}>
-        {business?.plan || 'Free'}
-      </span>
-    </div>
-  </div>
-</div>
+          <Logo variant="primary" size="small" />
+          <div>
+            <div className="logo-text">Cresoa</div>
+            <div className="sub">
+              {business?.name || 'Your business'}
+              <span className="badge">{getIndustryBadge()}</span>
+              <br />
+              <span className={`plan-badge ${business?.plan === 'beta' ? 'beta' : ''}`}>
+                {business?.plan || 'Free'}
+              </span>
+            </div>
+          </div>
+        </div>
 
-        <div className="nav" data-tour="sidebar-nav">
+        <div className="nav">
           {currentNavItems.map((item) => (
             <a
               key={item.path}
@@ -488,8 +497,14 @@ export default function DashboardLayout({ children }) {
           <a href="/dashboard/subscription" onClick={handleNavClick}>💳 Subscription</a>
 
           {business && !business.has_applied_for_beta && (
-            <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }} data-tour="beta-button">
+            <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               🧪 Apply for Beta
+            </a>
+          )}
+
+          {business && (business.plan === 'pro' || business.plan === 'beta') && (
+            <a href="/dashboard/settings/tracking" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
+              🎨 Tracking Page
             </a>
           )}
 
@@ -502,14 +517,14 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <div className="main-content">
-        {/* 👇 Dashboard Header with Beta Button */}
+        {/* ─── DASHBOARD HEADER ─── */}
         <div className="dashboard-header" data-tour="dashboard-header">
           <div className="left">
-            <h2 style={{ margin: 0, color: 'var(--color-text)' }}>📊 Dashboard</h2>
+            {/* No heading – removed for cleaner UX */}
           </div>
           <div className="right">
             {business && !business.has_applied_for_beta && (
-              <a href="/dashboard/beta-apply" className="beta-btn" data-tour="beta-button">
+              <a href="/dashboard/beta-apply" className="beta-btn">
                 🧪 Apply for Beta
               </a>
             )}
@@ -522,7 +537,7 @@ export default function DashboardLayout({ children }) {
         {children}
       </div>
 
-      {/* 👇 Onboarding Tour */}
+      {/* Onboarding Tour */}
       {showTour && (
         <OnboardingTour
           onComplete={async () => {
@@ -540,4 +555,4 @@ export default function DashboardLayout({ children }) {
       )}
     </div>
   )
-                       }
+        }
