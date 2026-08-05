@@ -22,19 +22,22 @@ function AcceptInviteContent() {
 
     const accept = async () => {
       try {
-        // 1. Check if user is logged in
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError || !user) {
-          // Redirect to login, then back here
+        // ✅ Get the current session and access token
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !session) {
+          console.error('Session error:', sessionError)
           router.push(`/login?redirect=${encodeURIComponent(`/accept-invite?token=${token}`)}`)
           return
         }
 
-        // 2. Call the accept API
+        const accessToken = session.access_token
+
+        // ✅ Call the accept API with the access token
         const res = await fetch('/api/staff/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
+          body: JSON.stringify({ token, accessToken }),
         })
 
         const data = await res.json()
