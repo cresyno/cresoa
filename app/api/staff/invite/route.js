@@ -66,7 +66,6 @@ export async function POST(req) {
       )
     }
 
-    // 3. Verify the user is the owner
     if (business.owner_id !== user.id) {
       return NextResponse.json(
         { error: 'Only business owners can invite staff' },
@@ -74,7 +73,7 @@ export async function POST(req) {
       )
     }
 
-    // 4. Check plan limit for staff accounts
+    // 3. Check plan limit for staff accounts
     const planLimits = getPlanLimits(business.plan || 'free')
     const maxStaff = planLimits.staff_accounts || 0
 
@@ -91,104 +90,121 @@ export async function POST(req) {
       )
     }
 
-    // ✅ 5. Check if the email exists in auth.users using the ADMIN API
+    // 4. Check if the email exists in auth.users
+    let userId = null
+    let lookupError = null
+
+    // Try with admin API first
     try {
-      const { data: userData, error: userLookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
-
-      if (userLookupError) {
-        console.error('Admin API error:', userLookupError)
-        return NextResponse.json(
-          { error: 'User not found. They must sign up first.' },
-          { status: 404 }
-        )
+      const { data: userData, error: adminError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
+      if (adminError) {
+        console.error('Admin API error:', adminError)
+        lookupError = adminError
+      } else if (userData && userData.user) {
+        userId = userData.user.id
       }
+    } catch (err) {
+      console.error('Admin API exception:', err)
+      lookupError = err
+    }
 
-      if (!userData || !userData.user) {
-        return NextResponse.json(
-          { error: 'User not found. They must sign up first.' },
-          { status: 404 }
-        )
-      }
-
-      const userId = userData.user.id
-
-      // 6. Check if already a staff member
-      const { data: existing } = await supabaseWithToken
-        .from('staff')
-        .select('id, status')
-        .eq('business_id', business.id)
-        .eq('user_id', userId)
+    // If admin API failed, fallback to direct query on auth.users
+    if (!userId) {
+      const { data: userData, error: queryError } = await supabaseAdmin
+        .from('auth.users')
+        .select('id')
+        .ilike('email', email)
         .maybeSingle()
 
-      if (existing) {
-        if (existing.status === 'pending') {
-          return NextResponse.json(
-            { error: `Invitation already sent to ${email}` },
-            { status: 400 }
-          )
-        }
-        if (existing.status === 'active') {
-          return NextResponse.json(
-            { error: `${email} is already a staff member` },
-            { status: 400 }
-          )
-        }
-      }
-
-      // 7. Generate invite token and expiry (7 days)
-      const inviteToken = crypto.randomUUID()
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-
-      // 8. Insert staff record
-      const { data: newStaff, error: insertError } = await supabaseWithToken
-        .from('staff')
-        .insert({
-          business_id: business.id,
-          user_id: userId,
-          email: email,
-          role: role,
-          status: 'pending',
-          invited_by: user.id,
-          invited_at: new Date().toISOString(),
-          invite_token: inviteToken,
-          expires_at: expiresAt,
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error('Insert error:', insertError)
+      if (queryError) {
+        console.error('Fallback query error:', queryError)
+        // Provide a helpful error message
         return NextResponse.json(
-          { error: 'Failed to invite staff' },
+          { error: 'Unable to verify user. Please ensure SUPABASE_SERVICE_ROLE_KEY is set correctly and try again.' },
           { status: 500 }
         )
       }
-
-      // 9. Send email notification (non-blocking)
-      try {
-        const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
-        await sendStaffInviteEmail(
-          email,
-          user.email || 'The business owner',
-          business.name || 'your business',
-          acceptLink
-        )
-      } catch (emailErr) {
-        console.error('Email error (non‑fatal):', emailErr)
+      if (userData) {
+        userId = userData.id
       }
+    }
 
-      return NextResponse.json({
-        success: true,
-        message: `✅ Invitation sent to ${email}! They will receive an email with instructions.`,
-      })
-
-    } catch (adminError) {
-      console.error('Admin API error:', adminError)
+    if (!userId) {
       return NextResponse.json(
-        { error: 'Unable to verify user. Please ensure SUPABASE_SERVICE_ROLE_KEY is set correctly.' },
+        { error: 'User not found. They must sign up first.' },
+        { status: 404 }
+      )
+    }
+
+    // 5. Check if already a staff member
+    const { data: existing } = await supabaseWithToken
+      .from('staff')
+      .select('id, status')
+      .eq('business_id', business.id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (existing) {
+      if (existing.status === 'pending') {
+        return NextResponse.json(
+          { error: `Invitation already sent to ${email}` },
+          { status: 400 }
+        )
+      }
+      if (existing.status === 'active') {
+        return NextResponse.json(
+          { error: `${email} is already a staff member` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // 6. Generate invite token and expiry (7 days)
+    const inviteToken = crypto.randomUUID()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    // 7. Insert staff record
+    const { data: newStaff, error: insertError } = await supabaseWithToken
+      .from('staff')
+      .insert({
+        business_id: business.id,
+        user_id: userId,
+        email: email,
+        role: role,
+        status: 'pending',
+        invited_by: user.id,
+        invited_at: new Date().toISOString(),
+        invite_token: inviteToken,
+        expires_at: expiresAt,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('Insert error:', insertError)
+      return NextResponse.json(
+        { error: 'Failed to invite staff' },
         { status: 500 }
       )
     }
+
+    // 8. Send email notification (non-blocking)
+    try {
+      const acceptLink = `https://cresoa.vercel.app/accept-invite?token=${inviteToken}`
+      await sendStaffInviteEmail(
+        email,
+        user.email || 'The business owner',
+        business.name || 'your business',
+        acceptLink
+      )
+    } catch (emailErr) {
+      console.error('Email error (non‑fatal):', emailErr)
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `✅ Invitation sent to ${email}! They will receive an email with instructions.`,
+    })
   } catch (error) {
     console.error('Invite error:', error)
     return NextResponse.json(
