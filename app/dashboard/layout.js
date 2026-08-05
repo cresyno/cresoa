@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase } from '../lib/supabaseClient';
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher';// Added Business Switcher
