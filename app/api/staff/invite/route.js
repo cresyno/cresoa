@@ -44,7 +44,6 @@ export async function POST(req) {
     )
 
     const { data: { user }, error: authError } = await supabaseWithToken.auth.getUser()
-
     if (authError || !user) {
       console.error('Auth error:', authError)
       return NextResponse.json(
@@ -85,24 +84,18 @@ export async function POST(req) {
       .eq('business_id', business.id)
       .eq('status', 'active')
 
-    const canAdd = (activeStaffCount || 0) < maxStaff
-    if (!canAdd) {
+    if ((activeStaffCount || 0) >= maxStaff) {
       return NextResponse.json(
         { error: `Your plan allows a maximum of ${maxStaff} staff members. Please upgrade to add more.` },
         { status: 403 }
       )
     }
 
-    // 5. ✅ Check if the email exists in auth.users (using admin client)
-    //    CORRECT table reference: 'auth.users', NOT 'public.auth.users'
-    const { data: userData, error: userLookupError } = await supabaseAdmin
-      .from('auth.users')
-      .select('id')
-      .ilike('email', email)
-      .maybeSingle()
+    // ✅ 5. Check if the email exists in auth.users using admin API
+    const { data: userData, error: userLookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
 
     if (userLookupError) {
-      console.error('Admin client error:', userLookupError)
+      console.error('Admin API error:', userLookupError)
       return NextResponse.json(
         { error: 'Database error while checking user: ' + userLookupError.message },
         { status: 500 }
