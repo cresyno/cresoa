@@ -1,17 +1,18 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 
-export default function AcceptInvitePage() {
+// ─── Component that uses useSearchParams ───
+function AcceptInviteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('')
-  const [debug, setDebug] = useState('')
 
   useEffect(() => {
     if (!token) {
@@ -22,17 +23,15 @@ export default function AcceptInvitePage() {
 
     const accept = async () => {
       try {
-        // 1. Get the current user
+        // 1. Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-          // Not logged in – redirect to login with return URL
           const redirect = `/accept-invite?token=${token}`
           router.push(`/login?redirect=${encodeURIComponent(redirect)}`)
           return
         }
 
-        // 2. Validate the token via API (or directly)
-        // We'll call an API to handle the update
+        // 2. Call accept API
         const res = await fetch('/api/staff/accept', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -48,20 +47,18 @@ export default function AcceptInvitePage() {
         } else {
           setStatus('error')
           setMessage(`❌ ${data.error || 'Failed to accept invitation'}`)
-          setDebug(JSON.stringify(data, null, 2))
         }
       } catch (err) {
         console.error('Accept error:', err)
         setStatus('error')
         setMessage('❌ Network error. Please try again.')
-        setDebug(err.message)
       }
     }
 
     accept()
   }, [token, router])
 
-  // Render
+  // ─── Render ───
   if (status === 'loading') {
     return (
       <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -85,11 +82,6 @@ export default function AcceptInvitePage() {
             <div style={{ fontSize: '3rem' }}>❌</div>
             <h2 style={{ color: '#D9534F' }}>Error</h2>
             <p style={{ color: '#8A8A8A' }}>{message}</p>
-            {debug && (
-              <pre style={{ background: '#f0f0f0', padding: '0.5rem', borderRadius: '4px', fontSize: '0.7rem', textAlign: 'left', maxWidth: '100%', overflow: 'auto' }}>
-                {debug}
-              </pre>
-            )}
             <button
               onClick={() => router.push('/dashboard')}
               style={{ marginTop: '1rem', padding: '0.6rem 1.2rem', background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
@@ -100,5 +92,18 @@ export default function AcceptInvitePage() {
         )}
       </div>
     </div>
+  )
+}
+
+// ─── Main page with Suspense boundary ───
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p>Loading invitation...</p>
+      </div>
+    }>
+      <AcceptInviteContent />
+    </Suspense>
   )
       }
