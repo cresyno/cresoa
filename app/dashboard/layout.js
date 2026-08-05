@@ -135,12 +135,14 @@ export default function DashboardLayout({ children }) {
           return
         }
 
+        // 1. Check if the user owns a business
         let { data: businessData } = await supabase
           .from('businesses')
           .select('*')
           .eq('owner_id', user.id)
           .single()
 
+        // 2. If not owner, check if they are active staff
         if (!businessData) {
           const { data: staffData } = await supabase
             .from('staff')
@@ -162,6 +164,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
+        // 3. If still no business, redirect to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -315,7 +318,7 @@ export default function DashboardLayout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
-        /* ─── CSS VARIABLES ─── */
+        /* ─── CSS VARIABLES (dashboard only) ─── */
         :root {
           --color-bg: #F7F5F0;
           --color-card: #FFFFFF;
@@ -607,6 +610,7 @@ export default function DashboardLayout({ children }) {
       </button>
 
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
+
       {/* ─── SIDEBAR ─── */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
@@ -726,4 +730,4 @@ export default function DashboardLayout({ children }) {
       )}
     </div>
   )
-                }
+}
