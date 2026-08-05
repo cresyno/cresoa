@@ -135,41 +135,65 @@ export default function DashboardLayout({ children }) {
           return
         }
 
-        // 1. Check if the user owns a business
-        let { data: businessData } = await supabase
+        let businessData = null
+
+        // 1. Check if user owns a business
+        const { data: ownedBusiness, error: ownerError } = await supabase
           .from('businesses')
           .select('*')
           .eq('owner_id', user.id)
-          .single()
+          .maybeSingle()
+
+        if (ownedBusiness) {
+          businessData = ownedBusiness
+          console.log('✅ User is owner of business:', businessData.name)
+        }
 
         // 2. If not owner, check if they are active staff
         if (!businessData) {
-          const { data: staffData } = await supabase
+          console.log('🔍 Checking if user is staff...')
+          
+          const { data: staffData, error: staffError } = await supabase
             .from('staff')
-            .select('business_id')
+            .select('business_id, status, role')
             .eq('user_id', user.id)
             .eq('status', 'active')
             .maybeSingle()
 
+          if (staffError) {
+            console.error('Staff error:', staffError)
+          }
+
           if (staffData) {
-            const { data: staffBusiness } = await supabase
+            console.log('✅ Staff record found:', staffData)
+            
+            const { data: staffBusiness, error: bizError } = await supabase
               .from('businesses')
               .select('*')
               .eq('id', staffData.business_id)
-              .single()
+              .maybeSingle()
+
+            if (bizError) {
+              console.error('Business fetch error:', bizError)
+            }
 
             if (staffBusiness) {
               businessData = staffBusiness
+              console.log('✅ Business loaded for staff:', businessData.name)
             }
           }
         }
 
         // 3. If still no business, redirect to onboarding
         if (!businessData) {
+          console.log('❌ No business found, redirecting to onboarding')
           router.push('/onboarding')
           return
         }
 
+        console.log('✅ Final business loaded:', businessData.name)
+
+        // Check tour
         if (!businessData.has_completed_onboarding) {
           setShowTour(true)
         }
@@ -242,9 +266,9 @@ export default function DashboardLayout({ children }) {
           if (!o.due_date || o.current_status === 'Delivered') return false
           const due = new Date(o.due_date)
           due.setHours(0,0,0,0)
-          const now = new Date()
-          now.setHours(0,0,0,0)
-          return due < now
+          const now2 = new Date()
+          now2.setHours(0,0,0,0)
+          return due < now2
         }).length || 0
 
         const dueToday = orders?.filter(o => o.due_date === today && o.current_status !== 'Delivered').length || 0
@@ -294,7 +318,6 @@ export default function DashboardLayout({ children }) {
     return ''
   }
 
-  // ─── Page header content ───
   const header = getPageHeader(pathname, business, stats)
 
   if (loading) {
@@ -318,7 +341,7 @@ export default function DashboardLayout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
-        /* ─── CSS VARIABLES (dashboard only) ─── */
+        /* ─── CSS VARIABLES ─── */
         :root {
           --color-bg: #F7F5F0;
           --color-card: #FFFFFF;
@@ -345,7 +368,6 @@ export default function DashboardLayout({ children }) {
           --shadow: 0 4px 16px rgba(0,0,0,0.3);
         }
 
-        /* ─── HAMBURGER ─── */
         .hamburger {
           position: fixed;
           top: 0.8rem;
@@ -374,7 +396,6 @@ export default function DashboardLayout({ children }) {
         }
         .overlay.open { display: block; }
 
-        /* ─── SIDEBAR ─── */
         .sidebar {
           width: 240px;
           min-height: 100vh;
@@ -528,7 +549,6 @@ export default function DashboardLayout({ children }) {
           color: #25D366;
         }
 
-        /* ─── MAIN CONTENT ─── */
         .main-content {
           flex: 1;
           min-width: 0;
@@ -611,7 +631,6 @@ export default function DashboardLayout({ children }) {
 
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
-      {/* ─── SIDEBAR ─── */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo variant="primary" size="small" />
@@ -622,7 +641,7 @@ export default function DashboardLayout({ children }) {
               <span className="badge">{getIndustryBadge()}</span>
               <br />
               <span className={`plan ${business?.plan === 'beta' ? 'beta' : ''}`}>
-                {business?.plan || 'Free'}
+                       {business?.plan || 'Free'}
               </span>
             </div>
           </div>
@@ -691,7 +710,6 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <div className="main-content">
-        {/* ─── TOP HEADER WITH DATE AND BETA BUTTON ─── */}
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -704,7 +722,6 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-        {/* ─── PAGE HEADER ─── */}
         <div className="page-header">
           <h1>{header.title}</h1>
           <p>{header.subtitle}</p>
@@ -730,4 +747,4 @@ export default function DashboardLayout({ children }) {
       )}
     </div>
   )
-}
+                }
