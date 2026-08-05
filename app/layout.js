@@ -1,10 +1,14 @@
 'use client'
 
 import { Inter } from 'next/font/google'
+import { usePathname } from 'next/navigation'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export default function RootLayout({ children }) {
+  const pathname = usePathname()
+  const isTrackingPage = pathname?.startsWith('/track/')
+
   return (
     <html lang="en">
       <head>
@@ -13,17 +17,19 @@ export default function RootLayout({ children }) {
       </head>
       <body className={inter.className}>
         {children}
-        {/* Floating Support Button */}
-        <a
-          href="https://wa.me/2349049209780?text=Hi%20Cresoa%20Support%2C%20I%20need%20help%20with..."
-          target="_blank"
-          rel="noopener noreferrer"
-          className="support-float"
-          aria-label="Contact Support on WhatsApp"
-        >
-          <span className="support-icon">💬</span>
-          <span className="support-text">Support</span>
-        </a>
+        {/* Floating Support Button – hidden on tracking pages */}
+        {!isTrackingPage && (
+          <a
+            href="https://wa.me/2349049209780?text=Hi%20Cresoa%20Support%2C%20I%20need%20help%20with..."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="support-float"
+            aria-label="Contact Support on WhatsApp"
+          >
+            <span className="support-icon">💬</span>
+            <span className="support-text">Support</span>
+          </a>
+        )}
 
         <style>{`
           .support-float {
@@ -83,4 +89,4 @@ export default function RootLayout({ children }) {
       </body>
     </html>
   )
-}
+              }
