@@ -144,9 +144,9 @@ function DashboardLayoutContent({ children }) {
 
         let businessData = null
 
-        // ─── Get business_id from URL ───
-        const businessIdFromUrl = searchParams.get('business_id')
-
+      
+        // FORCE LOAD TEST BUSINESS – REMOVE THIS AFTER TESTING
+const businessIdFromUrl = searchParams.get('business_id') || '35c2e34d-832b-471a-b015-5063ce85c653';
         // ─── If we have a business_id in URL, FORCE load it ───
         if (businessIdFromUrl) {
           const { data: session } = await supabase.auth.getSession()
