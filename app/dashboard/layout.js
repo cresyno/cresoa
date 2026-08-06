@@ -7,7 +7,6 @@ import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 
-// ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
     const isRepairs = pathname?.startsWith('/dashboard/repairs')
@@ -90,9 +89,7 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
-  const [selectedId, setSelectedId] = useState(null)
 
-  // ─── Theme ───
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
@@ -111,7 +108,6 @@ export default function DashboardLayout({ children }) {
     }
   }, [])
 
-  // ─── Nav items ───
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
     { name: 'Orders', path: '/dashboard/orders', icon: '📋' },
@@ -131,7 +127,7 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data ───
+  // ─── LOAD BUSINESS DATA ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -142,61 +138,44 @@ export default function DashboardLayout({ children }) {
         }
 
         let businessData = null
-        let selectedIdFromStorage = null
+        let selectedId = null
 
-        // 1. Check URL for ?business_id= (highest priority)
+        // 1. Check URL for business_id (highest priority)
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search)
           const urlBusinessId = params.get('business_id')
           if (urlBusinessId) {
-            selectedIdFromStorage = urlBusinessId
+            selectedId = urlBusinessId
           } else {
-            // 2. Check localStorage for saved selection
+            // 2. Check localStorage
             const stored = localStorage.getItem('selectedBusinessId')
             if (stored) {
-              selectedIdFromStorage = stored
+              selectedId = stored
             }
           }
         }
 
-        setSelectedId(selectedIdFromStorage)
+        console.log('🔍 Selected ID:', selectedId)
 
-        // 3. ALWAYS try to load the selected business first (if it exists)
-        if (selectedIdFromStorage) {
+        // 3. Try to load the selected business via API
+        if (selectedId) {
           const { data: session } = await supabase.auth.getSession()
           if (session) {
-            const response = await fetch(`/api/user/businesses?business_id=${selectedIdFromStorage}`, {
+            const response = await fetch(`/api/user/businesses?business_id=${selectedId}`, {
               headers: { 'Authorization': `Bearer ${session.access_token}` }
             })
             const result = await response.json()
             if (response.ok && result.business) {
               businessData = result.business
-              // Ensure membership exists if owner
-              if (businessData.owner_id === user.id) {
-                const { data: existing } = await supabase
-                  .from('business_memberships')
-                  .select('id')
-                  .eq('business_id', businessData.id)
-                  .eq('user_id', user.id)
-                  .maybeSingle()
-                if (!existing) {
-                  await supabase.from('business_memberships').insert({
-                    business_id: businessData.id,
-                    user_id: user.id,
-                    role: 'Owner'
-                  })
-                }
-              }
+              console.log('✅ Loaded selected business:', businessData.name)
             } else {
-              // If selected business not found, clear it and fall back
-              if (typeof window !== 'undefined') {
-                localStorage.removeItem('selectedBusinessId')
-              }
+              console.log('❌ Selected business not found via API, falling back')
+              localStorage.removeItem('selectedBusinessId')
             }
           }
         }
 
-        // 4. If businessData is STILL null, fallback to owned business
+        // 4. If businessData is still null, fallback to owned business
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
@@ -205,24 +184,11 @@ export default function DashboardLayout({ children }) {
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
-            // ensure membership
-            const { data: existing } = await supabase
-              .from('business_memberships')
-              .select('id')
-              .eq('business_id', ownedBusiness.id)
-              .eq('user_id', user.id)
-              .maybeSingle()
-            if (!existing) {
-              await supabase.from('business_memberships').insert({
-                business_id: ownedBusiness.id,
-                user_id: user.id,
-                role: 'Owner'
-              })
-            }
+            console.log('📌 Fallback to owned business:', businessData.name)
           }
         }
 
-        // 5. If still no business, check membership (user is member but not owner)
+        // 5. If still no business, check membership
         if (!businessData) {
           const { data: membershipData } = await supabase
             .from('business_memberships')
@@ -237,11 +203,12 @@ export default function DashboardLayout({ children }) {
               .maybeSingle()
             if (memberBusiness) {
               businessData = memberBusiness
+              console.log('📌 Loaded from membership:', businessData.name)
             }
           }
         }
 
-        // 6. If still no business, redirect to onboarding
+        // 6. If still nothing, redirect
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -292,7 +259,7 @@ export default function DashboardLayout({ children }) {
           localStorage.setItem('selectedBusinessId', businessData.id)
         }
 
-        // ─── Compute stats for headers ───
+        // ─── COMPUTE STATS ───
         const { count: totalOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -344,7 +311,6 @@ export default function DashboardLayout({ children }) {
     load()
   }, [router])
 
-  // ─── Logout ───
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -389,7 +355,6 @@ export default function DashboardLayout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
-        /* ─── CSS VARIABLES ─── */
         :root {
           --color-bg: #F7F5F0;
           --color-card: #FFFFFF;
@@ -402,7 +367,6 @@ export default function DashboardLayout({ children }) {
           --color-danger: #D9534F;
           --shadow: 0 4px 16px rgba(15,43,74,0.06);
         }
-
         [data-theme="dark"] {
           --color-bg: #12121A;
           --color-card: #1E1E2A;
@@ -415,7 +379,6 @@ export default function DashboardLayout({ children }) {
           --color-danger: #D9534F;
           --shadow: 0 4px 16px rgba(0,0,0,0.3);
         }
-
         .hamburger {
           position: fixed;
           top: 0.8rem;
@@ -443,7 +406,6 @@ export default function DashboardLayout({ children }) {
           z-index: 999;
         }
         .overlay.open { display: block; }
-
         .sidebar {
           width: 260px;
           min-height: 100vh;
@@ -462,7 +424,6 @@ export default function DashboardLayout({ children }) {
         }
         .sidebar::-webkit-scrollbar { width: 3px; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-
         .sidebar .brand {
           display: flex;
           align-items: center;
@@ -506,7 +467,6 @@ export default function DashboardLayout({ children }) {
           background: #1E3A5F;
           color: #C79A2B;
         }
-
         .sidebar .nav-section {
           margin-bottom: 0.8rem;
         }
@@ -546,7 +506,6 @@ export default function DashboardLayout({ children }) {
           text-align: center;
           flex-shrink: 0;
         }
-
         .sidebar .bottom {
           margin-top: auto;
           border-top: 1px solid rgba(255,255,255,0.06);
@@ -596,13 +555,11 @@ export default function DashboardLayout({ children }) {
           background: rgba(37,211,102,0.06);
           color: #25D366;
         }
-
         .main-content {
           flex: 1;
           min-width: 0;
           padding: 0;
         }
-
         .page-header {
           padding: 0.8rem 1.2rem 0.4rem 1.2rem;
           background: var(--color-card);
@@ -619,8 +576,7 @@ export default function DashboardLayout({ children }) {
           color: var(--color-text-muted);
           margin: 0.1rem 0 0;
         }
-
-               .dashboard-header {
+        .dashboard-header {
           display: flex;
           justify-content: flex-end;
           align-items: center;
@@ -647,7 +603,6 @@ export default function DashboardLayout({ children }) {
           transition: transform 0.1s ease;
         }
         .beta-btn:hover { transform: scale(1.02); }
-
         @media (min-width: 769px) {
           .hamburger { display: none !important; }
           .sidebar { transform: translateX(0) !important; }
@@ -665,7 +620,7 @@ export default function DashboardLayout({ children }) {
             z-index: 1000;
             height: 100vh;
           }
-          .sidebar.open { transform: translateX(0); }
+            .sidebar.open { transform: translateX(0); }
           .overlay.open { display: block; }
           .main-content { padding-top: 3rem; }
           .page-header { padding: 0.6rem 1rem 0.2rem 1rem; }
@@ -695,7 +650,6 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-        {/* Business Switcher – always visible */}
         <div style={{ marginBottom: '1rem' }}>
           <BusinessSwitcher 
             currentBusinessId={business?.id} 
@@ -771,21 +725,6 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <div className="main-content">
-        {/* ─── DEBUG PANEL ─── */}
-        <div style={{
-          background: '#1e1e2a',
-          color: '#fff',
-          padding: '0.3rem 0.8rem',
-          fontSize: '0.7rem',
-          fontFamily: 'monospace',
-          display: 'flex',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #333'
-        }}>
-          <span>🔍 Selected ID: <strong>{selectedId || 'none'}</strong></span>
-          <span>🏢 Loaded: <strong>{business?.name || 'none'}</strong> ({business?.id || 'none'})</span>
-        </div>
-
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -807,4 +746,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-          }
+        }
