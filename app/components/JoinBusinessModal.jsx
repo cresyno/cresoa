@@ -1,130 +1,110 @@
 'use client';
 
-import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
-export default function JoinBusinessModal({ isOpen, onClose, onSuccess }) {
-  const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
+  const [businesses, setBusinesses] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    async function loadUserBusinesses() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  const handleJoin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+      // Owned businesses
+      const { data: owned } = await supabase
+        .from('businesses')
+        .select('id, name, sector')
+        .eq('owner_id', user.id);
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const res = await fetch('/api/team/invites/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({ code })
-      });
+      // Businesses from memberships
+      const { data: memberships } = await supabase
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id);
 
-      const data = await res.json();
+      let memberBusinesses = [];
+      if (memberships && memberships.length > 0) {
+        const ids = memberships.map(m => m.business_id);
+        const { data: biz } = await supabase
+          .from('businesses')
+          .select('id, name, sector')
+          .in('id', ids);
+        if (biz) memberBusinesses = biz;
+      }
 
-      if (!res.ok) throw new Error(data.error || 'Failed to join business');
-      
-      setCode('');
-      if (onSuccess) onSuccess(data.business_id);
-      onClose();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      const all = [...(owned || []), ...memberBusinesses];
+      const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
+      setBusinesses(unique);
     }
-  };
+    loadUserBusinesses();
+  }, []);
+
+  const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
+
+  if (businesses.length <= 1) return null;
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(15, 43, 74, 0.4)', // Slightly tinted navy overlay
-      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-      zIndex: 1000, padding: '20px'
-    }}>
-      <div style={{
-        background: 'var(--color-card)', 
-        padding: '24px', 
-        borderRadius: '12px', 
-        width: '100%', 
-        maxWidth: '400px',
-        boxShadow: 'var(--shadow-lg, 0 8px 32px rgba(15,43,74,0.08))'
-      }}>
-        <h3 style={{ marginTop: 0, marginBottom: '8px', color: 'var(--color-text)', fontSize: '18px' }}>
-          Join a Business
-        </h3>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginBottom: '20px', lineHeight: '1.5' }}>
-          Enter the one-time invite code provided by the business owner to join their workspace.
-        </p>
-        
-        <form onSubmit={handleJoin}>
-          <input
-            type="text"
-            placeholder="e.g. ZY284GSJ2"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            style={{
-              width: '100%', 
-              padding: '12px', 
-              marginBottom: '12px',
-              border: '1px solid var(--color-border)',
-              borderRadius: '8px', 
-              textTransform: 'uppercase',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '16px',
-              outline: 'none'
-            }}
-            required
-          />
-          
-          {error && (
-            <div style={{ color: 'var(--color-danger)', fontSize: '13px', marginBottom: '12px' }}>
-              {error}
-            </div>
-          )}
-          
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-            <button 
-              type="button" 
-              onClick={onClose}
+    <div style={{ position: 'relative', marginBottom: '16px' }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 12px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '8px',
+          color: '#fff',
+          cursor: 'pointer',
+          fontSize: '13px',
+          fontWeight: '500',
+        }}
+      >
+        <span>{currentBusiness ? currentBusiness.name : 'Switch Business'}</span>
+        <span>▼</span>
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '105%',
+          left: 0,
+          right: 0,
+          background: '#0F2B4A',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          zIndex: 100,
+          overflow: 'hidden'
+        }}>
+          {businesses.map((biz) => (
+            <button
+              key={biz.id}
+              onClick={() => {
+                setIsOpen(false);
+                onSwitch(biz.id);
+              }}
               style={{
-                padding: '10px 16px', 
-                border: '1px solid var(--color-border)', 
-                background: 'transparent',
-                borderRadius: '8px',
-                cursor: 'pointer', 
-                color: 'var(--color-text)',
-                fontWeight: '500'
+                width: '100%',
+                padding: '10px 12px',
+                textAlign: 'left',
+                background: biz.id === currentBusinessId ? 'rgba(212, 165, 42, 0.15)' : 'transparent',
+                color: biz.id === currentBusinessId ? '#D4A52A' : '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13px',
+                display: 'block'
               }}
             >
-              Cancel
+              {biz.name}
             </button>
-            <button 
-              type="submit" 
-              disabled={loading || !code.trim()}
-              style={{
-                padding: '10px 16px', 
-                border: 'none', 
-                borderRadius: '8px',
-                background: 'var(--color-primary)', 
-                color: '#FFFFFF',
-                cursor: loading || !code.trim() ? 'not-allowed' : 'pointer',
-                fontWeight: '500',
-                opacity: loading || !code.trim() ? 0.7 : 1
-              }}
-            >
-              {loading ? 'Joining...' : 'Join Business'}
-            </button>
-          </div>
-        </form>
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
-        }
+}
