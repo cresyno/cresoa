@@ -11,35 +11,16 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
 
   useEffect(() => {
     async function loadBusinesses() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      // 1. Owned businesses
-      const { data: owned } = await supabase
-        .from('businesses')
-        .select('id, name, sector')
-        .eq('owner_id', user.id);
-
-      // 2. Businesses from memberships
-      const { data: memberships } = await supabase
-        .from('business_memberships')
-        .select('business_id')
-        .eq('user_id', user.id);
-
-      let memberBusinesses = [];
-      if (memberships && memberships.length > 0) {
-        const ids = memberships.map(m => m.business_id);
-        const { data: biz } = await supabase
-          .from('businesses')
-          .select('id, name, sector')
-          .in('id', ids);
-        if (biz) memberBusinesses = biz;
+      const response = await fetch('/api/user/businesses', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      const result = await response.json();
+      if (response.ok) {
+        setBusinesses(result.businesses || []);
       }
-
-      // Combine and deduplicate
-      const all = [...(owned || []), ...memberBusinesses];
-      const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
-      setBusinesses(unique);
     }
     loadBusinesses();
   }, []);
@@ -140,4 +121,4 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
       )}
     </div>
   );
-            }
+}
