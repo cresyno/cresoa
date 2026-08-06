@@ -33,7 +33,16 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
       router.push('/accept-invite');
       return;
     }
-    if (onSwitch) onSwitch(businessId);
+    // Save the selected business ID to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedBusinessId', businessId);
+    }
+    // Call parent's onSwitch or reload directly
+    if (onSwitch) {
+      onSwitch(businessId);
+    } else {
+      window.location.reload();
+    }
   };
 
   return (
@@ -121,4 +130,4 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
       )}
     </div>
   );
-}
+                }
