@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../../lib/supabaseClient';
+import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
@@ -18,13 +19,13 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
     }
 
-    // Look up the invite
-    const { data: invite, error: inviteError } = await supabase
+    // Use admin client to find the invite (bypass RLS)
+    const { data: invite, error: inviteError } = await supabaseAdmin
       .from('business_invites')
       .select('*')
       .eq('invite_code', invite_code.toUpperCase())
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
 
     if (inviteError || !invite) {
       return NextResponse.json({ error: 'Invalid or expired invite code' }, { status: 404 });
@@ -34,24 +35,24 @@ export async function POST(req) {
     const now = new Date();
     const expires = new Date(invite.expires_at);
     if (expires < now) {
-      await supabase.from('business_invites').update({ status: 'expired' }).eq('id', invite.id);
+      await supabaseAdmin.from('business_invites').update({ status: 'expired' }).eq('id', invite.id);
       return NextResponse.json({ error: 'Invite code has expired' }, { status: 410 });
     }
 
-    // Check if user is already a member
-    const { data: existingMembership } = await supabase
+    // Check if user is already a member (using admin client)
+    const { data: existing } = await supabaseAdmin
       .from('business_memberships')
       .select('id')
       .eq('business_id', invite.business_id)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (existingMembership) {
+    if (existing) {
       return NextResponse.json({ error: 'You are already a member of this business' }, { status: 400 });
     }
 
     // Create membership
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('business_memberships')
       .insert({
         business_id: invite.business_id,
@@ -62,13 +63,13 @@ export async function POST(req) {
     if (insertError) throw insertError;
 
     // Mark invite as accepted
-    await supabase
+    await supabaseAdmin
       .from('business_invites')
       .update({ status: 'accepted' })
       .eq('id', invite.id);
 
     // Log activity
-    await supabase.from('business_activity_logs').insert({
+    await supabaseAdmin.from('business_activity_logs').insert({
       business_id: invite.business_id,
       performed_by: user.id,
       action: 'invite_accepted',
