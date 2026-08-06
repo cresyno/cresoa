@@ -8,11 +8,17 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
+
+    // ─── SET THE AUTH TOKEN ON THE SUPABASE CLIENT ───
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Now set the session so RLS sees the user
+    await supabase.auth.setSession({ access_token: token, refresh_token: '' });
+
+    // ─── NOW QUERIES WILL RESPECT RLS WITH auth.uid() ───
     const { business_id, email, role } = await req.json();
     if (!business_id || !email || !role) {
       return NextResponse.json({ error: 'Business ID, email, and role are required' }, { status: 400 });
@@ -21,7 +27,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Role must be either "Staff" or "Manager"' }, { status: 400 });
     }
 
-    // Fetch business - using maybeSingle to avoid error if not found
+    // Fetch business – now RLS will allow owner to see it
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('owner_id, name')
@@ -40,7 +46,7 @@ export async function POST(req) {
       }, { status: 404 });
     }
 
-    // Check permission: owner OR manager via membership
+    // Check permission
     let hasPermission = false;
     if (business.owner_id === user.id) {
       hasPermission = true;
@@ -58,22 +64,7 @@ export async function POST(req) {
     }
 
     if (!hasPermission) {
-      return NextResponse.json({
-        error: 'You do not have permission to invite staff',
-        debug: {
-          user_id: user.id,
-          business_id,
-          business_owner_id: business.owner_id,
-          is_owner: business.owner_id === user.id,
-          membership: await supabase
-            .from('business_memberships')
-            .select('*')
-            .eq('business_id', business_id)
-            .eq('user_id', user.id)
-            .maybeSingle()
-            .then(r => r.data)
-        }
-      }, { status: 403 });
+      return NextResponse.json({ error: 'You do not have permission to invite staff' }, { status: 403 });
     }
 
     // Check for duplicate pending invite
@@ -89,7 +80,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'An invite for this email is already pending' }, { status: 400 });
     }
 
-    // Generate 6-character code
+    // Generate code
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
@@ -99,7 +90,6 @@ export async function POST(req) {
     const expires_at = new Date();
     expires_at.setDate(expires_at.getDate() + 3);
 
-    // Insert invite
     const { data: invite, error: insertError } = await supabase
       .from('business_invites')
       .insert({
@@ -121,7 +111,6 @@ export async function POST(req) {
       throw insertError;
     }
 
-    // Log activity
     await supabase.from('business_activity_logs').insert({
       business_id,
       performed_by: user.id,
