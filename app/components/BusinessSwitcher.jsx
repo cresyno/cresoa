@@ -1,24 +1,26 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
+  const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    async function loadUserBusinesses() {
+    async function loadBusinesses() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Owned businesses
+      // 1. Owned businesses
       const { data: owned } = await supabase
         .from('businesses')
         .select('id, name, sector')
         .eq('owner_id', user.id);
 
-      // Businesses from memberships
+      // 2. Businesses from memberships
       const { data: memberships } = await supabase
         .from('business_memberships')
         .select('business_id')
@@ -34,16 +36,24 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
         if (biz) memberBusinesses = biz;
       }
 
+      // Combine and deduplicate
       const all = [...(owned || []), ...memberBusinesses];
       const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
       setBusinesses(unique);
     }
-    loadUserBusinesses();
+    loadBusinesses();
   }, []);
 
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
-  if (businesses.length <= 1) return null;
+  const handleSwitch = (businessId) => {
+    setIsOpen(false);
+    if (businessId === 'join') {
+      router.push('/accept-invite');
+      return;
+    }
+    if (onSwitch) onSwitch(businessId);
+  };
 
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -62,10 +72,13 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
           cursor: 'pointer',
           fontSize: '13px',
           fontWeight: '500',
+          transition: 'all 0.2s'
         }}
       >
-        <span>{currentBusiness ? currentBusiness.name : 'Switch Business'}</span>
-        <span>▼</span>
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {currentBusiness ? currentBusiness.name : 'Select Business'}
+        </span>
+        <span style={{ marginLeft: '8px' }}>▼</span>
       </button>
 
       {isOpen && (
@@ -79,15 +92,14 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
           borderRadius: '8px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
           zIndex: 100,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          maxHeight: '250px',
+          overflowY: 'auto'
         }}>
           {businesses.map((biz) => (
             <button
               key={biz.id}
-              onClick={() => {
-                setIsOpen(false);
-                onSwitch(biz.id);
-              }}
+              onClick={() => handleSwitch(biz.id)}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -97,14 +109,35 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: '13px',
-                display: 'block'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.05)'
               }}
             >
-              {biz.name}
+              <span>{biz.name}</span>
+              {biz.id === currentBusinessId && <span style={{ fontSize: '12px', color: '#D4A52A' }}>✓</span>}
             </button>
           ))}
+          <button
+            onClick={() => handleSwitch('join')}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              textAlign: 'left',
+              background: 'rgba(212, 165, 42, 0.1)',
+              color: '#D4A52A',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '600',
+              borderTop: '1px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            ➕ Join another business
+          </button>
         </div>
       )}
     </div>
   );
-}
+            }
