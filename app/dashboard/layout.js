@@ -151,9 +151,26 @@ export default function DashboardLayout({ children }) {
 
         if (ownedBusiness) {
           businessData = ownedBusiness
+
+          // ─── Ensure owner has a membership entry ───
+          const { data: existingMembership } = await supabase
+            .from('business_memberships')
+            .select('id')
+            .eq('business_id', ownedBusiness.id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          if (!existingMembership) {
+            await supabase.from('business_memberships').insert({
+              business_id: ownedBusiness.id,
+              user_id: user.id,
+              role: 'Owner'
+            })
+            console.log('✅ Added missing membership for owner')
+          }
         }
 
-        // 2. If not owner, check memberships table (NEW – no more staff table)
+        // 2. If not owner, check memberships table
         if (!businessData) {
           const { data: membershipData } = await supabase
             .from('business_memberships')
@@ -265,7 +282,6 @@ export default function DashboardLayout({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
-        // If there's any error, redirect to onboarding to recover
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -626,7 +642,7 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-         {/* Embedded Business Switcher */}
+               {/* Embedded Business Switcher */}
         <div style={{ marginBottom: '1rem' }}>
           <BusinessSwitcher 
             currentBusinessId={business?.id} 
