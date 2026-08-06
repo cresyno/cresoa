@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../../lib/supabaseClient';
 import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
+
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -13,12 +14,33 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // ─── Check if user already owns a business or is a member of any business ───
+    const { data: ownedBusiness } = await supabaseAdmin
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+
+    if (ownedBusiness) {
+      return NextResponse.json({ error: 'You already own a business. You cannot join another.' }, { status: 400 });
+    }
+
+    const { data: existingMembership } = await supabaseAdmin
+      .from('business_memberships')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingMembership) {
+      return NextResponse.json({ error: 'You are already a member of another business. You cannot join another.' }, { status: 400 });
+    }
+
     const { invite_code } = await req.json();
     if (!invite_code) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
     }
 
-    // Find invite
+    // ─── Look up the invite ───
     const { data: invite, error: inviteError } = await supabaseAdmin
       .from('business_invites')
       .select('*')
@@ -30,7 +52,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid or expired invite code' }, { status: 404 });
     }
 
-    // Check expiry
+    // ─── Check expiry ───
     const now = new Date();
     const expires = new Date(invite.expires_at);
     if (expires < now) {
@@ -38,19 +60,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invite code has expired' }, { status: 410 });
     }
 
-    // Check if user already a member
-    const { data: existing } = await supabaseAdmin
-      .from('business_memberships')
-      .select('id')
-      .eq('business_id', invite.business_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (existing) {
-      return NextResponse.json({ error: 'You are already a member of this business' }, { status: 400 });
-    }
-
-    // Create membership
+    // ─── Create membership ───
     const { error: insertError } = await supabaseAdmin
       .from('business_memberships')
       .insert({
@@ -61,13 +71,13 @@ export async function POST(req) {
 
     if (insertError) throw insertError;
 
-    // Mark invite as accepted
+    // ─── Mark invite as accepted ───
     await supabaseAdmin
       .from('business_invites')
       .update({ status: 'accepted' })
       .eq('id', invite.id);
 
-    // Log activity
+    // ─── Log activity ───
     await supabaseAdmin.from('business_activity_logs').insert({
       business_id: invite.business_id,
       performed_by: user.id,
@@ -75,13 +85,11 @@ export async function POST(req) {
       details: { email: user.email, role: invite.role }
     });
 
-    // Return success with redirect to the joined business
     return NextResponse.json({
       success: true,
       message: 'You have successfully joined the business',
       redirect: `/dashboard?business_id=${invite.business_id}`
     }, { status: 200 });
-
   } catch (error) {
     console.error('Accept invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
