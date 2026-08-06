@@ -141,15 +141,15 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        let businessData = null
-
-        // ─── Get business_id from URL or sessionStorage ───
-        let businessIdFromUrl = searchParams.get('business_id')
-        if (!businessIdFromUrl && typeof window !== 'undefined') {
-          businessIdFromUrl = sessionStorage.getItem('selectedBusinessId')
+        // ─── DEBUG: show URL param ───
+        const businessIdFromUrl = searchParams.get('business_id')
+        if (typeof window !== 'undefined') {
+          alert(`🔍 URL param: ${businessIdFromUrl || 'none'}`)
         }
 
-        // ─── If we have a business_id, FORCE load it (regular client, RLS will allow) ───
+        let businessData = null
+
+        // ─── FORCE LOAD FROM URL ───
         if (businessIdFromUrl) {
           const { data: business, error } = await supabase
             .from('businesses')
@@ -159,10 +159,17 @@ function DashboardLayoutContent({ children }) {
 
           if (business && !error) {
             businessData = business
+            if (typeof window !== 'undefined') {
+              alert(`✅ Loaded from URL: ${business.name} (ID: ${business.id})`)
+            }
+          } else {
+            if (typeof window !== 'undefined') {
+              alert(`❌ Failed to load from URL: ${error?.message || 'not found'}`)
+            }
           }
         }
 
-        // ─── If still no business, load owned ───
+        // ─── If URL param failed or missing, fallback to owned business ───
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
@@ -171,6 +178,9 @@ function DashboardLayoutContent({ children }) {
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
+            if (typeof window !== 'undefined') {
+              alert(`📌 Fallback to owned: ${businessData.name}`)
+            }
           }
         }
 
@@ -189,11 +199,17 @@ function DashboardLayoutContent({ children }) {
               .maybeSingle()
             if (memberBusiness) {
               businessData = memberBusiness
+              if (typeof window !== 'undefined') {
+                alert(`📌 From membership: ${businessData.name}`)
+              }
             }
           }
         }
 
         if (!businessData) {
+          if (typeof window !== 'undefined') {
+            alert('❌ No business found – redirecting to onboarding')
+          }
           router.push('/onboarding')
           return
         }
@@ -283,6 +299,9 @@ function DashboardLayoutContent({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
+        if (typeof window !== 'undefined') {
+          alert(`❌ Error: ${error.message}`)
+        }
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -541,4 +560,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-            }
+                }
