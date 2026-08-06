@@ -44,8 +44,8 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       router.push('/accept-invite');
       return;
     }
-    // Direct URL redirect – bypasses localStorage issues
-    router.push(`/dashboard?business_id=${businessId}`);
+    // DIRECT NAVIGATION - forces the layout to load this business
+    window.location.href = `/dashboard?business_id=${businessId}`;
   };
 
   return (
@@ -148,4 +148,4 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       </div>
     </div>
   );
-}
+      }
