@@ -8,15 +8,29 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('Staff')
+  const [activeBusinessId, setActiveBusinessId] = useState(null)
 
-  // Fetch team members when the page loads
+  // Fetch team members and get the active business when the page loads
   useEffect(() => {
-    fetchTeamMembers()
+    // Assuming your BusinessSwitcher saves the selected business to localStorage
+    const storedBusiness = localStorage.getItem('activeBusiness')
+    
+    if (storedBusiness) {
+      try {
+        const parsed = JSON.parse(storedBusiness)
+        setActiveBusinessId(parsed.id)
+        fetchTeamMembers(parsed.id)
+      } catch (err) {
+        console.error("Error parsing active business", err)
+        setLoading(false)
+      }
+    } else {
+      setLoading(false)
+    }
   }, [])
 
-  const fetchTeamMembers = async () => {
+  const fetchTeamMembers = async (businessId) => {
     setLoading(true)
-    // TODO: Replace 'business_users' with your exact Supabase table name linking users to businesses
     const { data, error } = await supabase
       .from('business_users')
       .select(`
@@ -24,6 +38,7 @@ export default function TeamPage() {
         role,
         users ( id, email, full_name )
       `)
+      .eq('business_id', businessId)
       
     if (error) {
       console.error('Error fetching team:', error)
@@ -35,10 +50,36 @@ export default function TeamPage() {
 
   const handleInvite = async (e) => {
     e.preventDefault()
-    // Here we will add the Supabase Edge Function or insert logic to invite a user
-    console.log(`Inviting ${inviteEmail} as ${inviteRole}`)
-    alert(`Invite sent to ${inviteEmail}!`)
-    setInviteEmail('')
+    
+    if (!activeBusinessId) {
+      alert("Error: No active business selected.")
+      return
+    }
+
+    // 1. Generate a random 6-character alphanumeric invite code
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    
+    // 2. Save it to Supabase (Assuming you have a 'business_invites' table)
+    const { data, error } = await supabase
+      .from('business_invites')
+      .insert([
+        { 
+          business_id: activeBusinessId, 
+          email: inviteEmail, 
+          role: inviteRole, 
+          invite_code: inviteCode,
+          status: 'pending'
+        }
+      ])
+
+    if (error) {
+      console.error('Error saving invite:', error)
+      alert('Failed to generate invite code.')
+    } else {
+      // 3. Show the code to the owner so they can share it with the staff member
+      alert(`Success! Share this invite code with your staff: ${inviteCode}`)
+      setInviteEmail('')
+    }
   }
 
   return (
@@ -58,6 +99,8 @@ export default function TeamPage() {
           
           {loading ? (
             <p className="text-gray-500 animate-pulse">Loading team...</p>
+          ) : !activeBusinessId ? (
+            <p className="text-red-500">Please select a business from the switcher to view the team.</p>
           ) : team.length === 0 ? (
             <p className="text-gray-500">You are the only member of this business.</p>
           ) : (
@@ -109,9 +152,10 @@ export default function TeamPage() {
 
             <button
               type="submit"
-              className="w-full bg-[#1e293b] text-white font-medium rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors"
+              disabled={!activeBusinessId}
+              className="w-full bg-[#1e293b] text-white font-medium rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              Send Invite
+              Generate Invite Code
             </button>
           </form>
         </div>
@@ -119,4 +163,4 @@ export default function TeamPage() {
       </div>
     </div>
   )
-                      }
+}
