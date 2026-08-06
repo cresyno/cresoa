@@ -141,8 +141,12 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        // ─── Get business_id from URL ───
-        const businessIdFromUrl = searchParams.get('business_id')
+        // ─── Get business_id from URL: try searchParams first, fallback to window.location ───
+        let businessIdFromUrl = searchParams.get('business_id')
+        if (!businessIdFromUrl && typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search)
+          businessIdFromUrl = urlParams.get('business_id')
+        }
         alert(`🔍 URL param: ${businessIdFromUrl || 'none'}`)
 
         let businessData = null
@@ -159,7 +163,6 @@ function DashboardLayoutContent({ children }) {
             businessData = business
             alert(`✅ Loaded from URL: ${business.name}`)
           } else {
-            // If we have a URL param but can't load it, show error and stop
             alert(`❌ Failed to load business from URL: ${error?.message || 'not found'}`)
             router.push('/onboarding')
             return
@@ -195,7 +198,6 @@ function DashboardLayoutContent({ children }) {
           }
         }
 
-        // ─── If still no business, redirect to onboarding ───
         if (!businessData) {
           alert('❌ No business found – redirecting to onboarding')
           router.push('/onboarding')
@@ -461,7 +463,7 @@ function DashboardLayoutContent({ children }) {
           <a href="/dashboard/subscription" onClick={handleNavClick}>
             <span className="icon">💳</span> Billing & Plan
           </a>
-     {business && !business.has_applied_for_beta && (
+             {business && !business.has_applied_for_beta && (
             <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🧪</span> Join Beta Program
             </a>
@@ -546,4 +548,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-            }
+                        }
