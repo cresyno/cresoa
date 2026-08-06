@@ -1,96 +1,113 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient' // Adjust path if necessary (e.g., '../lib/supabaseClient')
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function AcceptInvitePage() {
-  const [code, setCode] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const router = useRouter()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const codeParam = searchParams.get('code') || '';
 
-  const handleAcceptCode = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage('')
+  const [code, setCode] = useState(codeParam);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [success, setSuccess] = useState(false);
 
-    // 1. Verify the code exists and is pending in Supabase
-    const { data: inviteData, error: inviteError } = await supabase
-      .from('business_invites')
-      .select('*')
-      .eq('invite_code', code.toUpperCase())
-      .eq('status', 'pending')
-      .single()
+  const handleAccept = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
 
-    if (inviteError || !inviteData) {
-      setMessage('Invalid or expired invite code.')
-      setLoading(false)
-      return
+    try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/login?redirect=' + encodeURIComponent(`/accept-invite?code=${code}`));
+        return;
+      }
+
+      const response = await fetch('/api/team/invites/accept', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ invite_code: code })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setSuccess(true);
+        setMessage('✅ ' + result.message);
+        setTimeout(() => router.push('/dashboard'), 2000);
+      } else {
+        setMessage('❌ ' + (result.error || 'Failed to accept invite'));
+      }
+    } catch (error) {
+      setMessage('❌ An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
-
-    // 2. Get the currently logged-in user accepting the invite
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      setMessage('You must be logged in to accept an invite.')
-      // Route them to login if needed: router.push('/login')
-      setLoading(false)
-      return
-    }
-
-    // 3. Add the user to the business_users table
-    const { error: insertError } = await supabase
-      .from('business_users')
-      .insert([
-        {
-          business_id: inviteData.business_id,
-          user_id: user.id,
-          role: inviteData.role
-        }
-      ])
-
-    if (insertError) {
-      setMessage('Error joining the business. Please try again.')
-      setLoading(false)
-      return
-    }
-
-    // 4. Mark the invite as accepted
-    await supabase
-      .from('business_invites')
-      .update({ status: 'accepted' })
-      .eq('id', inviteData.id)
-
-    setMessage('Success! You have joined the business.')
-    
-    // Redirect to the dashboard after a short delay
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 2000)
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="bg-white max-w-md w-full rounded-xl shadow-md p-8 border border-gray-100">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">Join a Business</h1>
-        <p className="text-center text-gray-600 mb-6">Enter the invite code provided by your manager.</p>
-        
-        <form onSubmit={handleAcceptCode} className="space-y-4">
-          <div>
-            <input
-              type="text"
-              required
-              maxLength={6}
-              className="w-full text-center text-2xl tracking-widest border border-gray-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-500 uppercase"
-              placeholder="XXXXXX"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </div>
-          
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--color-bg)',
+      padding: '1rem'
+    }}>
+      <div style={{
+        maxWidth: '400px',
+        width: '100%',
+        background: 'var(--color-card)',
+        padding: '2rem',
+        borderRadius: '12px',
+        boxShadow: 'var(--shadow)',
+        border: '1px solid var(--color-border)'
+      }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'center', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
+          Join a Business
+        </h1>
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
+          Enter the invite code provided by your manager.
+        </p>
+
+        <form onSubmit={handleAccept}>
+          <input
+            type="text"
+            required
+            maxLength={6}
+            placeholder="XXXXXX"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            style={{
+              width: '100%',
+              padding: '0.8rem',
+              fontSize: '1.5rem',
+              textAlign: 'center',
+              letterSpacing: '0.5rem',
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              background: 'var(--color-bg)',
+              color: 'var(--color-text)',
+              outline: 'none',
+              fontWeight: 'bold',
+              marginBottom: '1rem'
+            }}
+          />
+
           {message && (
-            <p className={`text-sm text-center ${message.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+            <p style={{
+              textAlign: 'center',
+              color: success ? 'var(--color-success)' : 'var(--color-danger)',
+              marginBottom: '1rem',
+              fontSize: '0.9rem'
+            }}>
               {message}
             </p>
           )}
@@ -98,12 +115,24 @@ export default function AcceptInvitePage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#1e293b] text-white font-medium rounded-lg px-4 py-3 hover:bg-gray-800 transition-colors disabled:bg-gray-400"
+            style={{
+              width: '100%',
+              padding: '0.8rem',
+              background: 'var(--color-accent)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              opacity: loading ? 0.7 : 1,
+              transition: 'opacity 0.2s'
+            }}
           >
-            {loading ? 'Verifying...' : 'Accept Invite'}
+            {loading ? 'Accepting...' : 'Accept Invite'}
           </button>
         </form>
       </div>
     </div>
-  )
-            }
+  );
+}
