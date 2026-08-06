@@ -130,7 +130,7 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data ───
+  // ─── Load business data with URL + localStorage support ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -141,32 +141,90 @@ export default function DashboardLayout({ children }) {
         }
 
         let businessData = null
+        let selectedId = null
 
-        // 1. Check if user owns a business
-        const { data: ownedBusiness } = await supabase
-          .from('businesses')
-          .select('*')
-          .eq('owner_id', user.id)
-          .maybeSingle()
-
-        if (ownedBusiness) {
-          businessData = ownedBusiness
-          // Ensure membership exists
-          const { data: existing } = await supabase
-            .from('business_memberships')
-            .select('id')
-            .eq('business_id', ownedBusiness.id)
-            .eq('user_id', user.id)
-            .maybeSingle()
-          if (!existing) {
-            await supabase.from('business_memberships').insert({
-              business_id: ownedBusiness.id,
-              user_id: user.id,
-              role: 'Owner'
-            })
+        // 1. Check URL for ?business_id= (after accepting invite)
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search)
+          const urlBusinessId = params.get('business_id')
+          if (urlBusinessId) {
+            selectedId = urlBusinessId
+          } else {
+            // 2. Check localStorage for saved selection
+            const stored = localStorage.getItem('selectedBusinessId')
+            if (stored) {
+              selectedId = stored
+            }
           }
-        } else {
-          // 2. Check membership
+        }
+
+        // 3. If we have a selectedId, try to load that business
+        if (selectedId) {
+          const { data: requested, error } = await supabase
+            .from('businesses')
+            .select('*')
+            .eq('id', selectedId)
+            .maybeSingle()
+
+          if (requested && !error) {
+            // Verify user is owner or member
+            const isOwner = requested.owner_id === user.id
+            const { data: membership } = await supabase
+              .from('business_memberships')
+              .select('id')
+              .eq('business_id', selectedId)
+              .eq('user_id', user.id)
+              .maybeSingle()
+            const isMember = !!membership
+
+            if (isOwner || isMember) {
+              businessData = requested
+              // Ensure owner has membership (if not already)
+              if (isOwner && !isMember) {
+                await supabase.from('business_memberships').insert({
+                  business_id: selectedId,
+                  user_id: user.id,
+                  role: 'Owner'
+                })
+              }
+            } else {
+              // If user doesn't have access, clear stored selection
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('selectedBusinessId')
+              }
+            }
+          }
+        }
+
+        // 4. If businessData is still null, fallback to owned business
+        if (!businessData) {
+          const { data: ownedBusiness } = await supabase
+            .from('businesses')
+            .select('*')
+            .eq('owner_id', user.id)
+            .maybeSingle()
+
+          if (ownedBusiness) {
+            businessData = ownedBusiness
+            // Ensure membership exists for owner
+            const { data: existing } = await supabase
+              .from('business_memberships')
+              .select('id')
+              .eq('business_id', ownedBusiness.id)
+              .eq('user_id', user.id)
+              .maybeSingle()
+            if (!existing) {
+              await supabase.from('business_memberships').insert({
+                business_id: ownedBusiness.id,
+                user_id: user.id,
+                role: 'Owner'
+              })
+            }
+          }
+        }
+
+        // 5. If still no business, check membership (user is member but not owner)
+        if (!businessData) {
           const { data: membershipData } = await supabase
             .from('business_memberships')
             .select('business_id, role')
@@ -185,7 +243,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 3. If still no business, redirect to onboarding
+        // 6. If still no business, redirect to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -232,6 +290,11 @@ export default function DashboardLayout({ children }) {
         }
 
         setBusiness(businessData)
+
+        // Save the loaded business ID to localStorage (for switcher to remember)
+        if (typeof window !== 'undefined' && businessData) {
+          localStorage.setItem('selectedBusinessId', businessData.id)
+        }
 
         // ─── Compute stats for headers ───
         const { count: totalOrders } = await supabase
@@ -569,7 +632,7 @@ export default function DashboardLayout({ children }) {
           background: var(--color-card);
           border-bottom: 1px solid var(--color-border);
         }
-        .dashboard-header .date {
+             .dashboard-header .date {
           font-size: 0.7rem;
           color: var(--color-text-muted);
         }
@@ -636,11 +699,12 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-        {/* ─── Business Switcher – RE‑ENABLED ─── */}
+        {/* Embedded Business Switcher – always visible */}
         <div style={{ marginBottom: '1rem' }}>
           <BusinessSwitcher 
             currentBusinessId={business?.id} 
-            onSwitch={(newBusinessId) => {
+            onSwitch={() => {
+              // Just reload – the switcher already saved the selected ID to localStorage
               window.location.reload()
             }} 
           />
@@ -733,4 +797,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-                }
+        }
