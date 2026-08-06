@@ -121,7 +121,8 @@ export default function StaffPage() {
 
       const result = await response.json();
       if (response.ok) {
-        const code = result.invite?.code || '';
+        // ─── FIX: use invite_code, not code ───
+        const code = result.invite?.invite_code || '';
         setGeneratedCode(code);
         setLastGeneratedEmail(inviteEmail);
         setInviteMessage('✅ Invite code generated successfully!');
@@ -195,7 +196,6 @@ export default function StaffPage() {
     }
   };
 
-  // ─── Share to WhatsApp ───
   const shareOnWhatsApp = () => {
     if (!generatedCode) return;
     const url = `https://wa.me/?text=🎉%20You%20have%20been%20invited%20to%20join%20our%20business%20on%20Cresoa!%0A%0AUse%20this%20code%20to%20join:%20*${generatedCode}*%0A%0A👉%20Go%20to%20${window.location.origin}/accept-invite%20to%20accept%20the%20invite.`;
@@ -494,4 +494,4 @@ export default function StaffPage() {
       </div>
     </div>
   );
-                                }
+    }
