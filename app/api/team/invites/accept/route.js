@@ -14,26 +14,8 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ─── Check if user already owns a business or is a member of any business ───
-    const { data: ownedBusiness } = await supabaseAdmin
-      .from('businesses')
-      .select('id')
-      .eq('owner_id', user.id)
-      .maybeSingle();
-
-    if (ownedBusiness) {
-      return NextResponse.json({ error: 'You already own a business. You cannot join another.' }, { status: 400 });
-    }
-
-    const { data: existingMembership } = await supabaseAdmin
-      .from('business_memberships')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (existingMembership) {
-      return NextResponse.json({ error: 'You are already a member of another business. You cannot join another.' }, { status: 400 });
-    }
+    // ─── REMOVED: "already owns a business" and "already a member of any business" checks ───
+    // We'll only check if they are already a member of THIS specific business.
 
     const { invite_code } = await req.json();
     if (!invite_code) {
@@ -58,6 +40,18 @@ export async function POST(req) {
     if (expires < now) {
       await supabaseAdmin.from('business_invites').update({ status: 'expired' }).eq('id', invite.id);
       return NextResponse.json({ error: 'Invite code has expired' }, { status: 410 });
+    }
+
+    // ─── Check if user is already a member of THIS business ───
+    const { data: existing } = await supabaseAdmin
+      .from('business_memberships')
+      .select('id')
+      .eq('business_id', invite.business_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ error: 'You are already a member of this business' }, { status: 400 });
     }
 
     // ─── Create membership ───
@@ -94,4 +88,4 @@ export async function POST(req) {
     console.error('Accept invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-}
+        }
