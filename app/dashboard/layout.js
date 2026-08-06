@@ -143,13 +143,11 @@ function DashboardLayoutContent({ children }) {
 
         // ─── Get business_id from URL ───
         const businessIdFromUrl = searchParams.get('business_id')
-        if (typeof window !== 'undefined') {
-          alert(`🔍 URL param: ${businessIdFromUrl || 'none'}`)
-        }
+        alert(`🔍 URL param: ${businessIdFromUrl || 'none'}`)
 
         let businessData = null
 
-        // ─── FORCE LOAD FROM URL ───
+        // ─── If URL param exists, FORCE load it – NO FALLBACK ───
         if (businessIdFromUrl) {
           const { data: business, error } = await supabase
             .from('businesses')
@@ -159,38 +157,30 @@ function DashboardLayoutContent({ children }) {
 
           if (business && !error) {
             businessData = business
-            if (typeof window !== 'undefined') {
-              alert(`✅ Loaded from URL: ${business.name} (ID: ${business.id})`)
-            }
+            alert(`✅ Loaded from URL: ${business.name}`)
           } else {
-            if (typeof window !== 'undefined') {
-              alert(`❌ Failed to load from URL: ${error?.message || 'not found'}`)
-            }
+            // If we have a URL param but can't load it, show error and stop
+            alert(`❌ Failed to load business from URL: ${error?.message || 'not found'}`)
+            router.push('/onboarding')
+            return
           }
-        }
-
-        // ─── FALLBACK: ONLY IF URL LOADING FAILED ───
-        if (!businessData) {
-          // First, check owned business
+        } else {
+          // ─── No URL param – fallback to owned business ───
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
             .eq('owner_id', user.id)
             .maybeSingle()
-          
           if (ownedBusiness) {
             businessData = ownedBusiness
-            if (typeof window !== 'undefined') {
-              alert(`📌 Fallback to owned: ${businessData.name}`)
-            }
+            alert(`📌 No URL param – loaded owned: ${businessData.name}`)
           } else {
-            // If no owned business, check membership
+            // Check membership
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
               .eq('user_id', user.id)
               .maybeSingle()
-            
             if (membershipData) {
               const { data: memberBusiness } = await supabase
                 .from('businesses')
@@ -199,18 +189,15 @@ function DashboardLayoutContent({ children }) {
                 .maybeSingle()
               if (memberBusiness) {
                 businessData = memberBusiness
-                if (typeof window !== 'undefined') {
-                  alert(`📌 From membership: ${businessData.name}`)
-                }
+                alert(`📌 From membership: ${businessData.name}`)
               }
             }
           }
         }
 
+        // ─── If still no business, redirect to onboarding ───
         if (!businessData) {
-          if (typeof window !== 'undefined') {
-            alert('❌ No business found – redirecting to onboarding')
-          }
+          alert('❌ No business found – redirecting to onboarding')
           router.push('/onboarding')
           return
         }
@@ -300,9 +287,7 @@ function DashboardLayoutContent({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
-        if (typeof window !== 'undefined') {
-          alert(`❌ Error: ${error.message}`)
-        }
+        alert(`❌ Error: ${error.message}`)
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -476,7 +461,7 @@ function DashboardLayoutContent({ children }) {
           <a href="/dashboard/subscription" onClick={handleNavClick}>
             <span className="icon">💳</span> Billing & Plan
           </a>
-          {business && !business.has_applied_for_beta && (
+     {business && !business.has_applied_for_beta && (
             <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🧪</span> Join Beta Program
             </a>
