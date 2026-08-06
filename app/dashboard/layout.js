@@ -130,7 +130,7 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data ───
+  // ─── Load business data with auto-creation fallback ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -151,27 +151,22 @@ export default function DashboardLayout({ children }) {
 
         if (ownedBusiness) {
           businessData = ownedBusiness
-
-          // ─── Ensure owner has a membership entry ───
-          const { data: existingMembership } = await supabase
+          // ensure membership
+          const { data: existing } = await supabase
             .from('business_memberships')
             .select('id')
             .eq('business_id', ownedBusiness.id)
             .eq('user_id', user.id)
             .maybeSingle()
-
-          if (!existingMembership) {
+          if (!existing) {
             await supabase.from('business_memberships').insert({
               business_id: ownedBusiness.id,
               user_id: user.id,
               role: 'Owner'
             })
-            console.log('✅ Added missing membership for owner')
           }
-        }
-
-        // 2. If not owner, check memberships table
-        if (!businessData) {
+        } else {
+          // 2. Check membership (maybe user is member but not owner)
           const { data: membershipData } = await supabase
             .from('business_memberships')
             .select('business_id, role')
@@ -184,17 +179,46 @@ export default function DashboardLayout({ children }) {
               .select('*')
               .eq('id', membershipData.business_id)
               .maybeSingle()
-
             if (memberBusiness) {
               businessData = memberBusiness
             }
           }
         }
 
-        // 3. If still no business, redirect to onboarding
+        // 3. If STILL no business, CREATE ONE automatically
         if (!businessData) {
-          router.push('/onboarding')
-          return
+          // Create a default business
+          const { data: newBusiness, error: createError } = await supabase
+            .from('businesses')
+            .insert({
+              name: 'My Cresoa Business',
+              sector: 'Fashion & Custom Wear',
+              owner_id: user.id,
+              is_active: true,
+              onboarding_completed: true,
+              has_completed_onboarding: true,
+            })
+            .select()
+            .single()
+
+          if (createError) throw createError
+
+          // Add membership
+          await supabase.from('business_memberships').insert({
+            business_id: newBusiness.id,
+            user_id: user.id,
+            role: 'Owner'
+          })
+
+          // Log activity
+          await supabase.from('business_activity_logs').insert({
+            business_id: newBusiness.id,
+            performed_by: user.id,
+            action: 'business_auto_created',
+            details: { reason: 'No business found, auto-created' }
+          })
+
+          businessData = newBusiness
         }
 
         // ─── BETA EXPIRY CHECK ───
@@ -282,6 +306,7 @@ export default function DashboardLayout({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
+        // If anything fails, redirect to onboarding as fallback
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -612,7 +637,7 @@ export default function DashboardLayout({ children }) {
             z-index: 1000;
             height: 100vh;
           }
-          .sidebar.open { transform: translateX(0); }
+                   .sidebar.open { transform: translateX(0); }
           .overlay.open { display: block; }
           .main-content { padding-top: 3rem; }
           .page-header { padding: 0.6rem 1rem 0.2rem 1rem; }
@@ -642,12 +667,11 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-               {/* Embedded Business Switcher */}
+        {/* Embedded Business Switcher */}
         <div style={{ marginBottom: '1rem' }}>
           <BusinessSwitcher 
             currentBusinessId={business?.id} 
             onSwitch={(newBusinessId) => {
-              // Reload page to switch workspace context
               window.location.reload()
             }} 
           />
@@ -740,4 +764,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-          }
+        }
