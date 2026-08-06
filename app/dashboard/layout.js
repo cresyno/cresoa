@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useRef, useState, useEffect } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
@@ -94,8 +94,6 @@ function DashboardLayoutContent({ children }) {
   const [stats, setStats] = useState({})
   const [userRole, setUserRole] = useState(null)
 
-  const loadedBusinessRef = useRef(null)
-
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
@@ -133,15 +131,9 @@ function DashboardLayoutContent({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data and user role ───
+  // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
-      if (loadedBusinessRef.current) {
-        setBusiness(loadedBusinessRef.current)
-        setLoading(false)
-        return
-      }
-
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -149,12 +141,8 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        let businessIdFromUrl = searchParams.get('business_id')
-        if (!businessIdFromUrl && typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search)
-          businessIdFromUrl = urlParams.get('business_id')
-        }
-
+        // ─── ALWAYS get business_id from URL ───
+        const businessIdFromUrl = searchParams.get('business_id')
         let businessData = null
 
         if (businessIdFromUrl) {
@@ -167,10 +155,14 @@ function DashboardLayoutContent({ children }) {
           if (business && !error) {
             businessData = business
           } else {
-            router.push('/onboarding')
+            // If the business from URL is not found, clear URL param and fallback
+            router.push('/dashboard')
             return
           }
-        } else {
+        }
+
+        // ─── If no URL param, fallback to owned business ───
+        if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
@@ -179,6 +171,7 @@ function DashboardLayoutContent({ children }) {
           if (ownedBusiness) {
             businessData = ownedBusiness
           } else {
+            // Check membership
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
@@ -192,6 +185,8 @@ function DashboardLayoutContent({ children }) {
                 .maybeSingle()
               if (memberBusiness) {
                 businessData = memberBusiness
+                // Also save role
+                setUserRole(membershipData.role)
               }
             }
           }
@@ -202,23 +197,20 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        loadedBusinessRef.current = businessData
-
-        // ─── Fetch user role for this business ───
-        const { data: roleData } = await supabase
-          .from('business_memberships')
-          .select('role')
-          .eq('business_id', businessData.id)
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (roleData) {
-          setUserRole(roleData.role)
-        } else {
-          // Fallback: if user is owner, set role to Owner
-          if (businessData.owner_id === user.id) {
+        // ─── Fetch user role (if not already set) ───
+        if (!userRole) {
+          const { data: roleData } = await supabase
+            .from('business_memberships')
+            .select('role')
+            .eq('business_id', businessData.id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (roleData) {
+            setUserRole(roleData.role)
+          } else if (businessData.owner_id === user.id) {
             setUserRole('Owner')
           } else {
-            setUserRole('Staff') // default
+            setUserRole('Staff')
           }
         }
 
@@ -314,8 +306,9 @@ function DashboardLayoutContent({ children }) {
     }
 
     load()
-  }, [router, searchParams])
+  }, [router, searchParams]) // ← re‑run when URL changes
 
+  // ─── Logout ───
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -359,13 +352,8 @@ function DashboardLayoutContent({ children }) {
 
   // ─── Role‑based visibility ───
   const isStaff = userRole === 'Staff'
-  const isManager = userRole === 'Manager'
-  const isOwner = userRole === 'Owner'
-
-  // Staff cannot see Team & Activity at all
   const showTeamActivity = !isStaff
-
-  // Only Owner can see Billing & Plan, Beta, Tracking
+  const isOwner = userRole === 'Owner'
   const showBilling = isOwner
   const showBeta = isOwner
   const showTracking = isOwner && (business?.plan === 'pro' || business?.plan === 'beta')
@@ -478,7 +466,7 @@ function DashboardLayoutContent({ children }) {
           ))}
         </div>
 
-             {showTeamActivity && (
+                     {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
             <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
@@ -533,8 +521,6 @@ function DashboardLayoutContent({ children }) {
       </div>
 
       <div className="main-content">
-        
-
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -569,4 +555,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-               }
+                }
