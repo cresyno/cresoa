@@ -21,7 +21,6 @@ export default function FashionDashboardPage() {
   const [showOwingOnly, setShowOwingOnly] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Modals state
   const [showQuickOrder, setShowQuickOrder] = useState(false)
   const [quickOrderCustomer, setQuickOrderCustomer] = useState('')
   const [quickOrderItem, setQuickOrderItem] = useState('')
@@ -86,7 +85,6 @@ export default function FashionDashboardPage() {
       }
       setBusiness(businessData)
 
-      // ─── Fetch data ───
       const { data: customerData } = await supabase
         .from('customers')
         .select('*')
@@ -127,7 +125,6 @@ export default function FashionDashboardPage() {
     loadDashboard()
   }, [])
 
-  // ─── Click outside modal ───
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (modalRef.current && !modalRef.current.contains(e.target)) {
@@ -139,7 +136,6 @@ export default function FashionDashboardPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // ─── Handlers ───
   const toggleGroup = (groupId) => {
     setExpandedGroups(prev =>
       prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
@@ -363,14 +359,21 @@ export default function FashionDashboardPage() {
     )
   }
 
-  // ─── Main Render (same as previous full file) ───
-  // To avoid duplication, I'll include the complete JSX from the earlier version (the one with all cards, stats, modals).
-  // Since this file is very long, I'll provide a placeholder comment and suggest using the existing JSX.
-  // For completeness, I'll include the full return from the earlier version.
+  // ─── Main Render (inline styles for core sections) ───
   return (
     <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem 1rem', fontFamily: "'Inter', -apple-system, sans-serif" }}>
       {/* ─── HEADER ─── */}
-      <div className="card" style={{ padding: 'var(--spacing-md) var(--spacing-lg)', marginBottom: 'var(--spacing-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #fff, #FAF8F5)' }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #fff, #FAF8F5)',
+        borderRadius: '16px',
+        padding: '1rem 1.5rem',
+        marginBottom: '1rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        boxShadow: '0 1px 3px rgba(15,43,74,0.04)',
+        border: '1px solid rgba(15,43,74,0.04)'
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <LetterLogo name={business?.name} size={44} />
           <div>
@@ -390,76 +393,143 @@ export default function FashionDashboardPage() {
       {business && <FeedbackBanner business={business} />}
 
       {/* ─── BUSINESS HEALTH ─── */}
-      <div className="health-card" style={{ marginBottom: 'var(--spacing-md)' }}>
-        <div><div className="label">Business Health</div><div className="score">{healthScore}<span style={{ fontSize: '1rem', opacity: 0.6 }}>/100</span></div></div>
-        <div className="stats">
-          <div className="item"><div className="num">{Math.round((1 - overdueCount / (totalOrders || 1)) * 100)}%</div><div className="desc">On‑time</div></div>
-          <div className="item"><div className="num">{customers.length}</div><div className="desc">Customers</div></div>
-          <div className="item"><div className="num">{allActiveOrders.filter(o => o.current_status !== 'Delivered').length}</div><div className="desc">Active</div></div>
+      <div style={{
+        background: 'linear-gradient(135deg, #0F2B4A, #1A3F66)',
+        borderRadius: '12px',
+        padding: '1rem 1.5rem',
+        marginBottom: '1rem',
+        color: '#fff',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        boxShadow: '0 8px 32px rgba(15,43,74,0.08)'
+      }}>
+        <div>
+          <div style={{ fontSize: '0.7rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Business Health</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: '700', letterSpacing: '-0.5px' }}>{healthScore}<span style={{ fontSize: '1rem', opacity: 0.6 }}>/100</span></div>
+        </div>
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700', fontSize: '1rem' }}>{Math.round((1 - overdueCount / (totalOrders || 1)) * 100)}%</div><div style={{ fontSize: '0.6rem', opacity: 0.7 }}>On‑time</div></div>
+          <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700', fontSize: '1rem' }}>{customers.length}</div><div style={{ fontSize: '0.6rem', opacity: 0.7 }}>Customers</div></div>
+          <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700', fontSize: '1rem' }}>{allActiveOrders.filter(o => o.current_status !== 'Delivered').length}</div><div style={{ fontSize: '0.6rem', opacity: 0.7 }}>Active</div></div>
         </div>
       </div>
 
-      {/* ─── REVENUE ─── */}
-      <div className="revenue-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-        <div className="revenue-card" style={{ borderTop: '3px solid #D4A52A' }}><div className="label">Today</div><div className="amount">₦{todayRevenue.toLocaleString()}</div><span className="badge" style={{ background: todayRevenue > 0 ? '#DCEBE2' : '#F0EDE8', color: todayRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{todayRevenue > 0 ? '📈' : '—'}</span></div>
-        <div className="revenue-card" style={{ borderTop: '3px solid #D9534F' }}><div className="label">This Week</div><div className="amount">₦{weekRevenue.toLocaleString()}</div><span className="badge" style={{ background: weekRevenue > 0 ? '#DCEBE2' : '#F0EDE8', color: weekRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{weekRevenue > 0 ? '📈' : '—'}</span></div>
-        <div className="revenue-card" style={{ borderTop: '3px solid #2E7D5E' }}><div className="label">This Month</div><div className="amount">₦{monthRevenue.toLocaleString()}</div><span className="badge" style={{ background: monthRevenue > 0 ? '#DCEBE2' : '#F0EDE8', color: monthRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{monthRevenue > 0 ? '📈' : '—'}</span></div>
+      {/* ─── REVENUE CARDS ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', borderTop: '3px solid #D4A52A', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <div style={{ fontSize: '0.6rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>Today</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#0F2B4A' }}>₦{todayRevenue.toLocaleString()}</div>
+          <span style={{ display: 'inline-block', padding: '0.1rem 0.5rem', borderRadius: '20px', fontSize: '0.55rem', fontWeight: '600', background: todayRevenue > 0 ? '#DCEBE2' : '#F0EDE8', color: todayRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{todayRevenue > 0 ? '📈' : '—'}</span>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', borderTop: '3px solid #D9534F', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <div style={{ fontSize: '0.6rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>This Week</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#0F2B4A' }}>₦{weekRevenue.toLocaleString()}</div>
+          <span style={{ display: 'inline-block', padding: '0.1rem 0.5rem', borderRadius: '20px', fontSize: '0.55rem', fontWeight: '600', background: weekRevenue > 0 ? '#DCEBE2' : '#F0EDE8', color: weekRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{weekRevenue > 0 ? '📈' : '—'}</span>
+        </div>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', borderTop: '3px solid #2E7D5E', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <div style={{ fontSize: '0.6rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>This Month</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#0F2B4A' }}>₦{monthRevenue.toLocaleString()}</div>
+          <span style={{ display: 'inline-block', padding: '0.1rem 0.5rem', borderRadius: '20px', fontSize: '0.55rem', fontWeight: '600', background: monthRevenue > 0 ? '#DCEBE2' : '#F0EDE8', color: monthRevenue > 0 ? '#2E7D5E' : '#8A8A8A' }}>{monthRevenue > 0 ? '📈' : '—'}</span>
+        </div>
       </div>
 
-      {/* ─── KEY METRICS ─── */}
-      <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
-        <a href="/dashboard/customers" className="stat-card"><span className="icon">👤</span><div className="value">{customers.length}</div><div className="label">Customers</div></a>
-        <a href="/dashboard/orders" className="stat-card"><span className="icon">📦</span><div className="value">{totalOrders}</div><div className="label">Orders</div></a>
-        <button onClick={toggleOwingFilter} className="stat-card" style={{ border: showOwingOnly ? '2px solid #D9534F' : '1px solid rgba(15,43,74,0.04)' }}><span className="icon">💰</span><div className="value" style={{ color: totalBalanceOwed > 0 ? '#D9534F' : '#2E7D5E' }}>₦{totalBalanceOwed.toLocaleString()}</div><div className="label">{showOwingOnly ? '🔴 Filtered' : 'Owed'}</div></button>
-        <a href="/dashboard/orders?filter=ready" className="stat-card"><span className="icon">✅</span><div className="value" style={{ color: '#2E7D5E' }}>{readyCount}</div><div className="label">Ready</div></a>
-        <a href="/dashboard/orders?filter=overdue" className="stat-card"><span className="icon">⚠️</span><div className="value" style={{ color: '#D9534F' }}>{overdueCount}</div><div className="label">Overdue</div></a>
+      {/* ─── STATS GRID ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+        <a href="/dashboard/customers" style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', border: '1px solid rgba(15,43,74,0.04)', textDecoration: 'none', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.4rem', display: 'block', marginBottom: '0.2rem' }}>👤</span>
+          <div style={{ fontSize: '1.6rem', fontWeight: '700', color: '#0F2B4A' }}>{customers.length}</div>
+          <div style={{ color: '#8A8A8A', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: '600' }}>Customers</div>
+        </a>
+        <a href="/dashboard/orders" style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', border: '1px solid rgba(15,43,74,0.04)', textDecoration: 'none', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.4rem', display: 'block', marginBottom: '0.2rem' }}>📦</span>
+          <div style={{ fontSize: '1.6rem', fontWeight: '700', color: '#0F2B4A' }}>{totalOrders}</div>
+          <div style={{ color: '#8A8A8A', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: '600' }}>Orders</div>
+        </a>
+        <button onClick={toggleOwingFilter} style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', border: showOwingOnly ? '2px solid #D9534F' : '1px solid rgba(15,43,74,0.04)', boxShadow: '0 1px 3px rgba(15,43,74,0.04)', cursor: 'pointer' }}>
+          <span style={{ fontSize: '1.4rem', display: 'block', marginBottom: '0.2rem' }}>💰</span>
+          <div style={{ fontSize: '1.6rem', fontWeight: '700', color: totalBalanceOwed > 0 ? '#D9534F' : '#2E7D5E' }}>₦{totalBalanceOwed.toLocaleString()}</div>
+          <div style={{ color: '#8A8A8A', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: '600' }}>{showOwingOnly ? '🔴 Filtered' : 'Owed'}</div>
+        </button>
+        <a href="/dashboard/orders?filter=ready" style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', border: '1px solid rgba(15,43,74,0.04)', textDecoration: 'none', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.4rem', display: 'block', marginBottom: '0.2rem' }}>✅</span>
+          <div style={{ fontSize: '1.6rem', fontWeight: '700', color: '#2E7D5E' }}>{readyCount}</div>
+          <div style={{ color: '#8A8A8A', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: '600' }}>Ready</div>
+        </a>
+        <a href="/dashboard/orders?filter=overdue" style={{ background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', border: '1px solid rgba(15,43,74,0.04)', textDecoration: 'none', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.4rem', display: 'block', marginBottom: '0.2rem' }}>⚠️</span>
+          <div style={{ fontSize: '1.6rem', fontWeight: '700', color: '#D9534F' }}>{overdueCount}</div>
+          <div style={{ color: '#8A8A8A', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: '600' }}>Overdue</div>
+        </a>
       </div>
 
-         {/* ─── ALERTS ─── */}
+      {/* ─── ALERTS ─── */}
       {(overdueCount > 0 || dueTodayCount > 0 || readyCount > 0) && (
-        <div className="alert-row" style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
-          {overdueCount > 0 && <span className="alert-badge overdue">⚠️ {overdueCount} Overdue</span>}
-          {dueTodayCount > 0 && <span className="alert-badge today">📅 {dueTodayCount} Due today</span>}
-          {readyCount > 0 && <span className="alert-badge ready">✅ {readyCount} Ready</span>}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {overdueCount > 0 && <span style={{ background: '#F1DBD3', color: '#D9534F', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>⚠️ {overdueCount} Overdue</span>}
+          {dueTodayCount > 0 && <span style={{ background: '#FFF3E0', color: '#E67E22', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>📅 {dueTodayCount} Due today</span>}
+          {readyCount > 0 && <span style={{ background: '#DCEBE2', color: '#2E7D5E', padding: '0.3rem 0.8rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600' }}>✅ {readyCount} Ready</span>}
         </div>
       )}
 
       {/* ─── QUICK ACTIONS ─── */}
-      <div className="action-grid" style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap', marginBottom: 'var(--spacing-lg)' }}>
-        <a href="/dashboard/orders/new" className="action-card" style={{ background: 'linear-gradient(135deg, #D4A52A, #C79A2B)', color: '#0F2B4A', border: 'none' }}><span className="icon">📋</span><span className="label" style={{ color: '#0F2B4A' }}>New Order</span></a>
-        <a href="/dashboard/customers/new" className="action-card" style={{ background: '#0F2B4A', color: '#fff', border: 'none' }}><span className="icon">👤</span><span className="label" style={{ color: '#fff' }}>New Customer</span></a>
-        <a href={canCreateGroup ? "/dashboard/groups/new" : "#"} className="action-card" style={{ opacity: canCreateGroup ? 1 : 0.5, border: canCreateGroup ? '2px solid #D4A52A' : '1px solid #E5E0D8' }} onClick={(e) => { if (!canCreateGroup) { e.preventDefault(); router.push('/dashboard/subscription') } }}><span className="icon">👥</span><span className="label">{canCreateGroup ? 'Group' : 'Group (Upgrade)'}</span></a>
-        <a href="/dashboard/reminders" className="action-card"><span className="icon">🔔</span><span className="label">Reminders</span></a>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <a href="/dashboard/orders/new" style={{ flex: 1, minWidth: '80px', background: 'linear-gradient(135deg, #D4A52A, #C79A2B)', borderRadius: '12px', padding: '1rem', textAlign: 'center', textDecoration: 'none', color: '#0F2B4A', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '0.2rem' }}>📋</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: '600' }}>New Order</span>
+        </a>
+        <a href="/dashboard/customers/new" style={{ flex: 1, minWidth: '80px', background: '#0F2B4A', borderRadius: '12px', padding: '1rem', textAlign: 'center', textDecoration: 'none', color: '#fff', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '0.2rem' }}>👤</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: '600' }}>New Customer</span>
+        </a>
+        <a href={canCreateGroup ? "/dashboard/groups/new" : "#"} style={{ flex: 1, minWidth: '80px', background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', textDecoration: 'none', color: '#0F2B4A', boxShadow: '0 1px 3px rgba(15,43,74,0.04)', opacity: canCreateGroup ? 1 : 0.5, border: canCreateGroup ? '2px solid #D4A52A' : '1px solid #E5E0D8' }} onClick={(e) => { if (!canCreateGroup) { e.preventDefault(); router.push('/dashboard/subscription') } }}>
+          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '0.2rem' }}>👥</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: '600' }}>{canCreateGroup ? 'Group' : 'Group (Upgrade)'}</span>
+        </a>
+        <a href="/dashboard/reminders" style={{ flex: 1, minWidth: '80px', background: '#fff', borderRadius: '12px', padding: '1rem', textAlign: 'center', textDecoration: 'none', color: '#0F2B4A', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+          <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '0.2rem' }}>🔔</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: '600' }}>Reminders</span>
+        </a>
       </div>
 
       {/* ─── RECENT ORDERS ─── */}
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-        <div className="section-title"><h3>📋 Recent Orders</h3><a href="/dashboard/orders">View all →</a></div>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h3 style={{ color: '#0F2B4A', fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>📋 Recent Orders</h3>
+          <a href="/dashboard/orders" style={{ color: '#8A8A8A', fontSize: '0.75rem', textDecoration: 'none' }}>View all →</a>
+        </div>
         {filteredPreviewOrders.length === 0 ? (
-          <div className="empty-state"><span className="icon">📦</span><h4>{showOwingOnly || statusFilter !== 'all' ? 'No orders match your filters' : 'No orders yet'}</h4><p>{showOwingOnly || statusFilter !== 'all' ? 'Try clearing the filters above.' : 'Create your first order to get started.'}</p>{!showOwingOnly && statusFilter === 'all' && <a href="/dashboard/orders/new" className="cta">Create First Order →</a>}</div>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#8A8A8A', background: '#fff', borderRadius: '12px', border: '1px dashed #E5E0D8' }}>
+            <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>📦</span>
+            <h4 style={{ color: '#0F2B4A', fontSize: '1rem', margin: '0 0 0.2rem' }}>{showOwingOnly || statusFilter !== 'all' ? 'No orders match your filters' : 'No orders yet'}</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem' }}>{showOwingOnly || statusFilter !== 'all' ? 'Try clearing the filters above.' : 'Create your first order to get started.'}</p>
+            {!showOwingOnly && statusFilter === 'all' && <a href="/dashboard/orders/new" style={{ display: 'inline-block', marginTop: '0.5rem', padding: '0.5rem 1.2rem', borderRadius: '8px', background: '#D4A52A', color: '#0F2B4A', fontWeight: '600', textDecoration: 'none', fontSize: '0.85rem' }}>Create First Order →</a>}
+          </div>
         ) : (
           filteredPreviewOrders.map((o) => {
             const status = getStatusInfo(o.current_status)
             const due = getDueDisplay(o.due_date)
             const balance = o.price - o.amount_paid
             return (
-              <div key={o.id} className="order-card">
-                <div className="top">
+              <div key={o.id} style={{ background: '#fff', borderRadius: '12px', padding: '1rem 1.5rem', marginBottom: '0.5rem', border: '1px solid rgba(15,43,74,0.04)', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
-                    <div className="customer">{o.customers?.name || 'No customer'}<span style={{ fontSize:'0.8rem', color:'#8A8A8A', marginLeft:'0.3rem' }}>· {getOrderName(o)}</span></div>
+                    <div style={{ fontWeight: '600', color: '#0F2B4A', fontSize: '0.95rem' }}>{o.customers?.name || 'No customer'}<span style={{ fontSize:'0.8rem', color:'#8A8A8A', marginLeft:'0.3rem' }}>· {getOrderName(o)}</span></div>
                     <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', marginTop:'0.2rem' }}>
-                      <span className="status-badge" style={{ background: status.bg, color: status.color }}><span style={{ marginRight:'0.2rem' }}>{status.icon}</span>{status.label}</span>
-                      <span className="due" style={{ color: due.color }}>{due.label}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.15rem 0.7rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '600', background: status.bg, color: status.color }}><span style={{ marginRight:'0.2rem' }}>{status.icon}</span>{status.label}</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: '500', color: due.color }}>{due.label}</span>
                     </div>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:'0.3rem', flexShrink:0 }}>
-                    <span className={`balance ${balance > 0 ? 'positive' : 'zero'}`}>{balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}</span>
-                    <div className="actions">
-                      <a href={`/dashboard/orders/${o.id}`} className="btn-sm">👁️</a>
-                      {o.customers?.phone && <a href={`tel:${o.customers.phone}`} className="btn-sm">📞</a>}
-                      {balance > 0 && <button className="btn-sm success" onClick={() => openSettleModal(o)}>💰</button>}
-                      <a href={`/dashboard/orders/${o.id}?edit=true`} className="btn-sm primary">✏️</a>
-                      {o.customers?.phone && <button className="btn-sm warning" onClick={() => { const msg = `Hi ${o.customers?.name || ''}, your order ${getOrderName(o)} is ${status.label}.`; window.open(`https://wa.me/${o.customers.phone}?text=${encodeURIComponent(msg)}`, '_blank') }}>💬</button>}
+                    <span style={{ fontWeight: '700', fontSize: '0.95rem', marginRight: '0.5rem', color: balance > 0 ? '#D9534F' : '#2E7D5E' }}>{balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}</span>
+                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                      <a href={`/dashboard/orders/${o.id}`} style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #E5E0D8', background: '#fff', color: '#0F2B4A', textDecoration: 'none' }}>👁️</a>
+                      {o.customers?.phone && <a href={`tel:${o.customers.phone}`} style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #E5E0D8', background: '#fff', color: '#0F2B4A', textDecoration: 'none' }}>📞</a>}
+                      {balance > 0 && <button style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #2E7D5E', background: '#2E7D5E', color: '#fff', cursor: 'pointer' }} onClick={() => openSettleModal(o)}>💰</button>}
+                      <a href={`/dashboard/orders/${o.id}?edit=true`} style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #0F2B4A', background: '#0F2B4A', color: '#fff', textDecoration: 'none' }}>✏️</a>
+                      {o.customers?.phone && <button style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #D4A52A', background: '#D4A52A', color: '#0F2B4A', cursor: 'pointer' }} onClick={() => { const msg = `Hi ${o.customers?.name || ''}, your order ${getOrderName(o)} is ${status.label}.`; window.open(`https://wa.me/${o.customers.phone}?text=${encodeURIComponent(msg)}`, '_blank') }}>💬</button>}
                     </div>
                   </div>
                 </div>
@@ -470,10 +540,18 @@ export default function FashionDashboardPage() {
       </div>
 
       {/* ─── GROUP ORDERS ─── */}
-      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-        <div className="section-title"><h3>👥 Group Orders</h3><a href="/dashboard/groups">View all →</a></div>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h3 style={{ color: '#0F2B4A', fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>👥 Group Orders</h3>
+          <a href="/dashboard/groups" style={{ color: '#8A8A8A', fontSize: '0.75rem', textDecoration: 'none' }}>View all →</a>
+        </div>
         {groups.length === 0 ? (
-          <div className="empty-state"><span className="icon">👥</span><h4>No group orders yet</h4><p>{canCreateGroup ? 'Create your first group order to manage Aso‑Ebi and bulk orders.' : 'Upgrade your plan to create group orders.'}</p>{canCreateGroup && <a href="/dashboard/groups/new" className="cta">Create Group Order →</a>}</div>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#8A8A8A', background: '#fff', borderRadius: '12px', border: '1px dashed #E5E0D8' }}>
+            <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>👥</span>
+            <h4 style={{ color: '#0F2B4A', fontSize: '1rem', margin: '0 0 0.2rem' }}>No group orders yet</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem' }}>{canCreateGroup ? 'Create your first group order to manage Aso‑Ebi and bulk orders.' : 'Upgrade your plan to create group orders.'}</p>
+            {canCreateGroup && <a href="/dashboard/groups/new" style={{ display: 'inline-block', marginTop: '0.5rem', padding: '0.5rem 1.2rem', borderRadius: '8px', background: '#D4A52A', color: '#0F2B4A', fontWeight: '600', textDecoration: 'none', fontSize: '0.85rem' }}>Create Group Order →</a>}
+          </div>
         ) : (
           groups.map((g) => {
             const isExpanded = expandedGroups.includes(g.id)
@@ -483,22 +561,22 @@ export default function FashionDashboardPage() {
             const combinedBalance = filteredOrders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
             const progress = g.orders.length > 0 ? (g.orders.filter(o => o.current_status === 'Delivered').length / g.orders.length) * 100 : 0
             return (
-              <div key={g.id} className={`group-card ${isExpanded ? 'expanded' : ''}`}>
-                <div className="header" onClick={() => toggleGroup(g.id)}>
+              <div key={g.id} style={{ background: '#fff', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem', border: isExpanded ? '1px solid #D4A52A' : '1px solid rgba(15,43,74,0.04)', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }} onClick={() => toggleGroup(g.id)}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span className="name">{g.group_name}</span>
-                      <span className="meta">{g.orders.length} members</span>
+                      <span style={{ fontWeight: '700', color: '#0F2B4A', fontSize: '0.95rem' }}>{g.group_name}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#8A8A8A' }}>{g.orders.length} members</span>
                       {combinedBalance > 0 && <span style={{ fontSize: '0.6rem', background: '#F1DBD3', color: '#D9534F', padding: '0.1rem 0.5rem', borderRadius: '12px', fontWeight: '600' }}>₦{combinedBalance.toLocaleString()}</span>}
                     </div>
-                    <div className="meta">Coordinator: {g.customers?.name || 'Unnamed'}</div>
-                    <div className="progress"><div className="bar" style={{ width: `${progress}%` }} /></div>
-                    <div className={`balance ${combinedBalance > 0 ? 'owing' : 'paid'}`}>{combinedBalance > 0 ? `₦${combinedBalance.toLocaleString()} remaining` : '✓ All paid'}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#8A8A8A' }}>Coordinator: {g.customers?.name || 'Unnamed'}</div>
+                    <div style={{ marginTop: '0.3rem', background: '#F0EDE8', borderRadius: '10px', height: '4px', overflow: 'hidden' }}><div style={{ height: '100%', background: '#2E7D5E', borderRadius: '10px', width: `${progress}%` }} /></div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '600', color: combinedBalance > 0 ? '#D9534F' : '#2E7D5E' }}>{combinedBalance > 0 ? `₦${combinedBalance.toLocaleString()} remaining` : '✓ All paid'}</div>
                   </div>
                   <span style={{ color: '#8A8A8A', fontSize: '0.8rem' }}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
                 {isExpanded && hasVisible && (
-                  <div style={{ marginTop: 'var(--spacing-md)', borderTop: '1px solid #F0EDE8', paddingTop: 'var(--spacing-sm)' }}>
+                  <div style={{ marginTop: '1rem', borderTop: '1px solid #F0EDE8', paddingTop: '0.5rem' }}>
                     {filteredOrders.map((o) => {
                       const status = getStatusInfo(o.current_status)
                       const due = getDueDisplay(o.due_date)
@@ -508,14 +586,14 @@ export default function FashionDashboardPage() {
                           <div style={{ flex: 1 }}>
                             <div style={{ fontWeight: '600', color: '#0F2B4A', fontSize: '0.85rem' }}>{o.customers?.name || 'No customer'}</div>
                             <div style={{ fontSize: '0.7rem', color: '#8A8A8A', display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-                              <span className="status-badge" style={{ background: status.bg, color: status.color, fontSize:'0.55rem', padding:'0.05rem 0.4rem' }}>{status.icon} {status.label}</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.05rem 0.4rem', borderRadius: '20px', fontSize: '0.55rem', fontWeight: '600', background: status.bg, color: status.color }}>{status.icon} {status.label}</span>
                               <span style={{ color: due.color }}>{due.label}</span>
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                             <span style={{ fontWeight: '700', color: balance > 0 ? '#D9534F' : '#2E7D5E' }}>{balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}</span>
-                            <a href={`/dashboard/orders/${o.id}`} className="btn-sm">👁️</a>
-                            {balance > 0 && <button className="btn-sm success" onClick={() => openSettleModal(o)}>💰</button>}
+                            <a href={`/dashboard/orders/${o.id}`} style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #E5E0D8', background: '#fff', color: '#0F2B4A', textDecoration: 'none' }}>👁️</a>
+                            {balance > 0 && <button style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '600', border: '1px solid #2E7D5E', background: '#2E7D5E', color: '#fff', cursor: 'pointer' }} onClick={() => openSettleModal(o)}>💰</button>}
                           </div>
                         </div>
                       )
@@ -528,20 +606,34 @@ export default function FashionDashboardPage() {
         )}
       </div>
 
- {/* ─── RECENT CUSTOMERS ─── */}
+{/* ─── RECENT CUSTOMERS ─── */}
       <div>
-        <div className="section-title"><h3>👤 Recent Customers</h3><a href="/dashboard/customers">View all →</a></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h3 style={{ color: '#0F2B4A', fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>👤 Recent Customers</h3>
+          <a href="/dashboard/customers" style={{ color: '#8A8A8A', fontSize: '0.75rem', textDecoration: 'none' }}>View all →</a>
+        </div>
         {previewCustomers.length === 0 ? (
-          <div className="empty-state"><span className="icon">👤</span><h4>No customers yet</h4><p>Add your first customer to start tracking orders.</p><a href="/dashboard/customers/new" className="cta">Add Customer →</a></div>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#8A8A8A', background: '#fff', borderRadius: '12px', border: '1px dashed #E5E0D8' }}>
+            <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.5rem' }}>👤</span>
+            <h4 style={{ color: '#0F2B4A', fontSize: '1rem', margin: '0 0 0.2rem' }}>No customers yet</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem' }}>Add your first customer to start tracking orders.</p>
+            <a href="/dashboard/customers/new" style={{ display: 'inline-block', marginTop: '0.5rem', padding: '0.5rem 1.2rem', borderRadius: '8px', background: '#D4A52A', color: '#0F2B4A', fontWeight: '600', textDecoration: 'none', fontSize: '0.85rem' }}>Add Customer →</a>
+          </div>
         ) : (
           previewCustomers.map((c) => {
             const orders = allActiveOrders.filter(o => o.customer_id === c.id)
             const totalSpent = orders.reduce((sum, o) => sum + o.amount_paid, 0)
             const lastOrder = orders.length > 0 ? new Date(orders[0].created_at).toLocaleDateString('en-GB') : '—'
             return (
-              <a key={c.id} href={`/dashboard/customers/${c.id}`} className="customer-row">
-                <div><div className="name">{c.name}</div>{c.phone && <div className="phone">{c.phone}</div>}</div>
-                <div className="stats"><div>₦{totalSpent.toLocaleString()}</div><div style={{ fontSize: '0.65rem' }}>Last: {lastOrder}</div></div>
+              <a key={c.id} href={`/dashboard/customers/${c.id}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 1rem', background: '#fff', borderRadius: '8px', border: '1px solid rgba(15,43,74,0.04)', textDecoration: 'none', marginBottom: '0.5rem', boxShadow: '0 1px 3px rgba(15,43,74,0.04)' }}>
+                <div>
+                  <div style={{ fontWeight: '600', color: '#0F2B4A', fontSize: '0.9rem' }}>{c.name}</div>
+                  {c.phone && <div style={{ fontSize: '0.7rem', color: '#8A8A8A' }}>{c.phone}</div>}
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '0.7rem', color: '#8A8A8A' }}>
+                  <div>₦{totalSpent.toLocaleString()}</div>
+                  <div style={{ fontSize: '0.65rem' }}>Last: {lastOrder}</div>
+                </div>
               </a>
             )
           })
@@ -549,34 +641,34 @@ export default function FashionDashboardPage() {
       </div>
 
       {/* ─── FAB ─── */}
-      <button className="fab" onClick={() => setShowQuickOrder(true)}>+</button>
+      <button style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', background: 'linear-gradient(135deg, #D4A52A, #C79A2B)', color: '#0F2B4A', width: '56px', height: '56px', borderRadius: '50%', border: 'none', fontSize: '1.8rem', fontWeight: '700', boxShadow: '0 4px 20px rgba(212,165,42,0.4)', cursor: 'pointer', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowQuickOrder(true)}>+</button>
 
       {/* ─── QUICK ORDER MODAL ─── */}
       {showQuickOrder && (
-        <div className="modal-overlay" onClick={() => setShowQuickOrder(false)}>
-          <div className="modal-content" ref={modalRef} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-handle"></div>
+        <div style={{ position: 'fixed', top:0, left:0, right:0, bottom:0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex:1000, display:'flex', alignItems:'flex-end', justifyContent:'center', animation: 'slideUp 0.3s' }} onClick={() => setShowQuickOrder(false)}>
+          <div style={{ background: '#F8F6F2', borderRadius: '20px 20px 0 0', padding: '1.5rem', maxWidth: '480px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }} ref={modalRef} onClick={(e) => e.stopPropagation()}>
+            <div style={{ width: '40px', height: '4px', background: '#D6D0C5', borderRadius: '4px', margin: '0 auto 1rem' }}></div>
             <h2 style={{ color:'#0F2B4A', fontSize:'1.2rem', margin:'0 0 0.3rem' }}>Quick Order</h2>
             <p style={{ color:'#8A8A8A', fontSize:'0.85rem', margin:'0 0 1.2rem' }}>Create an order in seconds.</p>
             <form onSubmit={handleQuickOrderSubmit}>
               <div style={{ marginBottom:'0.8rem' }}>
                 <label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Customer</label>
-                <select className="select" value={quickOrderCustomer} onChange={(e) => setQuickOrderCustomer(e.target.value)} required style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8', background:'#fff' }}>
+                <select style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8', background:'#fff' }} value={quickOrderCustomer} onChange={(e) => setQuickOrderCustomer(e.target.value)} required>
                   <option value="">Select customer</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom:'0.8rem' }}>
                 <label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Item / Garment</label>
-                <input className="input" type="text" value={quickOrderItem} onChange={(e) => setQuickOrderItem(e.target.value)} placeholder="e.g. Aso-ebi gown" required style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} />
+                <input style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} type="text" value={quickOrderItem} onChange={(e) => setQuickOrderItem(e.target.value)} placeholder="e.g. Aso-ebi gown" required />
               </div>
               <div style={{ display:'flex', gap:'0.5rem', marginBottom:'0.8rem' }}>
-                <div style={{ flex:1 }}><label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Price (₦)</label><input className="input" type="number" value={quickOrderPrice} onChange={(e) => setQuickOrderPrice(e.target.value)} placeholder="5000" required style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} /></div>
-                <div style={{ flex:1 }}><label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Deposit (₦)</label><input className="input" type="number" value={quickOrderDeposit} onChange={(e) => setQuickOrderDeposit(e.target.value)} placeholder="2000" style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} /></div>
+                <div style={{ flex:1 }}><label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Price (₦)</label><input style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} type="number" value={quickOrderPrice} onChange={(e) => setQuickOrderPrice(e.target.value)} placeholder="5000" required /></div>
+                <div style={{ flex:1 }}><label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Deposit (₦)</label><input style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} type="number" value={quickOrderDeposit} onChange={(e) => setQuickOrderDeposit(e.target.value)} placeholder="2000" /></div>
               </div>
               <div style={{ marginBottom:'1.2rem' }}>
                 <label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Due date</label>
-                <input className="input" type="date" value={quickOrderDue} onChange={(e) => setQuickOrderDue(e.target.value)} style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} />
+                <input style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} type="date" value={quickOrderDue} onChange={(e) => setQuickOrderDue(e.target.value)} />
               </div>
               <button type="submit" disabled={quickOrderLoading || customers.length === 0} style={{ width:'100%', padding:'0.8rem', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #D4A52A, #C79A2B)', color:'#0F2B4A', fontWeight:'700', fontSize:'1rem', cursor: quickOrderLoading ? 'default' : 'pointer', opacity: quickOrderLoading ? 0.6 : 1 }}>
                 {quickOrderLoading ? 'Creating...' : '🚀 Create order'}
@@ -589,8 +681,8 @@ export default function FashionDashboardPage() {
 
       {/* ─── SETTLE PAYMENT MODAL ─── */}
       {showSettleModal && settleOrder && (
-        <div className="settle-modal" onClick={() => setShowSettleModal(false)}>
-          <div className="settle-content" ref={modalRef} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center', padding:'1.5rem' }} onClick={() => setShowSettleModal(false)}>
+          <div style={{ background:'#F8F6F2', borderRadius:'20px', padding:'1.8rem', maxWidth:'380px', width:'100%' }} ref={modalRef} onClick={(e) => e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.3rem' }}>
               <h2 style={{ color:'#0F2B4A', fontSize:'1.1rem', margin:0 }}>💰 Record Payment</h2>
               <button onClick={() => setShowSettleModal(false)} style={{ background:'none', border:'none', fontSize:'1.3rem', color:'#8A8A8A', cursor:'pointer' }}>✕</button>
@@ -599,11 +691,11 @@ export default function FashionDashboardPage() {
             <form onSubmit={handleSettleSubmit}>
               <div style={{ marginBottom:'0.8rem' }}>
                 <label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Amount paid (₦)</label>
-                <input className="input" type="number" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} placeholder="Enter amount" required autoFocus style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} />
+                <input style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} type="number" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} placeholder="Enter amount" required autoFocus />
               </div>
               <div style={{ marginBottom:'1.2rem' }}>
                 <label style={{ display:'block', fontSize:'0.85rem', fontWeight:'500' }}>Note (optional)</label>
-                <input className="input" type="text" value={settleNote} onChange={(e) => setSettleNote(e.target.value)} placeholder="e.g. Cash payment" style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} />
+                <input style={{ width:'100%', padding:'0.7rem', borderRadius:'8px', border:'1px solid #E5E0D8' }} type="text" value={settleNote} onChange={(e) => setSettleNote(e.target.value)} placeholder="e.g. Cash payment" />
               </div>
               <button type="submit" disabled={settleLoading} style={{ width:'100%', padding:'0.8rem', borderRadius:'10px', border:'none', background:'#2E7D5E', color:'#fff', fontWeight:'700', fontSize:'1rem', cursor: settleLoading ? 'default' : 'pointer', opacity: settleLoading ? 0.6 : 1 }}>
                 {settleLoading ? 'Recording...' : '💰 Record payment'}
@@ -613,9 +705,21 @@ export default function FashionDashboardPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 'var(--spacing-2xl)', textAlign: 'center', fontSize: '0.6rem', color: '#C8C0B5', borderTop: '1px solid #E5E0D8', paddingTop: 'var(--spacing-md)' }}>
+      <style>{`
+        @keyframes slideUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+        .btn-sm { padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; border: 1px solid #E5E0D8; background: #fff; color: #0F2B4A; cursor: pointer; transition: all 0.2s ease; min-height: 32px; min-width: 32px; display: inline-flex; align-items: center; justify-content: center; }
+        .btn-sm:hover { background: #F8F6F2; border-color: #D4A52A; transform: translateY(-1px); }
+        .btn-sm.primary { background: #0F2B4A; color: #fff; border-color: #0F2B4A; }
+        .btn-sm.primary:hover { background: #1A3F66; }
+        .btn-sm.success { background: #2E7D5E; color: #fff; border-color: #2E7D5E; }
+        .btn-sm.success:hover { background: #1E5A44; }
+        .btn-sm.warning { background: #D4A52A; color: #0F2B4A; border-color: #D4A52A; }
+        .btn-sm.warning:hover { background: #C79A2B; }
+      `}</style>
+
+      <div style={{ marginTop: '2.5rem', textAlign: 'center', fontSize: '0.6rem', color: '#C8C0B5', borderTop: '1px solid #E5E0D8', paddingTop: '1rem' }}>
         Cresoa Fashion · {new Date().getFullYear()}
       </div>
     </div>
   )
-        }
+}
