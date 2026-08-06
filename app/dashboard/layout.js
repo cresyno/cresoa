@@ -533,21 +533,7 @@ function DashboardLayoutContent({ children }) {
       </div>
 
       <div className="main-content">
-        {/* ─── DEBUG BAR (Optional – remove later) ─── */}
-        <div style={{
-          background: '#1e1e2a',
-          color: '#fff',
-          padding: '0.4rem 0.8rem',
-          fontSize: '0.65rem',
-          fontFamily: 'monospace',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderBottom: '2px solid #D4A52A'
-        }}>
-          <span>🔍 URL: {typeof window !== 'undefined' ? window.location.search : 'none'}</span>
-          <span>🏢 {business?.name || 'none'} | Role: {userRole || 'none'}</span>
-        </div>
+        
 
         <div className="dashboard-header">
           <div></div>
