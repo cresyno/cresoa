@@ -90,7 +90,7 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
-  const [selectedId, setSelectedId] = useState(null) // for debug panel
+  const [selectedId, setSelectedId] = useState(null)
 
   // ─── Theme ───
   const toggleTheme = () => {
@@ -131,7 +131,7 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data with URL + localStorage + API fetch ───
+  // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -144,13 +144,14 @@ export default function DashboardLayout({ children }) {
         let businessData = null
         let selectedIdFromStorage = null
 
-        // 1. Check URL for ?business_id=
+        // 1. Check URL for ?business_id= (highest priority)
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search)
           const urlBusinessId = params.get('business_id')
           if (urlBusinessId) {
             selectedIdFromStorage = urlBusinessId
           } else {
+            // 2. Check localStorage for saved selection
             const stored = localStorage.getItem('selectedBusinessId')
             if (stored) {
               selectedIdFromStorage = stored
@@ -158,9 +159,9 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        setSelectedId(selectedIdFromStorage) // for debug panel
+        setSelectedId(selectedIdFromStorage)
 
-        // 2. If we have a selectedId, fetch via API (bypasses RLS)
+        // 3. ALWAYS try to load the selected business first (if it exists)
         if (selectedIdFromStorage) {
           const { data: session } = await supabase.auth.getSession()
           if (session) {
@@ -170,7 +171,7 @@ export default function DashboardLayout({ children }) {
             const result = await response.json()
             if (response.ok && result.business) {
               businessData = result.business
-              // Ensure owner has membership (if owner and not already)
+              // Ensure membership exists if owner
               if (businessData.owner_id === user.id) {
                 const { data: existing } = await supabase
                   .from('business_memberships')
@@ -187,7 +188,7 @@ export default function DashboardLayout({ children }) {
                 }
               }
             } else {
-              // If not found, clear stored selection
+              // If selected business not found, clear it and fall back
               if (typeof window !== 'undefined') {
                 localStorage.removeItem('selectedBusinessId')
               }
@@ -195,7 +196,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 3. Fallback to owned business if businessData is still null
+        // 4. If businessData is STILL null, fallback to owned business
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
@@ -221,7 +222,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 4. Fallback to membership (if member but not owner)
+        // 5. If still no business, check membership (user is member but not owner)
         if (!businessData) {
           const { data: membershipData } = await supabase
             .from('business_memberships')
@@ -240,7 +241,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 5. If still no business, redirect to onboarding
+        // 6. If still no business, redirect to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -619,7 +620,7 @@ export default function DashboardLayout({ children }) {
           margin: 0.1rem 0 0;
         }
 
-        .dashboard-header {
+               .dashboard-header {
           display: flex;
           justify-content: flex-end;
           align-items: center;
@@ -627,7 +628,7 @@ export default function DashboardLayout({ children }) {
           background: var(--color-card);
           border-bottom: 1px solid var(--color-border);
         }
-                .dashboard-header .date {
+        .dashboard-header .date {
           font-size: 0.7rem;
           color: var(--color-text-muted);
         }
@@ -694,12 +695,11 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-        {/* Embedded Business Switcher – always visible */}
+        {/* Business Switcher – always visible */}
         <div style={{ marginBottom: '1rem' }}>
           <BusinessSwitcher 
             currentBusinessId={business?.id} 
             onSwitch={() => {
-              // Just reload – the switcher already saved the selected ID to localStorage
               window.location.reload()
             }} 
           />
@@ -807,4 +807,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-                }
+          }
