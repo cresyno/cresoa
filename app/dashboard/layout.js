@@ -10,7 +10,6 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
-  // ... (keep your existing getPageHeader) ...
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
     const isRepairs = pathname?.startsWith('/dashboard/repairs')
     return {
@@ -95,8 +94,9 @@ function DashboardLayoutContent({ children }) {
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
   
-  // ─── REF to prevent fallback after URL load ───
-  const hasLoadedFromUrl = useRef(false)
+  // ─── REF to store loaded business across renders ───
+  const loadedBusinessRef = useRef(null)
+  const hasAttemptedLoad = useRef(false)
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -138,6 +138,13 @@ function DashboardLayoutContent({ children }) {
   // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
+      // If we already have a business loaded in ref, skip everything
+      if (loadedBusinessRef.current) {
+        setBusiness(loadedBusinessRef.current)
+        setLoading(false)
+        return
+      }
+
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -145,7 +152,7 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        // ─── Get business_id from URL: try searchParams first, fallback to window.location ───
+        // ─── Get business_id from URL ───
         let businessIdFromUrl = searchParams.get('business_id')
         if (!businessIdFromUrl && typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search)
@@ -155,7 +162,7 @@ function DashboardLayoutContent({ children }) {
 
         let businessData = null
 
-        // ─── If URL param exists, FORCE load it – NO FALLBACK ───
+        // ─── If URL param exists, load it ───
         if (businessIdFromUrl) {
           const { data: business, error } = await supabase
             .from('businesses')
@@ -165,17 +172,14 @@ function DashboardLayoutContent({ children }) {
 
           if (business && !error) {
             businessData = business
-            hasLoadedFromUrl.current = true  // ─── MARK AS LOADED ───
             alert(`✅ Loaded from URL: ${business.name}`)
           } else {
             alert(`❌ Failed to load business from URL: ${error?.message || 'not found'}`)
             router.push('/onboarding')
             return
           }
-        }
-
-        // ─── FALLBACK: ONLY if we haven't already loaded from URL ───
-        if (!businessData && !hasLoadedFromUrl.current) {
+        } else {
+          // ─── No URL param – fallback to owned business ───
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
@@ -209,6 +213,9 @@ function DashboardLayoutContent({ children }) {
           router.push('/onboarding')
           return
         }
+
+        // ─── Store in ref to persist ───
+        loadedBusinessRef.current = businessData
 
         // ─── BETA EXPIRY CHECK ───
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
@@ -459,12 +466,12 @@ function DashboardLayoutContent({ children }) {
           <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
             <span className="icon">👥</span> Team & Staff
           </a>
-          <a href="/dashboard/activity" className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
+             <a href="/dashboard/activity" className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
             <span className="icon">📜</span> Activity Logs
           </a>
         </div>
 
-           <div className="nav-section">
+        <div className="nav-section">
           <div className="section-label">Settings</div>
           <a href="/dashboard/subscription" onClick={handleNavClick}>
             <span className="icon">💳</span> Billing & Plan
@@ -554,4 +561,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-          }
+            }
