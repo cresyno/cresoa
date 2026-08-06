@@ -3,7 +3,6 @@ import { supabase } from '../../../../../lib/supabaseClient';
 
 export async function POST(req) {
   try {
-    // 1. Authenticate user (the person accepting)
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
@@ -14,16 +13,15 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Parse request
     const { invite_code } = await req.json();
     if (!invite_code) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
     }
 
-    // 3. Look up the invite
+    // Look up the invite
     const { data: invite, error: inviteError } = await supabase
       .from('business_invites')
-      .select('*, businesses!inner(owner_id)')
+      .select('*')
       .eq('invite_code', invite_code.toUpperCase())
       .eq('status', 'pending')
       .single();
@@ -32,16 +30,15 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid or expired invite code' }, { status: 404 });
     }
 
-    // 4. Check expiry
+    // Check expiry
     const now = new Date();
     const expires = new Date(invite.expires_at);
     if (expires < now) {
-      // Mark as expired
       await supabase.from('business_invites').update({ status: 'expired' }).eq('id', invite.id);
       return NextResponse.json({ error: 'Invite code has expired' }, { status: 410 });
     }
 
-    // 5. Check if the user is already a member of this business
+    // Check if user is already a member
     const { data: existingMembership } = await supabase
       .from('business_memberships')
       .select('id')
@@ -53,7 +50,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'You are already a member of this business' }, { status: 400 });
     }
 
-    // 6. Create membership
+    // Create membership
     const { error: insertError } = await supabase
       .from('business_memberships')
       .insert({
@@ -62,17 +59,15 @@ export async function POST(req) {
         role: invite.role
       });
 
-    if (insertError) {
-      throw insertError;
-    }
+    if (insertError) throw insertError;
 
-    // 7. Update invite status to accepted
+    // Mark invite as accepted
     await supabase
       .from('business_invites')
       .update({ status: 'accepted' })
       .eq('id', invite.id);
 
-    // 8. Log activity
+    // Log activity
     await supabase.from('business_activity_logs').insert({
       business_id: invite.business_id,
       performed_by: user.id,
@@ -85,4 +80,4 @@ export async function POST(req) {
     console.error('Accept invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-        }
+}
