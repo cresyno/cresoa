@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
+import { supabase } from '../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../lib/getBusinessId'
 
 export default function ActivityPage() {
   const router = useRouter()
@@ -45,8 +45,8 @@ export default function ActivityPage() {
         }
         setUserRole(membership.role)
 
-        // Fetch logs using admin client (bypasses RLS)
-        const { data, error: fetchError } = await supabaseAdmin
+        // Fetch logs using regular supabase (RLS will allow Owners/Managers)
+        const { data, error: fetchError } = await supabase
           .from('business_activity_logs')
           .select('*')
           .eq('business_id', bizId)
@@ -228,7 +228,7 @@ export default function ActivityPage() {
 
       <style>{`
         @media (max-width: 640px) {
-          .activity-table th, .activity-table td {
+          table th, table td {
             padding: 0.5rem 0.6rem;
             font-size: 0.7rem;
           }
@@ -236,4 +236,4 @@ export default function ActivityPage() {
       `}</style>
     </div>
   )
-                           }
+            }
