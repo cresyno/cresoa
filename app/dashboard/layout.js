@@ -90,6 +90,7 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
+  const [debugInfo, setDebugInfo] = useState({})
 
   // ─── Theme ───
   const toggleTheme = () => {
@@ -130,7 +131,7 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data with auto-creation fallback ───
+  // ─── Load business data with full debugging ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -141,52 +142,66 @@ export default function DashboardLayout({ children }) {
         }
 
         let businessData = null
+        const debug = {}
 
         // 1. Check if user owns a business
-        const { data: ownedBusiness } = await supabase
+        const { data: ownedBusiness, error: ownedError } = await supabase
           .from('businesses')
           .select('*')
           .eq('owner_id', user.id)
           .maybeSingle()
+        debug.owned = { data: ownedBusiness, error: ownedError }
+        console.log('🔍 Owned business:', ownedBusiness)
 
         if (ownedBusiness) {
           businessData = ownedBusiness
           // ensure membership
-          const { data: existing } = await supabase
+          const { data: existing, error: existError } = await supabase
             .from('business_memberships')
             .select('id')
             .eq('business_id', ownedBusiness.id)
             .eq('user_id', user.id)
             .maybeSingle()
+          debug.existingMembership = { data: existing, error: existError }
           if (!existing) {
-            await supabase.from('business_memberships').insert({
+            const { error: insertError } = await supabase.from('business_memberships').insert({
               business_id: ownedBusiness.id,
               user_id: user.id,
               role: 'Owner'
             })
+            debug.insertResult = { error: insertError }
           }
         } else {
           // 2. Check membership (maybe user is member but not owner)
-          const { data: membershipData } = await supabase
+          const { data: membershipData, error: membershipError } = await supabase
             .from('business_memberships')
             .select('business_id, role')
             .eq('user_id', user.id)
             .maybeSingle()
+          debug.membership = { data: membershipData, error: membershipError }
+          console.log('🔍 Membership data:', membershipData)
 
           if (membershipData) {
-            const { data: memberBusiness } = await supabase
+            const { data: memberBusiness, error: memberError } = await supabase
               .from('businesses')
               .select('*')
               .eq('id', membershipData.business_id)
               .maybeSingle()
+            debug.memberBusiness = { data: memberBusiness, error: memberError }
+            console.log('🔍 Member business:', memberBusiness)
+
             if (memberBusiness) {
               businessData = memberBusiness
+            } else {
+              // Membership exists but business not found – possible RLS issue
+              debug.warning = 'Membership exists but business not found'
             }
           }
         }
 
-        // 3. If STILL no business, CREATE ONE automatically
+        // 3. If still no business, CREATE ONE automatically
         if (!businessData) {
+          debug.autoCreate = true
           // Create a default business
           const { data: newBusiness, error: createError } = await supabase
             .from('businesses')
@@ -200,15 +215,17 @@ export default function DashboardLayout({ children }) {
             })
             .select()
             .single()
+          debug.newBusiness = { data: newBusiness, error: createError }
 
           if (createError) throw createError
 
           // Add membership
-          await supabase.from('business_memberships').insert({
+          const { error: memberInsertError } = await supabase.from('business_memberships').insert({
             business_id: newBusiness.id,
             user_id: user.id,
             role: 'Owner'
           })
+          debug.memberInsert = { error: memberInsertError }
 
           // Log activity
           await supabase.from('business_activity_logs').insert({
@@ -220,6 +237,16 @@ export default function DashboardLayout({ children }) {
 
           businessData = newBusiness
         }
+
+        // ─── At this point we MUST have a business ───
+        if (!businessData) {
+          debug.fatal = true
+          setDebugInfo(debug)
+          setLoading(false)
+          return
+        }
+
+        setBusiness(businessData)
 
         // ─── BETA EXPIRY CHECK ───
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
@@ -260,8 +287,6 @@ export default function DashboardLayout({ children }) {
             businessData.plan_status = 'expired'
           }
         }
-
-        setBusiness(businessData)
 
         // ─── Compute stats for headers ───
         const { count: totalOrders } = await supabase
@@ -304,12 +329,14 @@ export default function DashboardLayout({ children }) {
           groups: groups || 0
         })
 
+        setDebugInfo(debug)
+        setLoading(false)
+
       } catch (error) {
         console.error('Dashboard layout error:', error)
-        // If anything fails, redirect to onboarding as fallback
-        router.push('/onboarding')
-      } finally {
+        setDebugInfo({ error: error.message, stack: error.stack })
         setLoading(false)
+        // DO NOT redirect – we'll show an error instead
       }
     }
 
@@ -340,24 +367,36 @@ export default function DashboardLayout({ children }) {
 
   const header = getPageHeader(pathname, business, stats)
 
+  // ─── If still loading ───
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid var(--color-border);
-            border-top: 4px solid var(--color-accent);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-          }
-        `}</style>
-        <div className="spinner" style={{ margin: 'auto', marginTop: '40vh' }} />
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--color-text-muted)' }}>Loading...</div>
       </div>
     )
   }
 
+  // ─── If error or no business, show debug info ───
+  if (!business) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', padding: '2rem' }}>
+        <h1 style={{ color: 'var(--color-danger)' }}>⚠️ Dashboard Error</h1>
+        <p style={{ color: 'var(--color-text)' }}>Could not load your business. Debug info:</p>
+        <pre style={{ background: '#1A1A1A', color: '#fff', padding: '1rem', borderRadius: '8px', overflow: 'auto' }}>
+          {JSON.stringify(debugInfo, null, 2)}
+        </pre>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+          Retry
+        </button>
+        <br />
+        <button onClick={() => router.push('/onboarding')} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+          Go to Onboarding
+        </button>
+      </div>
+    )
+  }
+
+  // ─── Normal render ───
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
@@ -564,7 +603,7 @@ export default function DashboardLayout({ children }) {
         .sidebar .bottom .support-link {
           color: #25D366;
         }
-        .sidebar .bottom .support-link:hover {
+              .sidebar .bottom .support-link:hover {
           background: rgba(37,211,102,0.06);
           color: #25D366;
         }
@@ -637,7 +676,7 @@ export default function DashboardLayout({ children }) {
             z-index: 1000;
             height: 100vh;
           }
-                   .sidebar.open { transform: translateX(0); }
+          .sidebar.open { transform: translateX(0); }
           .overlay.open { display: block; }
           .main-content { padding-top: 3rem; }
           .page-header { padding: 0.6rem 1rem 0.2rem 1rem; }
@@ -764,4 +803,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-        }
+                }
