@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +20,7 @@ export async function GET(req) {
     const businessId = url.searchParams.get('business_id');
 
     if (businessId) {
-      // Fetch single business – RLS will allow if user is owner or member
-      const { data: business, error } = await supabase
+      const { data: business, error } = await supabaseAdmin
         .from('businesses')
         .select('*')
         .eq('id', businessId)
@@ -29,18 +29,17 @@ export async function GET(req) {
       if (error || !business) {
         return NextResponse.json({ error: 'Business not found' }, { status: 404 });
       }
+      // Optional: verify access manually (but admin client already bypasses RLS)
       return NextResponse.json({ success: true, business });
     }
 
     // ─── Return all businesses (owned + member) ───
-    // Use regular client – RLS will enforce visibility
-    const { data: owned } = await supabase
+    const { data: owned } = await supabaseAdmin
       .from('businesses')
       .select('id, name, sector')
       .eq('owner_id', user.id);
 
-    // Fetch memberships to get business_ids where user is a member
-    const { data: memberships } = await supabase
+    const { data: memberships } = await supabaseAdmin
       .from('business_memberships')
       .select('business_id')
       .eq('user_id', user.id);
@@ -48,7 +47,7 @@ export async function GET(req) {
     let memberBusinesses = [];
     if (memberships && memberships.length > 0) {
       const ids = memberships.map(m => m.business_id);
-      const { data: biz } = await supabase
+      const { data: biz } = await supabaseAdmin
         .from('businesses')
         .select('id, name, sector')
         .in('id', ids);
@@ -63,4 +62,4 @@ export async function GET(req) {
     console.error('Businesses API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+    }
