@@ -141,7 +141,7 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        // ─── DEBUG: show URL param ───
+        // ─── Get business_id from URL ───
         const businessIdFromUrl = searchParams.get('business_id')
         if (typeof window !== 'undefined') {
           alert(`🔍 URL param: ${businessIdFromUrl || 'none'}`)
@@ -169,38 +169,39 @@ function DashboardLayoutContent({ children }) {
           }
         }
 
-        // ─── If URL param failed or missing, fallback to owned business ───
+        // ─── FALLBACK: ONLY IF URL LOADING FAILED ───
         if (!businessData) {
+          // First, check owned business
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
             .eq('owner_id', user.id)
             .maybeSingle()
+          
           if (ownedBusiness) {
             businessData = ownedBusiness
             if (typeof window !== 'undefined') {
               alert(`📌 Fallback to owned: ${businessData.name}`)
             }
-          }
-        }
-
-        // ─── If still nothing, check membership ───
-        if (!businessData) {
-          const { data: membershipData } = await supabase
-            .from('business_memberships')
-            .select('business_id, role')
-            .eq('user_id', user.id)
-            .maybeSingle()
-          if (membershipData) {
-            const { data: memberBusiness } = await supabase
-              .from('businesses')
-              .select('*')
-              .eq('id', membershipData.business_id)
+          } else {
+            // If no owned business, check membership
+            const { data: membershipData } = await supabase
+              .from('business_memberships')
+              .select('business_id, role')
+              .eq('user_id', user.id)
               .maybeSingle()
-            if (memberBusiness) {
-              businessData = memberBusiness
-              if (typeof window !== 'undefined') {
-                alert(`📌 From membership: ${businessData.name}`)
+            
+            if (membershipData) {
+              const { data: memberBusiness } = await supabase
+                .from('businesses')
+                .select('*')
+                .eq('id', membershipData.business_id)
+                .maybeSingle()
+              if (memberBusiness) {
+                businessData = memberBusiness
+                if (typeof window !== 'undefined') {
+                  alert(`📌 From membership: ${businessData.name}`)
+                }
               }
             }
           }
@@ -560,4 +561,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-                }
+            }
