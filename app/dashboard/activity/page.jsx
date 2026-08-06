@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../lib/getBusinessId'
+import { supabase } from '../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 
 export default function ActivityPage() {
   const router = useRouter()
