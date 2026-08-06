@@ -35,8 +35,7 @@ export default function StaffPage() {
           .from('businesses')
           .select('id')
           .eq('owner_id', user.id)
-          .single();
-
+          .maybeSingle();
         if (owned) {
           bizId = owned.id;
           role = 'Owner';
@@ -46,8 +45,7 @@ export default function StaffPage() {
             .from('business_memberships')
             .select('business_id, role')
             .eq('user_id', user.id)
-            .single();
-
+            .maybeSingle();
           if (membership) {
             bizId = membership.business_id;
             role = membership.role;
@@ -62,7 +60,7 @@ export default function StaffPage() {
         setBusinessId(bizId);
         setUserRole(role);
 
-        // Fetch members
+        // Fetch members using admin client through API
         const response = await fetch(`/api/team/members?business_id=${bizId}`, {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
@@ -115,10 +113,6 @@ export default function StaffPage() {
         setInviteEmail('');
       } else {
         setInviteMessage('❌ ' + (result.error || 'Failed to generate invite'));
-        if (result.debug) {
-          console.log('Debug info:', result.debug);
-          setInviteMessage(prev => prev + ' (Check console for details)');
-        }
       }
     } catch (err) {
       setInviteMessage('❌ An unexpected error occurred');
@@ -129,11 +123,7 @@ export default function StaffPage() {
   };
 
   if (loading) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-        Loading team...
-      </div>
-    );
+    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading team...</div>;
   }
 
   const canManage = userRole === 'Owner' || userRole === 'Manager';
@@ -165,14 +155,8 @@ export default function StaffPage() {
         alignItems: 'center',
         flexWrap: 'wrap'
       }}>
-        <span>
-          <strong>Your role:</strong> {userRole || 'Not set'}
-        </span>
-        {businessId && (
-          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            Business ID: {businessId.slice(0, 8)}...
-          </span>
-        )}
+        <span><strong>Your role:</strong> {userRole || 'Not set'}</span>
+        {businessId && <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Business ID: {businessId.slice(0, 8)}...</span>}
       </div>
 
       {/* Members table */}
@@ -351,4 +335,4 @@ export default function StaffPage() {
       )}
     </div>
   );
-          }
+                }
