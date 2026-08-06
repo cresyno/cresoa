@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
 import { isFeatureAvailable } from '../../../lib/planLimits'
 import FeedbackBanner from '../../../components/FeedbackBanner'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 
 export default function FashionDashboardPage() {
   const router = useRouter()
@@ -47,49 +46,48 @@ export default function FashionDashboardPage() {
       return
     }
 
-    // ─── Get business ID from URL or localStorage ───
-    const businessId = getCurrentBusinessId();
+    // ─── FORCE TEST BUSINESS ID ───
+    const TEST_BUSINESS_ID = '35c2e34d-832b-471a-b015-5063ce85c653';
     let businessData = null;
-    let bizError = null;
 
-    if (businessId) {
-      const { data, error } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('id', businessId)
-        .maybeSingle();
+    // Try to load the Test Business directly
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('id', TEST_BUSINESS_ID)
+      .maybeSingle();
+
+    if (data && !error) {
       businessData = data;
-      bizError = error;
-    }
-
-    // If not found or no businessId, fallback to owner (original behavior)
-    if (!businessData) {
-      const { data, error } = await supabase
+      alert(`✅ FORCED: Loaded Test Business: ${businessData.name}`);
+    } else {
+      // Fallback to owner if something goes wrong
+      const { data: ownerData, error: ownerError } = await supabase
         .from('businesses')
         .select('*')
         .eq('owner_id', user.id)
         .single();
-      businessData = data;
-      bizError = error;
-    }
-
-    if (bizError || !businessData) {
-      router.push('/onboarding')
-      return
+      if (ownerError || !ownerData) {
+        router.push('/onboarding');
+        return;
+      }
+      businessData = ownerData;
+      alert(`⚠️ Fallback to owned: ${businessData.name}`);
     }
 
     if (businessData && businessData.is_active === false) {
-      setDeactivated(true)
-      setLoading(false)
-      return
+      setDeactivated(true);
+      setLoading(false);
+      return;
     }
 
     if (businessData && !businessData.onboarding_completed) {
-      router.push('/onboarding')
-      return
+      router.push('/onboarding');
+      return;
     }
-    setBusiness(businessData)
+    setBusiness(businessData);
 
+    // ─── Fetch data for this business ───
     if (businessData) {
       const { data: customerData } = await supabase
         .from('customers')
@@ -350,9 +348,7 @@ export default function FashionDashboardPage() {
 return (
   <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem 1rem', fontFamily: "'Inter', -apple-system, sans-serif" }}>
     <style>{`
-      /* ─── Premium Design System ─── */
       * { box-sizing: border-box; }
-      
       :root {
         --spacing-xs: 0.25rem;
         --spacing-sm: 0.5rem;
@@ -369,7 +365,6 @@ return (
         --shadow-lg: 0 8px 32px rgba(15,43,74,0.08);
         --shadow-xl: 0 12px 48px rgba(15,43,74,0.12);
       }
-
       .card {
         background: #fff;
         border-radius: var(--radius-lg);
@@ -381,7 +376,6 @@ return (
         box-shadow: var(--shadow-md);
         transform: translateY(-2px);
       }
-
       .stat-card {
         background: #fff;
         border-radius: var(--radius-md);
@@ -418,7 +412,6 @@ return (
       .stat-card .trend { font-size: 0.6rem; margin-left: 0.3rem; font-weight: 600; }
       .stat-card .trend.up { color: #2E7D5E; }
       .stat-card .trend.down { color: #D9534F; }
-
       .revenue-card {
         background: #fff;
         border-radius: var(--radius-md);
@@ -433,7 +426,6 @@ return (
       .revenue-card .amount { font-size: 1.4rem; font-weight: 700; color: #0F2B4A; margin: 0.1rem 0 0; }
       .revenue-card .label { font-size: 0.6rem; color: #8A8A8A; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
       .revenue-card .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 20px; font-size: 0.55rem; font-weight: 600; margin-top: 0.2rem; }
-
       .action-card {
         background: #fff;
         border-radius: var(--radius-md);
@@ -453,7 +445,6 @@ return (
       }
       .action-card .icon { font-size: 1.8rem; display: block; margin-bottom: 0.2rem; }
       .action-card .label { font-size: 0.65rem; font-weight: 600; color: #0F2B4A; }
-
       .order-card {
         background: #fff;
         border-radius: var(--radius-md);
@@ -476,7 +467,6 @@ return (
       .order-card .balance.positive { color: #D9534F; }
       .order-card .balance.zero { color: #2E7D5E; }
       .order-card .actions { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.3rem; }
-
       .btn-sm { padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; border: 1px solid #E5E0D8; background: #fff; color: #0F2B4A; cursor: pointer; transition: all 0.2s ease; min-height: 32px; min-width: 32px; display: inline-flex; align-items: center; justify-content: center; }
       .btn-sm:hover { background: #F8F6F2; border-color: #D4A52A; transform: translateY(-1px); }
       .btn-sm.primary { background: #0F2B4A; color: #fff; border-color: #0F2B4A; }
@@ -485,31 +475,27 @@ return (
       .btn-sm.success:hover { background: #1E5A44; }
       .btn-sm.warning { background: #D4A52A; color: #0F2B4A; border-color: #D4A52A; }
       .btn-sm.warning:hover { background: #C79A2B; }
-
       .section-title { display: flex; justify-content: space-between; align-items: center; margin: var(--spacing-lg) 0 var(--spacing-sm); }
       .section-title h3 { color: #0F2B4A; font-size: 1.05rem; font-weight: 700; margin: 0; letter-spacing: -0.3px; }
       .section-title a { color: #8A8A8A; font-size: 0.75rem; text-decoration: none; font-weight: 500; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
       .section-title a:hover { border-bottom-color: #8A8A8A; }
-
       .empty-state { text-align: center; padding: var(--spacing-xl); color: #8A8A8A; background: #fff; border-radius: var(--radius-md); border: 1px dashed #E5E0D8; }
       .empty-state .icon { font-size: 2.5rem; display: block; margin-bottom: var(--spacing-sm); }
       .empty-state h4 { color: #0F2B4A; font-size: 1rem; margin: 0 0 0.2rem; }
       .empty-state p { margin: 0; font-size: 0.85rem; }
       .empty-state .cta { display: inline-block; margin-top: var(--spacing-sm); padding: 0.5rem 1.2rem; border-radius: var(--radius-sm); background: #D4A52A; color: #0F2B4A; font-weight: 600; text-decoration: none; font-size: 0.85rem; transition: all 0.2s ease; }
       .empty-state .cta:hover { background: #C79A2B; transform: translateY(-2px); }
-
       .group-card { background: #fff; border-radius: var(--radius-md); padding: var(--spacing-md); margin-bottom: var(--spacing-sm); border: 1px solid rgba(15,43,74,0.04); box-shadow: var(--shadow-sm); transition: all 0.3s ease; }
       .group-card:hover { box-shadow: var(--shadow-md); }
       .group-card.expanded { border-color: #D4A52A; }
       .group-card .header { display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; }
       .group-card .header .name { font-weight: 700; color: #0F2B4A; font-size: 0.95rem; }
-       .group-card .header .meta { font-size: 0.7rem; color: #8A8A8A; }
+      .group-card .header .meta { font-size: 0.7rem; color: #8A8A8A; }
       .group-card .header .balance { font-size: 0.8rem; font-weight: 600; }
       .group-card .header .balance.owing { color: #D9534F; }
       .group-card .header .balance.paid { color: #2E7D5E; }
       .group-card .progress { margin-top: 0.3rem; background: #F0EDE8; border-radius: 10px; height: 4px; overflow: hidden; }
       .group-card .progress .bar { height: 100%; background: #2E7D5E; border-radius: 10px; transition: width 0.6s ease; }
-
       .fab {
         position: fixed;
         bottom: 1.5rem;
@@ -532,7 +518,6 @@ return (
       }
       .fab:hover { transform: scale(1.05); box-shadow: 0 8px 32px rgba(212,165,42,0.5); }
       .fab:active { transform: scale(0.92); }
-
       .customer-row {
         display: flex;
         justify-content: space-between;
@@ -551,7 +536,6 @@ return (
       .customer-row .phone { font-size: 0.7rem; color: #8A8A8A; }
       .customer-row .stats { text-align: right; font-size: 0.7rem; color: #8A8A8A; }
       .customer-row .stats strong { color: #0F2B4A; }
-
       .health-card {
         background: linear-gradient(135deg, #0F2B4A, #1A3F66);
         border-radius: var(--radius-md);
@@ -570,12 +554,10 @@ return (
       .health-card .stats .item { text-align: center; }
       .health-card .stats .item .num { font-weight: 700; font-size: 1rem; }
       .health-card .stats .item .desc { font-size: 0.6rem; opacity: 0.7; }
-
       .alert-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
       .alert-badge.overdue { background: #F1DBD3; color: #D9534F; }
       .alert-badge.today { background: #FFF3E0; color: #E67E22; }
       .alert-badge.ready { background: #DCEBE2; color: #2E7D5E; }
-
       .glass { 
         background: rgba(255,255,255,0.6); 
         backdrop-filter: blur(12px); 
@@ -587,14 +569,12 @@ return (
         transition: all 0.3s ease; 
       }
       .glass:hover { box-shadow: var(--shadow-md); }
-
       .modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index:1000; display:flex; align-items:flex-end; justify-content:center; animation: slideUp 0.3s; }
       @keyframes slideUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
       .modal-content { background: #F8F6F2; border-radius:20px 20px 0 0; padding:1.5rem; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; }
       .modal-handle { width:40px; height:4px; background:#D6D0C5; border-radius:4px; margin:0 auto 1rem; }
       .settle-modal { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:1100; display:flex; align-items:center; justify-content:center; padding:1.5rem; }
       .settle-content { background:#F8F6F2; border-radius:20px; padding:1.8rem; max-width:380px; width:100%; }
-
       @media (max-width: 640px) {
         .stat-card .value { font-size: 1.2rem; }
         .action-card { min-width: 60px; padding: var(--spacing-sm); }
@@ -667,7 +647,7 @@ return (
       </div>
     </div>
 
-{/* ─── KEY METRICS ─── */}
+    {/* ─── KEY METRICS ─── */}
     <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
       <a href="/dashboard/customers" className="stat-card">
         <span className="icon">👤</span>
@@ -696,7 +676,7 @@ return (
       </a>
     </div>
 
-    {/* ─── ALERTS ─── */}
+{/* ─── ALERTS ─── */}
     {(overdueCount > 0 || dueTodayCount > 0 || readyCount > 0) && (
       <div className="alert-row" style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)', flexWrap: 'wrap' }}>
         {overdueCount > 0 && <span className="alert-badge overdue">⚠️ {overdueCount} Overdue</span>}
@@ -844,7 +824,7 @@ return (
         )}
       </div>
 
-{/* ─── RECENT CUSTOMERS ─── */}
+      {/* ─── RECENT CUSTOMERS ─── */}
       <div>
         <div className="section-title">
           <h3>👤 Recent Customers</h3>
@@ -949,4 +929,4 @@ return (
       </div>
     </div>
   )
-}
+        }
