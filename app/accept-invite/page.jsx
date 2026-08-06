@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../lib/supabaseClient' // Adjust path if necessary (e.g., '../lib/supabaseClient')
+import { supabase } from '../../lib/supabaseClient' // Adjust path if necessary (e.g., '../lib/supabaseClient')
 
 export default function AcceptInvitePage() {
   const [code, setCode] = useState('')
