@@ -22,19 +22,19 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Role must be either "Staff" or "Manager"' }, { status: 400 });
     }
 
-    // ─── USE ADMIN CLIENT TO BYPASS RLS ───
+    // Fetch business using admin client
     const { data: business, error: bizError } = await supabaseAdmin
       .from('businesses')
       .select('owner_id, name')
       .eq('id', business_id)
-      .single();
+      .maybeSingle();
 
     if (bizError || !business) {
       console.error('Business fetch error:', bizError);
       return NextResponse.json({ error: 'Business not found' }, { status: 404 });
     }
 
-    // Manually check permission
+    // Check permission: owner OR manager via membership
     let hasPermission = false;
     if (business.owner_id === user.id) {
       hasPermission = true;
@@ -45,7 +45,6 @@ export async function POST(req) {
         .eq('business_id', business_id)
         .eq('user_id', user.id)
         .maybeSingle();
-
       if (membership && (membership.role === 'Owner' || membership.role === 'Manager')) {
         hasPermission = true;
       }
@@ -68,7 +67,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'An invite for this email is already pending' }, { status: 400 });
     }
 
-    // Generate code
+    // Generate 6-character code
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
