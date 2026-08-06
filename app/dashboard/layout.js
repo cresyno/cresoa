@@ -1,7 +1,6 @@
 'use client'
 
-import { Suspense, useRef } from 'react'
-import { useEffect, useState } from 'react'
+import { Suspense, useRef, useState, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
@@ -93,10 +92,9 @@ function DashboardLayoutContent({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
-  
-  // ─── REF to store loaded business across renders ───
+  const [userRole, setUserRole] = useState(null)
+
   const loadedBusinessRef = useRef(null)
-  const hasAttemptedLoad = useRef(false)
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -135,10 +133,9 @@ function DashboardLayoutContent({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data ───
+  // ─── Load business data and user role ───
   useEffect(() => {
     const load = async () => {
-      // If we already have a business loaded in ref, skip everything
       if (loadedBusinessRef.current) {
         setBusiness(loadedBusinessRef.current)
         setLoading(false)
@@ -152,17 +149,14 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        // ─── Get business_id from URL ───
         let businessIdFromUrl = searchParams.get('business_id')
         if (!businessIdFromUrl && typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search)
           businessIdFromUrl = urlParams.get('business_id')
         }
-        alert(`🔍 URL param: ${businessIdFromUrl || 'none'}`)
 
         let businessData = null
 
-        // ─── If URL param exists, load it ───
         if (businessIdFromUrl) {
           const { data: business, error } = await supabase
             .from('businesses')
@@ -172,14 +166,11 @@ function DashboardLayoutContent({ children }) {
 
           if (business && !error) {
             businessData = business
-            alert(`✅ Loaded from URL: ${business.name}`)
           } else {
-            alert(`❌ Failed to load business from URL: ${error?.message || 'not found'}`)
             router.push('/onboarding')
             return
           }
         } else {
-          // ─── No URL param – fallback to owned business ───
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
@@ -187,7 +178,6 @@ function DashboardLayoutContent({ children }) {
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
-            alert(`📌 No URL param – loaded owned: ${businessData.name}`)
           } else {
             const { data: membershipData } = await supabase
               .from('business_memberships')
@@ -202,20 +192,35 @@ function DashboardLayoutContent({ children }) {
                 .maybeSingle()
               if (memberBusiness) {
                 businessData = memberBusiness
-                alert(`📌 From membership: ${businessData.name}`)
               }
             }
           }
         }
 
         if (!businessData) {
-          alert('❌ No business found – redirecting to onboarding')
           router.push('/onboarding')
           return
         }
 
-        // ─── Store in ref to persist ───
         loadedBusinessRef.current = businessData
+
+        // ─── Fetch user role for this business ───
+        const { data: roleData } = await supabase
+          .from('business_memberships')
+          .select('role')
+          .eq('business_id', businessData.id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (roleData) {
+          setUserRole(roleData.role)
+        } else {
+          // Fallback: if user is owner, set role to Owner
+          if (businessData.owner_id === user.id) {
+            setUserRole('Owner')
+          } else {
+            setUserRole('Staff') // default
+          }
+        }
 
         // ─── BETA EXPIRY CHECK ───
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
@@ -302,7 +307,6 @@ function DashboardLayoutContent({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
-        alert(`❌ Error: ${error.message}`)
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -310,7 +314,7 @@ function DashboardLayoutContent({ children }) {
     }
 
     load()
-  }, [router, searchParams]) // Keep dependencies
+  }, [router, searchParams])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -352,6 +356,19 @@ function DashboardLayoutContent({ children }) {
       </div>
     )
   }
+
+  // ─── Role‑based visibility ───
+  const isStaff = userRole === 'Staff'
+  const isManager = userRole === 'Manager'
+  const isOwner = userRole === 'Owner'
+
+  // Staff cannot see Team & Activity at all
+  const showTeamActivity = !isStaff
+
+  // Only Owner can see Billing & Plan, Beta, Tracking
+  const showBilling = isOwner
+  const showBeta = isOwner
+  const showTracking = isOwner && (business?.plan === 'pro' || business?.plan === 'beta')
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -461,27 +478,31 @@ function DashboardLayoutContent({ children }) {
           ))}
         </div>
 
-        <div className="nav-section">
-          <div className="section-label">Team & Activity</div>
-          <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
-            <span className="icon">👥</span> Team & Staff
-          </a>
-             <a href="/dashboard/activity" className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
-            <span className="icon">📜</span> Activity Logs
-          </a>
-        </div>
+             {showTeamActivity && (
+          <div className="nav-section">
+            <div className="section-label">Team & Activity</div>
+            <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
+              <span className="icon">👥</span> Team & Staff
+            </a>
+            <a href="/dashboard/activity" className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
+              <span className="icon">📜</span> Activity Logs
+            </a>
+          </div>
+        )}
 
         <div className="nav-section">
           <div className="section-label">Settings</div>
-          <a href="/dashboard/subscription" onClick={handleNavClick}>
-            <span className="icon">💳</span> Billing & Plan
-          </a>
-          {business && !business.has_applied_for_beta && (
+          {showBilling && (
+            <a href="/dashboard/subscription" onClick={handleNavClick}>
+              <span className="icon">💳</span> Billing & Plan
+            </a>
+          )}
+          {showBeta && business && !business.has_applied_for_beta && (
             <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🧪</span> Join Beta Program
             </a>
           )}
-          {business && (business.plan === 'pro' || business.plan === 'beta') && (
+          {showTracking && (
             <a href="/dashboard/settings/tracking" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🎨</span> Order Tracking Page
             </a>
@@ -512,6 +533,7 @@ function DashboardLayoutContent({ children }) {
       </div>
 
       <div className="main-content">
+        {/* ─── DEBUG BAR (Optional – remove later) ─── */}
         <div style={{
           background: '#1e1e2a',
           color: '#fff',
@@ -524,13 +546,13 @@ function DashboardLayoutContent({ children }) {
           borderBottom: '2px solid #D4A52A'
         }}>
           <span>🔍 URL: {typeof window !== 'undefined' ? window.location.search : 'none'}</span>
-          <span>🏢 {business?.name || 'none'}</span>
+          <span>🏢 {business?.name || 'none'} | Role: {userRole || 'none'}</span>
         </div>
 
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {business && !business.has_applied_for_beta && (
+            {business && !business.has_applied_for_beta && isOwner && (
               <a href="/dashboard/beta-apply" className="beta-btn">🧪 Join Beta</a>
             )}
             <span className="date">
@@ -561,4 +583,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-            }
+               }
