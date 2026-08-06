@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
-export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
+export default function BusinessSwitcher({ currentBusinessId }) {
   const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -44,14 +44,8 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
       router.push('/accept-invite');
       return;
     }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedBusinessId', businessId);
-    }
-    if (onSwitch) {
-      onSwitch(businessId);
-    } else {
-      window.location.reload();
-    }
+    // Direct URL redirect – bypasses localStorage issues
+    router.push(`/dashboard?business_id=${businessId}`);
   };
 
   return (
@@ -138,7 +132,7 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
         </div>
       )}
 
-      {/* ─── DEBUG: Show API result ─── */}
+      {/* ─── DEBUG ─── */}
       <div style={{
         marginTop: '8px',
         padding: '4px 8px',
@@ -149,9 +143,9 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
         fontFamily: 'monospace',
         wordBreak: 'break-all'
       }}>
-        <div>📡 Debug: {debugMessage}</div>
-        <div>📋 List: {businesses.map(b => b.name).join(', ') || '(empty)'}</div>
+        <div>📡 {debugMessage}</div>
+        <div>📋 {businesses.map(b => b.name).join(', ') || '(empty)'}</div>
       </div>
     </div>
   );
-          }
+}
