@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient'; // Adjust path to supabase client if needed
+import { supabase } from '../../lib/supabaseClient';
 
 export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
   const [businesses, setBusinesses] = useState([]);
@@ -12,22 +12,38 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch businesses owned by user or where user is a member
+      // Owned businesses
       const { data: owned } = await supabase
         .from('businesses')
         .select('id, name, sector')
         .eq('owner_id', user.id);
 
-      if (owned) {
-        setBusinesses(owned);
+      // Businesses from memberships
+      const { data: memberships } = await supabase
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id);
+
+      let memberBusinesses = [];
+      if (memberships && memberships.length > 0) {
+        const ids = memberships.map(m => m.business_id);
+        const { data: biz } = await supabase
+          .from('businesses')
+          .select('id, name, sector')
+          .in('id', ids);
+        if (biz) memberBusinesses = biz;
       }
+
+      const all = [...(owned || []), ...memberBusinesses];
+      const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
+      setBusinesses(unique);
     }
     loadUserBusinesses();
   }, []);
 
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
-  if (businesses.length <= 1) return null; // Hide if user only has one business
+  if (businesses.length <= 1) return null;
 
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -48,9 +64,7 @@ export default function BusinessSwitcher({ currentBusinessId, onSwitch }) {
           fontWeight: '500',
         }}
       >
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {currentBusiness ? currentBusiness.name : 'Switch Business'}
-        </span>
+        <span>{currentBusiness ? currentBusiness.name : 'Switch Business'}</span>
         <span>▼</span>
       </button>
 
