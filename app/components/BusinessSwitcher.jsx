@@ -44,7 +44,9 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       router.push('/accept-invite');
       return;
     }
-    // DIRECT NAVIGATION - forces the layout to load this business
+    // Save to sessionStorage AND reload with URL param
+    sessionStorage.setItem('selectedBusinessId', businessId);
+    // Also try URL param approach
     window.location.href = `/dashboard?business_id=${businessId}`;
   };
 
@@ -148,4 +150,4 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       </div>
     </div>
   );
-      }
+}
