@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
 import FeedbackBanner from '../../../components/FeedbackBanner'
 import { getPlanLimits } from '../../../lib/planLimits'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 
 export default function RepairsDashboardPage() {
   const router = useRouter()
@@ -13,6 +14,7 @@ export default function RepairsDashboardPage() {
   const [jobs, setJobs] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -31,6 +33,8 @@ export default function RepairsDashboardPage() {
   const [plan, setPlan] = useState('free')
 
   const loadDashboard = async () => {
+    setLoading(true)
+    setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -38,15 +42,29 @@ export default function RepairsDashboardPage() {
         return
       }
 
-      const { data: businessData, error: bizError } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('owner_id', user.id)
-        .single()
+      const businessId = getCurrentBusinessId()
+      let businessData = null
 
-      if (bizError || !businessData) {
-        router.push('/onboarding')
-        return
+      if (businessId) {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('id', businessId)
+          .maybeSingle()
+        if (data && !error) businessData = data
+      }
+
+      if (!businessData) {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('owner_id', user.id)
+          .single()
+        if (error || !data) {
+          router.push('/onboarding')
+          return
+        }
+        businessData = data
       }
 
       setBusiness(businessData)
@@ -114,6 +132,7 @@ export default function RepairsDashboardPage() {
 
     } catch (err) {
       console.error('Error loading dashboard:', err)
+      setError('Failed to load dashboard. Please refresh.')
     } finally {
       setLoading(false)
     }
@@ -150,14 +169,41 @@ export default function RepairsDashboardPage() {
   const limits = getPlanLimits(plan)
   const canAddMore = totalOrdersCount < limits.orders
 
+  // ─── Skeleton Loading ───
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: '40px', height: '40px', border: '4px solid #E5E0D8', borderTop: '4px solid #0F2B4A', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1rem' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '1rem', marginBottom: '1rem', animation: 'pulse 1.5s infinite' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div><div style={{ width: '120px', height: '16px', background: '#E5E0D8', borderRadius: '6px', marginBottom: '4px' }} /><div style={{ width: '80px', height: '10px', background: '#E5E0D8', borderRadius: '6px' }} /></div>
+              <div><div style={{ width: '60px', height: '10px', background: '#E5E0D8', borderRadius: '6px' }} /></div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+            {[1,2,3,4].map(i => <div key={i} style={{ background: '#fff', borderRadius: '12px', padding: '0.8rem', animation: 'pulse 1.5s infinite' }}><div style={{ width: '50%', height: '16px', background: '#E5E0D8', borderRadius: '6px', marginBottom: '4px' }} /><div style={{ width: '30%', height: '10px', background: '#E5E0D8', borderRadius: '6px' }} /></div>)}
+          </div>
+          <div style={{ background: '#fff', borderRadius: '12px', padding: '0.8rem', animation: 'pulse 1.5s infinite' }}>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>{[1,2,3,4,5].map(i => <div key={i} style={{ flex:1, textAlign:'center' }}><div style={{ width:'100%', height:'12px', background:'#E5E0D8', borderRadius:'6px' }} /></div>)}</div>
+          </div>
+          <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
+        </div>
       </div>
     )
-            }
+  }
+
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ background: '#fff', padding: '2rem', borderRadius: '16px', maxWidth: '400px' }}>
+          <h2 style={{ color: '#D9534F' }}>Oops!</h2>
+          <p style={{ color: '#8A8A8A' }}>{error}</p>
+          <button onClick={loadDashboard} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.6rem 2rem', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer' }}>Retry</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg, #F8F6F2)', padding: '1rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`
@@ -197,7 +243,7 @@ export default function RepairsDashboardPage() {
       `}</style>
 
       {/* ─── HEADER ─── */}
-      <div className="glass" data-tour="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.2rem', color: '#0F2B4A', margin: 0 }}>{business?.name || 'Repairs'}</h1>
           <div style={{ fontSize: '0.7rem', color: '#8A8A8A' }}>
@@ -212,11 +258,10 @@ export default function RepairsDashboardPage() {
         </div>
       </div>
 
-      {/* Feedback banner */}
       {business && <FeedbackBanner business={business} />}
 
       {/* ─── STATS ─── */}
-      <div data-tour="stats-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
         <div className="stat-card"><div className="number">{stats.total || 0}</div><div className="label">Jobs</div></div>
         <div className="stat-card"><div className="number">{stats.active || 0}</div><div className="label">Active</div></div>
         <div className="stat-card"><div className="number">{stats.ready || 0}</div><div className="label">Ready</div></div>
@@ -224,7 +269,7 @@ export default function RepairsDashboardPage() {
       </div>
 
       {/* ─── QUICK ACTIONS ─── */}
-      <div data-tour="quick-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <a href={canAddMore ? "/dashboard/repairs/jobs/new" : "#"} className="action-btn primary" style={{ opacity: canAddMore ? 1 : 0.6 }} onClick={(e) => { if (!canAddMore) { e.preventDefault(); router.push('/dashboard/subscription') } }}>
           {canAddMore ? '🔧 + Job' : '🔒 Upgrade'}
         </a>
@@ -255,11 +300,8 @@ export default function RepairsDashboardPage() {
       </div>
 
       {/* ─── RECENT JOBS ─── */}
-      <div data-tour="recent-orders" style={{ marginBottom: '1.2rem' }}>
-        <div className="section-title">
-          <h3>📋 Recent Jobs</h3>
-          <a href="/dashboard/repairs/jobs">View all →</a>
-        </div>
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div className="section-title"><h3>📋 Recent Jobs</h3><a href="/dashboard/repairs/jobs">View all →</a></div>
         {jobs.length === 0 ? (
           <div className="empty-state"><span className="icon">🔧</span><p>No repair jobs yet</p></div>
         ) : (
@@ -281,10 +323,7 @@ export default function RepairsDashboardPage() {
 
       {/* ─── RECENT CUSTOMERS ─── */}
       <div>
-        <div className="section-title">
-          <h3>👤 Recent Customers</h3>
-          <a href="/dashboard/customers">View all →</a>
-        </div>
+        <div className="section-title"><h3>👤 Recent Customers</h3><a href="/dashboard/customers">View all →</a></div>
         {customers.length === 0 ? (
           <div className="empty-state"><span className="icon">👤</span><p>No customers yet</p></div>
         ) : (
@@ -296,10 +335,9 @@ export default function RepairsDashboardPage() {
         )}
       </div>
 
-      {/* ─── FOOTER ─── */}
       <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.6rem', color: '#C8C0B5' }}>
         Cresoa Repairs · {new Date().getFullYear()}
       </div>
     </div>
   )
-        }
+                               }
