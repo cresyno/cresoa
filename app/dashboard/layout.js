@@ -93,7 +93,6 @@ function DashboardLayoutContent({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
-  const [debugMessage, setDebugMessage] = useState('Loading...')
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -137,20 +136,18 @@ function DashboardLayoutContent({ children }) {
   useEffect(() => {
     const load = async () => {
       try {
-        setDebugMessage('🔍 Loading...')
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
           router.push('/login')
           return
         }
 
-        // ─── Get business_id from URL ───
-        const businessIdFromUrl = searchParams.get('business_id')
-        setDebugMessage(`📌 URL param: ${businessIdFromUrl?.slice(0,8) || 'none'}`)
-
         let businessData = null
 
-        // ─── If we have a business_id in URL, load it ───
+        // ─── Get business_id from URL ───
+        const businessIdFromUrl = searchParams.get('business_id')
+
+        // ─── If we have a business_id in URL, FORCE load it ───
         if (businessIdFromUrl) {
           const { data: session } = await supabase.auth.getSession()
           if (session) {
@@ -160,14 +157,11 @@ function DashboardLayoutContent({ children }) {
             const result = await response.json()
             if (response.ok && result.business) {
               businessData = result.business
-              setDebugMessage(`✅ Loaded: ${businessData.name} from URL`)
-            } else {
-              setDebugMessage(`❌ API failed: ${result.error || 'not found'}`)
             }
           }
         }
 
-        // ─── If no URL param or failed, load owned business ───
+        // ─── If URL param failed or doesn't exist, load owned business ───
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
@@ -176,7 +170,6 @@ function DashboardLayoutContent({ children }) {
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
-            setDebugMessage(`📌 Fallback owned: ${businessData.name}`)
           }
         }
 
@@ -195,13 +188,11 @@ function DashboardLayoutContent({ children }) {
               .maybeSingle()
             if (memberBusiness) {
               businessData = memberBusiness
-              setDebugMessage(`📌 From membership: ${businessData.name}`)
             }
           }
         }
 
         if (!businessData) {
-          setDebugMessage('❌ No business found')
           router.push('/onboarding')
           return
         }
@@ -291,7 +282,6 @@ function DashboardLayoutContent({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
-        setDebugMessage(`❌ Error: ${error.message}`)
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -736,7 +726,7 @@ function DashboardLayoutContent({ children }) {
           alignItems: 'center',
           borderBottom: '2px solid #D4A52A'
         }}>
-          <span>🔍 {debugMessage}</span>
+          <span>🔍 URL: {typeof window !== 'undefined' ? window.location.search : 'none'}</span>
           <span>🏢 {business?.name || 'none'}</span>
         </div>
 
@@ -774,4 +764,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-                  }
+                }
