@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
+
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
@@ -152,10 +153,10 @@ export default function DashboardLayout({ children }) {
           businessData = ownedBusiness
         }
 
-        // 2. If not owner, check memberships table
+        // 2. If not owner, check memberships table (NEW – no more staff table)
         if (!businessData) {
           const { data: membershipData } = await supabase
-            .from('memberships')
+            .from('business_memberships')
             .select('business_id, role')
             .eq('user_id', user.id)
             .maybeSingle()
@@ -173,8 +174,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-
-        // 4. If still no business, redirect to onboarding
+        // 3. If still no business, redirect to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -265,6 +265,8 @@ export default function DashboardLayout({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
+        // If there's any error, redirect to onboarding to recover
+        router.push('/onboarding')
       } finally {
         setLoading(false)
       }
@@ -624,12 +626,12 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
 
-        {/* Embedded Business Switcher */}
+         {/* Embedded Business Switcher */}
         <div style={{ marginBottom: '1rem' }}>
           <BusinessSwitcher 
             currentBusinessId={business?.id} 
             onSwitch={(newBusinessId) => {
-              // Reload page or force state update to switch workspace context seamlessly
+              // Reload page to switch workspace context
               window.location.reload()
             }} 
           />
@@ -649,7 +651,8 @@ export default function DashboardLayout({ children }) {
             </a>
           ))}
         </div>
-<div className="nav-section">
+
+        <div className="nav-section">
           <div className="section-label">Team & Activity</div>
           <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
             <span className="icon">👥</span> Team & Staff
@@ -678,7 +681,8 @@ export default function DashboardLayout({ children }) {
             <span className="icon">⚙️</span> Profile & Settings
           </a>
         </div>
-<div className="bottom">
+
+        <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}>
             <span className="icon">{theme === 'light' ? '🌙' : '☀️'}</span>
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
@@ -710,7 +714,8 @@ export default function DashboardLayout({ children }) {
             </span>
           </div>
         </div>
-<div className="page-header">
+
+        <div className="page-header">
           <h1>{header.title}</h1>
           <p>{header.subtitle}</p>
         </div>
@@ -719,4 +724,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-              }
+          }
