@@ -90,6 +90,7 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
+  const [selectedId, setSelectedId] = useState(null) // for debug panel
 
   // ─── Theme ───
   const toggleTheme = () => {
@@ -130,7 +131,7 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── Load business data with URL + localStorage support ───
+  // ─── Load business data with URL + localStorage + API fetch ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -141,54 +142,52 @@ export default function DashboardLayout({ children }) {
         }
 
         let businessData = null
-        let selectedId = null
+        let selectedIdFromStorage = null
 
-        // 1. Check URL for ?business_id= (after accepting invite)
+        // 1. Check URL for ?business_id=
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search)
           const urlBusinessId = params.get('business_id')
           if (urlBusinessId) {
-            selectedId = urlBusinessId
+            selectedIdFromStorage = urlBusinessId
           } else {
-            // 2. Check localStorage for saved selection
             const stored = localStorage.getItem('selectedBusinessId')
             if (stored) {
-              selectedId = stored
+              selectedIdFromStorage = stored
             }
           }
         }
 
-        // 3. If we have a selectedId, try to load that business
-        if (selectedId) {
-          const { data: requested, error } = await supabase
-            .from('businesses')
-            .select('*')
-            .eq('id', selectedId)
-            .maybeSingle()
+        setSelectedId(selectedIdFromStorage) // for debug panel
 
-          if (requested && !error) {
-            // Verify user is owner or member
-            const isOwner = requested.owner_id === user.id
-            const { data: membership } = await supabase
-              .from('business_memberships')
-              .select('id')
-              .eq('business_id', selectedId)
-              .eq('user_id', user.id)
-              .maybeSingle()
-            const isMember = !!membership
-
-            if (isOwner || isMember) {
-              businessData = requested
-              // Ensure owner has membership (if not already)
-              if (isOwner && !isMember) {
-                await supabase.from('business_memberships').insert({
-                  business_id: selectedId,
-                  user_id: user.id,
-                  role: 'Owner'
-                })
+        // 2. If we have a selectedId, fetch via API (bypasses RLS)
+        if (selectedIdFromStorage) {
+          const { data: session } = await supabase.auth.getSession()
+          if (session) {
+            const response = await fetch(`/api/user/businesses?business_id=${selectedIdFromStorage}`, {
+              headers: { 'Authorization': `Bearer ${session.access_token}` }
+            })
+            const result = await response.json()
+            if (response.ok && result.business) {
+              businessData = result.business
+              // Ensure owner has membership (if owner and not already)
+              if (businessData.owner_id === user.id) {
+                const { data: existing } = await supabase
+                  .from('business_memberships')
+                  .select('id')
+                  .eq('business_id', businessData.id)
+                  .eq('user_id', user.id)
+                  .maybeSingle()
+                if (!existing) {
+                  await supabase.from('business_memberships').insert({
+                    business_id: businessData.id,
+                    user_id: user.id,
+                    role: 'Owner'
+                  })
+                }
               }
             } else {
-              // If user doesn't have access, clear stored selection
+              // If not found, clear stored selection
               if (typeof window !== 'undefined') {
                 localStorage.removeItem('selectedBusinessId')
               }
@@ -196,17 +195,16 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 4. If businessData is still null, fallback to owned business
+        // 3. Fallback to owned business if businessData is still null
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
             .eq('owner_id', user.id)
             .maybeSingle()
-
           if (ownedBusiness) {
             businessData = ownedBusiness
-            // Ensure membership exists for owner
+            // ensure membership
             const { data: existing } = await supabase
               .from('business_memberships')
               .select('id')
@@ -223,14 +221,13 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 5. If still no business, check membership (user is member but not owner)
+        // 4. Fallback to membership (if member but not owner)
         if (!businessData) {
           const { data: membershipData } = await supabase
             .from('business_memberships')
             .select('business_id, role')
             .eq('user_id', user.id)
             .maybeSingle()
-
           if (membershipData) {
             const { data: memberBusiness } = await supabase
               .from('businesses')
@@ -243,7 +240,7 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 6. If still no business, redirect to onboarding
+        // 5. If still no business, redirect to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
@@ -290,8 +287,6 @@ export default function DashboardLayout({ children }) {
         }
 
         setBusiness(businessData)
-
-        // Save the loaded business ID to localStorage (for switcher to remember)
         if (typeof window !== 'undefined' && businessData) {
           localStorage.setItem('selectedBusinessId', businessData.id)
         }
@@ -632,7 +627,7 @@ export default function DashboardLayout({ children }) {
           background: var(--color-card);
           border-bottom: 1px solid var(--color-border);
         }
-             .dashboard-header .date {
+                .dashboard-header .date {
           font-size: 0.7rem;
           color: var(--color-text-muted);
         }
@@ -776,6 +771,21 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <div className="main-content">
+        {/* ─── DEBUG PANEL ─── */}
+        <div style={{
+          background: '#1e1e2a',
+          color: '#fff',
+          padding: '0.3rem 0.8rem',
+          fontSize: '0.7rem',
+          fontFamily: 'monospace',
+          display: 'flex',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #333'
+        }}>
+          <span>🔍 Selected ID: <strong>{selectedId || 'none'}</strong></span>
+          <span>🏢 Loaded: <strong>{business?.name || 'none'}</strong> ({business?.id || 'none'})</span>
+        </div>
+
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -797,4 +807,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-        }
+                }
