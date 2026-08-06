@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -16,7 +18,6 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get business_id from URL
     const url = new URL(req.url);
     const businessId = url.searchParams.get('business_id');
 
@@ -33,35 +34,35 @@ export async function GET(req) {
         return NextResponse.json({ error: 'Business not found' }, { status: 404 });
       }
 
-      // Check if user is owner or member
+      // Check if user is owner OR member (using admin client to bypass RLS)
       const isOwner = business.owner_id === user.id;
-      let isMember = false;
-
-      if (!isOwner) {
-        const { data: membership } = await supabaseAdmin
-          .from('business_memberships')
-          .select('id')
-          .eq('business_id', businessId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        isMember = !!membership;
-      }
+      
+      // Check membership
+      const { data: membership } = await supabaseAdmin
+        .from('business_memberships')
+        .select('id, role')
+        .eq('business_id', businessId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      const isMember = !!membership;
 
       if (!isOwner && !isMember) {
-        return NextResponse.json({ error: 'You do not have access to this business' }, { status: 403 });
+        return NextResponse.json({ 
+          error: 'You do not have access to this business',
+          debug: { userId: user.id, businessId, isOwner, isMember, membership }
+        }, { status: 403 });
       }
 
       return NextResponse.json({ success: true, business });
     }
 
     // Otherwise, return all businesses (owned + member)
-    // Fetch businesses where user is owner
     const { data: owned } = await supabaseAdmin
       .from('businesses')
       .select('id, name, sector')
       .eq('owner_id', user.id);
 
-    // Fetch memberships to get businesses where user is a member
     const { data: memberships } = await supabaseAdmin
       .from('business_memberships')
       .select('business_id')
@@ -77,7 +78,6 @@ export async function GET(req) {
       if (biz) memberBusinesses = biz;
     }
 
-    // Combine and deduplicate
     const all = [...(owned || []), ...memberBusinesses];
     const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
 
@@ -85,10 +85,9 @@ export async function GET(req) {
 
   } catch (error) {
     console.error('Businesses API error:', error);
-    // Always return valid JSON, even on error
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
-        }
+}
