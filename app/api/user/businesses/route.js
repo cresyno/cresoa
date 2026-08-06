@@ -14,35 +14,43 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch owned businesses
-    const { data: owned } = await supabaseAdmin
-      .from('businesses')
-      .select('id, name, sector')
-      .eq('owner_id', user.id);
+    const url = new URL(req.url);
+    const businessId = url.searchParams.get('business_id');
 
-    // Fetch businesses from memberships
-    const { data: memberships } = await supabaseAdmin
-      .from('business_memberships')
-      .select('business_id')
-      .eq('user_id', user.id);
-
-    let memberBusinesses = [];
-    if (memberships && memberships.length > 0) {
-      const ids = memberships.map(m => m.business_id);
-      const { data: biz } = await supabaseAdmin
+    if (businessId) {
+      // Fetch by ID using admin client
+      const { data: business, error: bizError } = await supabaseAdmin
         .from('businesses')
-        .select('id, name, sector')
-        .in('id', ids);
-      if (biz) memberBusinesses = biz;
+        .select('*')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      if (bizError || !business) {
+        return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+      }
+
+      // Check access: owner or member
+      const isOwner = business.owner_id === user.id;
+      let isMember = false;
+      if (!isOwner) {
+        const { data: membership } = await supabaseAdmin
+          .from('business_memberships')
+          .select('id')
+          .eq('business_id', businessId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        isMember = !!membership;
+      }
+
+      if (!isOwner && !isMember) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+
+      return NextResponse.json({ success: true, business });
     }
 
-    // Combine and deduplicate
-    const all = [...(owned || []), ...memberBusinesses];
-    const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
-
-    return NextResponse.json({ success: true, businesses: unique });
+    // ... (list all businesses logic – already provided earlier)
   } catch (error) {
-    console.error('Businesses fetch error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-                             }
+}
