@@ -707,9 +707,13 @@ export default function DashboardLayout({ children }) {
         </div>
 
         {/* Embedded Business Switcher */}
-        {/* BusinessSwitcher disabled – testing */}
-<div style={{ marginBottom: '1rem', color: '#fff', padding: '0.5rem', background: 'rgba(255,0,0,0.2)' }}>
-  Switcher disabled
+        <div style={{ marginBottom: '1rem' }}>
+  <BusinessSwitcher 
+    currentBusinessId={business?.id} 
+    onSwitch={(newBusinessId) => {
+      window.location.reload()
+    }} 
+  />
 </div>
 
         <div className="nav-section">
