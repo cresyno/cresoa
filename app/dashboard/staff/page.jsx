@@ -60,6 +60,12 @@ export default function StaffPage() {
         setBusinessId(bizId);
         setUserRole(role);
 
+        // ─── Redirect if not Owner or Manager ───
+        if (role !== 'Owner' && role !== 'Manager') {
+          router.push('/dashboard');
+          return;
+        }
+
         // Fetch members using admin client through API
         const response = await fetch(`/api/team/members?business_id=${bizId}`, {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
@@ -128,6 +134,10 @@ export default function StaffPage() {
 
   const canManage = userRole === 'Owner' || userRole === 'Manager';
 
+  if (!canManage) {
+    return null; // Already redirecting
+  }
+
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', color: 'var(--color-text)' }}>
       <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.25rem', color: 'var(--color-text)' }}>
@@ -143,7 +153,6 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* Role indicator */}
       <div style={{
         background: 'var(--color-card)',
         border: '1px solid var(--color-border)',
@@ -159,7 +168,6 @@ export default function StaffPage() {
         {businessId && <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Business ID: {businessId.slice(0, 8)}...</span>}
       </div>
 
-      {/* Members table */}
       <div style={{
         background: 'var(--color-card)',
         border: '1px solid var(--color-border)',
@@ -173,7 +181,7 @@ export default function StaffPage() {
               <th style={{ padding: '0.8rem 1rem', textAlign: 'left', fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Name / Email</th>
               <th style={{ padding: '0.8rem 1rem', textAlign: 'left', fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Role</th>
               <th style={{ padding: '0.8rem 1rem', textAlign: 'left', fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Joined</th>
-              {canManage && <th style={{ padding: '0.8rem 1rem', textAlign: 'right', fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Actions</th>}
+              <th style={{ padding: '0.8rem 1rem', textAlign: 'right', fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -209,21 +217,19 @@ export default function StaffPage() {
                     <td style={{ padding: '0.8rem 1rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                       {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}
                     </td>
-                    {canManage && (
-                      <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
-                        {!isOwner && (
-                          <button style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--color-danger)',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem'
-                          }} onClick={() => alert('Remove functionality coming soon')}>
-                            Remove
-                          </button>
-                        )}
-                      </td>
-                    )}
+                    <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
+                      {!isOwner && (
+                        <button style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-danger)',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem'
+                        }} onClick={() => alert('Remove functionality coming soon')}>
+                          Remove
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })
@@ -232,107 +238,100 @@ export default function StaffPage() {
         </table>
       </div>
 
-      {/* Invite form */}
-      {canManage ? (
-        <div style={{
-          background: 'var(--color-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: '8px',
-          padding: '1.5rem'
-        }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-text)', marginBottom: '1rem' }}>
-            Invite New Team Member
-          </h3>
+      <div style={{
+        background: 'var(--color-card)',
+        border: '1px solid var(--color-border)',
+        borderRadius: '8px',
+        padding: '1.5rem'
+      }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-text)', marginBottom: '1rem' }}>
+          Invite New Team Member
+        </h3>
 
-          {generatedCode && (
-            <div style={{
-              background: '#d4edda',
-              padding: '1rem',
-              borderRadius: '8px',
-              marginBottom: '1.5rem',
-              textAlign: 'center'
-            }}>
-              <strong style={{ fontSize: '1.5rem', letterSpacing: '0.2rem' }}>{generatedCode}</strong>
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>Share this 6‑character code with {inviteEmail}</p>
-              <button
-                onClick={() => navigator.clipboard?.writeText(generatedCode)}
-                style={{ marginTop: '0.5rem', padding: '0.3rem 1.5rem', background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                Copy Code
-              </button>
-            </div>
-          )}
+        {generatedCode && (
+          <div style={{
+            background: '#d4edda',
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1.5rem',
+            textAlign: 'center'
+          }}>
+            <strong style={{ fontSize: '1.5rem', letterSpacing: '0.2rem' }}>{generatedCode}</strong>
+            <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>Share this 6‑character code with {inviteEmail}</p>
+            <button
+              onClick={() => navigator.clipboard?.writeText(generatedCode)}
+              style={{ marginTop: '0.5rem', padding: '0.3rem 1.5rem', background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Copy Code
+            </button>
+          </div>
+        )}
 
-          <form onSubmit={handleInvite} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
-            <div style={{ flex: '1 1 200px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
-                Email address
-              </label>
-              <input
-                type="email"
-                required
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  background: 'var(--color-bg)',
-                  color: 'var(--color-text)'
-                }}
-              />
-            </div>
-            <div style={{ flex: '0 0 120px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
-                Role
-              </label>
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '6px',
-                  background: 'var(--color-bg)',
-                  color: 'var(--color-text)'
-                }}
-              >
-                <option value="Staff">Staff</option>
-                <option value="Manager">Manager</option>
-              </select>
-            </div>
-            <div>
-              <button
-                type="submit"
-                disabled={inviting}
-                style={{
-                  padding: '0.6rem 1.5rem',
-                  background: 'var(--color-accent)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '500',
-                  cursor: inviting ? 'not-allowed' : 'pointer',
-                  opacity: inviting ? 0.6 : 1
-                }}
-              >
-                {inviting ? 'Generating...' : 'Generate Code'}
-              </button>
-            </div>
-          </form>
-          {inviteMessage && (
-            <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: inviteMessage.includes('✅') ? 'var(--color-success)' : 'var(--color-danger)' }}>
-              {inviteMessage}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>
-          You need to be an Owner or Manager to invite team members.
-        </div>
-      )}
+        <form onSubmit={handleInvite} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
+              Email address
+            </label>
+            <input
+              type="email"
+              required
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.6rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                background: 'var(--color-bg)',
+                color: 'var(--color-text)'
+              }}
+            />
+          </div>
+          <div style={{ flex: '0 0 120px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
+              Role
+            </label>
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.6rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                background: 'var(--color-bg)',
+                color: 'var(--color-text)'
+              }}
+            >
+              <option value="Staff">Staff</option>
+              <option value="Manager">Manager</option>
+            </select>
+          </div>
+          <div>
+            <button
+              type="submit"
+              disabled={inviting}
+              style={{
+                padding: '0.6rem 1.5rem',
+                background: 'var(--color-accent)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: inviting ? 'not-allowed' : 'pointer',
+                opacity: inviting ? 0.6 : 1
+              }}
+            >
+              {inviting ? 'Generating...' : 'Generate Code'}
+            </button>
+          </div>
+        </form>
+        {inviteMessage && (
+          <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: inviteMessage.includes('✅') ? 'var(--color-success)' : 'var(--color-danger)' }}>
+            {inviteMessage}
+          </div>
+        )}
+      </div>
     </div>
   );
-                }
+                        }
