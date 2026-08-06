@@ -17,6 +17,7 @@ export default function StaffPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
+  const [lastGeneratedEmail, setLastGeneratedEmail] = useState('');
   const [actionLoading, setActionLoading] = useState({});
 
   useEffect(() => {
@@ -96,6 +97,7 @@ export default function StaffPage() {
     setInviting(true);
     setInviteMessage('');
     setGeneratedCode('');
+    setLastGeneratedEmail('');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -119,11 +121,14 @@ export default function StaffPage() {
 
       const result = await response.json();
       if (response.ok) {
+        const code = result.invite?.code || '';
+        setGeneratedCode(code);
+        setLastGeneratedEmail(inviteEmail);
         setInviteMessage('✅ Invite code generated successfully!');
-        setGeneratedCode(result.invite?.code || '');
         setInviteEmail('');
       } else {
         setInviteMessage('❌ ' + (result.error || 'Failed to generate invite'));
+        setGeneratedCode('');
       }
     } catch (err) {
       setInviteMessage('❌ An unexpected error occurred');
@@ -188,6 +193,13 @@ export default function StaffPage() {
     } finally {
       setActionLoading(prev => ({ ...prev, [memberId]: false }));
     }
+  };
+
+  // ─── Share to WhatsApp ───
+  const shareOnWhatsApp = () => {
+    if (!generatedCode) return;
+    const url = `https://wa.me/?text=🎉%20You%20have%20been%20invited%20to%20join%20our%20business%20on%20Cresoa!%0A%0AUse%20this%20code%20to%20join:%20*${generatedCode}*%0A%0A👉%20Go%20to%20${window.location.origin}/accept-invite%20to%20accept%20the%20invite.`;
+    window.open(url, '_blank');
   };
 
   if (loading) {
@@ -345,14 +357,73 @@ export default function StaffPage() {
             marginBottom: '1.5rem',
             textAlign: 'center'
           }}>
-            <strong style={{ fontSize: '1.5rem', letterSpacing: '0.2rem' }}>{generatedCode}</strong>
-            <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>Share this 6‑character code with {inviteEmail}</p>
-            <button
-              onClick={() => navigator.clipboard?.writeText(generatedCode)}
-              style={{ marginTop: '0.5rem', padding: '0.3rem 1.5rem', background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Copy Code
-            </button>
+            <div style={{ fontSize: '0.8rem', color: '#2E7D5E', marginBottom: '0.3rem' }}>
+              ✅ Invite code for <strong>{lastGeneratedEmail || 'new member'}</strong>
+            </div>
+            <div style={{
+              fontSize: '2rem',
+              fontWeight: '700',
+              letterSpacing: '0.4rem',
+              background: '#fff',
+              padding: '0.5rem 1rem',
+              borderRadius: '8px',
+              display: 'inline-block',
+              marginBottom: '0.8rem',
+              fontFamily: 'monospace',
+              border: '2px dashed #2E7D5E'
+            }}>
+              {generatedCode}
+            </div>
+            <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => navigator.clipboard?.writeText(generatedCode)}
+                style={{
+                  padding: '0.4rem 1.2rem',
+                  background: '#0F2B4A',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+              >
+                📋 Copy Code
+              </button>
+              <button
+                onClick={shareOnWhatsApp}
+                style={{
+                  padding: '0.4rem 1.2rem',
+                  background: '#25D366',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+              >
+                💬 Share on WhatsApp
+              </button>
+              <button
+                onClick={() => { setGeneratedCode(''); setInviteMessage(''); }}
+                style={{
+                  padding: '0.4rem 1.2rem',
+                  background: 'transparent',
+                  color: '#8A8A8A',
+                  border: '1px solid #E5E0D8',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                ✕ Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -423,4 +494,4 @@ export default function StaffPage() {
       </div>
     </div>
   );
-                              }
+                                }
