@@ -10,11 +10,80 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
-  // ... (keep your existing getPageHeader function - copy it from your current file)
-  // I'm keeping it short here but you need to keep your full version
+  if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
+    const isRepairs = pathname?.startsWith('/dashboard/repairs')
+    return {
+      title: isRepairs ? '🔧 Repairs Dashboard' : '📊 Dashboard',
+      subtitle: `Welcome back, ${business?.name || 'Your business'}`
+    }
+  }
+  if (pathname.startsWith('/dashboard/orders')) {
+    return {
+      title: '📋 Orders',
+      subtitle: `${stats?.totalOrders || 0} orders · ${stats?.overdue || 0} overdue`
+    }
+  }
+  if (pathname.startsWith('/dashboard/customers')) {
+    return {
+      title: '👤 Customers',
+      subtitle: `${stats?.customers || 0} customers`
+    }
+  }
+  if (pathname.startsWith('/dashboard/groups')) {
+    return {
+      title: '👥 Group Orders',
+      subtitle: `${stats?.groups || 0} groups`
+    }
+  }
+  if (pathname.startsWith('/dashboard/reminders')) {
+    return {
+      title: '🔔 Reminders',
+      subtitle: `${stats?.dueToday || 0} due today · ${stats?.overdue || 0} overdue`
+    }
+  }
+  if (pathname.startsWith('/dashboard/staff') || pathname.startsWith('/dashboard/members')) {
+    return {
+      title: '👥 Team & Staff',
+      subtitle: 'Manage your team members'
+    }
+  }
+  if (pathname.startsWith('/dashboard/activity')) {
+    return {
+      title: '📜 Activity Logs',
+      subtitle: 'Monitor business actions and audit trails'
+    }
+  }
+  if (pathname.startsWith('/dashboard/subscription')) {
+    return {
+      title: '💳 Billing & Plan',
+      subtitle: `${business?.plan || 'Free'} plan`
+    }
+  }
+  if (pathname.startsWith('/dashboard/beta-apply')) {
+    return {
+      title: '🧪 Join Beta Program',
+      subtitle: 'Get 90 days free Pro access'
+    }
+  }
+  if (pathname.startsWith('/dashboard/settings/tracking')) {
+    return {
+      title: '🎨 Order Tracking Page',
+      subtitle: 'Customize your customer\'s tracking experience'
+    }
+  }
+  if (pathname.startsWith('/dashboard/profile')) {
+    return {
+      title: '⚙️ Profile & Settings',
+      subtitle: 'Manage your account'
+    }
+  }
+  return {
+    title: '📊 Dashboard',
+    subtitle: 'Welcome back'
+  }
 }
 
-// ─── MAIN LAYOUT COMPONENT ───
+// ─── MAIN LAYOUT CONTENT ───
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -705,4 +774,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-                }
+                  }
