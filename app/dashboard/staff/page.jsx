@@ -11,12 +11,12 @@ export default function StaffPage() {
   const [error, setError] = useState('');
   const [businessId, setBusinessId] = useState(null);
   const [userRole, setUserRole] = useState('');
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('Staff');
   const [inviting, setInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
-  // For role change / removal loading states
   const [actionLoading, setActionLoading] = useState({});
 
   useEffect(() => {
@@ -29,6 +29,13 @@ export default function StaffPage() {
         }
 
         const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+
+        setCurrentUserId(user.id);
+
         let bizId = null;
         let role = '';
 
@@ -115,7 +122,6 @@ export default function StaffPage() {
         setInviteMessage('✅ Invite code generated successfully!');
         setGeneratedCode(result.invite?.code || '');
         setInviteEmail('');
-        // Optionally reload members
       } else {
         setInviteMessage('❌ ' + (result.error || 'Failed to generate invite'));
       }
@@ -143,7 +149,6 @@ export default function StaffPage() {
       });
 
       if (response.ok) {
-        // Update local state
         setMembers(prev => prev.map(m =>
           m.id === memberId ? { ...m, role: newRole } : m
         ));
@@ -251,8 +256,7 @@ export default function StaffPage() {
             ) : (
               members.map((m) => {
                 const isOwner = m.role === 'Owner';
-                const isSelf = m.user?.id === supabase.auth.user()?.id; // approximate
-                const isCurrentUser = m.user?.id === supabase.auth.user()?.id;
+                const isCurrentUser = m.user?.id === currentUserId;
 
                 return (
                   <tr key={m.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -419,4 +423,4 @@ export default function StaffPage() {
       </div>
     </div>
   );
-          }
+                              }
