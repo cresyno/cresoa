@@ -56,7 +56,6 @@ export async function POST(req) {
     }
 
     // ─── Check if email is already a member of this business ───
-    // First, find the user by email
     const { data: existingUser } = await supabaseAdmin
       .from('auth.users')
       .select('id')
@@ -75,7 +74,7 @@ export async function POST(req) {
       }
     }
 
-    // ─── Check if there's already a pending invite for this email ───
+    // ─── Check if there's already a pending invite ───
     const { data: existingInvite } = await supabaseAdmin
       .from('business_invites')
       .select('id')
@@ -84,11 +83,7 @@ export async function POST(req) {
       .eq('status', 'pending')
       .maybeSingle();
 
-    if (existingInvite) {
-      return NextResponse.json({ error: 'An invite for this email is already pending' }, { status: 400 });
-    }
-
-    // ─── Generate code ───
+    // Generate a new code
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
@@ -98,26 +93,42 @@ export async function POST(req) {
     const expires_at = new Date();
     expires_at.setDate(expires_at.getDate() + 3);
 
-    // ─── Insert invite ───
-    const { data: invite, error: insertError } = await supabaseAdmin
-      .from('business_invites')
-      .insert({
-        business_id,
-        email,
-        role,
-        invite_code: code,
-        expires_at: expires_at.toISOString(),
-        created_by: user.id,
-        status: 'pending'
-      })
-      .select()
-      .single();
+    let invite;
 
-    if (insertError) {
-      if (insertError.code === '23505') {
-        return NextResponse.json({ error: 'An invite for this email already exists for this business' }, { status: 400 });
-      }
-      throw insertError;
+    if (existingInvite) {
+      // ─── UPDATE existing invite with new code ───
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('business_invites')
+        .update({
+          invite_code: code,
+          expires_at: expires_at.toISOString(),
+          role: role, // update role in case it changed
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingInvite.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      invite = updated;
+    } else {
+      // ─── INSERT new invite ───
+      const { data: inserted, error: insertError } = await supabaseAdmin
+        .from('business_invites')
+        .insert({
+          business_id,
+          email,
+          role,
+          invite_code: code,
+          expires_at: expires_at.toISOString(),
+          created_by: user.id,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      invite = inserted;
     }
 
     // ─── Log activity ───
@@ -128,7 +139,7 @@ export async function POST(req) {
       details: { email, role, invite_code: code }
     });
 
-    // ─── Send email ───
+    // ─── Send email (optional) ───
     const acceptLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?code=${code}`;
     try {
       await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
