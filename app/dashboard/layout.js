@@ -173,27 +173,6 @@ export default function DashboardLayout({ children }) {
           }
         }
 
-        // 3. Fallback: check old staff table for legacy compatibility if needed
-        if (!businessData) {
-          const { data: staffData } = await supabase
-            .from('staff')
-            .select('business_id, status')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .maybeSingle()
-
-          if (staffData) {
-            const { data: staffBusiness } = await supabase
-              .from('businesses')
-              .select('*')
-              .eq('id', staffData.business_id)
-              .maybeSingle()
-
-            if (staffBusiness) {
-              businessData = staffBusiness
-            }
-          }
-        }
 
         // 4. If still no business, redirect to onboarding
         if (!businessData) {
