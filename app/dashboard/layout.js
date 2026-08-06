@@ -8,6 +8,8 @@ import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 
 function getPageHeader(pathname, business, stats) {
+  // ... (keep your existing getPageHeader function)
+  // (I'll keep it short here – use your existing one)
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
     const isRepairs = pathname?.startsWith('/dashboard/repairs')
     return {
@@ -89,6 +91,7 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
+  const [debugMessage, setDebugMessage] = useState('Loading...')
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -127,10 +130,10 @@ export default function DashboardLayout({ children }) {
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
   const currentNavItems = isRepairs ? repairNavItems : navItems
 
-  // ─── LOAD BUSINESS DATA ───
   useEffect(() => {
     const load = async () => {
       try {
+        setDebugMessage('🔍 Loading...')
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
           router.push('/login')
@@ -140,24 +143,25 @@ export default function DashboardLayout({ children }) {
         let businessData = null
         let selectedId = null
 
-        // 1. Check URL for business_id (highest priority)
+        // 1. Check URL for business_id
         if (typeof window !== 'undefined') {
           const params = new URLSearchParams(window.location.search)
           const urlBusinessId = params.get('business_id')
           if (urlBusinessId) {
             selectedId = urlBusinessId
+            setDebugMessage(`📌 URL param: ${urlBusinessId.slice(0,8)}...`)
           } else {
-            // 2. Check localStorage
             const stored = localStorage.getItem('selectedBusinessId')
             if (stored) {
               selectedId = stored
+              setDebugMessage(`📌 localStorage: ${stored.slice(0,8)}...`)
+            } else {
+              setDebugMessage('📌 No stored ID, checking owned...')
             }
           }
         }
 
-        console.log('🔍 Selected ID:', selectedId)
-
-        // 3. Try to load the selected business via API
+        // 2. Try to load selected business
         if (selectedId) {
           const { data: session } = await supabase.auth.getSession()
           if (session) {
@@ -167,15 +171,15 @@ export default function DashboardLayout({ children }) {
             const result = await response.json()
             if (response.ok && result.business) {
               businessData = result.business
-              console.log('✅ Loaded selected business:', businessData.name)
+              setDebugMessage(`✅ Loaded: ${businessData.name}`)
             } else {
-              console.log('❌ Selected business not found via API, falling back')
+              setDebugMessage(`❌ API failed: ${result.error || 'not found'}`)
               localStorage.removeItem('selectedBusinessId')
             }
           }
         }
 
-        // 4. If businessData is still null, fallback to owned business
+        // 3. Fallback to owned
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
@@ -184,11 +188,11 @@ export default function DashboardLayout({ children }) {
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
-            console.log('📌 Fallback to owned business:', businessData.name)
+            setDebugMessage(`📌 Fallback owned: ${businessData.name}`)
           }
         }
 
-        // 5. If still no business, check membership
+        // 4. Fallback to membership
         if (!businessData) {
           const { data: membershipData } = await supabase
             .from('business_memberships')
@@ -203,18 +207,18 @@ export default function DashboardLayout({ children }) {
               .maybeSingle()
             if (memberBusiness) {
               businessData = memberBusiness
-              console.log('📌 Loaded from membership:', businessData.name)
+              setDebugMessage(`📌 From membership: ${businessData.name}`)
             }
           }
         }
 
-        // 6. If still nothing, redirect
         if (!businessData) {
+          setDebugMessage('❌ No business found')
           router.push('/onboarding')
           return
         }
 
-        // ─── BETA EXPIRY CHECK ───
+        // Beta expiry checks (keep your existing code here)
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
@@ -257,9 +261,10 @@ export default function DashboardLayout({ children }) {
         setBusiness(businessData)
         if (typeof window !== 'undefined' && businessData) {
           localStorage.setItem('selectedBusinessId', businessData.id)
+          setDebugMessage(`💾 Saved: ${businessData.name}`)
         }
 
-        // ─── COMPUTE STATS ───
+        // Stats
         const { count: totalOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -302,6 +307,7 @@ export default function DashboardLayout({ children }) {
 
       } catch (error) {
         console.error('Dashboard layout error:', error)
+        setDebugMessage(`❌ Error: ${error.message}`)
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -608,7 +614,7 @@ export default function DashboardLayout({ children }) {
           .sidebar { transform: translateX(0) !important; }
           .overlay { display: none !important; }
         }
-        @media (max-width: 768px) {
+           @media (max-width: 768px) {
           .hamburger { display: block; }
           .sidebar {
             position: fixed;
@@ -620,7 +626,7 @@ export default function DashboardLayout({ children }) {
             z-index: 1000;
             height: 100vh;
           }
-            .sidebar.open { transform: translateX(0); }
+          .sidebar.open { transform: translateX(0); }
           .overlay.open { display: block; }
           .main-content { padding-top: 3rem; }
           .page-header { padding: 0.6rem 1rem 0.2rem 1rem; }
@@ -725,6 +731,22 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <div className="main-content">
+        {/* ─── DEBUG BAR ─── */}
+        <div style={{
+          background: '#1e1e2a',
+          color: '#fff',
+          padding: '0.4rem 0.8rem',
+          fontSize: '0.65rem',
+          fontFamily: 'monospace',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '2px solid #D4A52A'
+        }}>
+          <span>🔍 <strong>{debugMessage}</strong></span>
+          <span>🏢 {business?.name || 'none'}</span>
+        </div>
+
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -746,4 +768,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   )
-        }
+}
