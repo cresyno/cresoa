@@ -4,7 +4,6 @@ import { Suspense } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
-import { supabaseAdmin } from '../../lib/supabaseAdmin'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
@@ -144,12 +143,15 @@ function DashboardLayoutContent({ children }) {
 
         let businessData = null
 
-        // ─── Get business_id from URL ───
-        const businessIdFromUrl = searchParams.get('business_id')
+        // ─── Get business_id from URL or sessionStorage ───
+        let businessIdFromUrl = searchParams.get('business_id')
+        if (!businessIdFromUrl && typeof window !== 'undefined') {
+          businessIdFromUrl = sessionStorage.getItem('selectedBusinessId')
+        }
 
-        // ─── If we have a business_id, FORCE load it using ADMIN client ───
+        // ─── If we have a business_id, FORCE load it (regular client, RLS will allow) ───
         if (businessIdFromUrl) {
-          const { data: business, error } = await supabaseAdmin
+          const { data: business, error } = await supabase
             .from('businesses')
             .select('*')
             .eq('id', businessIdFromUrl)
@@ -333,7 +335,6 @@ function DashboardLayoutContent({ children }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
-      {/* CSS styles – keep your existing styles block */}
       <style>{`
         :root {
           --color-bg: #F7F5F0;
@@ -465,7 +466,7 @@ function DashboardLayoutContent({ children }) {
               <span className="icon">🎨</span> Order Tracking Page
             </a>
           )}
-           <a href="/dashboard/profile" onClick={handleNavClick}>
+          <a href="/dashboard/profile" onClick={handleNavClick}>
             <span className="icon">⚙️</span> Profile & Settings
           </a>
         </div>
