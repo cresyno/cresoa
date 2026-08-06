@@ -21,24 +21,30 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Role must be either "Staff" or "Manager"' }, { status: 400 });
     }
 
-    // 1. Check if user is the owner (most common)
+    // Fetch business - using maybeSingle to avoid error if not found
     const { data: business, error: bizError } = await supabase
       .from('businesses')
       .select('owner_id, name')
       .eq('id', business_id)
-      .single();
+      .maybeSingle();
 
     if (bizError) {
-      return NextResponse.json({ error: 'Business not found', debug: bizError }, { status: 404 });
+      console.error('Business fetch error:', bizError);
+      return NextResponse.json({ error: 'Database error fetching business' }, { status: 500 });
     }
 
-    let hasPermission = false;
-    let businessName = business.name || 'Your business';
+    if (!business) {
+      return NextResponse.json({
+        error: 'Business not found',
+        debug: { business_id, user_id: user.id }
+      }, { status: 404 });
+    }
 
+    // Check permission: owner OR manager via membership
+    let hasPermission = false;
     if (business.owner_id === user.id) {
       hasPermission = true;
     } else {
-      // Check membership
       const { data: membership } = await supabase
         .from('business_memberships')
         .select('role')
@@ -56,9 +62,9 @@ export async function POST(req) {
         error: 'You do not have permission to invite staff',
         debug: {
           user_id: user.id,
-          business_id: business_id,
+          business_id,
           business_owner_id: business.owner_id,
-          is_owner_match: business.owner_id === user.id,
+          is_owner: business.owner_id === user.id,
           membership: await supabase
             .from('business_memberships')
             .select('*')
@@ -70,7 +76,7 @@ export async function POST(req) {
       }, { status: 403 });
     }
 
-    // Check for duplicate invite
+    // Check for duplicate pending invite
     const { data: existing } = await supabase
       .from('business_invites')
       .select('id')
@@ -83,7 +89,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'An invite for this email is already pending' }, { status: 400 });
     }
 
-    // Generate code
+    // Generate 6-character code
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
@@ -93,6 +99,7 @@ export async function POST(req) {
     const expires_at = new Date();
     expires_at.setDate(expires_at.getDate() + 3);
 
+    // Insert invite
     const { data: invite, error: insertError } = await supabase
       .from('business_invites')
       .insert({
@@ -114,6 +121,7 @@ export async function POST(req) {
       throw insertError;
     }
 
+    // Log activity
     await supabase.from('business_activity_logs').insert({
       business_id,
       performed_by: user.id,
