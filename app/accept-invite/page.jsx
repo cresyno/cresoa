@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
-export default function AcceptInvitePage() {
+// This component uses useSearchParams – it must be wrapped in Suspense
+function AcceptInviteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const codeParam = searchParams.get('code') || '';
@@ -20,7 +22,6 @@ export default function AcceptInvitePage() {
     setMessage('');
 
     try {
-      // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push('/login?redirect=' + encodeURIComponent(`/accept-invite?code=${code}`));
@@ -134,5 +135,18 @@ export default function AcceptInvitePage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// Wrap the component in Suspense for useSearchParams
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <div style={{ color: 'var(--color-text-muted)' }}>Loading...</div>
+      </div>
+    }>
+      <AcceptInviteForm />
+    </Suspense>
   );
 }
