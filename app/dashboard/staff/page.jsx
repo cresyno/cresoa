@@ -16,6 +16,8 @@ export default function StaffPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
+  // For role change / removal loading states
+  const [actionLoading, setActionLoading] = useState({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -30,7 +32,6 @@ export default function StaffPage() {
         let bizId = null;
         let role = '';
 
-        // Check if user owns a business
         const { data: owned } = await supabase
           .from('businesses')
           .select('id')
@@ -40,7 +41,6 @@ export default function StaffPage() {
           bizId = owned.id;
           role = 'Owner';
         } else {
-          // Check membership
           const { data: membership } = await supabase
             .from('business_memberships')
             .select('business_id, role')
@@ -60,13 +60,11 @@ export default function StaffPage() {
         setBusinessId(bizId);
         setUserRole(role);
 
-        // ─── Redirect if not Owner or Manager ───
         if (role !== 'Owner' && role !== 'Manager') {
           router.push('/dashboard');
           return;
         }
 
-        // Fetch members using admin client through API
         const response = await fetch(`/api/team/members?business_id=${bizId}`, {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
@@ -117,6 +115,7 @@ export default function StaffPage() {
         setInviteMessage('✅ Invite code generated successfully!');
         setGeneratedCode(result.invite?.code || '');
         setInviteEmail('');
+        // Optionally reload members
       } else {
         setInviteMessage('❌ ' + (result.error || 'Failed to generate invite'));
       }
@@ -128,6 +127,64 @@ export default function StaffPage() {
     }
   };
 
+  const handleRoleChange = async (memberId, newRole) => {
+    setActionLoading(prev => ({ ...prev, [memberId]: true }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/team/members/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (response.ok) {
+        // Update local state
+        setMembers(prev => prev.map(m =>
+          m.id === memberId ? { ...m, role: newRole } : m
+        ));
+      } else {
+        const result = await response.json();
+        alert('Error: ' + (result.error || 'Failed to update role'));
+      }
+    } catch (err) {
+      alert('Error updating role');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [memberId]: false }));
+    }
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    if (!confirm('Are you sure you want to remove this member?')) return;
+    setActionLoading(prev => ({ ...prev, [memberId]: true }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/team/members/${memberId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        setMembers(prev => prev.filter(m => m.id !== memberId));
+      } else {
+        const result = await response.json();
+        alert('Error: ' + (result.error || 'Failed to remove member'));
+      }
+    } catch (err) {
+      alert('Error removing member');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [memberId]: false }));
+    }
+  };
+
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading team...</div>;
   }
@@ -135,7 +192,7 @@ export default function StaffPage() {
   const canManage = userRole === 'Owner' || userRole === 'Manager';
 
   if (!canManage) {
-    return null; // Already redirecting
+    return null;
   }
 
   return (
@@ -172,10 +229,10 @@ export default function StaffPage() {
         background: 'var(--color-card)',
         border: '1px solid var(--color-border)',
         borderRadius: '8px',
-        overflow: 'hidden',
+        overflow: 'auto',
         marginBottom: '2rem'
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
           <thead style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
             <tr>
               <th style={{ padding: '0.8rem 1rem', textAlign: 'left', fontWeight: '600', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Name / Email</th>
@@ -194,6 +251,9 @@ export default function StaffPage() {
             ) : (
               members.map((m) => {
                 const isOwner = m.role === 'Owner';
+                const isSelf = m.user?.id === supabase.auth.user()?.id; // approximate
+                const isCurrentUser = m.user?.id === supabase.auth.user()?.id;
+
                 return (
                   <tr key={m.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '0.8rem 1rem', color: 'var(--color-text)' }}>
@@ -201,32 +261,57 @@ export default function StaffPage() {
                       {isOwner && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: 'var(--color-accent)', color: '#fff', padding: '0.1rem 0.5rem', borderRadius: '4px' }}>Owner</span>}
                     </td>
                     <td style={{ padding: '0.8rem 1rem', color: 'var(--color-text)' }}>
-                      <span style={{
-                        background: m.role === 'Owner' ? 'var(--color-accent)' :
-                                   m.role === 'Manager' ? 'var(--color-primary)' :
-                                   'var(--color-text-muted)',
-                        color: '#fff',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        fontWeight: '500'
-                      }}>
-                        {m.role}
-                      </span>
+                      {canManage && !isOwner && !isCurrentUser ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) => handleRoleChange(m.id, e.target.value)}
+                          disabled={actionLoading[m.id]}
+                          style={{
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '4px',
+                            border: '1px solid var(--color-border)',
+                            background: 'var(--color-bg)',
+                            color: 'var(--color-text)',
+                            fontSize: '0.7rem'
+                          }}
+                        >
+                          <option value="Staff">Staff</option>
+                          <option value="Manager">Manager</option>
+                          {userRole === 'Owner' && <option value="Owner">Owner</option>}
+                        </select>
+                      ) : (
+                        <span style={{
+                          background: m.role === 'Owner' ? 'var(--color-accent)' :
+                                     m.role === 'Manager' ? 'var(--color-primary)' :
+                                     'var(--color-text-muted)',
+                          color: '#fff',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '4px',
+                          fontSize: '0.7rem',
+                          fontWeight: '500'
+                        }}>
+                          {m.role}
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '0.8rem 1rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                       {m.joined_at ? new Date(m.joined_at).toLocaleDateString() : '—'}
                     </td>
                     <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
-                      {!isOwner && (
-                        <button style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--color-danger)',
-                          cursor: 'pointer',
-                          fontSize: '0.8rem'
-                        }} onClick={() => alert('Remove functionality coming soon')}>
-                          Remove
+                      {canManage && !isOwner && !isCurrentUser && (
+                        <button
+                          onClick={() => handleRemoveMember(m.id)}
+                          disabled={actionLoading[m.id]}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-danger)',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            opacity: actionLoading[m.id] ? 0.5 : 1
+                          }}
+                        >
+                          {actionLoading[m.id] ? '...' : 'Remove'}
                         </button>
                       )}
                     </td>
@@ -334,4 +419,4 @@ export default function StaffPage() {
       </div>
     </div>
   );
-                        }
+          }
