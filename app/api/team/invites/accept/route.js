@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../../../lib/supabaseClient';
-import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
+import { supabase } from '../../../../lib/supabaseClient';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
@@ -19,7 +19,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
     }
 
-    // Use admin client to find the invite (bypass RLS)
+    // Find invite
     const { data: invite, error: inviteError } = await supabaseAdmin
       .from('business_invites')
       .select('*')
@@ -39,7 +39,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invite code has expired' }, { status: 410 });
     }
 
-    // Check if user is already a member (using admin client)
+    // Check if user already a member
     const { data: existing } = await supabaseAdmin
       .from('business_memberships')
       .select('id')
@@ -76,7 +76,13 @@ export async function POST(req) {
       details: { email: user.email, role: invite.role }
     });
 
-    return NextResponse.json({ success: true, message: 'You have successfully joined the business' }, { status: 200 });
+    // Return success with redirect to the joined business
+    return NextResponse.json({
+      success: true,
+      message: 'You have successfully joined the business',
+      redirect: `/dashboard?business_id=${invite.business_id}`
+    }, { status: 200 });
+
   } catch (error) {
     console.error('Accept invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
