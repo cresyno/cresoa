@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,35 +19,28 @@ export async function GET(req) {
     const businessId = url.searchParams.get('business_id');
 
     if (businessId) {
-      const { data: business, error } = await supabaseAdmin
+      // Fetch single business – RLS will allow if user is owner or member
+      const { data: business, error } = await supabase
         .from('businesses')
         .select('*')
         .eq('id', businessId)
         .maybeSingle();
+
       if (error || !business) {
         return NextResponse.json({ error: 'Business not found' }, { status: 404 });
-      }
-      // Check if user is owner or member
-      const isOwner = business.owner_id === user.id;
-      const { data: membership } = await supabaseAdmin
-        .from('business_memberships')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (!isOwner && !membership) {
-        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
       return NextResponse.json({ success: true, business });
     }
 
     // ─── Return all businesses (owned + member) ───
-    const { data: owned } = await supabaseAdmin
+    // Use regular client – RLS will enforce visibility
+    const { data: owned } = await supabase
       .from('businesses')
       .select('id, name, sector')
       .eq('owner_id', user.id);
 
-    const { data: memberships } = await supabaseAdmin
+    // Fetch memberships to get business_ids where user is a member
+    const { data: memberships } = await supabase
       .from('business_memberships')
       .select('business_id')
       .eq('user_id', user.id);
@@ -56,7 +48,7 @@ export async function GET(req) {
     let memberBusinesses = [];
     if (memberships && memberships.length > 0) {
       const ids = memberships.map(m => m.business_id);
-      const { data: biz } = await supabaseAdmin
+      const { data: biz } = await supabase
         .from('businesses')
         .select('id, name, sector')
         .in('id', ids);
