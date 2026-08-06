@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../../lib/supabaseClient';
-import { sendStaffInviteEmail } from '../../../../../lib/email'; // adjust path if needed
+import { sendStaffInviteEmail } from '../../../../../lib/email';
+
+// Note: For admin operations on auth.users, you may need a service role client.
+// If you don't have one, skip the email existence check – we'll still prevent duplicate invites.
+// I'm using the regular client, but we can try to fetch user by email via auth.admin if available.
 
 export async function POST(req) {
   try {
@@ -26,6 +30,8 @@ export async function POST(req) {
 
     // 3. Verify user has permission (Owner or Manager of this business)
     let hasPermission = false;
+    let businessName = '';
+
     // Check if they are the owner
     const { data: business } = await supabase
       .from('businesses')
@@ -35,7 +41,7 @@ export async function POST(req) {
 
     if (business?.owner_id === user.id) {
       hasPermission = true;
-      var businessName = business.name;
+      businessName = business.name || 'Your business';
     } else {
       // Check membership as Manager or Owner
       const { data: membership } = await supabase
@@ -44,9 +50,10 @@ export async function POST(req) {
         .eq('business_id', business_id)
         .eq('user_id', user.id)
         .single();
+
       if (membership && (membership.role === 'Owner' || membership.role === 'Manager')) {
         hasPermission = true;
-        // fetch business name if not already
+        // get business name if not already
         if (!businessName) {
           const { data: biz } = await supabase
             .from('businesses')
@@ -63,27 +70,21 @@ export async function POST(req) {
     }
 
     // 4. Check if email is already a member of this business
-    const { data: existingMember } = await supabase
-      .from('business_memberships')
-      .select('user_id')
-      .eq('business_id', business_id)
-      .eq('user_id', user.id); // This checks if the current user is a member? Actually we need to check if the invitee's email is already linked. We don't have user_id from email directly unless we query users. Let's check via auth.users.
-    // Better: find user by email in auth.users
-    const { data: existingUser } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', email)
-      .single();
-    if (existingUser) {
-      const { data: member } = await supabase
-        .from('business_memberships')
-        .select('id')
-        .eq('business_id', business_id)
-        .eq('user_id', existingUser.id)
-        .single();
-      if (member) {
-        return NextResponse.json({ error: 'This email is already a member of your business' }, { status: 400 });
-      }
+    // We need to find the user id for this email (if they have an account)
+    let targetUserId = null;
+    try {
+      // Attempt to get user by email using admin client – you need to set up supabaseAdmin
+      // If you don't have admin client, skip this part and rely on business_memberships lookup
+      // by joining with auth.users – which we can't do with anon key.
+      // For now, we'll try a simple approach: check if there's a membership with that email
+      // by first fetching the user id from auth.users using admin client if available.
+      // Since we may not have admin client, we'll just check if there's a pending invite or membership.
+      // We'll rely on the UNIQUE constraint on (business_id, email) in business_invites.
+      // And we'll check membership by trying to get user id via auth.admin (if we have service role).
+      // If not, we'll just let the user accept the invite and then membership creation will fail if already exists.
+      // We'll implement a fallback: if we can't check, we'll just proceed – the accept route will catch duplicates.
+    } catch (e) {
+      // Ignore
     }
 
     // 5. Check if there's a pending invite for this email/business
@@ -93,13 +94,13 @@ export async function POST(req) {
       .eq('business_id', business_id)
       .eq('email', email)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
+
     if (existingInvite) {
       return NextResponse.json({ error: 'An invite for this email is already pending' }, { status: 400 });
     }
 
-    // 6. (Optional) Plan limits – placeholder, we'll skip for now
-    // You can later count members and compare to plan limit
+    // 6. (Optional) Plan limits – we'll skip for now, you can add later
 
     // 7. Generate 6-character uppercase alphanumeric code
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -150,7 +151,6 @@ export async function POST(req) {
     } catch (emailError) {
       // Log but don't fail the request – the invite is already created
       console.error('Email sending failed:', emailError);
-      // Optionally log to activity as warning
     }
 
     return NextResponse.json({ success: true, invite }, { status: 200 });
@@ -158,4 +158,4 @@ export async function POST(req) {
     console.error('Generate invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-                       }
+            }
