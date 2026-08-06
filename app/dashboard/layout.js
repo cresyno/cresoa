@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useRef } from 'react'
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
@@ -10,6 +10,7 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
+  // ... (keep your existing getPageHeader) ...
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
     const isRepairs = pathname?.startsWith('/dashboard/repairs')
     return {
@@ -93,6 +94,9 @@ function DashboardLayoutContent({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [stats, setStats] = useState({})
+  
+  // ─── REF to prevent fallback after URL load ───
+  const hasLoadedFromUrl = useRef(false)
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -161,14 +165,17 @@ function DashboardLayoutContent({ children }) {
 
           if (business && !error) {
             businessData = business
+            hasLoadedFromUrl.current = true  // ─── MARK AS LOADED ───
             alert(`✅ Loaded from URL: ${business.name}`)
           } else {
             alert(`❌ Failed to load business from URL: ${error?.message || 'not found'}`)
             router.push('/onboarding')
             return
           }
-        } else {
-          // ─── No URL param – fallback to owned business ───
+        }
+
+        // ─── FALLBACK: ONLY if we haven't already loaded from URL ───
+        if (!businessData && !hasLoadedFromUrl.current) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
@@ -178,7 +185,6 @@ function DashboardLayoutContent({ children }) {
             businessData = ownedBusiness
             alert(`📌 No URL param – loaded owned: ${businessData.name}`)
           } else {
-            // Check membership
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
@@ -297,7 +303,7 @@ function DashboardLayoutContent({ children }) {
     }
 
     load()
-  }, [router, searchParams])
+  }, [router, searchParams]) // Keep dependencies
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -458,12 +464,12 @@ function DashboardLayoutContent({ children }) {
           </a>
         </div>
 
-        <div className="nav-section">
+           <div className="nav-section">
           <div className="section-label">Settings</div>
           <a href="/dashboard/subscription" onClick={handleNavClick}>
             <span className="icon">💳</span> Billing & Plan
           </a>
-             {business && !business.has_applied_for_beta && (
+          {business && !business.has_applied_for_beta && (
             <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🧪</span> Join Beta Program
             </a>
@@ -548,4 +554,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-                        }
+          }
