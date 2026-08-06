@@ -46,7 +46,6 @@ export default function BusinessSwitcher({ currentBusinessId }) {
     }
     // Save to sessionStorage AND reload with URL param
     sessionStorage.setItem('selectedBusinessId', businessId);
-    // Also try URL param approach
     window.location.href = `/dashboard?business_id=${businessId}`;
   };
 
