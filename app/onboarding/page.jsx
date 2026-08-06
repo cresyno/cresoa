@@ -85,7 +85,7 @@ export default function OnboardingPage() {
 
       if (bizError) throw bizError;
 
-      // 2. Add the owner as a member (Owner role)
+      // 2. Add the owner as a member (Owner role) – NO STAFF TABLE
       const { error: memberError } = await supabase
         .from('business_memberships')
         .insert({
@@ -163,7 +163,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      // 4. Add user as member
+      // 4. Add user as member – NO STAFF TABLE
       const { error: memberError } = await supabase
         .from('business_memberships')
         .insert({
@@ -364,4 +364,4 @@ export default function OnboardingPage() {
       </div>
     </div>
   );
-      }
+        }
