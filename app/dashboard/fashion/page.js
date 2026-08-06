@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient'
 import LetterLogo from '../../../components/LetterLogo'
 import { isFeatureAvailable } from '../../../lib/planLimits'
 import FeedbackBanner from '../../../components/FeedbackBanner'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 
 export default function FashionDashboardPage() {
   const router = useRouter()
@@ -46,24 +47,35 @@ export default function FashionDashboardPage() {
       return
     }
 
-    let { data: businessData } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('owner_id', user.id)
-      .single()
+    // ─── Get business ID from URL or localStorage ───
+    const businessId = getCurrentBusinessId();
+    let businessData = null;
+    let bizError = null;
 
-    if (!businessData) {
-      const businessName = user.user_metadata?.business_name || 'My Business'
-      const { data: newBusiness } = await supabase
+    if (businessId) {
+      const { data, error } = await supabase
         .from('businesses')
-        .insert({
-          owner_id: user.id,
-          name: businessName,
-          business_type: 'fashion',
-        })
-        .select()
-        .single()
-      businessData = newBusiness
+        .select('*')
+        .eq('id', businessId)
+        .maybeSingle();
+      businessData = data;
+      bizError = error;
+    }
+
+    // If not found or no businessId, fallback to owner (original behavior)
+    if (!businessData) {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('*')
+        .eq('owner_id', user.id)
+        .single();
+      businessData = data;
+      bizError = error;
+    }
+
+    if (bizError || !businessData) {
+      router.push('/onboarding')
+      return
     }
 
     if (businessData && businessData.is_active === false) {
@@ -334,6 +346,7 @@ export default function FashionDashboardPage() {
       </div>
     )
 }
+
 return (
   <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '1.2rem 1rem', fontFamily: "'Inter', -apple-system, sans-serif" }}>
     <style>{`
@@ -490,7 +503,7 @@ return (
       .group-card.expanded { border-color: #D4A52A; }
       .group-card .header { display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; }
       .group-card .header .name { font-weight: 700; color: #0F2B4A; font-size: 0.95rem; }
-      .group-card .header .meta { font-size: 0.7rem; color: #8A8A8A; }
+       .group-card .header .meta { font-size: 0.7rem; color: #8A8A8A; }
       .group-card .header .balance { font-size: 0.8rem; font-weight: 600; }
       .group-card .header .balance.owing { color: #D9534F; }
       .group-card .header .balance.paid { color: #2E7D5E; }
@@ -654,7 +667,7 @@ return (
       </div>
     </div>
 
-    {/* ─── KEY METRICS ─── */}
+{/* ─── KEY METRICS ─── */}
     <div className="stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-md)' }}>
       <a href="/dashboard/customers" className="stat-card">
         <span className="icon">👤</span>
@@ -831,7 +844,7 @@ return (
         )}
       </div>
 
-      {/* ─── RECENT CUSTOMERS ─── */}
+{/* ─── RECENT CUSTOMERS ─── */}
       <div>
         <div className="section-title">
           <h3>👤 Recent Customers</h3>
@@ -936,4 +949,4 @@ return (
       </div>
     </div>
   )
-        }
+}
