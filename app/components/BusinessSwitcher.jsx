@@ -8,16 +8,12 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [debugMessage, setDebugMessage] = useState('Loading...');
 
   useEffect(() => {
     async function loadBusinesses() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setDebugMessage('No session');
-          return;
-        }
+        if (!session) return;
 
         const response = await fetch('/api/user/businesses', {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
@@ -25,12 +21,9 @@ export default function BusinessSwitcher({ currentBusinessId }) {
         const result = await response.json();
         if (response.ok) {
           setBusinesses(result.businesses || []);
-          setDebugMessage(`✅ Found ${result.businesses?.length || 0} businesses`);
-        } else {
-          setDebugMessage(`❌ Error: ${result.error || 'Unknown'}`);
         }
       } catch (e) {
-        setDebugMessage(`❌ Fetch error: ${e.message}`);
+        console.error('Error loading businesses:', e);
       }
     }
     loadBusinesses();
@@ -44,8 +37,9 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       router.push('/accept-invite');
       return;
     }
-    // Save to sessionStorage AND reload with URL param
-    sessionStorage.setItem('selectedBusinessId', businessId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedBusinessId', businessId);
+    }
     window.location.href = `/dashboard?business_id=${businessId}`;
   };
 
@@ -132,21 +126,6 @@ export default function BusinessSwitcher({ currentBusinessId }) {
           </button>
         </div>
       )}
-
-      {/* ─── DEBUG ─── */}
-      <div style={{
-        marginTop: '8px',
-        padding: '4px 8px',
-        background: 'rgba(255,255,255,0.05)',
-        borderRadius: '4px',
-        fontSize: '10px',
-        color: '#aaa',
-        fontFamily: 'monospace',
-        wordBreak: 'break-all'
-      }}>
-        <div>📡 {debugMessage}</div>
-        <div>📋 {businesses.map(b => b.name).join(', ') || '(empty)'}</div>
-      </div>
     </div>
   );
 }
