@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../../../lib/supabaseClient';
 import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
+import { sendStaffInviteEmail } from '../../../../../lib/email';
 
 export async function POST(req) {
   try {
@@ -22,20 +23,20 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Role must be either "Staff" or "Manager"' }, { status: 400 });
     }
 
-    // Fetch business using admin client
-    const { data: business, error: bizError } = await supabaseAdmin
+    // ─── Verify user has permission (Owner or Manager) ───
+    const { data: business } = await supabaseAdmin
       .from('businesses')
       .select('owner_id, name')
       .eq('id', business_id)
-      .maybeSingle();
+      .single();
 
-    if (bizError || !business) {
-      console.error('Business fetch error:', bizError);
+    if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 });
     }
 
-    // Check permission: owner OR manager via membership
     let hasPermission = false;
+    let businessName = business.name || 'Your business';
+
     if (business.owner_id === user.id) {
       hasPermission = true;
     } else {
@@ -54,8 +55,28 @@ export async function POST(req) {
       return NextResponse.json({ error: 'You do not have permission to invite staff' }, { status: 403 });
     }
 
-    // Check for duplicate pending invite
-    const { data: existing } = await supabaseAdmin
+    // ─── Check if email is already a member of this business ───
+    // First, find the user by email
+    const { data: existingUser } = await supabaseAdmin
+      .from('auth.users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingUser) {
+      const { data: existingMember } = await supabaseAdmin
+        .from('business_memberships')
+        .select('id')
+        .eq('business_id', business_id)
+        .eq('user_id', existingUser.id)
+        .maybeSingle();
+      if (existingMember) {
+        return NextResponse.json({ error: 'This email is already a member of your business' }, { status: 400 });
+      }
+    }
+
+    // ─── Check if there's already a pending invite for this email ───
+    const { data: existingInvite } = await supabaseAdmin
       .from('business_invites')
       .select('id')
       .eq('business_id', business_id)
@@ -63,11 +84,11 @@ export async function POST(req) {
       .eq('status', 'pending')
       .maybeSingle();
 
-    if (existing) {
+    if (existingInvite) {
       return NextResponse.json({ error: 'An invite for this email is already pending' }, { status: 400 });
     }
 
-    // Generate 6-character code
+    // ─── Generate code ───
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
@@ -77,6 +98,7 @@ export async function POST(req) {
     const expires_at = new Date();
     expires_at.setDate(expires_at.getDate() + 3);
 
+    // ─── Insert invite ───
     const { data: invite, error: insertError } = await supabaseAdmin
       .from('business_invites')
       .insert({
@@ -98,7 +120,7 @@ export async function POST(req) {
       throw insertError;
     }
 
-    // Log activity
+    // ─── Log activity ───
     await supabaseAdmin.from('business_activity_logs').insert({
       business_id,
       performed_by: user.id,
@@ -106,13 +128,17 @@ export async function POST(req) {
       details: { email, role, invite_code: code }
     });
 
-    return NextResponse.json({
-      success: true,
-      invite: { code, email, role, expires_at: expires_at.toISOString() }
-    }, { status: 200 });
+    // ─── Send email ───
+    const acceptLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?code=${code}`;
+    try {
+      await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+    }
 
+    return NextResponse.json({ success: true, invite }, { status: 200 });
   } catch (error) {
     console.error('Generate invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-}
+      }
