@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Icon } from '../../../../components/Icon'
 
 export default function NewCustomerPage() {
@@ -14,9 +13,24 @@ export default function NewCustomerPage() {
   const [error, setError] = useState(null)
   const [businessId, setBusinessId] = useState(null)
   const [formData, setFormData] = useState({
-    name: '',
+    first_name: '',
+    last_name: '',
     phone: '',
+    email: '',
+    gender: '',
+    age_category: '',
+    address: '',
     notes: '',
+    measurements: {
+      bust: '',
+      waist: '',
+      hips: '',
+      shoulder: '',
+      length: '',
+      sleeve: '',
+      neck: '',
+      arm: '',
+    },
   })
 
   useEffect(() => {
@@ -28,30 +42,22 @@ export default function NewCustomerPage() {
           return
         }
 
-        // ─── Get business ID from URL with fallback ───
-        let bizId = getCurrentBusinessId()
-        console.log('🔍 New page: businessId from URL:', bizId)
-
-        if (!bizId) {
-          // Fallback to membership
+        const bizId = searchParams.get('business_id')
+        if (!bizId || bizId.length < 20) {
           const { data: membership } = await supabase
             .from('business_memberships')
             .select('business_id')
             .eq('user_id', user.id)
             .maybeSingle()
           if (membership) {
-            bizId = membership.business_id
-            console.log('🔍 New page: fallback from membership:', bizId)
+            setBusinessId(membership.business_id)
+          } else {
+            router.push('/dashboard')
+            return
           }
+        } else {
+          setBusinessId(bizId)
         }
-
-        if (!bizId) {
-          console.error('❌ New page: No business ID found')
-          router.push('/dashboard')
-          return
-        }
-
-        setBusinessId(bizId)
       } catch (err) {
         console.error(err)
         setError('Failed to load data.')
@@ -60,10 +66,19 @@ export default function NewCustomerPage() {
       }
     }
     load()
-  }, [router])
+  }, [router, searchParams])
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    if (name.startsWith('measurement_')) {
+      const key = name.replace('measurement_', '')
+      setFormData(prev => ({
+        ...prev,
+        measurements: { ...prev.measurements, [key]: value }
+      }))
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }))
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -78,6 +93,14 @@ export default function NewCustomerPage() {
         return
       }
 
+      // Validate phone – must be 11 digits
+      const phoneDigits = formData.phone.replace(/\D/g, '')
+      if (phoneDigits.length !== 11) {
+        setError('Phone number must be exactly 11 digits (e.g., 08012345678)')
+        setSaving(false)
+        return
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         setError('You must be logged in.')
@@ -85,7 +108,13 @@ export default function NewCustomerPage() {
         return
       }
 
-      console.log('📤 Sending request to /api/customers with business_id:', businessId)
+      // Filter out empty measurement values
+      const measurements = {}
+      Object.entries(formData.measurements).forEach(([key, value]) => {
+        if (value && value.trim() !== '') {
+          measurements[key] = value.trim()
+        }
+      })
 
       const response = await fetch('/api/customers', {
         method: 'POST',
@@ -95,28 +124,31 @@ export default function NewCustomerPage() {
         },
         body: JSON.stringify({
           business_id: businessId,
-          name: formData.name,
-          phone: formData.phone || null,
+          first_name: formData.first_name.trim(),
+          last_name: formData.last_name.trim(),
+          phone: phoneDigits,
+          email: formData.email || null,
+          gender: formData.gender,
+          age_category: formData.age_category,
+          address: formData.address || null,
           notes: formData.notes || null,
+          measurements: measurements,
         })
       })
 
       const result = await response.json()
-      console.log('📥 API response:', result)
-
       if (!response.ok) {
-        throw new Error(result.error || result.details?.message || 'Failed to create customer')
+        throw new Error(result.error || 'Failed to create customer')
       }
 
       router.push(`/dashboard/customers?business_id=${businessId}`)
     } catch (err) {
-      console.error('❌ Frontend error:', err)
+      console.error('Error:', err)
       setError(err.message)
       setSaving(false)
     }
   }
 
-  // ─── Loading state ───
   if (loading) {
     return (
       <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
@@ -141,36 +173,140 @@ export default function NewCustomerPage() {
   }
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', color: 'var(--color-text)' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', color: 'var(--color-text)' }}>
       <h1 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>New Customer</h1>
       <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>Add a new customer to your business.</p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+        {/* ─── First & Last Name ─── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>First Name *</label>
+            <input
+              type="text"
+              name="first_name"
+              value={formData.first_name}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Last Name *</label>
+            <input
+              type="text"
+              name="last_name"
+              value={formData.last_name}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            />
+          </div>
+        </div>
+
+        {/* ─── Phone & Email ─── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Phone * (11 digits)</label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              placeholder="08012345678"
+              maxLength={11}
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Email (optional)</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            />
+          </div>
+        </div>
+
+        {/* ─── Gender & Age Category ─── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Gender *</label>
+            <select
+              name="gender"
+              value={formData.gender}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            >
+              <option value="">Select gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Age Category *</label>
+            <select
+              name="age_category"
+              value={formData.age_category}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            >
+              <option value="">Select age category</option>
+              <option value="adult">Adult</option>
+              <option value="child">Child</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ─── Address ─── */}
         <div>
-          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Name *</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
+          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Address (optional)</label>
+          <textarea
+            name="address"
+            value={formData.address}
             onChange={handleChange}
-            required
-            placeholder="e.g. Aisha Bello"
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            rows={2}
+            placeholder="Street, city, state..."
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'vertical' }}
           />
         </div>
 
-        <div>
-          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Phone (optional)</label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            placeholder="e.g. 08012345678"
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
-          />
+        {/* ─── Measurements ─── */}
+        <div style={{ background: 'var(--color-card)', padding: '1.2rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.8rem' }}>📏 Measurements (optional)</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.8rem' }}>
+            {[
+              { key: 'bust', label: 'Bust (cm)' },
+              { key: 'waist', label: 'Waist (cm)' },
+              { key: 'hips', label: 'Hips (cm)' },
+              { key: 'shoulder', label: 'Shoulder (cm)' },
+              { key: 'length', label: 'Length (cm)' },
+              { key: 'sleeve', label: 'Sleeve (cm)' },
+              { key: 'neck', label: 'Neck (cm)' },
+              { key: 'arm', label: 'Arm (cm)' },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '500', color: 'var(--color-text-muted)', marginBottom: '0.2rem' }}>{label}</label>
+                <input
+                  type="number"
+                  name={`measurement_${key}`}
+                  value={formData.measurements[key]}
+                  onChange={handleChange}
+                  step="0.1"
+                  style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.85rem' }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
+        {/* ─── Notes ─── */}
         <div>
           <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Notes (optional)</label>
           <textarea
@@ -185,18 +321,38 @@ export default function NewCustomerPage() {
 
         {error && <div style={{ color: 'var(--color-danger)', marginTop: '0.5rem' }}>{error}</div>}
 
+        {/* ─── Buttons ─── */}
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
           <button
             type="submit"
             disabled={saving}
-            style={{ padding: '0.6rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+            style={{
+              padding: '0.6rem 1.5rem',
+              background: 'var(--color-accent)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: saving ? 'default' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}
           >
             <Icon name="plus" size={16} stroke="#fff" /> {saving ? 'Creating...' : 'Create Customer'}
           </button>
           <button
             type="button"
             onClick={() => router.back()}
-            style={{ padding: '0.6rem 1.5rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}
+            style={{
+              padding: '0.6rem 1.5rem',
+              background: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              color: 'var(--color-text)'
+            }}
           >
             Cancel
           </button>
@@ -204,4 +360,4 @@ export default function NewCustomerPage() {
       </form>
     </div>
   )
-          }
+    }
