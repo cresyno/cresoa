@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export default function Logo({ variant = 'primary', size = 'medium' }) {
+export default function Logo({ variant = 'primary', size = 'medium', className, style }) {
   const [error, setError] = useState(false);
 
   const logos = {
@@ -39,7 +39,8 @@ export default function Logo({ variant = 'primary', size = 'medium' }) {
       alt="Cresoa"
       width={width}
       height={height}
-      style={{ objectFit: 'contain', display: 'block' }}
+      className={className}
+      style={{ objectFit: 'contain', display: 'block', ...style }}
       onError={(e) => {
         console.error('Logo failed to load:', src);
         setError(true);
