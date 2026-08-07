@@ -8,7 +8,7 @@ import { Icon } from '../../../components/Icon'
 export default function TrackingPage() {
   const params = useParams()
   const searchParams = useSearchParams()
-  const orderId = params.id
+  const token = params.token // ← Use token from URL
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,13 +16,13 @@ export default function TrackingPage() {
   const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
 
-  // ─── Load order data ───
+  // ─── Load order data by tracking token ───
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       setError(null)
       try {
-        // 1. Fetch order with customer and business
+        // 1. Fetch order by tracking_token
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select(`
@@ -30,10 +30,13 @@ export default function TrackingPage() {
             customers (id, name, phone, email),
             businesses (id, name, logo_url, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message)
           `)
-          .eq('id', orderId)
+          .eq('tracking_token', token) // ← Use tracking_token
           .single()
 
-        if (orderError) throw orderError
+        if (orderError) {
+          console.error('Order fetch error:', orderError)
+          throw new Error('Order not found. Please check the tracking link.')
+        }
 
         setOrder(orderData)
         setCustomer(orderData.customers)
@@ -41,13 +44,13 @@ export default function TrackingPage() {
 
       } catch (err) {
         console.error('Error loading order:', err)
-        setError('Order not found. Please check the tracking link.')
+        setError(err.message || 'Order not found. Please check the tracking link.')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [orderId])
+  }, [token])
 
   // ─── Get status info ───
   const getStatusInfo = (status) => {
@@ -104,7 +107,7 @@ export default function TrackingPage() {
         gap: '1rem',
         textAlign: 'center'
       }}>
-        <span style={{ fontSize: '3rem', display: 'block' }}>📋</span>
+        <Icon name="alert-triangle" size={48} stroke="#D9534F" />
         <h1 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1A1A1A' }}>Order not found</h1>
         <p style={{ color: '#8A8A8A' }}>{error}</p>
       </div>
@@ -124,7 +127,7 @@ export default function TrackingPage() {
         gap: '1rem',
         textAlign: 'center'
       }}>
-        <span style={{ fontSize: '3rem', display: 'block' }}>📋</span>
+        <Icon name="file-text" size={48} stroke="#C8C0B5" />
         <h1 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1A1A1A' }}>Order not found</h1>
         <p style={{ color: '#8A8A8A' }}>The order you're looking for doesn't exist or has been removed.</p>
       </div>
@@ -231,7 +234,7 @@ export default function TrackingPage() {
             color: isFullyPaid ? '#2E7D5E' : '#D9534F',
             fontWeight: '600'
           }}>
-            {isFullyPaid ? 'Paid ✓' : `₦${balance.toLocaleString()} due`}
+            {isFullyPaid ? 'Paid' : `₦${balance.toLocaleString()} due`}
           </div>
         </div>
 
@@ -272,7 +275,7 @@ export default function TrackingPage() {
             marginBottom: '0.2rem' 
           }}>
             <span>Progress</span>
-            <span>{order.current_status === 'Delivered' ? '100%' : 'In progress'}</span>
+            <span>{order.current_status === 'Delivered' ? 'Complete' : 'In progress'}</span>
           </div>
           <div style={{ 
             width: '100%', 
@@ -361,4 +364,4 @@ export default function TrackingPage() {
       `}</style>
     </div>
   )
-}
+    }
