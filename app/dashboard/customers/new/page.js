@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
-import { getPlanLimits } from '../../../../lib/planLimits'
 import { Icon } from '../../../../components/Icon'
 
 export default function NewCustomerPage() {
@@ -29,9 +28,12 @@ export default function NewCustomerPage() {
           return
         }
 
+        // ─── Get business ID from URL with fallback ───
         let bizId = getCurrentBusinessId()
-        // If still missing, try to get from membership
+        console.log('🔍 New page: businessId from URL:', bizId)
+
         if (!bizId) {
+          // Fallback to membership
           const { data: membership } = await supabase
             .from('business_memberships')
             .select('business_id')
@@ -39,12 +41,16 @@ export default function NewCustomerPage() {
             .maybeSingle()
           if (membership) {
             bizId = membership.business_id
+            console.log('🔍 New page: fallback from membership:', bizId)
           }
         }
+
         if (!bizId) {
+          console.error('❌ New page: No business ID found')
           router.push('/dashboard')
           return
         }
+
         setBusinessId(bizId)
       } catch (err) {
         console.error(err)
@@ -72,7 +78,6 @@ export default function NewCustomerPage() {
         return
       }
 
-      // Get session token for authorization
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         setError('You must be logged in.')
@@ -80,7 +85,8 @@ export default function NewCustomerPage() {
         return
       }
 
-      // Call the API endpoint
+      console.log('📤 Sending request to /api/customers with business_id:', businessId)
+
       const response = await fetch('/api/customers', {
         method: 'POST',
         headers: {
@@ -96,13 +102,15 @@ export default function NewCustomerPage() {
       })
 
       const result = await response.json()
+      console.log('📥 API response:', result)
+
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create customer')
+        throw new Error(result.error || result.details?.message || 'Failed to create customer')
       }
 
       router.push(`/dashboard/customers?business_id=${businessId}`)
     } catch (err) {
-      console.error(err)
+      console.error('❌ Frontend error:', err)
       setError(err.message)
       setSaving(false)
     }
@@ -196,4 +204,4 @@ export default function NewCustomerPage() {
       </form>
     </div>
   )
-}
+          }
