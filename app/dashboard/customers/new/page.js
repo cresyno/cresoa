@@ -29,8 +29,18 @@ export default function NewCustomerPage() {
           return
         }
 
-        const bizId = getCurrentBusinessId()
-        // ─── CRITICAL: If no business ID, redirect to dashboard ───
+        let bizId = getCurrentBusinessId()
+        // If still missing, try to get from membership
+        if (!bizId) {
+          const { data: membership } = await supabase
+            .from('business_memberships')
+            .select('business_id')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (membership) {
+            bizId = membership.business_id
+          }
+        }
         if (!bizId) {
           router.push('/dashboard')
           return
@@ -56,81 +66,44 @@ export default function NewCustomerPage() {
     setError(null)
 
     try {
-      // ─── Debug: log the businessId ───
-      console.log('🔍 Creating customer for business ID:', businessId)
-
       if (!businessId) {
-        setError('No business selected. Please go back and try again.')
+        setError('No business selected.')
         setSaving(false)
         return
       }
 
-      // ─── Plan limit check ───
-      const { data: businessData, error: bizError } = await supabase
-        .from('businesses')
-        .select('plan')
-        .eq('id', businessId)
-        .single()
-
-      if (bizError) {
-        console.error('❌ Error fetching business plan:', bizError)
-        setError('Failed to verify business plan. Please try again.')
+      // Get session token for authorization
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError('You must be logged in.')
         setSaving(false)
         return
       }
 
-      const limits = getPlanLimits(businessData?.plan || 'free')
-      const { count: currentCustomers, error: countError } = await supabase
-        .from('customers')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', businessId)
-
-      if (countError) {
-        console.error('❌ Error counting customers:', countError)
-      }
-
-      if (currentCustomers >= limits.customers) {
-        setError(`You have reached the limit of ${limits.customers} customers on your current plan. Please upgrade to add more.`)
-        setSaving(false)
-        return
-      }
-
-      const { data: { user } } = await supabase.auth.getUser()
-
-      // ─── Insert customer ───
-      const { data, error } = await supabase
-        .from('customers')
-        .insert({
+      // Call the API endpoint
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
           business_id: businessId,
           name: formData.name,
           phone: formData.phone || null,
           notes: formData.notes || null,
         })
-        .select() // ← added .select() to get the inserted data
-
-      if (error) {
-        console.error('❌ Supabase insert error:', error)
-        console.error('❌ Error code:', error.code)
-        console.error('❌ Error message:', error.message)
-        console.error('❌ Error details:', error.details)
-        setError(`Failed to create customer: ${error.message}`)
-        setSaving(false)
-        return
-      }
-
-      console.log('✅ Customer created successfully:', data)
-
-      await supabase.from('business_activity_logs').insert({
-        business_id: businessId,
-        performed_by: user.id,
-        action: 'customer_created',
-        details: { name: formData.name }
       })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create customer')
+      }
 
       router.push(`/dashboard/customers?business_id=${businessId}`)
     } catch (err) {
-      console.error('❌ Unexpected error:', err)
-      setError('Failed to create customer. Please try again.')
+      console.error(err)
+      setError(err.message)
       setSaving(false)
     }
   }
@@ -223,4 +196,4 @@ export default function NewCustomerPage() {
       </form>
     </div>
   )
-  }
+}
