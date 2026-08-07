@@ -417,10 +417,8 @@ export default function FashionDashboardPage() {
           <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--color-text)' }}>₦{monthRevenue.toLocaleString()}</div>
         </div>
       </div>
- style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: showOwingOnly ? '2px solid var(--color-danger)' : '1px
 
-
-           {/* ─── STATS GRID ─── */}
+      {/* ─── STATS GRID ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
         <a href={`/dashboard/customers?business_id=${getCurrentBusinessId() || ''}`} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)', textDecoration: 'none', color: 'var(--color-text)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
@@ -588,7 +586,7 @@ export default function FashionDashboardPage() {
         )}
       </div>
 
-{/* ─── RECENT CUSTOMERS ─── */}
+      {/* ─── RECENT CUSTOMERS ─── */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Recent Customers</h3>
@@ -625,7 +623,7 @@ export default function FashionDashboardPage() {
         <Icon name="plus" size={24} stroke="#fff" />
       </button>
 
-      {/* ─── QUICK ORDER MODAL ─── */}
+    {/* ─── QUICK ORDER MODAL ─── */}
       {showQuickOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'fadeIn 0.2s' }} onClick={() => setShowQuickOrder(false)}>
           <div ref={modalRef} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-bg)', borderRadius: '20px 20px 0 0', padding: '1.5rem', maxWidth: '480px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
@@ -691,4 +689,4 @@ export default function FashionDashboardPage() {
       `}</style>
     </div>
   )
-}
+        }
