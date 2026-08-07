@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 
 export default function OrdersPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -14,57 +15,60 @@ export default function OrdersPage() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/login')
-          return
-        }
-
-        let businessId = getCurrentBusinessId()
-        if (!businessId) {
-          const { data: owned } = await supabase
-            .from('businesses')
-            .select('id, name')
-            .eq('owner_id', user.id)
-            .single()
-          if (owned) {
-            businessId = owned.id
-            setBusinessName(owned.name)
-          }
-        } else {
-          const { data: biz } = await supabase
-            .from('businesses')
-            .select('name')
-            .eq('id', businessId)
-            .single()
-          if (biz) setBusinessName(biz.name)
-        }
-
-        if (!businessId) {
-          router.push('/onboarding')
-          return
-        }
-
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*, customers(name, phone)')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        setOrders(data || [])
-      } catch (err) {
-        console.error('Error loading orders:', err)
-        setError('Failed to load orders.')
-      } finally {
-        setLoading(false)
+  const loadOrders = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
       }
+
+      let businessId = getCurrentBusinessId()
+      if (!businessId) {
+        const { data: owned } = await supabase
+          .from('businesses')
+          .select('id, name')
+          .eq('owner_id', user.id)
+          .single()
+        if (owned) {
+          businessId = owned.id
+          setBusinessName(owned.name)
+        }
+      } else {
+        const { data: biz } = await supabase
+          .from('businesses')
+          .select('name')
+          .eq('id', businessId)
+          .single()
+        if (biz) setBusinessName(biz.name)
+      }
+
+      if (!businessId) {
+        router.push('/onboarding')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, customers(name, phone)')
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setOrders(data || [])
+    } catch (err) {
+      console.error('Error loading orders:', err)
+      setError('Failed to load orders.')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     loadOrders()
-  }, [router])
+  }, [router, searchParams]) // re‑fetch when URL changes
 
   const filteredOrders = orders.filter(o => {
     if (filter !== 'all' && o.current_status !== filter) return false
@@ -94,7 +98,6 @@ export default function OrdersPage() {
     return due < today && o.current_status !== 'Delivered'
   }).length
 
-  // ─── Status badge helper ───
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
@@ -127,7 +130,7 @@ export default function OrdersPage() {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
         {error}
-        <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
+        <button onClick={loadOrders} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
       </div>
     )
   }
@@ -142,7 +145,7 @@ export default function OrdersPage() {
         <a href={`/dashboard/orders/new?business_id=${getCurrentBusinessId() || ''}`} style={{ padding: '0.6rem 1.2rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '8px', fontWeight: '600', textDecoration: 'none' }}>+ New Order</a>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Total</span><div style={{ fontWeight: '700', fontSize: '1.2rem' }}>{totalOrders}</div></div>
         <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Active</span><div style={{ fontWeight: '700', fontSize: '1.2rem' }}>{activeOrders}</div></div>
         <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Ready</span><div style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--color-success)' }}>{readyOrders}</div></div>
@@ -170,7 +173,8 @@ export default function OrdersPage() {
                 color: filter === s ? '#fff' : 'var(--color-text)',
                 cursor: 'pointer',
                 fontSize: '0.75rem',
-                fontWeight: '600'
+                fontWeight: '600',
+                transition: 'all 0.2s'
               }}
             >
               {s === 'all' ? `All (${totalOrders})` : `${s} (${statusCounts[s] || 0})`}
@@ -190,8 +194,9 @@ export default function OrdersPage() {
           {filteredOrders.map(o => {
             const status = getStatusInfo(o.current_status)
             const isOverdue = o.due_date && new Date(o.due_date) < new Date() && o.current_status !== 'Delivered'
+            const balance = (o.price || 0) - (o.amount_paid || 0)
             return (
-              <div key={o.id} style={{ background: 'var(--color-card)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+              <div key={o.id} style={{ background: 'var(--color-card)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', transition: 'box-shadow 0.2s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 200px' }}>
                     <div style={{ fontWeight: '600', color: 'var(--color-text)' }}>{o.title || 'Untitled'}</div>
@@ -199,6 +204,7 @@ export default function OrdersPage() {
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
                       <span style={{ background: status.bg, color: status.color, padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '600' }}>{status.label}</span>
                       {isOverdue && <span style={{ background: '#F1DBD3', color: '#D9534F', padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '600' }}>⚠️ Overdue</span>}
+                      {balance > 0 && <span style={{ background: '#F1DBD3', color: '#D9534F', padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '600' }}>₦{balance.toLocaleString()} due</span>}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -216,4 +222,4 @@ export default function OrdersPage() {
       )}
     </div>
   )
-              }
+                }
