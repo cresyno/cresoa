@@ -455,11 +455,11 @@ function DashboardLayoutContent({ children }) {
           <div className="section-label">Business</div>
           {currentNavItems.map((item) => (
             <a
-              key={item.path}
-              href={item.path}
-              className={isActive(item.path) ? 'active' : ''}
-              onClick={handleNavClick}
-            >
+  key={item.path}
+  href={business?.id ? `${item.path}?business_id=${business.id}` : item.path}
+  className={isActive(item.path) ? 'active' : ''}
+  onClick={handleNavClick}
+>
               <span className="icon">{item.icon}</span>
               {item.name}
             </a>
