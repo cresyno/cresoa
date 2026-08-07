@@ -689,4 +689,4 @@ export default function FashionDashboardPage() {
       `}</style>
     </div>
   )
-        }
+        }:
