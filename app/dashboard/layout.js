@@ -7,7 +7,6 @@ import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 
-// ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
     const isRepairs = pathname?.startsWith('/dashboard/repairs')
@@ -82,7 +81,6 @@ function getPageHeader(pathname, business, stats) {
   }
 }
 
-// ─── MAIN LAYOUT CONTENT ───
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -116,7 +114,7 @@ function DashboardLayoutContent({ children }) {
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
     { name: 'Orders', path: '/dashboard/orders', icon: '📋' },
     { name: 'Customers', path: '/dashboard/customers', icon: '👤' },
-    { name: 'Group Orders', path: '/dashboard/groups/new', icon: '👥' },
+    { name: 'Group Orders', path: '/dashboard/groups', icon: '👥' },
     { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
   ]
 
@@ -134,6 +132,7 @@ function DashboardLayoutContent({ children }) {
   // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
+      setLoading(true)
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -141,7 +140,6 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        // ─── ALWAYS get business_id from URL ───
         const businessIdFromUrl = searchParams.get('business_id')
         let businessData = null
 
@@ -155,13 +153,11 @@ function DashboardLayoutContent({ children }) {
           if (business && !error) {
             businessData = business
           } else {
-            // If the business from URL is not found, clear URL param and fallback
             router.push('/dashboard')
             return
           }
         }
 
-        // ─── If no URL param, fallback to owned business ───
         if (!businessData) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
@@ -171,7 +167,6 @@ function DashboardLayoutContent({ children }) {
           if (ownedBusiness) {
             businessData = ownedBusiness
           } else {
-            // Check membership
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
@@ -185,7 +180,6 @@ function DashboardLayoutContent({ children }) {
                 .maybeSingle()
               if (memberBusiness) {
                 businessData = memberBusiness
-                // Also save role
                 setUserRole(membershipData.role)
               }
             }
@@ -197,7 +191,6 @@ function DashboardLayoutContent({ children }) {
           return
         }
 
-        // ─── Fetch user role (if not already set) ───
         if (!userRole) {
           const { data: roleData } = await supabase
             .from('business_memberships')
@@ -214,7 +207,7 @@ function DashboardLayoutContent({ children }) {
           }
         }
 
-        // ─── BETA EXPIRY CHECK ───
+        // ─── Beta expiry and trial logic ───
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
@@ -256,7 +249,7 @@ function DashboardLayoutContent({ children }) {
 
         setBusiness(businessData)
 
-        // ─── Compute stats ───
+        // ─── Stats ───
         const { count: totalOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -283,7 +276,6 @@ function DashboardLayoutContent({ children }) {
         }).length || 0
 
         const dueToday = orders?.filter(o => o.due_date === today && o.current_status !== 'Delivered').length || 0
-
         const { count: groups } = await supabase
           .from('group_orders')
           .select('*', { count: 'exact', head: true })
@@ -306,9 +298,19 @@ function DashboardLayoutContent({ children }) {
     }
 
     load()
-  }, [router, searchParams]) // ← re‑run when URL changes
+  }, [router, searchParams]) // ← re‑runs when URL changes
 
-  // ─── Logout ───
+  // ─── Force reload if URL business_id doesn't match current business ───
+  useEffect(() => {
+    if (!loading && business) {
+      const urlBusinessId = searchParams.get('business_id')
+      if (urlBusinessId && urlBusinessId !== business.id) {
+        window.location.reload()
+      }
+    }
+  }, [searchParams, business, loading])
+
+  // ─── Handlers ───
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -357,6 +359,8 @@ function DashboardLayoutContent({ children }) {
   const showBilling = isOwner
   const showBeta = isOwner
   const showTracking = isOwner && (business?.plan === 'pro' || business?.plan === 'beta')
+
+  const baseUrl = (path) => business?.id ? `${path}?business_id=${business.id}` : path
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -455,24 +459,24 @@ function DashboardLayoutContent({ children }) {
           <div className="section-label">Business</div>
           {currentNavItems.map((item) => (
             <a
-  key={item.path}
-  href={business?.id ? `${item.path}?business_id=${business.id}` : item.path}
-  className={isActive(item.path) ? 'active' : ''}
-  onClick={handleNavClick}
->
+              key={item.path}
+              href={baseUrl(item.path)}
+              className={isActive(item.path) ? 'active' : ''}
+              onClick={handleNavClick}
+            >
               <span className="icon">{item.icon}</span>
               {item.name}
             </a>
           ))}
         </div>
 
-                     {showTeamActivity && (
+             {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
-            <a href="/dashboard/staff" className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
+            <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
               <span className="icon">👥</span> Team & Staff
             </a>
-            <a href="/dashboard/activity" className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
+            <a href={baseUrl('/dashboard/activity')} className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
               <span className="icon">📜</span> Activity Logs
             </a>
           </div>
@@ -481,21 +485,21 @@ function DashboardLayoutContent({ children }) {
         <div className="nav-section">
           <div className="section-label">Settings</div>
           {showBilling && (
-            <a href="/dashboard/subscription" onClick={handleNavClick}>
+            <a href={baseUrl('/dashboard/subscription')} onClick={handleNavClick}>
               <span className="icon">💳</span> Billing & Plan
             </a>
           )}
           {showBeta && business && !business.has_applied_for_beta && (
-            <a href="/dashboard/beta-apply" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
+            <a href={baseUrl('/dashboard/beta-apply')} onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🧪</span> Join Beta Program
             </a>
           )}
           {showTracking && (
-            <a href="/dashboard/settings/tracking" onClick={handleNavClick} style={{ color: '#D4A52A' }}>
+            <a href={baseUrl('/dashboard/settings/tracking')} onClick={handleNavClick} style={{ color: '#D4A52A' }}>
               <span className="icon">🎨</span> Order Tracking Page
             </a>
           )}
-          <a href="/dashboard/profile" onClick={handleNavClick}>
+          <a href={baseUrl('/dashboard/profile')} onClick={handleNavClick}>
             <span className="icon">⚙️</span> Profile & Settings
           </a>
         </div>
@@ -525,7 +529,7 @@ function DashboardLayoutContent({ children }) {
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {business && !business.has_applied_for_beta && isOwner && (
-              <a href="/dashboard/beta-apply" className="beta-btn">🧪 Join Beta</a>
+              <a href={baseUrl('/dashboard/beta-apply')} className="beta-btn">🧪 Join Beta</a>
             )}
             <span className="date">
               {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -544,7 +548,6 @@ function DashboardLayoutContent({ children }) {
   )
 }
 
-// ─── WRAP WITH SUSPENSE ───
 export default function DashboardLayout({ children }) {
   return (
     <Suspense fallback={
@@ -555,4 +558,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-                }
+            }
