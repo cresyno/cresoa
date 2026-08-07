@@ -12,6 +12,7 @@ export async function POST(req) {
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
+      console.error('Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -20,6 +21,8 @@ export async function POST(req) {
     if (!business_id || !name) {
       return NextResponse.json({ error: 'Business ID and name are required' }, { status: 400 });
     }
+
+    console.log('🔍 API: Creating customer for business:', business_id, 'name:', name);
 
     // 3. Verify user has access to this business (member or owner)
     const { data: membership } = await supabaseAdmin
@@ -36,10 +39,13 @@ export async function POST(req) {
       .single();
 
     if (!membership && business?.owner_id !== user.id) {
+      console.error('Access denied for user', user.id, 'to business', business_id);
       return NextResponse.json({ error: 'You do not have access to this business' }, { status: 403 });
     }
 
-    // 4. Insert customer using admin client (bypasses RLS)
+    console.log('✅ Access verified for user', user.id);
+
+    // 4. Insert customer using admin client
     const { data: customer, error: insertError } = await supabaseAdmin
       .from('customers')
       .insert({
@@ -52,9 +58,11 @@ export async function POST(req) {
       .single();
 
     if (insertError) {
-      console.error('Insert error:', insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      console.error('❌ Insert error:', insertError);
+      return NextResponse.json({ error: insertError.message, details: insertError }, { status: 500 });
     }
+
+    console.log('✅ Customer inserted:', customer);
 
     // 5. Log activity
     await supabaseAdmin.from('business_activity_logs').insert({
@@ -66,7 +74,7 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true, customer });
   } catch (err) {
-    console.error('API error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('❌ API error:', err);
+    return NextResponse.json({ error: 'Internal server error', details: err.message }, { status: 500 });
   }
-        }
+}
