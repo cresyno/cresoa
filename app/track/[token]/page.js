@@ -8,7 +8,7 @@ import { Icon } from '../../../components/Icon'
 export default function TrackingPage() {
   const params = useParams()
   const searchParams = useSearchParams()
-  const token = params.token // ← Use token from URL
+  const token = params.token
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,25 +16,48 @@ export default function TrackingPage() {
   const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
 
-  // ─── Load order data by tracking token ───
+  // ─── Load order data by tracking token or ID ───
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       setError(null)
       try {
-        // 1. Fetch order by tracking_token
-        const { data: orderData, error: orderError } = await supabase
+        let orderData = null
+        let orderError = null
+
+        // First try by tracking_token
+        const { data: tokenData, error: tokenError } = await supabase
           .from('orders')
           .select(`
             *,
             customers (id, name, phone, email),
             businesses (id, name, logo_url, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message)
           `)
-          .eq('tracking_token', token) // ← Use tracking_token
-          .single()
+          .eq('tracking_token', token)
+          .maybeSingle()
 
-        if (orderError) {
-          console.error('Order fetch error:', orderError)
+        if (tokenData) {
+          orderData = tokenData
+        } else {
+          // If not found by token, try by ID (fallback)
+          const { data: idData, error: idError } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              customers (id, name, phone, email),
+              businesses (id, name, logo_url, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message)
+            `)
+            .eq('id', token)
+            .maybeSingle()
+
+          if (idData) {
+            orderData = idData
+          } else {
+            orderError = tokenError || idError || new Error('Order not found')
+          }
+        }
+
+        if (orderError || !orderData) {
           throw new Error('Order not found. Please check the tracking link.')
         }
 
@@ -364,4 +387,4 @@ export default function TrackingPage() {
       `}</style>
     </div>
   )
-    }
+      }
