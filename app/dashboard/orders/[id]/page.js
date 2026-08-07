@@ -23,21 +23,17 @@ export default function OrderDetailPage() {
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
   const [userRole, setUserRole] = useState(null)
 
-  // ─── Internal notes ───
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
 
-  // ─── Payment modal ───
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
 
-  // ─── Status update modal ───
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [newStatus, setNewStatus] = useState('')
 
-  // ─── Edit mode ───
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({
     title: '',
@@ -47,7 +43,6 @@ export default function OrderDetailPage() {
 
   const statusOptions = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-  // ─── Load order data ───
   const loadOrder = async () => {
     setLoading(true)
     setError(null)
@@ -65,7 +60,6 @@ export default function OrderDetailPage() {
       }
       setCurrentBusinessId(bizId)
 
-      // Fetch order with customer
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -88,7 +82,6 @@ export default function OrderDetailPage() {
         due_date: orderData.due_date || '',
       })
 
-      // Fetch business plan
       const { data: bizData } = await supabase
         .from('businesses')
         .select('plan')
@@ -96,7 +89,6 @@ export default function OrderDetailPage() {
         .single()
       if (bizData) setBusinessPlan(bizData.plan || 'free')
 
-      // Fetch user role
       const { data: roleData } = await supabase
         .from('business_memberships')
         .select('role')
@@ -105,7 +97,6 @@ export default function OrderDetailPage() {
         .maybeSingle()
       if (roleData) setUserRole(roleData.role)
 
-      // Fetch payments
       const { data: paymentData, error: paymentError } = await supabase
         .from('payment_records')
         .select('*')
@@ -127,7 +118,6 @@ export default function OrderDetailPage() {
     loadOrder()
   }, [orderId, router])
 
-  // ─── Save internal notes ───
   const saveNotes = async () => {
     setSavingNotes(true)
     try {
@@ -141,7 +131,6 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
-      // Log activity
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
         performed_by: session.user.id,
@@ -156,7 +145,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ─── Record payment ───
   const handleRecordPayment = async (e) => {
     e.preventDefault()
     setRecordingPayment(true)
@@ -183,7 +171,7 @@ export default function OrderDetailPage() {
         },
         body: JSON.stringify({
           amount: amount,
-          note: paymentNote || 'Payment recorded from order detail',
+          note: paymentNote || 'Payment recorded',
         })
       })
 
@@ -204,7 +192,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ─── Update status ───
   const handleUpdateStatus = async (status) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -217,7 +204,6 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
-      // Log activity
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
         performed_by: session.user.id,
@@ -234,7 +220,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ─── Save edit form ───
   const handleEditSubmit = async (e) => {
     e.preventDefault()
     try {
@@ -252,7 +237,6 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
-      // Log activity
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
         performed_by: session.user.id,
@@ -268,7 +252,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ─── Duplicate order ───
   const handleDuplicate = async () => {
     if (!confirm('Duplicate this order?')) return
     try {
@@ -306,7 +289,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ─── Send WhatsApp ───
   const sendWhatsApp = () => {
     if (!customer?.phone) {
       alert('Customer has no phone number.')
@@ -317,14 +299,12 @@ export default function OrderDetailPage() {
     window.open(url, '_blank')
   }
 
-  // ─── Copy tracking link ───
   const copyTrackingLink = () => {
     const trackingLink = `${window.location.origin}/track/${orderId}?business_id=${currentBusinessId}`
     navigator.clipboard?.writeText(trackingLink)
     alert('Tracking link copied to clipboard!')
   }
 
-  // ─── Send tracking link ───
   const sendTrackingLink = () => {
     if (!customer?.phone) {
       alert('Customer has no phone number.')
@@ -336,7 +316,6 @@ export default function OrderDetailPage() {
     window.open(url, '_blank')
   }
 
-  // ─── Get status info ───
   const getStatusInfo = (status) => {
     const map = {
       'Order placed': { label: 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' },
@@ -348,11 +327,9 @@ export default function OrderDetailPage() {
     return map[status] || { label: status || 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' }
   }
 
-  // ─── Plan checks ───
   const canTracking = isFeatureAvailable(businessPlan, 'tracking_links')
   const canWhatsApp = isFeatureAvailable(businessPlan, 'whatsapp_reminders')
 
-  // ─── Skeleton ───
   if (loading) {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto' }}>
@@ -375,7 +352,7 @@ export default function OrderDetailPage() {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
         {error}
-        <button onClick={loadOrder} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Retry</button>
+        <button onClick={loadOrder} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Retry</button>
       </div>
     )
   }
@@ -396,17 +373,26 @@ export default function OrderDetailPage() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', color: 'var(--color-text)' }}>
-      {/* ─── Header ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
-            {order.title || 'Untitled'}
-          </h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-            #{orderId.slice(0, 8)} · {customer?.name || 'No customer'}
-          </p>
+
+      {/* ─── Header Row ─── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <button
+            onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId || ''}`)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.3rem' }}
+          >
+            <Icon name="arrow-left" size={20} stroke="currentColor" />
+          </button>
+          <div>
+            <h1 style={{ fontSize: '1.1rem', fontWeight: '600', margin: 0 }}>
+              {order.title || 'Untitled'}
+            </h1>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', margin: 0 }}>
+              #{orderId.slice(0, 8)} · {customer?.name || 'No customer'}
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             onClick={handleDuplicate}
             style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
@@ -414,18 +400,18 @@ export default function OrderDetailPage() {
             <Icon name="copy" size={14} stroke="#fff" /> Duplicate
           </button>
           <button
-            onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId || ''}`)}
-            style={{ padding: '0.3rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--color-text)' }}
+            onClick={() => setEditing(!editing)}
+            style={{ padding: '0.3rem 1rem', background: 'var(--color-accent)', color: '#0F2B4A', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
           >
-            Back
+            <Icon name="edit-2" size={14} stroke="#0F2B4A" /> {editing ? 'Close' : 'Edit'}
           </button>
         </div>
       </div>
 
-      {/* ─── Status Banner ─── */}
+      {/* ─── Status & Quick Actions ─── */}
       <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
             <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: '0.3rem 1rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '600' }}>
               {statusInfo.icon} {statusInfo.label}
             </span>
@@ -483,7 +469,7 @@ export default function OrderDetailPage() {
                     opacity: isActive ? 1 : 0.5,
                   }}
                 >
-                  {s}
+                  {s.split(' ').pop()}
                 </button>
                 {idx < statusOptions.length - 1 && (
                   <div style={{ flex: 1, height: '2px', background: isActive && idx < statusIndex ? 'var(--color-accent)' : 'var(--color-border)', margin: '0 0.2rem' }} />
@@ -495,7 +481,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* ─── Stats Grid ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
           <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Total</div>
           <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>₦{order.price?.toLocaleString() || 0}</div>
@@ -510,7 +496,7 @@ export default function OrderDetailPage() {
             {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
           </div>
         </div>
-          {order.due_date && (
+             {order.due_date && (
           <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
             <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Due Date</div>
             <div style={{ fontWeight: '600', fontSize: '0.9rem', color: isOverdue ? 'var(--color-danger)' : 'var(--color-text)' }}>
@@ -526,9 +512,9 @@ export default function OrderDetailPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontWeight: '600', fontSize: '1rem' }}>{customer.name}</div>
-              {customer.phone && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>📞 {customer.phone}</div>}
-              {customer.email && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>✉️ {customer.email}</div>}
-              {customer.address && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>📍 {customer.address}</div>}
+              {customer.phone && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{customer.phone}</div>}
+              {customer.email && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{customer.email}</div>}
+              {customer.address && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{customer.address}</div>}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {customer.phone && (
@@ -552,10 +538,10 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* ─── Tracking Links (Plan‑gated) ─── */}
-      <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
+      {/* ─── Tracking Links ─── */}
+      <div style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <span style={{ fontWeight: '500', fontSize: '0.9rem' }}>🔗 Tracking Link</span>
+          <span style={{ fontWeight: '500', fontSize: '0.85rem' }}>🔗 Tracking Link</span>
           {canTracking ? (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
@@ -607,16 +593,38 @@ export default function OrderDetailPage() {
         {balance > 0 ? 'Record Payment' : 'Fully Paid ✓'}
       </button>
 
-      {/* ─── Edit Order Form ─── */}
+      {/* ─── Payments History ─── */}
       <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
-        <div
-          style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-          onClick={() => setEditing(!editing)}
-        >
-          <span style={{ fontWeight: '600' }}>📝 Edit Order</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>{editing ? '▲' : '▼'}</span>
+        <div style={{ padding: '0.7rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
+          Payments History
         </div>
-        {editing && (
+        {payments.length === 0 ? (
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+            No payments recorded yet.
+          </div>
+        ) : (
+          <div>
+            {payments.map((p) => (
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 1rem', borderBottom: '1px solid var(--color-border)' }}>
+                <div>
+                  <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>₦{p.amount?.toLocaleString() || 0}</div>
+                  {p.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{p.note}</div>}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                  {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ─── Edit Order (Collapsible) ─── */}
+      {editing && (
+        <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
+          <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
+            ✏️ Edit Order
+          </div>
           <form onSubmit={handleEditSubmit} style={{ padding: '1rem' }}>
             <div style={{ marginBottom: '0.8rem' }}>
               <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Item / Garment</label>
@@ -652,39 +660,13 @@ export default function OrderDetailPage() {
               <button type="button" onClick={() => setEditing(false)} style={{ padding: '0.5rem 1.5rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
             </div>
           </form>
-        )}
-      </div>
-
-      {/* ─── Payments History ─── */}
-      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
-        <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
-          Payments History
         </div>
-        {payments.length === 0 ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-            No payments recorded yet.
-          </div>
-        ) : (
-          <div>
-            {payments.map((p) => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 1rem', borderBottom: '1px solid var(--color-border)' }}>
-                <div>
-                  <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>₦{p.amount?.toLocaleString() || 0}</div>
-                  {p.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{p.note}</div>}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                  {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* ─── Internal Notes ─── */}
       <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
-        <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
-          Internal Notes
+        <div style={{ padding: '0.7rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600', fontSize: '0.9rem' }}>
+          📝 Internal Notes
           <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: '400', marginLeft: '0.5rem' }}>(only you see these)</span>
         </div>
         <div style={{ padding: '1rem' }}>
@@ -765,4 +747,4 @@ export default function OrderDetailPage() {
       )}
     </div>
   )
-        }
+               }
