@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
+import { Icon } from '../../../components/Icon'
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -100,24 +101,43 @@ export default function OrdersPage() {
 
   const getStatusInfo = (status) => {
     const map = {
-      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
+      'Order placed': { label: 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)' },
       'Cutting':      { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
       'Sewing':       { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready':        { label: 'Ready', color: '#4C7A5E', bg: '#DCEBE2' },
+      'Ready':        { label: 'Ready', color: '#2E7D5E', bg: '#DCEBE2' },
       'Delivered':    { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
     }
-    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
+    return map[status] || { label: status || 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)' }
   }
 
+  // ─── Skeleton ───
   if (loading) {
     return (
-      <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ width: '200px', height: '24px', background: '#E5E0D8', borderRadius: '6px', marginBottom: '1rem' }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ width: '140px', height: '24px', background: 'var(--color-border)', borderRadius: '6px' }} />
+          <div style={{ width: '80px', height: '20px', background: 'var(--color-border)', borderRadius: '6px' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', marginBottom: '1rem' }}>
           {[1,2,3,4].map(i => (
-            <div key={i} style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '8px', boxShadow: 'var(--shadow-sm)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '60%', height: '16px', background: '#E5E0D8', borderRadius: '6px' }} />
-              <div style={{ width: '40%', height: '12px', background: '#E5E0D8', borderRadius: '6px', marginTop: '0.5rem' }} />
+            <div key={i} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ width: '40%', height: '12px', background: 'var(--color-border)', borderRadius: '6px' }} />
+              <div style={{ width: '60%', height: '20px', background: 'var(--color-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} style={{ width: '60px', height: '28px', background: 'var(--color-border)', borderRadius: '20px' }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {[1,2,3].map(i => (
+            <div key={i} style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div><div style={{ width: '120px', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} /><div style={{ width: '80px', height: '12px', background: 'var(--color-border)', borderRadius: '6px', marginTop: '0.3rem' }} /></div>
+                <div style={{ width: '60px', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
+              </div>
             </div>
           ))}
         </div>
@@ -137,28 +157,45 @@ export default function OrdersPage() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', color: 'var(--color-text)' }}>
+      {/* ─── Header ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0, color: 'var(--color-text)' }}>📋 Orders</h1>
-          {businessName && <p style={{ color: 'var(--color-text-muted)', margin: '0.2rem 0 0' }}>{totalOrders} orders · {overdueOrders} overdue</p>}
+          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0, color: 'var(--color-text)' }}>Orders</h1>
+          {businessName && <p style={{ color: 'var(--color-text-muted)', margin: '0.1rem 0 0', fontSize: '0.85rem' }}>{totalOrders} orders · {overdueOrders} overdue</p>}
         </div>
-        <a href={`/dashboard/orders/new?business_id=${getCurrentBusinessId() || ''}`} style={{ padding: '0.6rem 1.2rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '8px', fontWeight: '600', textDecoration: 'none' }}>+ New Order</a>
+        <a href={`/dashboard/orders/new?business_id=${getCurrentBusinessId() || ''}`} style={{ padding: '0.4rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontWeight: '500', fontSize: '0.85rem', textDecoration: 'none' }}>
+          <Icon name="plus" size={14} stroke="#fff" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> New Order
+        </a>
       </div>
 
+      {/* ─── Stats ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Total</span><div style={{ fontWeight: '700', fontSize: '1.2rem' }}>{totalOrders}</div></div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Active</span><div style={{ fontWeight: '700', fontSize: '1.2rem' }}>{activeOrders}</div></div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Ready</span><div style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--color-success)' }}>{readyOrders}</div></div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--color-border)' }}><span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Overdue</span><div style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--color-danger)' }}>{overdueOrders}</div></div>
+        <div style={{ background: 'var(--color-card)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>{totalOrders}</div>
+        </div>
+        <div style={{ background: 'var(--color-card)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Active</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>{activeOrders}</div>
+        </div>
+        <div style={{ background: 'var(--color-card)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Ready</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--color-success)' }}>{readyOrders}</div>
+        </div>
+        <div style={{ background: 'var(--color-card)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Overdue</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--color-danger)' }}>{overdueOrders}</div>
+        </div>
       </div>
 
+      {/* ─── Filters ─── */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <input
           type="text"
           placeholder="Search by customer or order..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ flex: '1 1 200px', padding: '0.5rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }}
+          style={{ flex: '1 1 200px', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.85rem' }}
         />
         <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
           {['all', 'Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered'].map(s => (
@@ -166,13 +203,13 @@ export default function OrdersPage() {
               key={s}
               onClick={() => setFilter(s)}
               style={{
-                padding: '0.3rem 0.8rem',
+                padding: '0.2rem 0.8rem',
                 borderRadius: '20px',
                 border: filter === s ? '2px solid var(--color-accent)' : '1px solid var(--color-border)',
                 background: filter === s ? 'var(--color-accent)' : 'var(--color-card)',
                 color: filter === s ? '#fff' : 'var(--color-text)',
                 cursor: 'pointer',
-                fontSize: '0.75rem',
+                fontSize: '0.7rem',
                 fontWeight: '600',
                 transition: 'all 0.2s'
               }}
@@ -183,11 +220,11 @@ export default function OrdersPage() {
         </div>
       </div>
 
+      {/* ─── Orders List ─── */}
       {filteredOrders.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-          <span style={{ fontSize: '3rem', display: 'block' }}>📦</span>
-          <h3 style={{ color: 'var(--color-text)' }}>No orders found</h3>
-          <p style={{ color: 'var(--color-text-muted)' }}>Try adjusting your filters or create a new order.</p>
+        <div style={{ textAlign: 'center', padding: '2.5rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
+          <p style={{ color: 'var(--color-text-muted)', margin: '0 0 0.5rem' }}>No orders found</p>
+          <a href={`/dashboard/orders/new?business_id=${getCurrentBusinessId() || ''}`} style={{ color: 'var(--color-accent)', fontWeight: '500', textDecoration: 'none' }}>Create first order →</a>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -196,23 +233,23 @@ export default function OrdersPage() {
             const isOverdue = o.due_date && new Date(o.due_date) < new Date() && o.current_status !== 'Delivered'
             const balance = (o.price || 0) - (o.amount_paid || 0)
             return (
-              <div key={o.id} style={{ background: 'var(--color-card)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', transition: 'box-shadow 0.2s' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1 1 200px' }}>
-                    <div style={{ fontWeight: '600', color: 'var(--color-text)' }}>{o.title || 'Untitled'}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{o.customers?.name || 'No customer'}</div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
-                      <span style={{ background: status.bg, color: status.color, padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '600' }}>{status.label}</span>
-                      {isOverdue && <span style={{ background: '#F1DBD3', color: '#D9534F', padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '600' }}>⚠️ Overdue</span>}
-                      {balance > 0 && <span style={{ background: '#F1DBD3', color: '#D9534F', padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '600' }}>₦{balance.toLocaleString()} due</span>}
+              <div key={o.id} style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ flex: '1', minWidth: '150px' }}>
+                    <div style={{ fontWeight: '500', fontSize: '0.9rem', color: 'var(--color-text)' }}>
+                      {o.customers?.name || 'No customer'} <span style={{ fontWeight: '400', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>· {o.title || 'Untitled'}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                      <span style={{ background: status.bg, color: status.color, padding: '0.1rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem', fontWeight: '500' }}>{status.label}</span>
+                      {isOverdue && <span style={{ background: 'var(--color-danger)', color: '#fff', padding: '0.1rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem', fontWeight: '500' }}>Overdue</span>}
+                      {balance > 0 && <span style={{ color: 'var(--color-danger)', fontSize: '0.7rem', fontWeight: '500' }}>₦{balance.toLocaleString()} due</span>}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: '700', color: 'var(--color-text)' }}>₦{o.price?.toLocaleString() || 0}</div>
-                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.3rem' }}>
-                      <a href={`/dashboard/orders/${o.id}?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.75rem', color: 'var(--color-primary)', textDecoration: 'underline' }}>View</a>
-                      <a href={`/dashboard/orders/${o.id}/edit?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textDecoration: 'underline' }}>Edit</a>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: '600', fontSize: '0.9rem', color: 'var(--color-text)' }}>₦{o.price?.toLocaleString() || 0}</span>
+                    <a href={`/dashboard/orders/${o.id}?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>View</a>
+                    <a href={`/dashboard/orders/${o.id}/edit?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Edit</a>
+                    {balance > 0 && <button onClick={() => {/* open settle modal */}} style={{ fontSize: '0.7rem', background: 'var(--color-success)', color: '#fff', border: 'none', padding: '0.1rem 0.6rem', borderRadius: '4px', cursor: 'pointer' }}>Pay</button>}
                   </div>
                 </div>
               </div>
@@ -222,4 +259,4 @@ export default function OrdersPage() {
       )}
     </div>
   )
-                }
+                    }
