@@ -447,7 +447,7 @@ export default function HomePage() {
           ========================================================= */}
       <nav className="navbar">
         <div className="logo-container">
-          <Logo variant="primary" size="medium" />
+          <Logo variant="primary" size="large" />
         </div>
         <div className="nav-links">
           <a href="#why" onClick={(e) => scrollToSection(e, 'why')}>Why Cresoa</a>
