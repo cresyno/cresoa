@@ -14,6 +14,7 @@ export default function CustomersPage() {
   const [error, setError] = useState(null)
   const [businessName, setBusinessName] = useState('')
   const [search, setSearch] = useState('')
+  const [currentBusinessId, setCurrentBusinessId] = useState(null)
 
   const loadCustomers = async () => {
     setLoading(true)
@@ -25,8 +26,13 @@ export default function CustomersPage() {
         return
       }
 
+      // ─── Get business ID from URL or fallback ───
       let businessId = getCurrentBusinessId()
-      if (!businessId) {
+      console.log('🔍 Customers list: businessId from getCurrentBusinessId():', businessId)
+
+      // If businessId is still null or invalid, fallback to owned business
+      if (!businessId || businessId.length < 20) {
+        console.warn('⚠️ Invalid or missing business ID, falling back to owned business')
         const { data: owned } = await supabase
           .from('businesses')
           .select('id, name')
@@ -35,8 +41,21 @@ export default function CustomersPage() {
         if (owned) {
           businessId = owned.id
           setBusinessName(owned.name)
+          console.log('📌 Fallback to owned business:', businessId)
+        } else {
+          // Also check membership as fallback
+          const { data: membership } = await supabase
+            .from('business_memberships')
+            .select('business_id')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (membership) {
+            businessId = membership.business_id
+            console.log('📌 Fallback to membership business:', businessId)
+          }
         }
       } else {
+        // Fetch business name for the valid ID
         const { data: biz } = await supabase
           .from('businesses')
           .select('name')
@@ -50,6 +69,11 @@ export default function CustomersPage() {
         return
       }
 
+      setCurrentBusinessId(businessId)
+
+      console.log('✅ Final business ID used for query:', businessId)
+
+      // ─── Fetch customers using the correct businessId ───
       const { data, error } = await supabase
         .from('customers')
         .select('*')
@@ -57,6 +81,7 @@ export default function CustomersPage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
+      console.log('📊 Customers fetched:', data?.length || 0)
       setCustomers(data || [])
     } catch (err) {
       console.error('Error loading customers:', err)
@@ -76,7 +101,7 @@ export default function CustomersPage() {
     return c.name?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q)
   })
 
-  // ─── Skeleton ───
+  // ─── Skeleton (unchanged) ───
   if (loading) {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
@@ -113,8 +138,9 @@ export default function CustomersPage() {
         <div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0, color: 'var(--color-text)' }}>Customers</h1>
           {businessName && <p style={{ color: 'var(--color-text-muted)', margin: '0.1rem 0 0', fontSize: '0.85rem' }}>{customers.length} customers</p>}
+          {currentBusinessId && <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Business ID: {currentBusinessId.slice(0,8)}...</p>}
         </div>
-        <a href={`/dashboard/customers/new?business_id=${getCurrentBusinessId() || ''}`} style={{ padding: '0.4rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontWeight: '500', fontSize: '0.85rem', textDecoration: 'none' }}>
+        <a href={`/dashboard/customers/new?business_id=${currentBusinessId || ''}`} style={{ padding: '0.4rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontWeight: '500', fontSize: '0.85rem', textDecoration: 'none' }}>
           <Icon name="plus" size={14} stroke="#fff" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Add Customer
         </a>
       </div>
@@ -132,7 +158,7 @@ export default function CustomersPage() {
       {filteredCustomers.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '2.5rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
           <p style={{ color: 'var(--color-text-muted)', margin: '0 0 0.5rem' }}>No customers found</p>
-          <a href={`/dashboard/customers/new?business_id=${getCurrentBusinessId() || ''}`} style={{ color: 'var(--color-accent)', fontWeight: '500', textDecoration: 'none' }}>Add first customer →</a>
+          <a href={`/dashboard/customers/new?business_id=${currentBusinessId || ''}`} style={{ color: 'var(--color-accent)', fontWeight: '500', textDecoration: 'none' }}>Add first customer →</a>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
@@ -141,8 +167,8 @@ export default function CustomersPage() {
               <div style={{ fontWeight: '500', fontSize: '0.95rem', color: 'var(--color-text)' }}>{c.name}</div>
               {c.phone && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{c.phone}</div>}
               <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                <a href={`/dashboard/customers/${c.id}?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>View</a>
-                <a href={`/dashboard/customers/${c.id}/edit?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Edit</a>
+                <a href={`/dashboard/customers/${c.id}?business_id=${currentBusinessId || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>View</a>
+                <a href={`/dashboard/customers/${c.id}/edit?business_id=${currentBusinessId || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Edit</a>
               </div>
             </div>
           ))}
@@ -150,4 +176,4 @@ export default function CustomersPage() {
       )}
     </div>
   )
-                  }
+            }
