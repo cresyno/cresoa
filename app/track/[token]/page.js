@@ -1,362 +1,303 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { Icon } from '../../../components/Icon'
 
-export default function TrackingPage() {
-  const params = useParams()
-  const searchParams = useSearchParams()
-  const token = params.token
+// Stage definitions per industry
+const STAGES_BY_INDUSTRY = {
+  fashion: ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered'],
+  repairs: ['Received', 'Diagnosing', 'Awaiting Parts', 'Repairing', 'Testing', 'Ready', 'Delivered'],
+  default: ['Order placed', 'Processing', 'Ready', 'Delivered'],
+}
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+export default function TrackPage() {
+  const params = useParams()
+  const token = params?.token
+
   const [order, setOrder] = useState(null)
   const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [industry, setIndustry] = useState('default')
+  const [stages, setStages] = useState(STAGES_BY_INDUSTRY.default)
 
-  // ─── Load order data by tracking token or ID ───
   useEffect(() => {
+    if (!token) {
+      setError(true)
+      setLoading(false)
+      return
+    }
+
     const load = async () => {
-      setLoading(true)
-      setError(null)
       try {
-        let orderData = null
-        let orderError = null
-
-        // First try by tracking_token
-        const { data: tokenData, error: tokenError } = await supabase
+        // 1. Fetch the order by tracking token
+        const { data: orderData, error: orderError } = await supabase
           .from('orders')
-          .select(`
-            *,
-            customers (id, name, phone, email),
-            businesses (id, name, logo_url, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message)
-          `)
+          .select('*, customers(name, phone)')
           .eq('tracking_token', token)
-          .maybeSingle()
-
-        if (tokenData) {
-          orderData = tokenData
-        } else {
-          // If not found by token, try by ID (fallback)
-          const { data: idData, error: idError } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              customers (id, name, phone, email),
-              businesses (id, name, logo_url, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message)
-            `)
-            .eq('id', token)
-            .maybeSingle()
-
-          if (idData) {
-            orderData = idData
-          } else {
-            orderError = tokenError || idError || new Error('Order not found')
-          }
-        }
+          .single()
 
         if (orderError || !orderData) {
-          throw new Error('Order not found. Please check the tracking link.')
+          console.error('Order error:', orderError)
+          setError(true)
+          setLoading(false)
+          return
         }
 
         setOrder(orderData)
-        setCustomer(orderData.customers)
-        setBusiness(orderData.businesses)
+        if (orderData.customers) setCustomer(orderData.customers)
 
+        // 2. Fetch the business details
+        const { data: businessData } = await supabase
+          .from('businesses')
+          .select('name, phone, whatsapp, location, sector, plan, tracking_primary_color, tracking_bg_color, tracking_logo_url, tracking_welcome_message, tracking_footer_message')
+          .eq('id', orderData.business_id)
+          .single()
+
+        setBusiness(businessData)
+
+        // 3. Detect industry
+        let detectedIndustry = 'default'
+        if (businessData) {
+          const sector = businessData.sector || ''
+          if (sector.toLowerCase().includes('fashion') || sector.toLowerCase().includes('wear')) {
+            detectedIndustry = 'fashion'
+          } else if (sector.toLowerCase().includes('repair') || sector.toLowerCase().includes('technical')) {
+            detectedIndustry = 'repairs'
+          }
+        }
+        setIndustry(detectedIndustry)
+        setStages(STAGES_BY_INDUSTRY[detectedIndustry] || STAGES_BY_INDUSTRY.default)
+
+        setLoading(false)
       } catch (err) {
-        console.error('Error loading order:', err)
-        setError(err.message || 'Order not found. Please check the tracking link.')
-      } finally {
+        console.error('Load error:', err)
+        setError(true)
         setLoading(false)
       }
     }
+
     load()
   }, [token])
 
-  // ─── Get status info ───
-  const getStatusInfo = (status) => {
+  // ─── Status info with SVG icons ───
+  const getStatusInfo = (status, industry) => {
     const map = {
-      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
-      'Cutting':      { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
-      'Sewing':       { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready':        { label: 'Ready', color: '#2E7D5E', bg: '#DCEBE2' },
-      'Delivered':    { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
+      // Fashion
+      'Order placed': { label: 'Order Placed', icon: 'file-text', color: '#6B6255', bg: '#F0EDE8' },
+      'Cutting': { label: 'Cutting', icon: 'scissors', color: '#B4881E', bg: '#F6E9C8' },
+      'Sewing': { label: 'Sewing', icon: 'sewing', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Ready': { label: 'Ready for Pickup', icon: 'check-circle', color: '#4C7A5E', bg: '#DCEBE2' },
+      'Delivered': { label: 'Delivered', icon: 'package', color: '#6B6255', bg: '#E8E0D5' },
+      // Repairs
+      'Received': { label: 'Received', icon: 'inbox', color: '#6B6255', bg: '#F0EDE8' },
+      'Diagnosing': { label: 'Diagnosing', icon: 'search', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Awaiting Parts': { label: 'Awaiting Parts', icon: 'clock', color: '#B4881E', bg: '#F6E9C8' },
+      'Repairing': { label: 'Repairing', icon: 'tool', color: '#1E3A5F', bg: '#D6E0EB' },
+      'Testing': { label: 'Testing', icon: 'flask', color: '#1E3A5F', bg: '#D6E0EB' },
+      // Default
+      'Processing': { label: 'Processing', icon: 'settings', color: '#6B6255', bg: '#F0EDE8' },
     }
-    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
+    return map[status] || { label: status || 'Processing', icon: 'file-text', color: '#6B6255', bg: '#F0EDE8' }
   }
 
-  // ─── Get custom colours and messages from business ───
-  const primaryColor = business?.tracking_primary_color || '#D4A52A'
-  const bgColor = business?.tracking_bg_color || '#F8F6F2'
-  const welcomeMessage = business?.tracking_welcome_message || 'Track your order status'
-  const footerMessage = business?.tracking_footer_message || 'Thank you for choosing us'
-  const logoUrl = business?.tracking_logo_url || business?.logo_url || null
+  const formatDate = (d) => {
+    if (!d) return ''
+    return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
 
+  const formatPhone = (phone) => {
+    if (!phone) return ''
+    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
+  }
+
+  // ─── Get icon component ───
+  const getIcon = (name, size = 16, stroke = 'currentColor') => {
+    return <Icon name={name} size={size} stroke={stroke} />
+  }
+
+  // Loading state
   if (loading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: bgColor,
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '1.5rem'
-      }}>
-        <div style={{ 
-          width: '40px', 
-          height: '40px', 
-          border: '3px solid #E5E0D8', 
-          borderTop: `3px solid ${primaryColor}`, 
-          borderRadius: '50%', 
-          animation: 'spin 0.8s linear infinite' 
-        }} />
+      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '40px', height: '40px', border: '4px solid #E5E0D8', borderTop: '4px solid #0F2B4A', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
 
-  if (error) {
+  if (error || !order) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: bgColor,
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '1.5rem',
-        flexDirection: 'column',
-        gap: '1rem',
-        textAlign: 'center'
-      }}>
-        <Icon name="alert-triangle" size={48} stroke="#D9534F" />
-        <h1 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1A1A1A' }}>Order not found</h1>
-        <p style={{ color: '#8A8A8A' }}>{error}</p>
+      <div style={{ minHeight: '100vh', background: '#F8F6F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '2rem', maxWidth: '400px', border: '1px solid #E5E0D8' }}>
+          <Icon name="alert-triangle" size={48} stroke="#D9534F" />
+          <h1 style={{ color: '#0F2B4A' }}>Order not found</h1>
+          <p style={{ color: '#8A8A8A' }}>The tracking link may be invalid or expired.</p>
+        </div>
       </div>
     )
   }
 
-  if (!order) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: bgColor,
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        padding: '1.5rem',
-        flexDirection: 'column',
-        gap: '1rem',
-        textAlign: 'center'
-      }}>
-        <Icon name="file-text" size={48} stroke="#C8C0B5" />
-        <h1 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1A1A1A' }}>Order not found</h1>
-        <p style={{ color: '#8A8A8A' }}>The order you're looking for doesn't exist or has been removed.</p>
-      </div>
-    )
-  }
+  // ─── Customisation settings ───
+  const isProOrBeta = business?.plan === 'pro' || business?.plan === 'beta'
+  const primaryColor = isProOrBeta && business?.tracking_primary_color ? business.tracking_primary_color : '#D4A52A'
+  const bgColor = isProOrBeta && business?.tracking_bg_color ? business.tracking_bg_color : '#F8F6F2'
+  const logoUrl = isProOrBeta ? business?.tracking_logo_url : null
+  const welcomeMsg = isProOrBeta ? business?.tracking_welcome_message : null
+  const footerMsg = isProOrBeta ? business?.tracking_footer_message : null
 
-  const statusInfo = getStatusInfo(order.current_status)
-  const balance = (order.price || 0) - (order.amount_paid || 0)
-  const isFullyPaid = balance <= 0
+  const status = getStatusInfo(order.current_status, industry)
+  const currentIndex = stages.indexOf(order.current_status)
+  const balance = order.price - order.amount_paid
+  const isRepairs = industry === 'repairs'
+  const hasContact = business?.phone || business?.whatsapp
+  const statusColor = status.color
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: bgColor,
-      padding: '1.5rem',
-      fontFamily: "'Inter', -apple-system, sans-serif"
-    }}>
-      {/* ─── Header ─── */}
-      <div style={{ 
-        maxWidth: '600px', 
-        margin: '0 auto', 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '0.8rem', 
-        marginBottom: '1.5rem' 
-      }}>
-        {logoUrl ? (
-          <img 
-            src={logoUrl} 
-            alt={business?.name || 'Business'} 
-            style={{ height: '44px', width: 'auto', objectFit: 'contain' }} 
-          />
-        ) : (
-          <div style={{ 
-            width: '44px', 
-            height: '44px', 
-            borderRadius: '50%', 
-            background: primaryColor,
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            color: '#fff',
-            fontWeight: '700',
-            fontSize: '1.2rem'
-          }}>
-            {(business?.name || 'C')[0].toUpperCase()}
-          </div>
+    <div style={{ minHeight: '100vh', background: bgColor, padding: '1.2rem 1rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`
+        .glass {
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 16px;
+          box-shadow: 0 4px 16px rgba(15,43,74,0.06);
+          padding: 1.5rem;
+          max-width: 480px;
+          margin: 0 auto 1rem;
+        }
+        .glass-header {
+          text-align: center;
+          border-bottom: 1px solid #E5E0D8;
+          padding-bottom: 0.8rem;
+        }
+        .business-name {
+          color: #0F2B4A;
+          font-size: 1.2rem;
+          font-weight: 700;
+          margin: 0;
+        }
+        .business-name span { color: ${primaryColor}; }
+        .tagline { color: #8A8A8A; font-size: 0.75rem; margin: 0.2rem 0 0; }
+        .business-contact { display: flex; justify-content: center; gap: 0.8rem; margin-top: 0.3rem; flex-wrap: wrap; }
+        .business-contact a { color: #0F2B4A; font-size: 0.75rem; text-decoration: none; background: rgba(255,255,255,0.5); padding: 0.2rem 0.8rem; border-radius: 20px; border: 1px solid #E5E0D8; display: inline-flex; align-items: center; gap: 0.3rem; }
+        .business-contact a:hover { background: #fff; }
+        .business-location { color: #8A8A8A; font-size: 0.7rem; margin-top: 0.2rem; }
+        .order-title { color: #0F2B4A; font-size: 1.2rem; font-weight: 700; margin: 0; }
+        .order-customer { color: #8A8A8A; font-size: 0.9rem; margin: 0.2rem 0 1rem; }
+        .status-badge { display: inline-block; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background: ${status.bg}; color: ${statusColor}; }
+        .timeline { display: flex; justify-content: space-between; position: relative; padding: 0.5rem 0; margin: 0.5rem 0 1rem; }
+        .timeline::before { content: ''; position: absolute; top: 16px; left: 5%; right: 5%; height: 2px; background: #E5E0D8; z-index: 0; }
+        .timeline .line-done { position: absolute; top: 16px; left: 5%; height: 2px; background: #2E7D5E; z-index: 0; transition: width 0.5s ease; }
+        .status-dot { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; z-index: 1; }
+        .status-dot .dot { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #E5E0D8; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; transition: all 0.3s ease; }
+        .status-dot .dot.active { border-color: ${primaryColor}; background: ${primaryColor}; color: #0F2B4A; }
+        .status-dot .dot.done { border-color: #2E7D5E; background: #2E7D5E; color: #fff; }
+        .status-dot .label { font-size: 0.55rem; color: #8A8A8A; text-align: center; margin-top: 0.3rem; max-width: 50px; line-height: 1.2; }
+        .status-dot .label.active { color: #0F2B4A; font-weight: 600; }
+        .detail-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid #F0EDE8; }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { color: #8A8A8A; font-size: 0.85rem; }
+        .detail-value { font-weight: 600; color: #0F2B4A; font-size: 0.85rem; text-align: right; }
+        .detail-value.gold { color: ${primaryColor}; }
+        .detail-value.positive { color: #D9534F; }
+        .detail-value.zero { color: #2E7D5E; }
+        .btn-whatsapp { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 8px; background: #25D366; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: transform 0.1s ease; border: none; cursor: pointer; }
+        .btn-whatsapp:hover { transform: scale(1.02); }
+        .btn-whatsapp:active { transform: scale(0.97); }
+        .footer { text-align: center; color: #C8C0B5; font-size: 0.7rem; padding-top: 1rem; }
+        .footer strong { color: #0F2B4A; }
+        @media (max-width: 480px) {
+          .glass { padding: 1rem; }
+          .status-dot .dot { width: 28px; height: 28px; font-size: 0.7rem; }
+          .status-dot .label { font-size: 0.5rem; max-width: 40px; }
+          .timeline .line-done { top: 14px; }
+          .timeline::before { top: 14px; }
+          .business-contact a { font-size: 0.65rem; padding: 0.15rem 0.6rem; }
+        }
+      `}</style>
+
+      {/* ─── HEADER ─── */}
+      <div className="glass glass-header">
+        {logoUrl && (
+          <img src={logoUrl} alt="Business logo" style={{ maxHeight: '60px', marginBottom: '0.5rem' }} />
         )}
-        <span style={{ fontWeight: '600', fontSize: '1rem', color: '#1A1A1A' }}>
-          {business?.name || 'Cresoa'}
-        </span>
-      </div>
-
-      {/* ─── Welcome Message ─── */}
-      <div style={{ maxWidth: '600px', margin: '0 auto', marginBottom: '1.5rem' }}>
-        <h1 style={{ 
-          fontSize: '1.5rem', 
-          fontWeight: '700', 
-          color: primaryColor,
-          margin: '0 0 0.2rem'
-        }}>
-          {welcomeMessage}
+        <h1 className="business-name">
+          {business?.name || 'Business'} <span>✦</span>
         </h1>
-        <p style={{ color: '#8A8A8A', fontSize: '0.95rem', margin: 0 }}>
-          {customer?.name ? `Order for ${customer.name}` : 'Order status'}
+        <p className="tagline">
+          {welcomeMsg || `Track your ${isRepairs ? 'repair' : 'order'} status`}
         </p>
-      </div>
-
-      {/* ─── Order Details ─── */}
-      <div style={{ 
-        maxWidth: '600px', 
-        margin: '0 auto', 
-        background: '#FFFFFF', 
-        borderRadius: '16px', 
-        padding: '1.5rem',
-        boxShadow: '0 4px 16px rgba(15,43,74,0.06)',
-        border: '1px solid #E5E0D8'
-      }}>
-        {/* ─── Status Badge ─── */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '1rem',
-          paddingBottom: '0.8rem',
-          borderBottom: '1px solid #E5E0D8'
-        }}>
-          <div>
-            <div style={{ fontSize: '0.7rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Current Status</div>
-            <div style={{ 
-              display: 'inline-block',
-              background: statusInfo.bg, 
-              color: statusInfo.color, 
-              padding: '0.2rem 0.8rem', 
-              borderRadius: '20px', 
-              fontSize: '0.85rem', 
-              fontWeight: '600'
-            }}>
-              {statusInfo.label}
-            </div>
-          </div>
-          <div style={{ 
-            fontSize: '0.7rem', 
-            color: isFullyPaid ? '#2E7D5E' : '#D9534F',
-            fontWeight: '600'
-          }}>
-            {isFullyPaid ? 'Paid' : `₦${balance.toLocaleString()} due`}
-          </div>
-        </div>
-
-        {/* ─── Order Info ─── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-          <div>
-            <div style={{ fontSize: '0.65rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Order</div>
-            <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{order.title || 'Untitled'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.65rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
-            <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>₦{order.price?.toLocaleString() || 0}</div>
-          </div>
-        </div>
-
-        {/* ─── Customer Info ─── */}
-        {customer && (
-          <div style={{ 
-            marginTop: '0.8rem', 
-            paddingTop: '0.8rem', 
-            borderTop: '1px solid #E5E0D8' 
-          }}>
-            <div style={{ fontSize: '0.65rem', color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Customer</div>
-            <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>{customer.name}</div>
-            {customer.phone && (
-              <div style={{ fontSize: '0.8rem', color: '#8A8A8A' }}>{customer.phone}</div>
+        {hasContact && (
+          <div className="business-contact">
+            {business.phone && (
+              <a href={`tel:${business.phone}`}>
+                <Icon name="phone" size={12} stroke="#0F2B4A" /> Call {business.phone}
+              </a>
+            )}
+            {business.whatsapp && (
+              <a href={`https://wa.me/${formatPhone(business.whatsapp)}`} target="_blank" rel="noopener noreferrer">
+                <Icon name="message-circle" size={12} stroke="#0F2B4A" /> WhatsApp
+              </a>
             )}
           </div>
         )}
+        {business?.location && (
+          <div className="business-location">
+            <Icon name="map-pin" size={12} stroke="#8A8A8A" style={{ verticalAlign: 'middle' }} /> {business.location}
+          </div>
+        )}
+      </div>
 
-        {/* ─── Progress Bar ─── */}
-        <div style={{ marginTop: '1rem' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            fontSize: '0.65rem', 
-            color: '#8A8A8A', 
-            marginBottom: '0.2rem' 
-          }}>
-            <span>Progress</span>
-            <span>{order.current_status === 'Delivered' ? 'Complete' : 'In progress'}</span>
+      {/* ─── ORDER CARD ─── */}
+      <div className="glass">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.3rem' }}>
+          <div>
+            <h2 className="order-title">{order.title || 'Order'}</h2>
+            <p className="order-customer">{customer?.name || 'Customer'}</p>
           </div>
-          <div style={{ 
-            width: '100%', 
-            height: '6px', 
-            background: '#F0EDE8', 
-            borderRadius: '4px', 
-            overflow: 'hidden' 
-          }}>
-            <div style={{ 
-              width: order.current_status === 'Delivered' ? '100%' : '60%', 
-              height: '100%', 
-              background: primaryColor, 
-              borderRadius: '4px',
-              transition: 'width 0.6s ease'
-            }} />
-          </div>
+          <span className="status-badge" style={{ background: status.bg, color: status.color }}>
+            <Icon name={status.icon} size={12} stroke={status.color} style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} />
+            {status.label}
+          </span>
         </div>
 
-        {/* ─── Status Steps ─── */}
-        <div style={{ 
-          marginTop: '1.2rem', 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          position: 'relative',
-          padding: '0 0.2rem'
-        }}>
-          {['Placed', 'Cutting', 'Sewing', 'Ready', 'Delivered'].map((label, idx) => {
-            const statuses = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
-            const isActive = statuses.indexOf(order.current_status) >= idx
+        {isRepairs && order.device_type && (
+          <div style={{ background: 'rgba(255,255,255,0.3)', borderRadius: '8px', padding: '0.4rem 0.8rem', marginTop: '0.2rem', fontSize: '0.85rem', color: '#0F2B4A', display: 'inline-block' }}>
+            <Icon name="smartphone" size={12} stroke="#0F2B4A" style={{ verticalAlign: 'middle' }} /> {order.device_type} {order.device_model || ''}
+            {order.serial_number && ` · SN: ${order.serial_number}`}
+          </div>
+        )}
+
+        <div className="timeline">
+          <div
+            className="line-done"
+            style={{
+              width: `${(currentIndex / (stages.length - 1)) * 90 + 5}%`,
+              maxWidth: '90%',
+            }}
+          />
+          {stages.map((stage, i) => {
+            const isActive = i === currentIndex
+            const isDone = i < currentIndex
+            const info = getStatusInfo(stage, industry)
             return (
-              <div key={label} style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center', 
-                flex: 1,
-                gap: '0.3rem'
-              }}>
-                <div style={{ 
-                  width: '24px', 
-                  height: '24px', 
-                  borderRadius: '50%', 
-                  background: isActive ? primaryColor : '#E5E0D8',
-                  color: isActive ? '#fff' : '#8A8A8A',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  fontSize: '0.6rem',
-                  fontWeight: '700'
-                }}>
-                  {idx + 1}
+              <div key={stage} className="status-dot">
+                <div className={`dot ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`}>
+                  {isActive ? (
+                    <Icon name={info.icon} size={14} stroke={isActive ? '#0F2B4A' : '#fff'} />
+                  ) : isDone ? (
+                    <Icon name="check" size={14} stroke="#fff" />
+                  ) : (
+                    i + 1
+                  )}
                 </div>
-                <div style={{ 
-                  fontSize: '0.5rem', 
-                  color: isActive ? primaryColor : '#8A8A8A',
-                  fontWeight: isActive ? '600' : '400',
-                  textAlign: 'center'
-                }}>
-                  {label}
+                <div className={`label ${isActive ? 'active' : ''}`}>
+                  {info.label}
                 </div>
               </div>
             )
@@ -364,27 +305,74 @@ export default function TrackingPage() {
         </div>
       </div>
 
-      {/* ─── Footer ─── */}
-      <div style={{ 
-        maxWidth: '600px', 
-        margin: '0 auto', 
-        marginTop: '1.5rem', 
-        textAlign: 'center' 
-      }}>
-        <p style={{ color: '#8A8A8A', fontSize: '0.75rem', margin: 0 }}>
-          {footerMessage}
-        </p>
-        <p style={{ color: '#C8C0B5', fontSize: '0.6rem', marginTop: '0.3rem' }}>
-          Powered by Cresoa
-        </p>
+      {/* ─── DETAILS ─── */}
+      <div className="glass">
+        <div className="detail-row">
+          <span className="detail-label">Order</span>
+          <span className="detail-value">{order.title || '—'}</span>
+        </div>
+        <div className="detail-row">
+          <span className="detail-label">Status</span>
+          <span className="detail-value" style={{ color: status.color }}>{status.label}</span>
+        </div>
+        {order.due_date && (
+          <div className="detail-row">
+            <span className="detail-label">Expected by</span>
+            <span className="detail-value">{formatDate(order.due_date)}</span>
+          </div>
+        )}
+        {isRepairs && order.device_type && (
+          <div className="detail-row">
+            <span className="detail-label">Device</span>
+            <span className="detail-value">{order.device_type} {order.device_model || ''}</span>
+          </div>
+        )}
+        <div className="detail-row">
+          <span className="detail-label">Total</span>
+          <span className="detail-value gold">₦{order.price.toLocaleString()}</span>
+        </div>
+        <div className="detail-row">
+          <span className="detail-label">Paid</span>
+          <span className="detail-value gold">₦{order.amount_paid.toLocaleString()}</span>
+        </div>
+        <div className="detail-row">
+          <span className="detail-label">Balance</span>
+          <span className={`detail-value ${balance > 0 ? 'positive' : 'zero'}`}>
+            {balance > 0 ? `₦${balance.toLocaleString()}` : (
+              <><Icon name="check" size={12} stroke="#2E7D5E" /> Paid in full</>
+            )}
+          </span>
+        </div>
       </div>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 480px) {
-          .tracking-header { flex-direction: column; align-items: flex-start; }
-        }
-      `}</style>
+      {/* ─── CONTACT ─── */}
+      {business?.whatsapp && (
+        <div className="glass" style={{ textAlign: 'center' }}>
+          <p style={{ color: '#8A8A8A', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>
+            Have questions? Contact the business
+          </p>
+          <a
+            href={`https://wa.me/${formatPhone(business.whatsapp)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-whatsapp"
+          >
+            <Icon name="message-circle" size={16} stroke="#fff" /> Message on WhatsApp
+          </a>
+        </div>
+      )}
+
+      {/* ─── CUSTOM FOOTER MESSAGE ─── */}
+      {footerMsg && (
+        <div className="glass" style={{ textAlign: 'center', padding: '1rem' }}>
+          <p style={{ color: '#8A8A8A', fontSize: '0.8rem', margin: 0 }}>{footerMsg}</p>
+        </div>
+      )}
+
+      {/* ─── POWERED BY ─── */}
+      <div className="footer">
+        Powered by <a href="/" style={{ color: '#0F2B4A', fontWeight: '600', textDecoration: 'none' }}>Cresoa</a> · Built for Nigerian businesses
+      </div>
     </div>
   )
       }
