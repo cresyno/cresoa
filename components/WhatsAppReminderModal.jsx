@@ -158,4 +158,4 @@ export default function WhatsAppReminderModal({ reminder, onClose, businessId })
       </div>
     </div>
   )
-        }
+}
