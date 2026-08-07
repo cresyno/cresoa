@@ -3,715 +3,392 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { getPlanLimits } from '../../../../lib/planLimits'
+import { Icon } from '../../../../components/Icon'
+
 export default function NewOrderPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-
-  const [businessId, setBusinessId] = useState(null)
-  const [sector, setSector] = useState(null)
-  const [plan, setPlan] = useState('free')
-  const [currentOrderCount, setCurrentOrderCount] = useState(0)
-  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
+  const [error, setError] = useState(null)
+  const [businessId, setBusinessId] = useState(null)
+  const [businessPlan, setBusinessPlan] = useState('free')
+  const [customers, setCustomers] = useState([])
+  const [orderCount, setOrderCount] = useState(0)
 
-  // Form fields
-  const [customerId, setCustomerId] = useState('')
-  const [itemName, setItemName] = useState('')
-  const [price, setPrice] = useState('')
-  const [deposit, setDeposit] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [status, setStatus] = useState('Order placed')
+  const [formData, setFormData] = useState({
+    customer_id: '',
+    customer_name: '',
+    customer_phone: '',
+    customer_email: '',
+    title: '',
+    price: '',
+    amount_paid: '',
+    due_date: '',
+    current_status: 'Order placed',
+    notes: '',
+  })
 
-  // Repairs-specific fields
-  const [deviceType, setDeviceType] = useState('')
-  const [deviceModel, setDeviceModel] = useState('')
-  const [serialNumber, setSerialNumber] = useState('')
-  const [deviceCondition, setDeviceCondition] = useState('')
-  const [deviceColor, setDeviceColor] = useState('')
-  const [issueDescription, setIssueDescription] = useState('')
-  const [estimatedTime, setEstimatedTime] = useState('')
-  const [partsUsed, setPartsUsed] = useState([])
-  const [partName, setPartName] = useState('')
-  const [partQuantity, setPartQuantity] = useState(1)
-  const [partCost, setPartCost] = useState('')
-
-  // Duplicate order
-  const [isDuplicating, setIsDuplicating] = useState(false)
-
-  // New customer
-  const [showNewCustomer, setShowNewCustomer] = useState(false)
-  const [newCustomerName, setNewCustomerName] = useState('')
-  const [newCustomerPhone, setNewCustomerPhone] = useState('')
-  const [creatingCustomer, setCreatingCustomer] = useState(false)
+  const [isNewCustomer, setIsNewCustomer] = useState(false)
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
+
+        const bizId = getCurrentBusinessId()
+        if (!bizId) {
+          router.push('/dashboard')
+          return
+        }
+        setBusinessId(bizId)
+
+        // Fetch business plan
+        const { data: bizData } = await supabase
+          .from('businesses')
+          .select('plan')
+          .eq('id', bizId)
+          .single()
+        if (bizData) setBusinessPlan(bizData.plan || 'free')
+
+        // Fetch customers
+        const { data: custData } = await supabase
+          .from('customers')
+          .select('id, name, phone, email')
+          .eq('business_id', bizId)
+          .order('name')
+        setCustomers(custData || [])
+
+        // Count existing orders for plan limit
+        const { count } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('business_id', bizId)
+        setOrderCount(count || 0)
+
+      } catch (err) {
+        console.error(err)
+        setError('Failed to load data.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [router])
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
+  }
+
+  const handleCustomerChange = (e) => {
+    const value = e.target.value
+    if (value === 'new') {
+      setIsNewCustomer(true)
+      setFormData({
+        ...formData,
+        customer_id: '',
+        customer_name: '',
+        customer_phone: '',
+        customer_email: '',
+      })
+    } else {
+      setIsNewCustomer(false)
+      const selected = customers.find(c => c.id === value)
+      setFormData({
+        ...formData,
+        customer_id: value,
+        customer_name: selected?.name || '',
+        customer_phone: selected?.phone || '',
+        customer_email: selected?.email || '',
+      })
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      if (!businessId) {
+        setError('No business selected.')
+        setSaving(false)
+        return
+      }
+
+      // ─── Plan limit check ───
+      const limits = getPlanLimits(businessPlan)
+      if (orderCount >= limits.orders) {
+        setError(`You have reached the limit of ${limits.orders} orders on your current plan. Please upgrade to add more.`)
+        setSaving(false)
+        return
+      }
+
+      // ─── Validate form ───
+      if (!formData.title) {
+        setError('Please enter an item / garment name.')
+        setSaving(false)
+        return
+      }
+
+      const price = parseFloat(formData.price)
+      if (!price || price <= 0) {
+        setError('Please enter a valid price.')
+        setSaving(false)
+        return
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
         router.push('/login')
         return
       }
 
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('id, sector, plan')
-        .eq('owner_id', user.id)
-        .single()
-
-      if (!business) {
-        router.push('/onboarding')
-        return
-      }
-
-      setBusinessId(business.id)
-      setSector(business.sector)
-      setPlan(business.plan || 'free')
-
-      // Count existing orders
-      const { count } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', business.id)
-      setCurrentOrderCount(count || 0)
-
-      // Load customers
-      const { data: customerData } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('business_id', business.id)
-        .order('name', { ascending: true })
-      setCustomers(customerData || [])
-
-      // Check for duplicate param
-      const duplicateId = searchParams?.get('duplicate')
-      if (duplicateId) {
-        await loadDuplicateOrder(duplicateId)
-      }
-
-      setLoading(false)
-    }
-
-    load()
-  }, [searchParams])
-
-  const loadDuplicateOrder = async (orderId) => {
-    setIsDuplicating(true)
-    const { data: order } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', orderId)
-      .single()
-
-    if (order) {
-      setCustomerId(order.customer_id || '')
-      setItemName(order.title || '')
-      setPrice(order.price?.toString() || '')
-      setDeposit(order.amount_paid?.toString() || '')
-      setDueDate(order.due_date || '')
-      setStatus(order.current_status || 'Order placed')
-      // For repairs
-      setDeviceType(order.device_type || '')
-      setDeviceModel(order.device_model || '')
-      setSerialNumber(order.serial_number || '')
-      setDeviceCondition(order.device_condition || '')
-      setDeviceColor(order.device_color || '')
-      setIssueDescription(order.customer_notes || '')
-      setEstimatedTime(order.estimated_repair_time?.toString() || '')
-      setPartsUsed(order.parts_used || [])
-    }
-    setIsDuplicating(false)
-  }
-
-  // Part management
-  const addPart = () => {
-    if (!partName.trim() || !partCost) return
-    const costNum = Number(partCost)
-    const qty = Number(partQuantity) || 1
-    setPartsUsed([...partsUsed, { name: partName.trim(), quantity: qty, cost: costNum }])
-    setPartName('')
-    setPartQuantity(1)
-    setPartCost('')
-  }
-
-  const removePart = (index) => {
-    setPartsUsed(partsUsed.filter((_, i) => i !== index))
-  }
-
-  // New customer
-  const handleCreateCustomer = async (e) => {
-    e.preventDefault()
-    setCreatingCustomer(true)
-    setMessage('')
-
-    const phoneDigits = newCustomerPhone.replace(/\D/g, '')
-    if (!newCustomerName.trim() || phoneDigits.length !== 11) {
-      setMessage('Please enter a valid name and 11-digit phone number.')
-      setCreatingCustomer(false)
-      return
-    }
-
-    const { data: customer, error } = await supabase
-      .from('customers')
-      .insert({
+      // ─── Build payload ───
+      const payload = {
         business_id: businessId,
-        name: newCustomerName.trim(),
-        phone: phoneDigits,
+        title: formData.title,
+        price: price,
+        amount_paid: parseFloat(formData.amount_paid) || 0,
+        due_date: formData.due_date || null,
+        current_status: formData.current_status,
+        notes: formData.notes || null,
+      }
+
+      if (isNewCustomer) {
+        payload.customer_name = formData.customer_name
+        payload.customer_phone = formData.customer_phone || null
+        payload.customer_email = formData.customer_email || null
+      } else if (formData.customer_id) {
+        payload.customer_id = formData.customer_id
+      }
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(payload)
       })
-      .select()
-      .single()
 
-    if (error) {
-      setMessage('Error creating customer: ' + error.message)
-      setCreatingCustomer(false)
-      return
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create order')
+      }
+
+      router.push(`/dashboard/orders?business_id=${businessId}`)
+    } catch (err) {
+      console.error('Error:', err)
+      setError(err.message)
+      setSaving(false)
     }
-
-    setCustomers([...customers, customer])
-    setCustomerId(customer.id)
-    setNewCustomerName('')
-    setNewCustomerPhone('')
-    setShowNewCustomer(false)
-    setCreatingCustomer(false)
-    setMessage('✅ Customer created!')
   }
 
-  // Submit
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setMessage('')
-    setSaving(true)
-
-    if (!customerId) {
-      setMessage('Please select a customer.')
-      setSaving(false)
-      return
-    }
-
-    // Plan limit check
-    const limits = getPlanLimits(plan)
-    if (currentOrderCount >= limits.orders) {
-      setMessage(`❌ You've reached the limit of ${limits.orders} orders on your Free plan. Please upgrade to add more.`)
-      setSaving(false)
-      return
-    }
-
-    // Validate based on sector
-    const isRepairs = sector === 'Repairs & Technical Services'
-    if (isRepairs) {
-      if (!deviceType.trim()) {
-        setMessage('Please enter the device type.')
-        setSaving(false)
-        return
-      }
-      if (!issueDescription.trim()) {
-        setMessage('Please describe the issue.')
-        setSaving(false)
-        return
-      }
-    }
-
-    if (!itemName.trim() && !isRepairs) {
-      setMessage('Please enter the item/garment name.')
-      setSaving(false)
-      return
-    }
-
-    if (!price || Number(price) <= 0) {
-      setMessage('Please enter a valid price.')
-      setSaving(false)
-      return
-    }
-
-    const priceNum = Number(price)
-    const depositNum = Number(deposit) || 0
-    const trackingToken = crypto.randomUUID()
-
-    // Build order object
-    const orderData = {
-      business_id: businessId,
-      customer_id: customerId,
-      title: isRepairs ? `${deviceType} ${deviceModel || 'Repair'}` : itemName.trim(),
-      price: priceNum,
-      amount_paid: depositNum,
-      due_date: dueDate || null,
-      current_status: status,
-      tracking_token: trackingToken,
-      customer_notes: isRepairs ? issueDescription.trim() : null,
-    }
-
-    // Add repairs-specific fields
-    if (isRepairs) {
-      orderData.device_type = deviceType.trim()
-      orderData.device_model = deviceModel.trim()
-      orderData.serial_number = serialNumber.trim()
-      orderData.device_condition = deviceCondition.trim()
-      orderData.device_color = deviceColor.trim()
-      orderData.estimated_repair_time = Number(estimatedTime) || null
-      orderData.parts_used = partsUsed.length > 0 ? partsUsed : null
-    }
-
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert(orderData)
-      .select()
-      .single()
-
-    if (error) {
-      setMessage('Error: ' + error.message)
-      setSaving(false)
-      return
-    }
-
-    setMessage('✅ Order created!')
-    setSaving(false)
-
-    setTimeout(() => {
-      // Redirect to order detail (fashion) or repair job detail (repairs)
-      if (isRepairs) {
-        router.push(`/dashboard/repairs/jobs/${order.id}`)
-      } else {
-        router.push(`/dashboard/orders/${order.id}`)
-      }
-    }, 800)
-  }
-
+  // ─── Skeleton ───
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #e4d8c2;
-            border-top: 4px solid #1E3A5F;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-          }
-        `}</style>
-        <div className="spinner"></div>
+      <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ width: '140px', height: '24px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px', animation: 'pulse 1.5s infinite' }} />
+          ))}
+        </div>
+        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
       </div>
     )
   }
 
-  const limits = getPlanLimits(plan)
-  const canAddMore = currentOrderCount < limits.orders
-  const isRepairs = sector === 'Repairs & Technical Services'
-
-  const inputStyle = {
-    width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #E8E0D5', fontSize: '1rem', boxSizing: 'border-box',
-    background: '#fff', color: '#2B2620',
-    transition: 'border-color 0.2s ease',
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+        {error}
+        <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Retry</button>
+      </div>
+    )
   }
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
-      <style>{`
-        .form-card {
-          background: #fff;
-          border-radius: 14px;
-          padding: 1.5rem;
-          border: 1px solid #E8E0D5;
-          max-width: 480px;
-          margin: 0 auto;
-        }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; color: #2B2620; margin-bottom: 0.3rem; font-size: 0.85rem; font-weight: 500; }
-        .form-input { width: 100%; padding: 0.7rem; border-radius: 8px; border: 1px solid #E8E0D5; font-size: 0.95rem; background: #fff; box-sizing: border-box; color: #2B2620; transition: border-color 0.2s ease; }
-        .form-input:focus { outline: none; border-color: #C79A2B; }
-        .btn-primary {
-          width: 100%; padding: 0.85rem; border-radius: 8px; border: none;
-          background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F; font-size: 1rem; font-weight: 700;
-          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
-          cursor: pointer; transition: transform 0.1s ease;
-        }
-        .btn-primary:active { transform: scale(0.98); }
-        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-secondary { padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid #E8E0D5; background: #fff; color: #1E3A5F; font-size: 0.8rem; cursor: pointer; }
-        .btn-secondary:hover { background: #F5EFE2; }
-        .btn-link { background: none; border: none; color: #1E3A5F; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
-        .btn-link:hover { color: #C79A2B; }
-        .back-link { background: none; border: none; color: #1E3A5F; font-size: 0.85rem; padding: 0; margin-bottom: 1rem; cursor: pointer; }
-        .back-link:hover { text-decoration: underline; }
-        .header-row { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem; flex-wrap: wrap; }
-        .header-row h1 { color: #1E3A5F; font-size: 1.3rem; font-weight: 700; margin: 0; }
-        .header-row .badge { background: #F6E9C8; color: #1E3A5F; padding: 0.1rem 0.6rem; border-radius: 12px; font-size: 0.65rem; font-weight: 600; }
-        .part-item { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #F0EDE8; font-size: 0.85rem; }
-        .part-item:last-child { border-bottom: none; }
-        .part-item .name { color: #1E3A5F; font-weight: 500; }
-        .part-item .cost { color: #6B6255; }
-        .part-item .remove-btn { background: none; border: none; color: #AE4A34; cursor: pointer; font-size: 0.8rem; }
-        .new-customer-form { background: #F8F6F2; border-radius: 8px; padding: 1rem; margin-top: 0.5rem; border: 1px solid #E8E0D5; }
-        .new-customer-form .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .new-customer-form .row input { flex: 1; min-width: 100px; }
-        .inline-flex { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .parts-section { background: #F8F6F2; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-        .parts-section .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
-        .parts-section .row input { flex: 1; min-width: 80px; }
-        .parts-section .row .small { flex: 0.5; min-width: 60px; }
-        .plan-limit-warning {
-          background: #F1DBD3;
-          border: 1px solid #AE4A34;
-          border-radius: 8px;
-          padding: 0.8rem 1rem;
-          margin-bottom: 1rem;
-          color: #AE4A34;
-          font-size: 0.85rem;
-          text-align: center;
-        }
-        @media (max-width: 420px) {
-          .form-card { padding: 1rem; }
-          .new-customer-form .row { flex-direction: column; }
-          .new-customer-form .row input { width: 100%; }
-          .parts-section .row { flex-direction: column; }
-          .parts-section .row input { width: 100%; }
-          .inline-flex { flex-direction: column; align-items: stretch; }
-        }
-      `}</style>
+    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', color: 'var(--color-text)' }}>
+      <h1 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>New Order</h1>
+      <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
+        {orderCount} orders used · {getPlanLimits(businessPlan).orders === Infinity ? 'Unlimited' : getPlanLimits(businessPlan).orders} max
+      </p>
 
-      <button className="back-link" onClick={() => router.push('/dashboard')}>
-        ← Back to dashboard
-      </button>
-
-      <div className="header-row">
-        <h1>{isRepairs ? '🔧 New Repair Job' : '📋 New Order'}</h1>
-        {isRepairs && <span className="badge">Repairs</span>}
-        {!isRepairs && <span className="badge">Fashion</span>}
-        {plan === 'free' && (
-          <span style={{ fontSize: '0.7rem', background: '#F0EDE8', padding: '0.1rem 0.5rem', borderRadius: '10px', color: '#6B6255' }}>
-            Free ({currentOrderCount}/{limits.orders} orders)
-          </span>
-        )}
-      </div>
-
-      {!canAddMore && (
-        <div className="plan-limit-warning">
-          <strong>⚠️ You've reached the limit of {limits.orders} orders on your Free plan.</strong>
-          <br />
-          <a href="/dashboard/subscription" style={{ color: '#AE4A34', fontWeight: '600' }}>Upgrade now to add more →</a>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="form-card">
-        {/* Customer */}
-        <div className="form-group">
-          <div className="inline-flex" style={{ justifyContent: 'space-between' }}>
-            <label style={labelStyle}>Customer</label>
-            <button type="button" className="btn-link" onClick={() => setShowNewCustomer(!showNewCustomer)}>
-              {showNewCustomer ? '✕ Cancel' : '+ New customer'}
-            </button>
-          </div>
-
-          {showNewCustomer ? (
-            <div className="new-customer-form">
-              <p style={{ fontSize: '0.8rem', color: '#6B6255', margin: '0 0 0.5rem' }}>
-                Add a new customer first, then create their order.
-              </p>
-              <div className="row">
-                <input
-                  className="form-input"
-                  type="text"
-                  value={newCustomerName}
-                  onChange={(e) => setNewCustomerName(e.target.value)}
-                  placeholder="Customer name"
-                  required
-                  disabled={!canAddMore}
-                  style={inputStyle}
-                />
-                <input
-                  className="form-input"
-                  type="tel"
-                  inputMode="numeric"
-                  value={newCustomerPhone}
-                  onChange={(e) => setNewCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                  placeholder="Phone 080..."
-                  required
-                  disabled={!canAddMore}
-                  style={inputStyle}
-                />
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleCreateCustomer}
-                disabled={creatingCustomer || !canAddMore}
-                style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-              >
-                {creatingCustomer ? 'Creating...' : '➕ Create customer'}
-              </button>
-            </div>
-          ) : (
-            <select
-              className="form-input"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-              disabled={!canAddMore}
-              style={inputStyle}
-            >
-              <option value="">Select a customer</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.phone ? `· ${c.phone}` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {isRepairs ? (
-          // REPAIRS FIELDS
-          <>
-            <div className="inline-flex">
-              <div className="form-group flex-1" style={{ flex: 1, minWidth: '120px' }}>
-                <label style={labelStyle}>Device Type <span style={{ color: '#AE4A34' }}>*</span></label>
-                <input
-                  type="text"
-                  value={deviceType}
-                  onChange={(e) => setDeviceType(e.target.value)}
-                  placeholder="e.g. iPhone, Samsung, Laptop"
-                  required
-                  disabled={!canAddMore}
-                  style={inputStyle}
-                />
-              </div>
-              <div className="form-group flex-1" style={{ flex: 1, minWidth: '120px' }}>
-                <label style={labelStyle}>Device Model</label>
-                <input
-                  type="text"
-                  value={deviceModel}
-                  onChange={(e) => setDeviceModel(e.target.value)}
-                  placeholder="e.g. iPhone 13, Galaxy S22"
-                  disabled={!canAddMore}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            <div className="inline-flex">
-              <div className="form-group flex-1">
-                <label style={labelStyle}>Serial / IMEI</label>
-                <input
-                  type="text"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="e.g. IMEI or Serial #"
-                  disabled={!canAddMore}
-                  style={inputStyle}
-                />
-              </div>
-              <div className="form-group flex-1">
-                <label style={labelStyle}>Device Color</label>
-                <input
-                  type="text"
-                  value={deviceColor}
-                  onChange={(e) => setDeviceColor(e.target.value)}
-                  placeholder="e.g. Black, Silver"
-                  disabled={!canAddMore}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label style={labelStyle}>Device Condition</label>
-              <input
-                type="text"
-                value={deviceCondition}
-                onChange={(e) => setDeviceCondition(e.target.value)}
-                placeholder="e.g. Cracked screen, Water damage"
-                disabled={!canAddMore}
-                style={inputStyle}
-              />
-            </div>
-
-            <div className="form-group">
-              <label style={labelStyle}>Issue Description <span style={{ color: '#AE4A34' }}>*</span></label>
-              <textarea
-                value={issueDescription}
-                onChange={(e) => setIssueDescription(e.target.value)}
-                rows={3}
-                placeholder="Describe the problem..."
-     required
-                disabled={!canAddMore}
-                style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
-              />
-            </div>
-
-            <div className="parts-section">
-              <label style={{ ...labelStyle, marginBottom: '0.3rem' }}>🔩 Parts Used</label>
-              <div className="row">
-                <input
-                  type="text"
-                  value={partName}
-                  onChange={(e) => setPartName(e.target.value)}
-                  placeholder="Part name"
-                  disabled={!canAddMore}
-                  style={{ ...inputStyle, padding: '0.4rem' }}
-                />
-                <input
-                  type="number"
-                  value={partQuantity}
-                  onChange={(e) => setPartQuantity(e.target.value)}
-                  placeholder="Qty"
-                  disabled={!canAddMore}
-                  style={{ ...inputStyle, padding: '0.4rem', minWidth: '60px' }}
-                />
-                <input
-                  type="number"
-                  value={partCost}
-                  onChange={(e) => setPartCost(e.target.value)}
-                  placeholder="Cost (₦)"
-                  disabled={!canAddMore}
-                  style={{ ...inputStyle, padding: '0.4rem', minWidth: '80px' }}
-                />
-                <button type="button" className="btn-secondary" onClick={addPart} disabled={!canAddMore} style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}>
-                  Add
-                </button>
-              </div>
-              {partsUsed.length > 0 && (
-                <div style={{ marginTop: '0.5rem' }}>
-                  {partsUsed.map((p, i) => (
-                    <div key={i} className="part-item">
-                      <span className="name">{p.name}</span>
-                      <span className="cost">{p.quantity} × ₦{p.cost.toLocaleString()} = ₦{(p.quantity * p.cost).toLocaleString()}</span>
-                      <button type="button" className="remove-btn" onClick={() => removePart(i)}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: '600', color: '#1E3A5F', paddingTop: '0.3rem' }}>
-                    Total Parts: ₦{partsUsed.reduce((sum, p) => sum + p.quantity * p.cost, 0).toLocaleString()}
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          // FASHION FIELDS
-          <div className="form-group">
-            <label style={labelStyle}>Item / Garment name</label>
-            <input
-              type="text"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              placeholder="e.g. Aso-ebi gown, Ankara top..."
-              required
-              disabled={!canAddMore}
-              style={inputStyle}
-            />
-          </div>
-        )}
-
-        {/* Pricing (shared) */}
-        <div className="inline-flex">
-          <div className="form-group flex-1" style={{ flex: 1, minWidth: '120px' }}>
-            <label style={labelStyle}>Total Price (₦) <span style={{ color: '#AE4A34' }}>*</span></label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-              required
-              disabled={!canAddMore}
-              style={inputStyle}
-            />
-          </div>
-          <div className="form-group flex-1" style={{ flex: 1, minWidth: '120px' }}>
-            <label style={labelStyle}>Deposit (₦)</label>
-            <input
-              type="number"
-              value={deposit}
-              onChange={(e) => setDeposit(e.target.value)}
-              placeholder="0.00"
-              disabled={!canAddMore}
-              style={inputStyle}
-            />
-          </div>
-        </div>
-
-        {/* Estimated time (repairs only) */}
-        {isRepairs && (
-          <div className="form-group">
-            <label style={labelStyle}>Estimated Time (minutes)</label>
-            <input
-              type="number"
-              value={estimatedTime}
-              onChange={(e) => setEstimatedTime(e.target.value)}
-              placeholder="e.g. 60"
-              disabled={!canAddMore}
-              style={inputStyle}
-            />
-          </div>
-        )}
-
-        {/* Due Date */}
-        <div className="form-group">
-          <label style={labelStyle}>Due date</label>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            disabled={!canAddMore}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Status */}
-        <div className="form-group">
-          <label style={labelStyle}>Starting status</label>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* ─── Customer ─── */}
+        <div>
+          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Customer</label>
           <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            disabled={!canAddMore}
-            style={inputStyle}
+            value={isNewCustomer ? 'new' : formData.customer_id}
+            onChange={handleCustomerChange}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
           >
-            {isRepairs ? (
-              <>
-                <option value="Diagnosing">Diagnosing</option>
-                <option value="Awaiting Parts">Awaiting Parts</option>
-                <option value="Repairing">Repairing</option>
-                <option value="Ready">Ready for Pickup</option>
-                <option value="Completed">Completed</option>
-                <option value="Delivered">Delivered</option>
-              </>
-            ) : (
-              <>
-                <option value="Order placed">Order placed</option>
-                <option value="Cutting">Cutting</option>
-                <option value="Sewing">Sewing</option>
-                <option value="Ready">Ready</option>
-                <option value="Delivered">Delivered</option>
-              </>
-            )}
+            <option value="">Select customer</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="new">➕ Create new customer</option>
           </select>
         </div>
 
-        {/* Submit */}
-        {canAddMore ? (
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Creating...' : isRepairs ? '🔧 Create repair job' : '🚀 Create order'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => router.push('/dashboard/subscription')}
-            style={{ background: '#AE4A34', boxShadow: '0 4px 14px rgba(174,74,52,0.3)' }}
-          >
-            🔒 Upgrade to add more orders
-          </button>
+        {/* ─── New Customer Fields ─── */}
+        {isNewCustomer && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Name *</label>
+              <input
+                type="text"
+                name="customer_name"
+                value={formData.customer_name}
+                onChange={handleChange}
+                required
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Phone</label>
+              <input
+                type="tel"
+                name="customer_phone"
+                value={formData.customer_phone}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+              />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Email</label>
+              <input
+                type="email"
+                name="customer_email"
+                value={formData.customer_email}
+                onChange={handleChange}
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+              />
+            </div>
+          </div>
         )}
 
-        {message && (
-          <p style={{ marginTop: '0.8rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34', textAlign: 'center' }}>
-            {message}
-          </p>
-        )}
+        {/* ─── Item / Garment ─── */}
+        <div>
+          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Item / Garment *</label>
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+            placeholder="e.g. Aso-ebi Gown"
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+          />
+        </div>
+
+        {/* ─── Price & Deposit ─── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Total Price (₦) *</label>
+            <input
+              type="number"
+              name="price"
+              value={formData.price}
+              onChange={handleChange}
+              required
+              placeholder="5000"
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Deposit (₦)</label>
+            <input
+              type="number"
+              name="amount_paid"
+              value={formData.amount_paid}
+              onChange={handleChange}
+              placeholder="2000"
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+            />
+          </div>
+        </div>
+
+        {/* ─── Due Date ─── */}
+        <div>
+          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Due Date</label>
+          <input
+            type="date"
+            name="due_date"
+            value={formData.due_date}
+            onChange={handleChange}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+          />
+        </div>
+
+        {/* ─── Status ─── */}
+        <div>
+          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Status</label>
+          <select
+            name="current_status"
+            value={formData.current_status}
+            onChange={handleChange}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+          >
+            <option value="Order placed">Order placed</option>
+            <option value="Cutting">Cutting</option>
+            <option value="Sewing">Sewing</option>
+            <option value="Ready">Ready</option>
+            <option value="Delivered">Delivered</option>
+          </select>
+        </div>
+
+        {/* ─── Notes ─── */}
+        <div>
+          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Notes (optional)</label>
+          <textarea
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            rows={3}
+            placeholder="Any extra information about this order..."
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'vertical' }}
+          />
+        </div>
+
+        {error && <div style={{ color: 'var(--color-danger)', marginTop: '0.5rem' }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+          <button
+            type="submit"
+            disabled={saving}
+            style={{
+              padding: '0.6rem 1.5rem',
+              background: 'var(--color-accent)',
+              color: '#0F2B4A',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: '600',
+              cursor: saving ? 'default' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}
+          >
+            <Icon name="plus" size={16} stroke="#0F2B4A" /> {saving ? 'Creating...' : 'Create Order'}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            style={{ padding: '0.6rem 1.5rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}
+          >
+            Cancel
+          </button>
+        </div>
       </form>
-    </main>
+    </div>
   )
-                    }
+}
