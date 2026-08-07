@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Icon } from '../../../components/Icon'
 
 export default function CustomersPage() {
@@ -26,13 +25,15 @@ export default function CustomersPage() {
         return
       }
 
-      let businessId = getCurrentBusinessId()
-      console.log('🔍 Customers list: businessId from getCurrentBusinessId():', businessId)
+      // ─── FORCE: Use ONLY the URL param – NO localStorage fallback ───
+      const urlBizId = searchParams.get('business_id')
+      console.log('🔍 List page: URL business_id =', urlBizId)
 
-      // If businessId is missing or invalid, fallback to owned or membership
+      let businessId = urlBizId
+
+      // If URL param is missing or invalid, fallback to owned business
       if (!businessId || businessId.length < 20) {
-        console.warn('⚠️ Invalid or missing business ID, falling back to owned business')
-        // Check owned
+        console.warn('⚠️ URL param missing or invalid, falling back to owned business')
         const { data: owned } = await supabase
           .from('businesses')
           .select('id, name')
@@ -43,7 +44,7 @@ export default function CustomersPage() {
           setBusinessName(owned.name)
           console.log('📌 Fallback to owned business:', businessId)
         } else {
-          // Check membership
+          // Also check membership
           const { data: membership } = await supabase
             .from('business_memberships')
             .select('business_id')
@@ -62,7 +63,7 @@ export default function CustomersPage() {
           }
         }
       } else {
-        // Fetch business name
+        // URL param is valid – fetch business name
         const { data: biz } = await supabase
           .from('businesses')
           .select('name')
@@ -106,6 +107,7 @@ export default function CustomersPage() {
     return c.name?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q)
   })
 
+  // ─── Skeleton ───
   if (loading) {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
@@ -142,7 +144,13 @@ export default function CustomersPage() {
         <div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0, color: 'var(--color-text)' }}>Customers</h1>
           {businessName && <p style={{ color: 'var(--color-text-muted)', margin: '0.1rem 0 0', fontSize: '0.85rem' }}>{customers.length} customers</p>}
-          {currentBusinessId && <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Business ID: {currentBusinessId.slice(0,8)}...</p>}
+          {/* ─── DEBUG: Show business ID ─── */}
+          {currentBusinessId && (
+            <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+              Business ID: {currentBusinessId.slice(0,8)}...
+              {currentBusinessId === searchParams.get('business_id') ? ' ✅ from URL' : ' ⚠️ fallback'}
+            </p>
+          )}
         </div>
         <a href={`/dashboard/customers/new?business_id=${currentBusinessId || ''}`} style={{ padding: '0.4rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontWeight: '500', fontSize: '0.85rem', textDecoration: 'none' }}>
           <Icon name="plus" size={14} stroke="#fff" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Add Customer
@@ -180,4 +188,4 @@ export default function CustomersPage() {
       )}
     </div>
   )
-            }
+  }
