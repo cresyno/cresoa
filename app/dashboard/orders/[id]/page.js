@@ -1,796 +1,465 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { isFeatureAvailable } from '../../../../lib/planLimits'
-import { showToast } from '../../../../lib/toast'
+import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
+import { Icon } from '../../../../components/Icon'
 
-const STAGES = {
-  fashion: ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered'],
-  repairs: ['Diagnosing', 'Awaiting Parts', 'Repairing', 'Ready', 'Completed', 'Delivered']
-}
-
-export default function OrderDetailPage({ params }) {
+export default function OrderDetailPage() {
   const router = useRouter()
+  const params = useParams()
   const searchParams = useSearchParams()
+  const orderId = params.id
 
-  const [order, setOrder] = useState(null)
-  const [business, setBusiness] = useState(null)
-  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [plan, setPlan] = useState('free')
-  const [sector, setSector] = useState('fashion')
-  const [title, setTitle] = useState('')
-  const [price, setPrice] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState('')
-  const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [error, setError] = useState(null)
+  const [order, setOrder] = useState(null)
+  const [customer, setCustomer] = useState(null)
+  const [payments, setPayments] = useState([])
+  const [businessId, setBusinessId] = useState(null)
+  const [currentBusinessId, setCurrentBusinessId] = useState(null)
+
+  // ─── Payment modal state ───
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
-  const [internalNotes, setInternalNotes] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
-  const [notesMessage, setNotesMessage] = useState('')
-  const [deleting, setDeleting] = useState(false)
 
-  const load = async () => {
-    const { data: orderData } = await supabase
-      .from('orders')
-      .select('*, customers(name, phone)')
-      .eq('id', params.id)
-      .single()
+  // ─── Status update modal ───
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [newStatus, setNewStatus] = useState('')
 
-    setOrder(orderData)
-    if (orderData) {
-      setTitle(orderData.title || '')
-      setPrice(orderData.price?.toString() || '')
-      setDueDate(orderData.due_date || '')
-      setInternalNotes(orderData.internal_notes || '')
+  const statusOptions = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('name, plan, sector')
-        .eq('id', orderData.business_id)
+  // ─── Load order data ───
+  const loadOrder = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const bizId = getCurrentBusinessId()
+      if (!bizId) {
+        router.push('/dashboard')
+        return
+      }
+      setCurrentBusinessId(bizId)
+
+      // Fetch order with customer
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          customers (id, name, phone, email, address)
+        `)
+        .eq('id', orderId)
+        .eq('business_id', bizId)
         .single()
 
-      setBusiness(businessData)
-      setPlan(businessData?.plan || 'free')
-      setSector(businessData?.sector === 'Repairs & Technical Services' ? 'repairs' : 'fashion')
+      if (orderError) throw orderError
 
-      const { data: paymentData } = await supabase
+      setOrder(orderData)
+      setCustomer(orderData.customers)
+      setBusinessId(bizId)
+
+      // Fetch payments
+      const { data: paymentData, error: paymentError } = await supabase
         .from('payment_records')
         .select('*')
-        .eq('order_id', params.id)
+        .eq('order_id', orderId)
         .order('created_at', { ascending: false })
-      setPayments(paymentData || [])
-    }
 
-    setLoading(false)
+      if (paymentError) throw paymentError
+      setPayments(paymentData || [])
+
+    } catch (err) {
+      console.error('Error loading order:', err)
+      setError('Failed to load order details.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    load()
-    if (searchParams?.get('edit') === 'true') {
-      setEditing(true)
-    }
-  }, [params.id])
+    loadOrder()
+  }, [orderId, router])
 
-  const getStatusInfo = (status) => {
-    const map = {
-      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
-      'Cutting': { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
-      'Sewing': { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Ready': { label: 'Ready for Pickup', color: '#4C7A5E', bg: '#DCEBE2' },
-      'Delivered': { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
-      'Diagnosing': { label: 'Diagnosing', color: '#6B6255', bg: '#F0EDE8' },
-      'Awaiting Parts': { label: 'Awaiting Parts', color: '#B4881E', bg: '#F6E9C8' },
-      'Repairing': { label: 'Repairing', color: '#1E3A5F', bg: '#D6E0EB' },
-      'Completed': { label: 'Completed', color: '#4C7A5E', bg: '#DCEBE2' },
-    }
-    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
-  }
-
-  const getOrderName = (order) => order?.title || 'Order'
-
-  const formatPhone = (phone) => {
-    if (!phone) return ''
-    return phone.startsWith('0') ? '234' + phone.slice(1) : phone
-  }
-
-  const formatDate = (d) => {
-    if (!d) return ''
-    return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
-  }
-
-  const stages = sector === 'repairs' ? STAGES.repairs : STAGES.fashion
-  const currentIndex = stages.indexOf(order?.current_status)
-  const isLastStage = currentIndex === stages.length - 1
-  const isFirstStage = currentIndex === 0
-
-  const advanceStatus = async () => {
-    if (currentIndex === -1 || isLastStage) return
-    await supabase.from('orders').update({ current_status: stages[currentIndex + 1] }).eq('id', order.id)
-    load()
-  }
-
-  const undoStatus = async () => {
-    if (currentIndex <= 0) return
-    await supabase.from('orders').update({ current_status: stages[currentIndex - 1] }).eq('id', order.id)
-    load()
-  }
-
-  // Locked actions
-  const copyTrackingLink = () => {
-    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
-    navigator.clipboard.writeText(link)
-    showToast('Tracking link copied!', '#1E3A5F')
-  }
-
-  const sendLinkViaWhatsApp = () => {
-    const phone = formatPhone(order.customers?.phone)
-    if (!phone) {
-      alert('This customer has no phone number saved.')
-      return
-    }
-    const link = `https://cresoa.vercel.app/track/${order.tracking_token}`
-    const msg = `Hi ${order.customers?.name}! This is ${business?.name}. Here's your order tracking link: ${link}`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
-  }
-
-  const sendStatusUpdate = () => {
-    const phone = formatPhone(order.customers?.phone)
-    if (!phone) {
-      alert('This customer has no phone number saved.')
-      return
-    }
-    const status = getStatusInfo(order.current_status)
-    const msg = `Hi ${order.customers?.name}, this is ${business?.name}. Your order "${order.title}" is now at the "${status.label}" stage.`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
-  }
-
-  const sendReminder = async () => {
-    const phone = formatPhone(order.customers?.phone)
-    if (!phone) {
-      alert('This customer has no phone number saved.')
-      return
-    }
-    const bal = order.price - order.amount_paid
-    const msg = `Hi ${order.customers?.name}, this is a reminder for your balance of ₦${bal.toLocaleString()} for "${order.title}". Thank you.`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
-    await supabase.from('orders').update({ last_reminder_sent_at: new Date().toISOString() }).eq('id', order.id)
-    load()
-  }
-
-  const duplicateOrder = () => {
-    router.push(`/dashboard/orders/new?duplicate=${order.id}`)
-  }
-
-  const handleSave = async (e) => {
-    e.preventDefault()
-    setMessage('')
-    setSaving(true)
-
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        title: title.trim(),
-        price: Number(price) || 0,
-        due_date: dueDate || null,
-      })
-      .eq('id', order.id)
-
-    if (error) {
-      setMessage('Error: ' + error.message)
-      setSaving(false)
-      return
-    }
-
-    setMessage('✅ Saved!')
-    setSaving(false)
-    load()
-  }
-
-  const handleSaveNotes = async () => {
-    setNotesMessage('')
-    setSavingNotes(true)
-
-    const { error } = await supabase
-      .from('orders')
-      .update({ internal_notes: internalNotes })
-      .eq('id', order.id)
-
-    if (error) {
-      setNotesMessage('Error saving notes.')
-    } else {
-      setNotesMessage('✅ Notes saved!')
-    }
-    setSavingNotes(false)
-  }
-
+  // ─── Record payment ───
   const handleRecordPayment = async (e) => {
     e.preventDefault()
-    const amount = Number(paymentAmount)
-
-    if (!amount || amount <= 0) {
-      alert('Enter a valid payment amount.')
-      return
-    }
-
-    const newTotal = order.amount_paid + amount
-    if (newTotal > order.price) {
-      alert(`This payment would exceed the order price (₦${order.price.toLocaleString()}).`)
-      return
-    }
-
     setRecordingPayment(true)
 
-    await supabase.from('payment_records').insert({
-      order_id: order.id,
-      amount: amount,
-      note: paymentNote || null,
-    })
+    try {
+      const amount = parseFloat(paymentAmount)
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount.')
+        setRecordingPayment(false)
+        return
+      }
 
-    await supabase
-      .from('orders')
-      .update({ amount_paid: newTotal })
-      .eq('id', order.id)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
 
-    setPaymentAmount('')
-    setPaymentNote('')
-    setShowPaymentForm(false)
-    setRecordingPayment(false)
-    load()
+      // 1. Insert payment record
+      const { error: insertError } = await supabase
+        .from('payment_records')
+        .insert({
+          order_id: orderId,
+          amount: amount,
+          note: paymentNote || 'Payment recorded from order detail',
+        })
+
+      if (insertError) throw insertError
+
+      // 2. Update order amount_paid
+      const newTotal = (order.amount_paid || 0) + amount
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ amount_paid: newTotal })
+        .eq('id', orderId)
+
+      if (updateError) throw updateError
+
+      // 3. Log activity
+      await supabase.from('business_activity_logs').insert({
+        business_id: businessId,
+        performed_by: session.user.id,
+        action: 'payment_recorded',
+        details: { order_id: orderId, amount }
+      })
+
+      // 4. Refresh data
+      await loadOrder()
+      setShowPaymentModal(false)
+      setPaymentAmount('')
+      setPaymentNote('')
+    } catch (err) {
+      console.error('Payment error:', err)
+      alert('Failed to record payment.')
+    } finally {
+      setRecordingPayment(false)
+    }
   }
 
-  const handleDelete = async () => {
-    const confirmed = window.confirm(`Delete this order? This cannot be undone.`)
-    if (!confirmed) return
+  // ─── Update status ───
+  const handleUpdateStatus = async () => {
+    if (!newStatus) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
 
-    setDeleting(true)
-    await supabase.from('orders').delete().eq('id', order.id)
-    router.push('/dashboard')
+      const { error } = await supabase
+        .from('orders')
+        .update({ current_status: newStatus })
+        .eq('id', orderId)
+
+      if (error) throw error
+
+      // Log activity
+      await supabase.from('business_activity_logs').insert({
+        business_id: businessId,
+        performed_by: session.user.id,
+        action: 'order_status_updated',
+        details: { order_id: orderId, new_status: newStatus }
+      })
+
+      await loadOrder()
+      setShowStatusModal(false)
+      setNewStatus('')
+    } catch (err) {
+      console.error('Status update error:', err)
+      alert('Failed to update status.')
+    }
   }
 
+  // ─── Send WhatsApp ───
+  const sendWhatsApp = () => {
+    if (!customer?.phone) {
+      alert('Customer has no phone number.')
+      return
+    }
+    const msg = `Hi ${customer.name || ''}, your order "${order.title || 'Untitled'}" is ${order.current_status || 'in progress'}.`
+    const url = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
+  }
+
+  // ─── Get status info ───
+  const getStatusInfo = (status) => {
+    const map = {
+      'Order placed': { label: 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' },
+      'Cutting':      { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8', icon: '✂️' },
+      'Sewing':       { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB', icon: '🧵' },
+      'Ready':        { label: 'Ready', color: '#2E7D5E', bg: '#DCEBE2', icon: '✅' },
+      'Delivered':    { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5', icon: '📦' },
+    }
+    return map[status] || { label: status || 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' }
+  }
+
+  // ─── Skeleton ───
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #e4d8c2;
-            border-top: 4px solid #1E3A5F;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-          }
-        `}</style>
-        <div className="spinner"></div>
-        <p style={{ color: '#6B6255', marginTop: '1rem' }}>Loading...</p>
+      <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ width: '200px', height: '24px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ width: '100px', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
+            <div style={{ width: '80px', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
+          </div>
+          <div style={{ width: '100%', height: '100px', background: 'var(--color-border)', borderRadius: '8px' }} />
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {[1,2,3,4,5].map(i => <div key={i} style={{ width: '60px', height: '32px', background: 'var(--color-border)', borderRadius: '20px' }} />)}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+        {error}
+        <button onClick={loadOrder} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Retry</button>
       </div>
     )
   }
 
   if (!order) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '2rem 1.5rem' }}>
-        <p style={{ color: '#2B2620' }}>Order not found.</p>
-        <button className="back-link" onClick={() => router.push('/dashboard')}>
-          ← Back to dashboard
-        </button>
-      </main>
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+        Order not found.
+      </div>
     )
   }
 
-  const status = getStatusInfo(order.current_status)
-  const balance = order.price - order.amount_paid
-  const canUseTracking = isFeatureAvailable(plan, 'tracking_links')
-  const canUseWhatsApp = isFeatureAvailable(plan, 'whatsapp_reminders')
-
-  const inputStyle = {
-    width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #E8E0D5', fontSize: '1rem', boxSizing: 'border-box',
-    background: '#fff', color: '#2B2620',
-    transition: 'border-color 0.2s ease',
-  }
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.3rem', fontSize: '0.85rem', fontWeight: '500' }
+  const statusInfo = getStatusInfo(order.current_status)
+  const balance = (order.price || 0) - (order.amount_paid || 0)
+  const isOverdue = order.due_date && new Date(order.due_date) < new Date() && order.current_status !== 'Delivered'
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
-      <style>{`
-        .card {
-          background: #fff;
-          border-radius: 14px;
-          padding: 1.2rem;
-          border: 1px solid #E8E0D5;
-          margin-bottom: 1rem;
-          box-shadow: 0 2px 8px rgba(30,58,95,0.04);
-        }
-        .stat-card {
-          background: #fff;
-          border-radius: 10px;
-          padding: 0.6rem 0.4rem;
-          border: 1px solid #E8E0D5;
-          text-align: center;
-          flex: 1;
-          min-width: 60px;
-        }
-        .stat-card .value {
-          font-size: 1.1rem;
-          font-weight: 700;
-          margin: 0;
-        }
-        .stat-card .value.red { color: #AE4A34; }
-        .stat-card .value.green { color: #4C7A5E; }
-        .stat-card .value.navy { color: #1E3A5F; }
-        .stat-card .label {
-          color: #6B6255;
-          font-size: 0.6rem;
-          margin: 0.1rem 0 0;
-        }
-        .status-timeline {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 1rem;
-          position: relative;
-          overflow-x: auto;
-          gap: 0.2rem;
-        }
-        .status-timeline::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 10%;
-          right: 10%;
-          height: 2px;
-          background: #E8E0D5;
-          transform: translateY(-50%);
-          z-index: 0;
-        }
-        .status-dot {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.2rem;
-          position: relative;
-          z-index: 1;
-          flex: 1;
-          min-width: 40px;
-        }
-        .status-dot .dot {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          border: 2px solid #E8E0D5;
-          background: #fff;
-          transition: all 0.3s ease;
-        }
-        .status-dot .dot.active {
-          width: 16px;
-          height: 16px;
-          border-color: #C79A2B;
-          background: #C79A2B;
-        }
-        .status-dot .dot.done {
-          border-color: #4C7A5E;
-          background: #4C7A5E;
-        }
-        .status-dot .label {
-          font-size: 0.5rem;
-          color: #6B6255;
-          text-align: center;
-          max-width: 40px;
-        }
-        .status-dot .label.active {
-          color: #1E3A5F;
-          font-weight: 600;
-        }
-        .btn {
-          padding: 0.4rem 0.8rem;
-          border-radius: 6px;
-          font-size: 0.7rem;
-          font-weight: 600;
-          text-decoration: none;
-          border: 1px solid #E8E0D5;
-          background: #fff;
-          color: #1E3A5F;
-          cursor: pointer;
-          transition: background 0.1s ease;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.2rem;
-        }
-        .btn:hover { background: #F5EFE2; }
-        .btn-primary {
-          background: #1E3A5F;
-          border-color: #1E3A5F;
-          color: #fff;
-        }
-        .btn-primary:hover { background: #0F1E30; }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-gold {
-          background: #C79A2B;
-          border-color: #C79A2B;
-          color: #1E3A5F;
-        }
-        .btn-gold:hover { background: #B4881E; }
-        .btn-green {
-          background: #4C7A5E;
-          border-color: #4C7A5E;
-          color: #fff;
-        }
-        .btn-green:hover { background: #3A5F4A; }
-        .btn-red {
-          background: #AE4A34;
-          border-color: #AE4A34;
-          color: #fff;
-        }
-        .btn-red:hover { background: #8A3626; }
-        .btn-block { width: 100%; justify-content: center; }
-        .btn-locked {
-          opacity: 0.6;
-          background: #F0EDE8;
-          color: #6B6255;
-          border-color: #D6D0C5;
-          cursor: pointer;
-        }
-        .btn-locked:hover { background: #E8E0D5; }
-        .back-link {
-          background: none;
-          border: none;
-          color: #1E3A5F;
-          font-size: 0.85rem;
-          padding: 0;
-          margin-bottom: 1rem;
-          cursor: pointer;
-        }
-        .back-link:hover { text-decoration: underline; }
-        .header-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          margin-bottom: 0.5rem;
-        }
-        .header-row .name-section { flex: 1; }
-        .header-row .name-section h1 {
-          color: #1E3A5F;
-          font-size: 1.3rem;
-          font-weight: 700;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
-        .header-row .name-section .customer {
-          color: #6B6255;
-          font-size: 0.9rem;
-          margin: 0.1rem 0 0;
-        }
-        .header-actions {
-          display: flex;
-          gap: 0.3rem;
-          flex-wrap: wrap;
-        }
-        .stats-row {
-          display: flex;
-          gap: 0.4rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-        }
-        .action-row {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-          margin-bottom: 1rem;
-        }
-        .payment-row {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.3rem 0;
-          border-bottom: 1px solid #F0EDE8;
-          font-size: 0.8rem;
-        }
-        .payment-row:last-child { border-bottom: none; }
-        .order-status-badge {
-          display: inline-block;
-          padding: 0.2rem 0.7rem;
-          border-radius: 20px;
-          font-size: 0.7rem;
-          font-weight: 600;
-          letter-spacing: 0.3px;
-          text-transform: uppercase;
-        }
-        .plan-badge {
-          font-size: 0.6rem;
-          background: #4C7A5E;
-          color: #fff;
-          padding: 0.1rem 0.5rem;
-          border-radius: 10px;
-          margin-left: 0.5rem;
-        }
-        .upgrade-banner {
-          background: #FBF3EC;
-          border: 1px solid #C79A2B;
-          border-radius: 10px;
-          padding: 0.8rem 1rem;
-          margin-bottom: 1rem;
-        }
-        .upgrade-banner p {
-          margin: 0;
-          font-size: 0.8rem;
-          color: #1E3A5F;
-        }
-        .upgrade-banner a {
-          color: #C79A2B;
-          font-weight: 600;
-          text-decoration: none;
-        }
-        .upgrade-banner a:hover { text-decoration: underline; }
-        @media (max-width: 420px) {
-          .header-row { flex-direction: column; }
-          .header-actions { width: 100%; }
-          .header-actions .btn { flex: 1; justify-content: center; }
-          .action-row .btn { flex: 1; justify-content: center; }
-          .action-row { flex-direction: column; }
-          .action-row button { width: 100%; }
-          .status-timeline { gap: 0.1rem; }
-          .status-dot { min-width: 30px; }
-          .status-dot .label { font-size: 0.4rem; max-width: 30px; }
-        }
-      `}</style>
-
-      <button className="back-link" onClick={() => router.back()}>← Back</button>
-
-      <div className="header-row">
-        <div className="name-section">
-          <h1>
-            {getOrderName(order)}
-            <span className="order-status-badge" style={{ background: status.bg, color: status.color }}>
-              {status.label}
-            </span>
-            <span className="plan-badge">{plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)}</span>
-          </h1>
-          <p className="customer">
-            👤 {order.customers?.name || 'No customer'}
-            {order.customers?.phone && ` · 📱 ${order.customers.phone}`}
+    <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', color: 'var(--color-text)' }}>
+      {/* ─── Header ─── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>Order</h1>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+            #{orderId.slice(0, 8)} · {customer?.name || 'No customer'}
           </p>
         </div>
-        <div className="header-actions">
-          {order.customers?.phone && (
-            <>
-              <a href={`tel:${order.customers.phone}`} className="btn btn-gold">📞 Call</a>
-              <a
-                href={`https://wa.me/${formatPhone(order.customers.phone)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-green"
-              >
-                💬 WhatsApp
-              </a>
-            </>
-          )}
-          <button className="btn btn-primary" onClick={duplicateOrder}>📋 Duplicate</button>
-          <button className="btn" onClick={() => setEditing(!editing)}>
-            {editing ? '✕ Close' : '✏️ Edit'}
-          </button>
-        </div>
-      </div>
-
-      <div className="stats-row">
-        <div className="stat-card">
-          <p className="value navy">₦{order.price.toLocaleString()}</p>
-          <p className="label">Total</p>
-        </div>
-        <div className="stat-card">
-          <p className="value green">₦{order.amount_paid.toLocaleString()}</p>
-          <p className="label">Paid</p>
-        </div>
-        <div className="stat-card">
-          <p className={`value ${balance > 0 ? 'red' : 'green'}`}>
-            {balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid'}
-          </p>
-          <p className="label">Balance</p>
-        </div>
-        <div className="stat-card">
-          <p className="value navy">{order.due_date ? formatDate(order.due_date) : '—'}</p>
-          <p className="label">Due Date</p>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="status-timeline">
-          {stages.map((stage, i) => {
-            const isActive = i === currentIndex
-            const isDone = i < currentIndex
-            return (
-              <div key={stage} className="status-dot">
-                <div className={`dot ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`} />
-                <span className={`label ${isActive ? 'active' : ''}`}>{stage}</span>
-              </div>
-            )
-          })}
-        </div>
-
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            className="btn"
-            onClick={undoStatus}
-            disabled={isFirstStage}
-            style={{ opacity: isFirstStage ? 0.4 : 1 }}
+          <a
+            href={`/dashboard/orders/${orderId}/edit?business_id=${currentBusinessId || ''}`}
+            style={{ padding: '0.3rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
           >
-            ← Undo
-          </button>
+            <Icon name="edit-2" size={14} stroke="#fff" /> Edit
+          </a>
           <button
-            className="btn btn-primary"
-            onClick={advanceStatus}
-            disabled={isLastStage}
-            style={{ opacity: isLastStage ? 0.4 : 1 }}
+            onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId || ''}`)}
+            style={{ padding: '0.3rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--color-text)' }}
           >
-            {isLastStage ? '✓ Completed' : `→ ${stages[currentIndex + 1]}`}
+            Back
           </button>
         </div>
       </div>
 
-      {/* ===== LOCKED ACTIONS ===== */}
-      <div className="action-row">
-        {canUseTracking ? (
-          <button className="btn btn-gold" onClick={copyTrackingLink}>🔗 Copy Link</button>
-        ) : (
-          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
-            🔒 Copy Link (Upgrade)
-          </button>
-        )}
-
-        {canUseTracking ? (
-          <button className="btn btn-green" onClick={sendLinkViaWhatsApp}>📱 Send Link</button>
-        ) : (
-          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
-            🔒 Send Link (Upgrade)
-          </button>
-        )}
-
-        {canUseWhatsApp ? (
-          <button className="btn btn-primary" onClick={sendStatusUpdate}>📤 Status Update</button>
-        ) : (
-          <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
-            🔒 Status Update (Upgrade)
-          </button>
-        )}
-
-        {balance > 0 && (
-          canUseWhatsApp ? (
-            <button className="btn btn-red" onClick={sendReminder}>🔔 Reminder</button>
-          ) : (
-            <button className="btn btn-locked" onClick={() => router.push('/dashboard/subscription')}>
-              🔒 Reminder (Upgrade)
-            </button>
-          )
-        )}
-      </div>
-
-      {(!canUseTracking || !canUseWhatsApp) && (
-        <div className="upgrade-banner">
-          <p>
-            💡 Upgrade to <strong>Starter</strong> or <strong>Pro</strong> to unlock tracking links, WhatsApp updates, and reminders.
-            <a href="/dashboard/subscription"> Upgrade now →</a>
-          </p>
-        </div>
-      )}
-
-      {editing && (
-        <form onSubmit={handleSave} className="card">
-          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.8rem' }}>✏️ Edit Order</h2>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={labelStyle}>Item / Garment</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} required />
-          </div>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={labelStyle}>Total Price (₦)</label>
-            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={inputStyle} required />
-          </div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Due Date</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={inputStyle} />
-          </div>
-          <button type="submit" className="btn btn-gold btn-block" disabled={saving}>
-            {saving ? 'Saving...' : '💾 Save changes'}
-          </button>
-          {message && (
-            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: message.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
-              {message}
-            </p>
-          )}
-        </form>
-      )}
-
-      <div className="card">
+      {/* ─── Status bar ─── */}
+      <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: 0 }}>💰 Payments</h2>
-          {balance > 0 && (
-            <button className="btn btn-green" onClick={() => setShowPaymentForm(!showPaymentForm)}>
-              {showPaymentForm ? '✕ Cancel' : '+ Record Payment'}
-            </button>
-          )}
+          <div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Current Status</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: '0.2rem 0.8rem', borderRadius: '20px', fontSize: '0.85rem' }}>
+                {statusInfo.icon} {statusInfo.label}
+              </span>
+              {isOverdue && <span style={{ background: 'var(--color-danger)', color: '#fff', padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '500' }}>Overdue</span>}
+            </div>
+          </div>
+          <button
+            onClick={() => { setNewStatus(order.current_status); setShowStatusModal(true) }}
+            style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+          >
+            Update Status
+          </button>
         </div>
+      </div>
 
-        {showPaymentForm && (
-          <form onSubmit={handleRecordPayment} style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid #E8E0D5' }}>
-            <div style={{ marginBottom: '0.6rem' }}>
-              <label style={labelStyle}>Amount (₦)</label>
-              <input
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                style={inputStyle}
-                required
-                autoFocus
-              />
+      {/* ─── Stats grid ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Total</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>₦{order.price?.toLocaleString() || 0}</div>
+        </div>
+        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Paid</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--color-success)' }}>₦{order.amount_paid?.toLocaleString() || 0}</div>
+        </div>
+        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Balance</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+            {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
+          </div>
+        </div>
+        {order.due_date && (
+          <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Due Date</div>
+            <div style={{ fontWeight: '600', fontSize: '0.9rem', color: isOverdue ? 'var(--color-danger)' : 'var(--color-text)' }}>
+              {new Date(order.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
             </div>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={labelStyle}>Note (optional)</label>
-              <input
-                type="text"
-                value={paymentNote}
-                onChange={(e) => setPaymentNote(e.target.value)}
-                placeholder="e.g. Cash payment"
-                style={inputStyle}
-              />
-            </div>
-            <button type="submit" className="btn btn-green btn-block" disabled={recordingPayment}>
-              {recordingPayment ? 'Recording...' : '💰 Record payment'}
-            </button>
-          </form>
+          </div>
         )}
+      </div>
 
+      {/* ─── Customer info ─── */}
+      {customer && (
+        <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '1rem' }}>{customer.name}</div>
+              {customer.phone && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>📞 {customer.phone}</div>}
+              {customer.email && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>✉️ {customer.email}</div>}
+              {customer.address && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>📍 {customer.address}</div>}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {customer.phone && (
+                <button
+                  onClick={() => window.location.href = `tel:${customer.phone.replace(/\D/g, '')}`}
+                  style={{ background: 'var(--color-success)', color: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Icon name="phone" size={16} stroke="#fff" />
+                </button>
+              )}
+              {customer.phone && (
+                <button
+                  onClick={sendWhatsApp}
+                  style={{ background: '#25D366', color: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Icon name="message-circle" size={16} stroke="#fff" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Record Payment ─── */}
+      <button
+        onClick={() => setShowPaymentModal(true)}
+        disabled={balance <= 0}
+        style={{
+          width: '100%',
+          padding: '0.8rem',
+          background: balance > 0 ? 'var(--color-accent)' : 'var(--color-border)',
+          color: balance > 0 ? '#0F2B4A' : 'var(--color-text-muted)',
+          border: 'none',
+          borderRadius: '8px',
+          fontWeight: '600',
+          fontSize: '0.95rem',
+          cursor: balance > 0 ? 'pointer' : 'not-allowed',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          marginBottom: '1rem'
+        }}
+      >
+        <Icon name="plus" size={16} stroke={balance > 0 ? '#0F2B4A' : 'var(--color-text-muted)'} />
+        {balance > 0 ? 'Record Payment' : 'Fully Paid ✓'}
+      </button>
+
+      {/* ─── Payments history ─── */}
+      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+        <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
+          Payments History
+        </div>
         {payments.length === 0 ? (
-          <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0.5rem 0 0' }}>No payments recorded yet.</p>
+          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+            No payments recorded yet.
+          </div>
         ) : (
-          <div style={{ marginTop: '0.5rem' }}>
+          <div>
             {payments.map((p) => (
-              <div key={p.id} className="payment-row">
-                <span style={{ color: '#6B6255' }}>
-                  {formatDate(p.created_at)} {p.note && `— ${p.note}`}
-                </span>
-                <span style={{ fontWeight: '600', color: '#4C7A5E' }}>₦{p.amount.toLocaleString()}</span>
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 1rem', borderBottom: '1px solid var(--color-border)' }}>
+                <div>
+                  <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>₦{p.amount?.toLocaleString() || 0}</div>
+                  {p.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{p.note}</div>}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                  {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <div className="card">
-        <h2 style={{ color: '#1E3A5F', fontSize: '1rem', margin: '0 0 0.3rem' }}>📝 Internal Notes</h2>
-        <p style={{ color: '#6B6255', fontSize: '0.75rem', margin: '0 0 0.6rem' }}>Only you see these — not shared with the customer.</p>
-        <textarea
-          value={internalNotes}
-          onChange={(e) => setInternalNotes(e.target.value)}
-          rows={3}
-          placeholder="Add internal notes..."
-          style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
-        />
-        <button className="btn btn-primary btn-block" onClick={handleSaveNotes} disabled={savingNotes}>
-          {savingNotes ? 'Saving...' : '💾 Save notes'}
-        </button>
-        {notesMessage && (
-          <p style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: notesMessage.startsWith('✅') ? '#4C7A5E' : '#AE4A34' }}>
-            {notesMessage}
-          </p>
-        )}
-      </div>
+      {/* ─── Status Modal ─── */}
+      {showStatusModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowStatusModal(false)}>
+          <div style={{ background: 'var(--color-bg)', borderRadius: '16px', padding: '1.5rem', maxWidth: '400px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', margin: '0 0 0.5rem' }}>Update Status</h2>
+            <select
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value)}
+              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-card)', color: 'var(--color-text)', fontSize: '0.9rem', marginBottom: '1rem' }}
+            >
+              {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <div style={{ display: 'flex', gap: '0.8rem' }}>
+              <button onClick={handleUpdateStatus} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Update</button>
+              <button onClick={() => setShowStatusModal(false)} style={{ padding: '0.6rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <button
-        className="btn btn-red btn-block"
-        onClick={handleDelete}
-        disabled={deleting}
-        style={{ marginTop: '0.5rem' }}
-      >
-        {deleting ? 'Deleting...' : '🗑️ Delete order'}
-      </button>
-    </main>
+       {/* ─── Payment Modal ─── */}
+      {showPaymentModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowPaymentModal(false)}>
+          <div style={{ background: 'var(--color-bg)', borderRadius: '16px', padding: '1.5rem', maxWidth: '400px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', margin: '0 0 0.5rem' }}>Record Payment</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '0 0 1rem' }}>Balance: ₦{balance.toLocaleString()}</p>
+            <form onSubmit={handleRecordPayment}>
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Amount (₦)</label>
+                <input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  required
+                  placeholder="Enter amount"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-card)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+                />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Note (optional)</label>
+                <input
+                  type="text"
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  placeholder="e.g. Cash payment"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-card)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <button type="submit" disabled={recordingPayment} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: recordingPayment ? 'default' : 'pointer', opacity: recordingPayment ? 0.6 : 1 }}>
+                  {recordingPayment ? 'Recording...' : 'Record Payment'}
+                </button>
+                <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.6rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   )
-        }
+                         }
