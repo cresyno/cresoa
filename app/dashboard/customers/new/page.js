@@ -30,6 +30,7 @@ export default function NewCustomerPage() {
         }
 
         const bizId = getCurrentBusinessId()
+        // ─── CRITICAL: If no business ID, redirect to dashboard ───
         if (!bizId) {
           router.push('/dashboard')
           return
@@ -55,18 +56,38 @@ export default function NewCustomerPage() {
     setError(null)
 
     try {
-      // Plan limit check
-      const { data: businessData } = await supabase
+      // ─── Debug: log the businessId ───
+      console.log('🔍 Creating customer for business ID:', businessId)
+
+      if (!businessId) {
+        setError('No business selected. Please go back and try again.')
+        setSaving(false)
+        return
+      }
+
+      // ─── Plan limit check ───
+      const { data: businessData, error: bizError } = await supabase
         .from('businesses')
         .select('plan')
         .eq('id', businessId)
         .single()
 
+      if (bizError) {
+        console.error('❌ Error fetching business plan:', bizError)
+        setError('Failed to verify business plan. Please try again.')
+        setSaving(false)
+        return
+      }
+
       const limits = getPlanLimits(businessData?.plan || 'free')
-      const { count: currentCustomers } = await supabase
+      const { count: currentCustomers, error: countError } = await supabase
         .from('customers')
         .select('*', { count: 'exact', head: true })
         .eq('business_id', businessId)
+
+      if (countError) {
+        console.error('❌ Error counting customers:', countError)
+      }
 
       if (currentCustomers >= limits.customers) {
         setError(`You have reached the limit of ${limits.customers} customers on your current plan. Please upgrade to add more.`)
@@ -75,7 +96,9 @@ export default function NewCustomerPage() {
       }
 
       const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase
+
+      // ─── Insert customer ───
+      const { data, error } = await supabase
         .from('customers')
         .insert({
           business_id: businessId,
@@ -83,8 +106,19 @@ export default function NewCustomerPage() {
           phone: formData.phone || null,
           notes: formData.notes || null,
         })
+        .select() // ← added .select() to get the inserted data
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Supabase insert error:', error)
+        console.error('❌ Error code:', error.code)
+        console.error('❌ Error message:', error.message)
+        console.error('❌ Error details:', error.details)
+        setError(`Failed to create customer: ${error.message}`)
+        setSaving(false)
+        return
+      }
+
+      console.log('✅ Customer created successfully:', data)
 
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
@@ -95,13 +129,13 @@ export default function NewCustomerPage() {
 
       router.push(`/dashboard/customers?business_id=${businessId}`)
     } catch (err) {
-      console.error(err)
-      setError('Failed to create customer.')
-    } finally {
+      console.error('❌ Unexpected error:', err)
+      setError('Failed to create customer. Please try again.')
       setSaving(false)
     }
   }
 
+  // ─── Loading state ───
   if (loading) {
     return (
       <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
@@ -111,6 +145,7 @@ export default function NewCustomerPage() {
           <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
           <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px' }} />
         </div>
+        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
       </div>
     )
   }
@@ -139,15 +174,7 @@ export default function NewCustomerPage() {
             onChange={handleChange}
             required
             placeholder="e.g. Aisha Bello"
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '0.9rem'
-            }}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
           />
         </div>
 
@@ -159,15 +186,7 @@ export default function NewCustomerPage() {
             value={formData.phone}
             onChange={handleChange}
             placeholder="e.g. 08012345678"
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '0.9rem'
-            }}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
           />
         </div>
 
@@ -179,16 +198,7 @@ export default function NewCustomerPage() {
             onChange={handleChange}
             rows={3}
             placeholder="Any extra information about this customer..."
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '0.9rem',
-              resize: 'vertical'
-            }}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'vertical' }}
           />
         </div>
 
@@ -198,34 +208,14 @@ export default function NewCustomerPage() {
           <button
             type="submit"
             disabled={saving}
-            style={{
-              padding: '0.6rem 1.5rem',
-              background: 'var(--color-accent)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '600',
-              cursor: saving ? 'default' : 'pointer',
-              opacity: saving ? 0.6 : 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}
+            style={{ padding: '0.6rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
           >
-            <Icon name="plus" size={16} stroke="#fff" />
-            {saving ? 'Creating...' : 'Create Customer'}
+            <Icon name="plus" size={16} stroke="#fff" /> {saving ? 'Creating...' : 'Create Customer'}
           </button>
           <button
             type="button"
             onClick={() => router.back()}
-            style={{
-              padding: '0.6rem 1.5rem',
-              background: 'transparent',
-              border: '1px solid var(--color-border)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              color: 'var(--color-text)'
-            }}
+            style={{ padding: '0.6rem 1.5rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}
           >
             Cancel
           </button>
@@ -233,4 +223,4 @@ export default function NewCustomerPage() {
       </form>
     </div>
   )
-}
+  }
