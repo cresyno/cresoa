@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { getPlanLimits } from '../../../../lib/planLimits'
+import { Icon } from '../../../../components/Icon'
 
 export default function NewCustomerPage() {
   const router = useRouter()
@@ -54,7 +55,7 @@ export default function NewCustomerPage() {
     setError(null)
 
     try {
-      // ─── Check plan limit for customers ───
+      // Plan limit check
       const { data: businessData } = await supabase
         .from('businesses')
         .select('plan')
@@ -85,7 +86,6 @@ export default function NewCustomerPage() {
 
       if (error) throw error
 
-      // Log activity
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
         performed_by: user.id,
@@ -102,7 +102,27 @@ export default function NewCustomerPage() {
     }
   }
 
-  // ─── Loading / Error states (unchanged) ───
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ width: '140px', height: '24px', background: 'var(--color-border)', borderRadius: '6px' }} />
+        <div style={{ marginTop: '1.5rem' }}>
+          <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
+          <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
+          <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px' }} />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+        {error}
+        <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
+      </div>
+    )
+  }
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', color: 'var(--color-text)' }}>
@@ -186,9 +206,13 @@ export default function NewCustomerPage() {
               borderRadius: '6px',
               fontWeight: '600',
               cursor: saving ? 'default' : 'pointer',
-              opacity: saving ? 0.6 : 1
+              opacity: saving ? 0.6 : 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem'
             }}
           >
+            <Icon name="plus" size={16} stroke="#fff" />
             {saving ? 'Creating...' : 'Create Customer'}
           </button>
           <button
@@ -209,4 +233,4 @@ export default function NewCustomerPage() {
       </form>
     </div>
   )
-  }
+}
