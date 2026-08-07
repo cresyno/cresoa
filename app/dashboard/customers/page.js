@@ -26,13 +26,13 @@ export default function CustomersPage() {
         return
       }
 
-      // ─── Get business ID from URL or fallback ───
       let businessId = getCurrentBusinessId()
       console.log('🔍 Customers list: businessId from getCurrentBusinessId():', businessId)
 
-      // If businessId is still null or invalid, fallback to owned business
+      // If businessId is missing or invalid, fallback to owned or membership
       if (!businessId || businessId.length < 20) {
         console.warn('⚠️ Invalid or missing business ID, falling back to owned business')
+        // Check owned
         const { data: owned } = await supabase
           .from('businesses')
           .select('id, name')
@@ -43,7 +43,7 @@ export default function CustomersPage() {
           setBusinessName(owned.name)
           console.log('📌 Fallback to owned business:', businessId)
         } else {
-          // Also check membership as fallback
+          // Check membership
           const { data: membership } = await supabase
             .from('business_memberships')
             .select('business_id')
@@ -52,10 +52,17 @@ export default function CustomersPage() {
           if (membership) {
             businessId = membership.business_id
             console.log('📌 Fallback to membership business:', businessId)
+            // Fetch name
+            const { data: biz } = await supabase
+              .from('businesses')
+              .select('name')
+              .eq('id', businessId)
+              .single()
+            if (biz) setBusinessName(biz.name)
           }
         }
       } else {
-        // Fetch business name for the valid ID
+        // Fetch business name
         const { data: biz } = await supabase
           .from('businesses')
           .select('name')
@@ -70,10 +77,8 @@ export default function CustomersPage() {
       }
 
       setCurrentBusinessId(businessId)
-
       console.log('✅ Final business ID used for query:', businessId)
 
-      // ─── Fetch customers using the correct businessId ───
       const { data, error } = await supabase
         .from('customers')
         .select('*')
@@ -101,7 +106,6 @@ export default function CustomersPage() {
     return c.name?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q)
   })
 
-  // ─── Skeleton (unchanged) ───
   if (loading) {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
