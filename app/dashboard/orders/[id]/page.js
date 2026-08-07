@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
+import { isFeatureAvailable } from '../../../../lib/planLimits'
 import { Icon } from '../../../../components/Icon'
 
 export default function OrderDetailPage() {
@@ -18,9 +19,15 @@ export default function OrderDetailPage() {
   const [customer, setCustomer] = useState(null)
   const [payments, setPayments] = useState([])
   const [businessId, setBusinessId] = useState(null)
+  const [businessPlan, setBusinessPlan] = useState('free')
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
+  const [userRole, setUserRole] = useState(null)
 
-  // ─── Payment modal state ───
+  // ─── Internal notes ───
+  const [notes, setNotes] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  // ─── Payment modal ───
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
@@ -29,6 +36,14 @@ export default function OrderDetailPage() {
   // ─── Status update modal ───
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [newStatus, setNewStatus] = useState('')
+
+  // ─── Edit mode ───
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    title: '',
+    price: '',
+    due_date: '',
+  })
 
   const statusOptions = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
@@ -66,6 +81,29 @@ export default function OrderDetailPage() {
       setOrder(orderData)
       setCustomer(orderData.customers)
       setBusinessId(bizId)
+      setNotes(orderData.notes || '')
+      setEditForm({
+        title: orderData.title || '',
+        price: orderData.price || '',
+        due_date: orderData.due_date || '',
+      })
+
+      // Fetch business plan
+      const { data: bizData } = await supabase
+        .from('businesses')
+        .select('plan')
+        .eq('id', bizId)
+        .single()
+      if (bizData) setBusinessPlan(bizData.plan || 'free')
+
+      // Fetch user role
+      const { data: roleData } = await supabase
+        .from('business_memberships')
+        .select('role')
+        .eq('business_id', bizId)
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+      if (roleData) setUserRole(roleData.role)
 
       // Fetch payments
       const { data: paymentData, error: paymentError } = await supabase
@@ -89,6 +127,35 @@ export default function OrderDetailPage() {
     loadOrder()
   }, [orderId, router])
 
+  // ─── Save internal notes ───
+  const saveNotes = async () => {
+    setSavingNotes(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { error } = await supabase
+        .from('orders')
+        .update({ notes })
+        .eq('id', orderId)
+
+      if (error) throw error
+
+      // Log activity
+      await supabase.from('business_activity_logs').insert({
+        business_id: businessId,
+        performed_by: session.user.id,
+        action: 'order_notes_updated',
+        details: { order_id: orderId }
+      })
+    } catch (err) {
+      console.error('Error saving notes:', err)
+      alert('Failed to save notes.')
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
   // ─── Record payment ───
   const handleRecordPayment = async (e) => {
     e.preventDefault()
@@ -108,60 +175,44 @@ export default function OrderDetailPage() {
         return
       }
 
-      // 1. Insert payment record
-      const { error: insertError } = await supabase
-        .from('payment_records')
-        .insert({
-          order_id: orderId,
+      const response = await fetch(`/api/orders/${orderId}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
           amount: amount,
           note: paymentNote || 'Payment recorded from order detail',
         })
-
-      if (insertError) throw insertError
-
-      // 2. Update order amount_paid
-      const newTotal = (order.amount_paid || 0) + amount
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ amount_paid: newTotal })
-        .eq('id', orderId)
-
-      if (updateError) throw updateError
-
-      // 3. Log activity
-      await supabase.from('business_activity_logs').insert({
-        business_id: businessId,
-        performed_by: session.user.id,
-        action: 'payment_recorded',
-        details: { order_id: orderId, amount }
       })
 
-      // 4. Refresh data
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to record payment')
+      }
+
       await loadOrder()
       setShowPaymentModal(false)
       setPaymentAmount('')
       setPaymentNote('')
     } catch (err) {
       console.error('Payment error:', err)
-      alert('Failed to record payment.')
+      alert(err.message)
     } finally {
       setRecordingPayment(false)
     }
   }
 
   // ─── Update status ───
-  const handleUpdateStatus = async () => {
-    if (!newStatus) return
+  const handleUpdateStatus = async (status) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-        return
-      }
+      if (!session) return
 
       const { error } = await supabase
         .from('orders')
-        .update({ current_status: newStatus })
+        .update({ current_status: status })
         .eq('id', orderId)
 
       if (error) throw error
@@ -171,7 +222,7 @@ export default function OrderDetailPage() {
         business_id: businessId,
         performed_by: session.user.id,
         action: 'order_status_updated',
-        details: { order_id: orderId, new_status: newStatus }
+        details: { order_id: orderId, new_status: status }
       })
 
       await loadOrder()
@@ -183,6 +234,78 @@ export default function OrderDetailPage() {
     }
   }
 
+  // ─── Save edit form ───
+  const handleEditSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          title: editForm.title,
+          price: parseFloat(editForm.price) || 0,
+          due_date: editForm.due_date || null,
+        })
+        .eq('id', orderId)
+
+      if (error) throw error
+
+      // Log activity
+      await supabase.from('business_activity_logs').insert({
+        business_id: businessId,
+        performed_by: session.user.id,
+        action: 'order_updated',
+        details: { order_id: orderId }
+      })
+
+      await loadOrder()
+      setEditing(false)
+    } catch (err) {
+      console.error('Edit error:', err)
+      alert('Failed to update order.')
+    }
+  }
+
+  // ─── Duplicate order ───
+  const handleDuplicate = async () => {
+    if (!confirm('Duplicate this order?')) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data, error } = await supabase
+        .from('orders')
+        .insert({
+          business_id: businessId,
+          customer_id: order.customer_id,
+          title: `${order.title} (Copy)`,
+          price: order.price,
+          amount_paid: 0,
+          due_date: order.due_date,
+          current_status: 'Order placed',
+          notes: order.notes,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await supabase.from('business_activity_logs').insert({
+        business_id: businessId,
+        performed_by: session.user.id,
+        action: 'order_duplicated',
+        details: { original_id: orderId, new_id: data.id }
+      })
+
+      router.push(`/dashboard/orders/${data.id}?business_id=${currentBusinessId}`)
+    } catch (err) {
+      console.error('Duplicate error:', err)
+      alert('Failed to duplicate order.')
+    }
+  }
+
   // ─── Send WhatsApp ───
   const sendWhatsApp = () => {
     if (!customer?.phone) {
@@ -190,6 +313,25 @@ export default function OrderDetailPage() {
       return
     }
     const msg = `Hi ${customer.name || ''}, your order "${order.title || 'Untitled'}" is ${order.current_status || 'in progress'}.`
+    const url = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
+  }
+
+  // ─── Copy tracking link ───
+  const copyTrackingLink = () => {
+    const trackingLink = `${window.location.origin}/track/${orderId}?business_id=${currentBusinessId}`
+    navigator.clipboard?.writeText(trackingLink)
+    alert('Tracking link copied to clipboard!')
+  }
+
+  // ─── Send tracking link ───
+  const sendTrackingLink = () => {
+    if (!customer?.phone) {
+      alert('Customer has no phone number.')
+      return
+    }
+    const trackingLink = `${window.location.origin}/track/${orderId}?business_id=${currentBusinessId}`
+    const msg = `Hi ${customer.name || ''}, track your order here: ${trackingLink}`
     const url = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
     window.open(url, '_blank')
   }
@@ -206,10 +348,14 @@ export default function OrderDetailPage() {
     return map[status] || { label: status || 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' }
   }
 
+  // ─── Plan checks ───
+  const canTracking = isFeatureAvailable(businessPlan, 'tracking_links')
+  const canWhatsApp = isFeatureAvailable(businessPlan, 'whatsapp_reminders')
+
   // ─── Skeleton ───
   if (loading) {
     return (
-      <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto' }}>
         <div style={{ width: '200px', height: '24px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -245,55 +391,110 @@ export default function OrderDetailPage() {
   const statusInfo = getStatusInfo(order.current_status)
   const balance = (order.price || 0) - (order.amount_paid || 0)
   const isOverdue = order.due_date && new Date(order.due_date) < new Date() && order.current_status !== 'Delivered'
+  const isFullyPaid = balance <= 0
+  const statusIndex = statusOptions.indexOf(order.current_status)
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', color: 'var(--color-text)' }}>
       {/* ─── Header ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>Order</h1>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
+            {order.title || 'Untitled'}
+          </h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
             #{orderId.slice(0, 8)} · {customer?.name || 'No customer'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <a
-            href={`/dashboard/orders/${orderId}/edit?business_id=${currentBusinessId || ''}`}
-            style={{ padding: '0.3rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+          <button
+            onClick={handleDuplicate}
+            style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
           >
-            <Icon name="edit-2" size={14} stroke="#fff" /> Edit
-          </a>
+            <Icon name="copy" size={14} stroke="#fff" /> Duplicate
+          </button>
           <button
             onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId || ''}`)}
-            style={{ padding: '0.3rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--color-text)' }}
+            style={{ padding: '0.3rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--color-text)' }}
           >
             Back
           </button>
         </div>
       </div>
 
-      {/* ─── Status bar ─── */}
+      {/* ─── Status Banner ─── */}
       <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Current Status</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: '0.2rem 0.8rem', borderRadius: '20px', fontSize: '0.85rem' }}>
-                {statusInfo.icon} {statusInfo.label}
-              </span>
-              {isOverdue && <span style={{ background: 'var(--color-danger)', color: '#fff', padding: '0.1rem 0.6rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '500' }}>Overdue</span>}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: '0.3rem 1rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '600' }}>
+              {statusInfo.icon} {statusInfo.label}
+            </span>
+            {isOverdue && <span style={{ background: 'var(--color-danger)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '500' }}>Overdue</span>}
+            {isFullyPaid && <span style={{ background: 'var(--color-success)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '500' }}>Paid ✓</span>}
           </div>
-          <button
-            onClick={() => { setNewStatus(order.current_status); setShowStatusModal(true) }}
-            style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
-          >
-            Update Status
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {order.current_status !== 'Ready' && (
+              <button
+                onClick={() => handleUpdateStatus('Ready')}
+                style={{ padding: '0.3rem 1rem', background: 'var(--color-success)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+              >
+                Mark Ready
+              </button>
+            )}
+            {order.current_status !== 'Delivered' && order.current_status === 'Ready' && (
+              <button
+                onClick={() => handleUpdateStatus('Delivered')}
+                style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+              >
+                Mark Delivered
+              </button>
+            )}
+            <button
+              onClick={() => { setNewStatus(order.current_status); setShowStatusModal(true) }}
+              style={{ padding: '0.3rem 1rem', background: 'var(--color-accent)', color: '#0F2B4A', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+            >
+              Update Status
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ─── Stats grid ─── */}
+      {/* ─── Status Timeline ─── */}
+      <div style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', minWidth: '450px' }}>
+          {statusOptions.map((s, idx) => {
+            const isActive = idx <= statusIndex
+            const isCurrent = s === order.current_status
+            return (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                <button
+                  onClick={() => handleUpdateStatus(s)}
+                  style={{
+                    flex: 1,
+                    padding: '0.3rem 0.2rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: isActive ? 'var(--color-accent)' : 'var(--color-border)',
+                    color: isActive ? '#0F2B4A' : 'var(--color-text-muted)',
+                    fontWeight: isCurrent ? '700' : '400',
+                    fontSize: '0.65rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    opacity: isActive ? 1 : 0.5,
+                  }}
+                >
+                  {s}
+                </button>
+                {idx < statusOptions.length - 1 && (
+                  <div style={{ flex: 1, height: '2px', background: isActive && idx < statusIndex ? 'var(--color-accent)' : 'var(--color-border)', margin: '0 0.2rem' }} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ─── Stats Grid ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
           <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Total</div>
@@ -309,7 +510,7 @@ export default function OrderDetailPage() {
             {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
           </div>
         </div>
-        {order.due_date && (
+          {order.due_date && (
           <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
             <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Due Date</div>
             <div style={{ fontWeight: '600', fontSize: '0.9rem', color: isOverdue ? 'var(--color-danger)' : 'var(--color-text)' }}>
@@ -319,7 +520,7 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* ─── Customer info ─── */}
+      {/* ─── Customer Info ─── */}
       {customer && (
         <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -351,19 +552,49 @@ export default function OrderDetailPage() {
         </div>
       )}
 
+      {/* ─── Tracking Links (Plan‑gated) ─── */}
+      <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ fontWeight: '500', fontSize: '0.9rem' }}>🔗 Tracking Link</span>
+          {canTracking ? (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={copyTrackingLink}
+                style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+              >
+                Copy Link
+              </button>
+              <button
+                onClick={sendTrackingLink}
+                style={{ padding: '0.3rem 1rem', background: '#25D366', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+              >
+                Send via WhatsApp
+              </button>
+            </div>
+          ) : (
+            <a
+              href={`/dashboard/subscription?business_id=${currentBusinessId}`}
+              style={{ color: 'var(--color-accent)', fontSize: '0.8rem', fontWeight: '500', textDecoration: 'underline' }}
+            >
+              Upgrade to enable tracking links →
+            </a>
+          )}
+        </div>
+      </div>
+
       {/* ─── Record Payment ─── */}
       <button
         onClick={() => setShowPaymentModal(true)}
         disabled={balance <= 0}
         style={{
           width: '100%',
-          padding: '0.8rem',
+          padding: '0.7rem',
           background: balance > 0 ? 'var(--color-accent)' : 'var(--color-border)',
           color: balance > 0 ? '#0F2B4A' : 'var(--color-text-muted)',
           border: 'none',
           borderRadius: '8px',
           fontWeight: '600',
-          fontSize: '0.95rem',
+          fontSize: '0.9rem',
           cursor: balance > 0 ? 'pointer' : 'not-allowed',
           display: 'flex',
           alignItems: 'center',
@@ -376,8 +607,56 @@ export default function OrderDetailPage() {
         {balance > 0 ? 'Record Payment' : 'Fully Paid ✓'}
       </button>
 
-      {/* ─── Payments history ─── */}
-      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+      {/* ─── Edit Order Form ─── */}
+      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
+        <div
+          style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          onClick={() => setEditing(!editing)}
+        >
+          <span style={{ fontWeight: '600' }}>📝 Edit Order</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>{editing ? '▲' : '▼'}</span>
+        </div>
+        {editing && (
+          <form onSubmit={handleEditSubmit} style={{ padding: '1rem' }}>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Item / Garment</label>
+              <input
+                type="text"
+                value={editForm.title}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                required
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+              />
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Total Price (₦)</label>
+              <input
+                type="number"
+                value={editForm.price}
+                onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                required
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+              />
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Due Date</label>
+              <input
+                type="date"
+                value={editForm.due_date}
+                onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
+                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="submit" style={{ padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Save Changes</button>
+              <button type="button" onClick={() => setEditing(false)} style={{ padding: '0.5rem 1.5rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* ─── Payments History ─── */}
+      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
         <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
           Payments History
         </div>
@@ -402,6 +681,30 @@ export default function OrderDetailPage() {
         )}
       </div>
 
+      {/* ─── Internal Notes ─── */}
+      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+        <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
+          Internal Notes
+          <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: '400', marginLeft: '0.5rem' }}>(only you see these)</span>
+        </div>
+        <div style={{ padding: '1rem' }}>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Add internal notes about this order..."
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'vertical' }}
+          />
+          <button
+            onClick={saveNotes}
+            disabled={savingNotes}
+            style={{ marginTop: '0.5rem', padding: '0.4rem 1.5rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: savingNotes ? 'default' : 'pointer', opacity: savingNotes ? 0.6 : 1 }}
+          >
+            {savingNotes ? 'Saving...' : 'Save Notes'}
+          </button>
+        </div>
+      </div>
+
       {/* ─── Status Modal ─── */}
       {showStatusModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowStatusModal(false)}>
@@ -415,14 +718,14 @@ export default function OrderDetailPage() {
               {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <div style={{ display: 'flex', gap: '0.8rem' }}>
-              <button onClick={handleUpdateStatus} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Update</button>
+              <button onClick={() => handleUpdateStatus(newStatus)} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Update</button>
               <button onClick={() => setShowStatusModal(false)} style={{ padding: '0.6rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-       {/* ─── Payment Modal ─── */}
+      {/* ─── Payment Modal ─── */}
       {showPaymentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowPaymentModal(false)}>
           <div style={{ background: 'var(--color-bg)', borderRadius: '16px', padding: '1.5rem', maxWidth: '400px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
@@ -451,7 +754,7 @@ export default function OrderDetailPage() {
                 />
               </div>
               <div style={{ display: 'flex', gap: '0.8rem' }}>
-                <button type="submit" disabled={recordingPayment} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: recordingPayment ? 'default' : 'pointer', opacity: recordingPayment ? 0.6 : 1 }}>
+                <button type="submit" disabled={recordingPayment} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: recordingPayment ? 'default' : 'pointer', opacity: recordingPayment ? 0.6 : 1 }}>
                   {recordingPayment ? 'Recording...' : 'Record Payment'}
                 </button>
                 <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.6rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
@@ -462,4 +765,4 @@ export default function OrderDetailPage() {
       )}
     </div>
   )
-                         }
+        }
