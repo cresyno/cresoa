@@ -6,7 +6,9 @@ import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
+import { Icon } from '../../components/Icon'
 
+// ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
   if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
     const isRepairs = pathname?.startsWith('/dashboard/repairs')
@@ -75,6 +77,12 @@ function getPageHeader(pathname, business, stats) {
       subtitle: 'Manage your account'
     }
   }
+  if (pathname.startsWith('/dashboard/settings')) {
+    return {
+      title: '⚙️ Business Settings',
+      subtitle: 'Manage your business details and branding'
+    }
+  }
   return {
     title: '📊 Dashboard',
     subtitle: 'Welcome back'
@@ -111,19 +119,19 @@ function DashboardLayoutContent({ children }) {
   }, [])
 
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: '📊' },
-    { name: 'Orders', path: '/dashboard/orders', icon: '📋' },
-    { name: 'Customers', path: '/dashboard/customers', icon: '👤' },
-    { name: 'Group Orders', path: '/dashboard/groups', icon: '👥' },
-    { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
+    { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
+    { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
+    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+    { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
+    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
   ]
 
   const repairNavItems = [
-    { name: 'Dashboard', path: '/dashboard/repairs', icon: '📊' },
-    { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: '🔧' },
-    { name: 'Customers', path: '/dashboard/customers', icon: '👤' },
-    { name: 'Parts', path: '/dashboard/repairs/parts', icon: '📦' },
-    { name: 'Reminders', path: '/dashboard/reminders', icon: '🔔' },
+    { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
+    { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+    { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
+    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
   ]
 
   const isRepairs = pathname?.startsWith('/dashboard/repairs')
@@ -132,7 +140,6 @@ function DashboardLayoutContent({ children }) {
   // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
-      setLoading(true)
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -149,13 +156,7 @@ function DashboardLayoutContent({ children }) {
             .select('*')
             .eq('id', businessIdFromUrl)
             .maybeSingle()
-
-          if (business && !error) {
-            businessData = business
-          } else {
-            router.push('/dashboard')
-            return
-          }
+          if (business && !error) businessData = business
         }
 
         if (!businessData) {
@@ -298,7 +299,7 @@ function DashboardLayoutContent({ children }) {
     }
 
     load()
-  }, [router, searchParams]) // ← re‑runs when URL changes
+  }, [router, searchParams])
 
   // ─── Force reload if URL business_id doesn't match current business ───
   useEffect(() => {
@@ -354,11 +355,19 @@ function DashboardLayoutContent({ children }) {
 
   // ─── Role‑based visibility ───
   const isStaff = userRole === 'Staff'
-  const showTeamActivity = !isStaff
+  const isManager = userRole === 'Manager'
   const isOwner = userRole === 'Owner'
+
+  // Team & Activity: Staff can't see
+  const showTeamActivity = !isStaff
+
+  // Settings section: Owner sees all, Manager sees only Profile, Staff sees nothing
+  const showSettingsSection = isOwner || isManager
+  const showBusinessSettings = isOwner
   const showBilling = isOwner
   const showBeta = isOwner
   const showTracking = isOwner && (business?.plan === 'pro' || business?.plan === 'beta')
+  const showProfile = isOwner || isManager
 
   const baseUrl = (path) => business?.id ? `${path}?business_id=${business.id}` : path
 
@@ -389,44 +398,263 @@ function DashboardLayoutContent({ children }) {
           --color-danger: #D9534F;
           --shadow: 0 4px 16px rgba(0,0,0,0.3);
         }
-        .hamburger { position: fixed; top: 0.8rem; left: 0.8rem; z-index: 1001; background: var(--color-primary); border: none; color: #fff; font-size: 1.3rem; padding: 0.2rem 0.5rem; border-radius: 6px; cursor: pointer; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .hamburger {
+          position: fixed;
+          top: 0.8rem;
+          left: 0.8rem;
+          z-index: 1001;
+          background: var(--color-primary);
+          border: none;
+          color: #fff;
+          font-size: 1.3rem;
+          padding: 0.2rem 0.5rem;
+          border-radius: 6px;
+          cursor: pointer;
+          display: none;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
         .hamburger:hover { opacity: 0.8; }
-        .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 999; }
+        .overlay {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.3);
+          z-index: 999;
+        }
         .overlay.open { display: block; }
-        .sidebar { width: 260px; min-height: 100vh; background: #0A1628; padding: 1.2rem 0.8rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; transition: transform 0.3s ease; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04); z-index: 1000; }
+
+        .sidebar {
+          width: 260px;
+          min-height: 100vh;
+          background: #0A1628;
+          padding: 1rem 0.8rem;
+          flex-shrink: 0;
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          overflow-y: auto;
+          transition: transform 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          border-right: 1px solid rgba(255,255,255,0.04);
+          z-index: 1000;
+        }
         .sidebar::-webkit-scrollbar { width: 3px; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-        .sidebar .brand { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.8rem; }
-        .sidebar .brand .logo-text { color: #fff; font-size: 1rem; font-weight: 700; font-family: 'Fraunces', serif; }
-        .sidebar .brand .sub { color: #8899AA; font-size: 0.5rem; line-height: 1.4; }
-        .sidebar .brand .sub .badge { display: inline-block; background: rgba(212,165,42,0.15); color: #D4A52A; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.45rem; font-weight: 600; margin-left: 0.2rem; }
-        .sidebar .brand .sub .plan { display: inline-block; background: #4C7A5E; color: #fff; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.45rem; font-weight: 600; text-transform: uppercase; }
-        .sidebar .brand .sub .plan.beta { background: #1E3A5F; color: #C79A2B; }
-        .sidebar .nav-section { margin-bottom: 0.8rem; }
-        .sidebar .nav-section .section-label { color: rgba(255,255,255,0.2); font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.2rem 0.7rem; margin-bottom: 0.2rem; font-weight: 600; }
-        .sidebar .nav-section a { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.8rem; font-weight: 500; transition: all 0.15s ease; }
-        .sidebar .nav-section a:hover { background: rgba(255,255,255,0.04); color: #fff; }
-        .sidebar .nav-section a.active { background: rgba(212,165,42,0.08); color: #D4A52A; font-weight: 600; }
-        .sidebar .nav-section a .icon { font-size: 0.9rem; width: 20px; text-align: center; flex-shrink: 0; }
-        .sidebar .bottom { margin-top: auto; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.6rem; }
-        .sidebar .bottom a, .sidebar .bottom button { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.8rem; font-weight: 500; transition: all 0.15s ease; background: none; border: none; width: 100%; cursor: pointer; text-align: left; }
-        .sidebar .bottom a:hover, .sidebar .bottom button:hover { background: rgba(255,255,255,0.04); color: #fff; }
-        .sidebar .bottom .logout { color: #D9534F; }
-        .sidebar .bottom .logout:hover { background: rgba(217,83,79,0.08); color: #D9534F; }
-        .sidebar .bottom .theme-btn { color: #D4A52A; }
-        .sidebar .bottom .theme-btn:hover { background: rgba(212,165,42,0.06); color: #D4A52A; }
-        .sidebar .bottom .support-link { color: #25D366; }
-        .sidebar .bottom .support-link:hover { background: rgba(37,211,102,0.06); color: #25D366; }
-        .main-content { flex: 1; min-width: 0; padding: 0; }
-        .page-header { padding: 0.8rem 1.2rem 0.4rem 1.2rem; background: var(--color-card); border-bottom: 1px solid var(--color-border); }
-        .page-header h1 { font-size: 1.1rem; font-weight: 700; color: var(--color-text); margin: 0; }
-        .page-header p { font-size: 0.75rem; color: var(--color-text-muted); margin: 0.1rem 0 0; }
-        .dashboard-header { display: flex; justify-content: flex-end; align-items: center; padding: 0.4rem 1.2rem; background: var(--color-card); border-bottom: 1px solid var(--color-border); }
-        .dashboard-header .date { font-size: 0.7rem; color: var(--color-text-muted); }
-        .beta-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.7rem; border-radius: 16px; background: linear-gradient(135deg, #D4A52A, #C79A2B); color: #0F2B4A; font-weight: 700; font-size: 0.65rem; text-decoration: none; box-shadow: 0 2px 8px rgba(212,165,42,0.2); transition: transform 0.1s ease; }
+        .sidebar .brand {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          padding-bottom: 0.8rem;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          margin-bottom: 0.8rem;
+        }
+        .sidebar .brand .logo-text {
+          color: #fff;
+          font-size: 1rem;
+          font-weight: 700;
+          font-family: 'Fraunces', serif;
+        }
+        .sidebar .brand .sub {
+          color: #8899AA;
+          font-size: 0.5rem;
+          line-height: 1.4;
+        }
+        .sidebar .brand .sub .badge {
+          display: inline-block;
+          background: rgba(212,165,42,0.15);
+          color: #D4A52A;
+          padding: 0.05rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.45rem;
+          font-weight: 600;
+          margin-left: 0.2rem;
+        }
+        .sidebar .brand .sub .plan {
+          display: inline-block;
+          background: #4C7A5E;
+          color: #fff;
+          padding: 0.05rem 0.4rem;
+          border-radius: 4px;
+          font-size: 0.45rem;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+        .sidebar .brand .sub .plan.beta {
+          background: #1E3A5F;
+          color: #C79A2B;
+        }
+
+        .sidebar .nav-section {
+          margin-bottom: 0.4rem;
+        }
+        .sidebar .nav-section .section-label {
+          color: rgba(255,255,255,0.25);
+          font-size: 0.5rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 0.2rem 0.7rem;
+          margin-bottom: 0.1rem;
+          font-weight: 600;
+        }
+        .sidebar .nav-section a {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          padding: 0.3rem 0.7rem;
+          borderRadius: 6px;
+          color: #8899AA;
+          text-decoration: none;
+          font-size: 0.8rem;
+          font-weight: 500;
+          transition: all 0.15s ease;
+        }
+        .sidebar .nav-section a:hover {
+          background: rgba(255,255,255,0.04);
+          color: #fff;
+        }
+        .sidebar .nav-section a.active {
+          background: rgba(212,165,42,0.08);
+          color: #D4A52A;
+          font-weight: 600;
+        }
+        .sidebar .nav-section a .icon {
+          font-size: 0.9rem;
+          width: 20px;
+          text-align: center;
+          flex-shrink: 0;
+        }
+
+        .sidebar .bottom {
+          margin-top: auto;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          padding-top: 0.4rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.1rem;
+        }
+        .sidebar .bottom a,
+        .sidebar .bottom button {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          padding: 0.3rem 0.7rem;
+          border-radius: 6px;
+          color: #8899AA;
+          text-decoration: none;
+          font-size: 0.8rem;
+          font-weight: 500;
+          transition: all 0.15s ease;
+          background: none;
+          border: none;
+          width: 100%;
+          cursor: pointer;
+          text-align: left;
+        }
+        .sidebar .bottom a:hover,
+        .sidebar .bottom button:hover {
+          background: rgba(255,255,255,0.04);
+          color: #fff;
+        }
+        .sidebar .bottom .logout {
+          color: #D9534F;
+        }
+        .sidebar .bottom .logout:hover {
+          background: rgba(217,83,79,0.08);
+          color: #D9534F;
+        }
+        .sidebar .bottom .theme-btn {
+          color: #D4A52A;
+        }
+        .sidebar .bottom .theme-btn:hover {
+          background: rgba(212,165,42,0.06);
+          color: #D4A52A;
+        }
+        .sidebar .bottom .support-link {
+          color: #25D366;
+        }
+        .sidebar .bottom .support-link:hover {
+          background: rgba(37,211,102,0.06);
+          color: #25D366;
+        }
+
+        .main-content {
+          flex: 1;
+          min-width: 0;
+          padding: 0;
+        }
+
+        .page-header {
+          padding: 0.8rem 1.2rem 0.4rem 1.2rem;
+          background: var(--color-card);
+          border-bottom: 1px solid var(--color-border);
+        }
+        .page-header h1 {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--color-text);
+          margin: 0;
+        }
+        .page-header p {
+          font-size: 0.75rem;
+          color: var(--color-text-muted);
+          margin: 0.1rem 0 0;
+        }
+
+        .dashboard-header {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          padding: 0.4rem 1.2rem;
+          background: var(--color-card);
+          border-bottom: 1px solid var(--color-border);
+        }
+        .dashboard-header .date {
+          font-size: 0.7rem;
+          color: var(--color-text-muted);
+        }
+        .beta-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.2rem 0.7rem;
+          border-radius: 16px;
+          background: linear-gradient(135deg, #D4A52A, #C79A2B);
+          color: #0F2B4A;
+          font-weight: 700;
+          font-size: 0.65rem;
+          text-decoration: none;
+          box-shadow: 0 2px 8px rgba(212,165,42,0.2);
+          transition: transform 0.1s ease;
+        }
         .beta-btn:hover { transform: scale(1.02); }
-        @media (min-width: 769px) { .hamburger { display: none !important; } .sidebar { transform: translateX(0) !important; } .overlay { display: none !important; } }
-        @media (max-width: 768px) { .hamburger { display: block; } .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; } .sidebar.open { transform: translateX(0); } .overlay.open { display: block; } .main-content { padding-top: 3rem; } .page-header { padding: 0.6rem 1rem 0.2rem 1rem; } .page-header h1 { font-size: 1rem; } }
+
+        @media (min-width: 769px) {
+          .hamburger { display: none !important; }
+          .sidebar { transform: translateX(0) !important; }
+          .overlay { display: none !important; }
+        }
+        @media (max-width: 768px) {
+          .hamburger { display: block; }
+          .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            transform: translateX(-100%);
+            width: 260px;
+            z-index: 1000;
+            height: 100vh;
+          }
+          .sidebar.open { transform: translateX(0); }
+          .overlay.open { display: block; }
+          .main-content { padding-top: 3rem; }
+          .page-header { padding: 0.6rem 1rem 0.2rem 1rem; }
+          .page-header h1 { font-size: 1rem; }
+        }
       `}</style>
 
       <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -437,7 +665,7 @@ function DashboardLayoutContent({ children }) {
 
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
-          <Logo variant="primary" size="small" />
+          <Logo variant="dark-bg" size="small" />
           <div>
             <div className="logo-text">Cresoa</div>
             <div className="sub">
@@ -464,49 +692,48 @@ function DashboardLayoutContent({ children }) {
               className={isActive(item.path) ? 'active' : ''}
               onClick={handleNavClick}
             >
-              <span className="icon">{item.icon}</span>
+              <span className="icon"><Icon name={item.icon} size={16} stroke="currentColor" /></span>
               {item.name}
             </a>
           ))}
         </div>
 
-             {showTeamActivity && (
+        {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
             <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
-              <span className="icon">👥</span> Team & Staff
+              <span className="icon"><Icon name="user-plus" size={16} stroke="currentColor" /></span> Team & Staff
             </a>
             <a href={baseUrl('/dashboard/activity')} className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}>
-              <span className="icon">📜</span> Activity Logs
+              <span className="icon"><Icon name="activity" size={16} stroke="currentColor" /></span> Activity Logs
             </a>
           </div>
         )}
 
-        <div className="nav-section">
-          <div className="section-label">Settings</div>
-          {showBilling && (
-            <a href={baseUrl('/dashboard/subscription')} onClick={handleNavClick}>
-              <span className="icon">💳</span> Billing & Plan
-            </a>
-          )}
-          {showBeta && business && !business.has_applied_for_beta && (
-            <a href={baseUrl('/dashboard/beta-apply')} onClick={handleNavClick} style={{ color: '#D4A52A' }}>
-              <span className="icon">🧪</span> Join Beta Program
-            </a>
-          )}
-          {showTracking && (
-            <a href={baseUrl('/dashboard/settings/tracking')} onClick={handleNavClick} style={{ color: '#D4A52A' }}>
-              <span className="icon">🎨</span> Order Tracking Page
-            </a>
-          )}
-          <a href={baseUrl('/dashboard/profile')} onClick={handleNavClick}>
-            <span className="icon">⚙️</span> Profile & Settings
-          </a>
-        </div>
+        {showSettingsSection && (
+          <div className="nav-section">
+            <div className="section-label">Settings</div>
+            {showBusinessSettings && (
+              <a href={baseUrl('/dashboard/settings')} className={isActive('/dashboard/settings') ? 'active' : ''} onClick={handleNavClick}>
+                <span className="icon"><Icon name="settings" size={16} stroke="currentColor" /></span> Business Settings
+              </a>
+            )}
+            {showBilling && (
+              <a href={baseUrl('/dashboard/subscription')} className={isActive('/dashboard/subscription') ? 'active' : ''} onClick={handleNavClick}>
+                <span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan
+              </a>
+            )}
+            {showProfile && (
+              <a href={baseUrl('/dashboard/profile')} className={isActive('/dashboard/profile') ? 'active' : ''} onClick={handleNavClick}>
+                <span className="icon"><Icon name="user" size={16} stroke="currentColor" /></span> Profile & Settings
+              </a>
+            )}
+          </div>
+        )}
 
         <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}>
-            <span className="icon">{theme === 'light' ? '🌙' : '☀️'}</span>
+            <span className="icon"><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} stroke="currentColor" /></span>
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </button>
           <a
@@ -516,10 +743,10 @@ function DashboardLayoutContent({ children }) {
             className="support-link"
             onClick={handleNavClick}
           >
-            <span className="icon">💬</span> Contact Support
+            <span className="icon"><Icon name="message-circle" size={16} stroke="currentColor" /></span> Contact Support
           </a>
           <button className="logout" onClick={handleLogout}>
-            <span className="icon">🚪</span> Logout
+            <span className="icon"><Icon name="log-out" size={16} stroke="currentColor" /></span> Logout
           </button>
         </div>
       </div>
@@ -558,4 +785,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-            }
+        }
