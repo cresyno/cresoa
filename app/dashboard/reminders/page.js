@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Icon } from '../../../components/Icon'
+import WhatsAppReminderModal from '../../../components/WhatsAppReminderModal'
 
 export default function RemindersPage() {
   const router = useRouter()
@@ -14,7 +15,9 @@ export default function RemindersPage() {
   const [error, setError] = useState(null)
   const [businessName, setBusinessName] = useState('')
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all') // all, pending, completed
+  const [filter, setFilter] = useState('all')
+  const [selectedReminder, setSelectedReminder] = useState(null)
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false)
 
   const loadReminders = async () => {
     setLoading(true)
@@ -51,31 +54,13 @@ export default function RemindersPage() {
         return
       }
 
-      // ─── Fetch reminders from the 'reminders' table ───
-      // If you don't have this table yet, create it in Supabase:
-      // CREATE TABLE reminders (
-      //   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      //   business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-      //   title TEXT NOT NULL,
-      //   due_date DATE,
-      //   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
-      //   created_at TIMESTAMPTZ DEFAULT NOW()
-      // );
       const { data, error } = await supabase
         .from('reminders')
         .select('*')
         .eq('business_id', businessId)
         .order('due_date', { ascending: true, nullsFirst: true })
 
-      if (error) {
-        // If table doesn't exist, show a friendly message
-        if (error.code === '42P01') {
-          setReminders([])
-          setLoading(false)
-          return
-        }
-        throw error
-      }
+      if (error) throw error
       setReminders(data || [])
     } catch (err) {
       console.error('Error loading reminders:', err)
@@ -101,7 +86,6 @@ export default function RemindersPage() {
   const pendingCount = reminders.filter(r => r.status === 'pending').length
   const completedCount = reminders.filter(r => r.status === 'completed').length
 
-  // ─── Handle status toggle ───
   const toggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'pending' ? 'completed' : 'pending'
     const { error } = await supabase
@@ -115,7 +99,6 @@ export default function RemindersPage() {
     loadReminders()
   }
 
-  // ─── Handle delete ───
   const deleteReminder = async (id) => {
     if (!confirm('Delete this reminder?')) return
     const { error } = await supabase
@@ -127,6 +110,11 @@ export default function RemindersPage() {
       return
     }
     loadReminders()
+  }
+
+  const openWhatsAppModal = (reminder) => {
+    setSelectedReminder(reminder)
+    setShowWhatsAppModal(true)
   }
 
   // ─── Skeleton ───
@@ -232,6 +220,12 @@ export default function RemindersPage() {
                 >
                   {r.status === 'pending' ? 'Mark done' : 'Reopen'}
                 </button>
+                <button
+                  onClick={() => openWhatsAppModal(r)}
+                  style={{ fontSize: '0.7rem', background: '#25D366', color: '#fff', border: 'none', padding: '0.1rem 0.6rem', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  💬 Send
+                </button>
                 <a href={`/dashboard/reminders/${r.id}/edit?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Edit</a>
                 <button onClick={() => deleteReminder(r.id)} style={{ fontSize: '0.7rem', color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
               </div>
@@ -239,6 +233,18 @@ export default function RemindersPage() {
           ))}
         </div>
       )}
+
+      {/* ─── WhatsApp Modal ─── */}
+      {showWhatsAppModal && selectedReminder && (
+        <WhatsAppReminderModal
+          reminder={selectedReminder}
+          onClose={() => {
+            setShowWhatsAppModal(false)
+            setSelectedReminder(null)
+          }}
+          businessId={getCurrentBusinessId()}
+        />
+      )}
     </div>
   )
-    }
+      }
