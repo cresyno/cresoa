@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Icon } from '../../../../components/Icon'
-import WhatsAppReminderModal from '../../../components/WhatsAppReminderModal'
+import WhatsAppReminderModal from '../../../../components/WhatsAppReminderModal'
 
 export default function NewReminderPage() {
   const router = useRouter()
