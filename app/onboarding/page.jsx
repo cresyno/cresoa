@@ -102,7 +102,7 @@ export default function OnboardingPage() {
         details: { name: businessName, sector },
       })
 
-      // 4. Redirect to dashboard
+      // 4. Redirect to dashboard with business_id
       router.push(`/dashboard?business_id=${business.id}&t=${Date.now()}`)
     } catch (err) {
       console.error('Create business error:', err)
@@ -120,9 +120,20 @@ export default function OnboardingPage() {
     setError('')
 
     try {
+      // ─── Get the current session ───
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setJoinMessage('❌ You are not logged in.')
+        setJoining(false)
+        return
+      }
+
       const response = await fetch('/api/team/invites/accept', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ invite_code: inviteCode })
       })
 
@@ -305,4 +316,4 @@ export default function OnboardingPage() {
       </div>
     </div>
   )
-                       }
+            }
