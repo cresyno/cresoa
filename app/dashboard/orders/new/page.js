@@ -8,12 +8,13 @@ import { getCurrentBusinessId } from '../../../../lib/getBusinessId';
 import { getPlanLimits } from '../../../../lib/planLimits';
 import { Icon } from '../../../../components/Icon';
 
+// ─── Helpers ──────────────────────────────────────────────
 const formatCurrency = (amount) => {
   if (!amount && amount !== 0) return '₦0';
   return `₦${Number(amount).toLocaleString()}`;
 };
 
-// ─── Styles ───
+// ─── Inline Styles (no Tailwind needed) ─────────────────
 const styles = {
   container: {
     maxWidth: '640px',
@@ -22,19 +23,14 @@ const styles = {
     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     color: '#1A1A1A',
   },
-  header: {
-    marginBottom: '24px',
-  },
+  header: { marginBottom: '24px' },
   title: {
     fontSize: '28px',
     fontWeight: '700',
     color: '#0F2B4A',
     marginBottom: '4px',
   },
-  subtitle: {
-    fontSize: '14px',
-    color: '#8A8A8A',
-  },
+  subtitle: { fontSize: '14px', color: '#8A8A8A' },
   stepIndicator: {
     display: 'flex',
     alignItems: 'center',
@@ -71,12 +67,8 @@ const styles = {
     height: '2px',
     borderRadius: '999px',
   },
-  stepLineCompleted: {
-    background: '#2E7D5E',
-  },
-  stepLinePending: {
-    background: '#E5E0D8',
-  },
+  stepLineCompleted: { background: '#2E7D5E' },
+  stepLinePending: { background: '#E5E0D8' },
   formCard: {
     background: 'white',
     borderRadius: '24px',
@@ -102,6 +94,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  searchWrapper: { position: 'relative' },
   searchInput: {
     width: '100%',
     padding: '14px 16px 14px 48px',
@@ -116,10 +109,7 @@ const styles = {
   },
   searchInputFocus: {
     borderColor: '#D4A52A',
-    boxShadow: '0 0 0 3px rgba(212, 165, 42, 0.2)',
-  },
-  searchWrapper: {
-    position: 'relative',
+    boxShadow: '0 0 0 3px rgba(212,165,42,0.2)',
   },
   searchIcon: {
     position: 'absolute',
@@ -132,6 +122,7 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '10px',
+    marginTop: '12px',
   },
   customerCard: {
     padding: '12px 16px',
@@ -146,16 +137,8 @@ const styles = {
     borderColor: '#D4A52A',
     boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
   },
-  customerName: {
-    fontWeight: '500',
-    color: '#0F2B4A',
-    fontSize: '14px',
-  },
-  customerPhone: {
-    fontSize: '12px',
-    color: '#8A8A8A',
-    marginTop: '2px',
-  },
+  customerName: { fontWeight: '500', color: '#0F2B4A', fontSize: '14px' },
+  customerPhone: { fontSize: '12px', color: '#8A8A8A', marginTop: '2px' },
   addButton: {
     display: 'flex',
     alignItems: 'center',
@@ -167,11 +150,10 @@ const styles = {
     cursor: 'pointer',
     padding: '0',
     fontSize: '14px',
+    marginTop: '16px',
     transition: 'color 0.2s',
   },
-  addButtonHover: {
-    color: '#B4881E',
-  },
+  addButtonHover: { color: '#B4881E' },
   addIcon: {
     width: '24px',
     height: '24px',
@@ -215,7 +197,7 @@ const styles = {
   },
   inputFocus: {
     borderColor: '#D4A52A',
-    boxShadow: '0 0 0 3px rgba(212, 165, 42, 0.15)',
+    boxShadow: '0 0 0 3px rgba(212,165,42,0.15)',
   },
   statsGrid: {
     display: 'grid',
@@ -241,12 +223,8 @@ const styles = {
     color: '#0F2B4A',
     marginTop: '2px',
   },
-  statsValueRed: {
-    color: '#D9534F',
-  },
-  fieldGroup: {
-    marginBottom: '20px',
-  },
+  statsValueRed: { color: '#D9534F' },
+  fieldGroup: { marginBottom: '20px' },
   select: {
     width: '100%',
     padding: '14px 16px',
@@ -260,9 +238,7 @@ const styles = {
     transition: 'all 0.2s',
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
   },
-  selectWrapper: {
-    position: 'relative',
-  },
+  selectWrapper: { position: 'relative' },
   selectArrow: {
     position: 'absolute',
     right: '16px',
@@ -346,20 +322,15 @@ const styles = {
     background: '#F8F6F2',
     borderRadius: '16px',
     border: '1px solid #E5E0D8',
+    marginBottom: '20px',
   },
   balanceRow: {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '14px',
   },
-  balanceLabel: {
-    color: '#8A8A8A',
-  },
-  balanceValue: {
-    fontWeight: '700',
-    color: '#0F2B4A',
-    fontSize: '18px',
-  },
+  balanceLabel: { color: '#8A8A8A' },
+  balanceValue: { fontWeight: '700', color: '#0F2B4A', fontSize: '18px' },
   statusBadge: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -370,11 +341,7 @@ const styles = {
     fontWeight: '500',
     marginTop: '8px',
   },
-  statusDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-  },
+  statusDot: { width: '6px', height: '6px', borderRadius: '50%' },
   summaryCard: {
     background: '#0F2B4A',
     color: 'white',
@@ -396,22 +363,14 @@ const styles = {
     fontSize: '14px',
     padding: '4px 0',
   },
-  summaryLabel: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  summaryValue: {
-    fontWeight: '500',
-  },
+  summaryLabel: { color: 'rgba(255,255,255,0.7)' },
+  summaryValue: { fontWeight: '500' },
   summaryDivider: {
     borderTop: '1px solid rgba(255,255,255,0.2)',
     margin: '8px 0 4px',
     paddingTop: '10px',
   },
-  summaryBalance: {
-    fontWeight: '700',
-    color: '#D4A52A',
-    fontSize: '18px',
-  },
+  summaryBalance: { fontWeight: '700', color: '#D4A52A', fontSize: '18px' },
   nav: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -434,9 +393,7 @@ const styles = {
     gap: '6px',
     fontSize: '14px',
   },
-  backBtnHover: {
-    background: '#F8F6F2',
-  },
+  backBtnHover: { background: '#F8F6F2' },
   continueBtn: {
     padding: '12px 24px',
     background: '#D4A52A',
@@ -519,6 +476,7 @@ const styles = {
   },
 };
 
+// ─── Component ──────────────────────────────────────────
 export default function NewOrderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -567,20 +525,14 @@ export default function NewOrderPage() {
 
   const [isNewCustomer, setIsNewCustomer] = useState(false);
 
+  // ─── Load data ──────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-
+        if (!user) { router.push('/login'); return; }
         const bizId = getCurrentBusinessId();
-        if (!bizId) {
-          router.push('/dashboard');
-          return;
-        }
+        if (!bizId) { router.push('/dashboard'); return; }
         setBusinessId(bizId);
 
         const { data: bizData } = await supabase
@@ -612,6 +564,7 @@ export default function NewOrderPage() {
     load();
   }, [router]);
 
+  // ─── Fetch customer stats ──────────────────────────────
   useEffect(() => {
     if (!formData.customer_id || !businessId) {
       setCustomerStats(null);
@@ -637,6 +590,7 @@ export default function NewOrderPage() {
     fetchStats();
   }, [formData.customer_id, businessId]);
 
+  // ─── Handlers ──────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -684,6 +638,7 @@ export default function NewOrderPage() {
 
   const recentCustomers = customers.slice(0, 5);
 
+  // ─── Submit ────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -776,6 +731,7 @@ export default function NewOrderPage() {
     }
   };
 
+  // ─── Navigation ────────────────────────────────────────
   const nextStep = () => {
     if (step === 1 && !formData.customer_id && !isNewCustomer && !showNewCustomer) {
       setError('Please select or add a customer.');
@@ -791,6 +747,7 @@ export default function NewOrderPage() {
 
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
+// ─── Render Step ──────────────────────────────────────
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -836,7 +793,7 @@ export default function NewOrderPage() {
                         <div style={{ fontWeight: '500', color: '#0F2B4A' }}>{c.name}</div>
                         {c.phone && <div style={{ fontSize: '12px', color: '#8A8A8A' }}>{c.phone}</div>}
                       </div>
-                      <Icon name="chevronRight" size={16} stroke="#D4A52A" />
+                      <Icon name="arrow-right" size={16} stroke="#D4A52A" />
                     </button>
                   ))
                 )}
@@ -983,7 +940,7 @@ export default function NewOrderPage() {
                   <option value="Other">Other</option>
                 </select>
                 <div style={styles.selectArrow}>
-                  <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
+                  <Icon name="arrow-down" size={16} stroke="#8A8A8A" />
                 </div>
               </div>
             </div>
@@ -1030,7 +987,7 @@ export default function NewOrderPage() {
                   <option value="Other">Other</option>
                 </select>
                 <div style={styles.selectArrow}>
-                  <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
+                  <Icon name="arrow-down" size={16} stroke="#8A8A8A" />
                 </div>
               </div>
             </div>
@@ -1138,7 +1095,7 @@ export default function NewOrderPage() {
           </div>
         );
 
-case 4:
+      case 4:
         const price = parseFloat(formData.price) || 0;
         const deposit = parseFloat(formData.amount_paid) || 0;
         const balance = price - deposit;
@@ -1156,7 +1113,7 @@ case 4:
           <div>
             <div style={styles.stepHeader}>
               <div style={styles.stepIconWrapper}>
-                <Icon name="creditCard" size={18} stroke="#D4A52A" />
+                <Icon name="credit-card" size={18} stroke="#D4A52A" />
               </div>
               <span>Payment</span>
             </div>
@@ -1202,7 +1159,7 @@ case 4:
               </div>
             )}
 
-            <div style={styles.fieldGroup}>
+ <div style={styles.fieldGroup}>
               <label style={styles.label}>Current status</label>
               <div style={styles.selectWrapper}>
                 <select
@@ -1220,7 +1177,7 @@ case 4:
                   <option value="Delivered">Delivered</option>
                 </select>
                 <div style={styles.selectArrow}>
-                  <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
+                  <Icon name="arrow-down" size={16} stroke="#8A8A8A" />
                 </div>
               </div>
             </div>
@@ -1268,6 +1225,7 @@ case 4:
     }
   };
 
+  // ─── Loading / Error ──────────────────────────────────
   if (loading) {
     return (
       <div style={styles.skeleton}>
@@ -1296,6 +1254,7 @@ case 4:
     );
   }
 
+  // ─── Main Render ──────────────────────────────────────
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -1312,7 +1271,7 @@ case 4:
               ...styles.stepDot,
               ...(i === step ? styles.stepDotActive : i < step ? styles.stepDotCompleted : styles.stepDotPending),
             }}>
-              {i < step ? '✓' : i}
+              {i < step ? <Icon name="check" size={14} stroke="white" /> : i}
             </div>
             {i < 4 && (
               <div style={{
@@ -1339,7 +1298,7 @@ case 4:
               onMouseEnter={(e) => e.target.style = { ...styles.backBtn, ...styles.backBtnHover }}
               onMouseLeave={(e) => e.target.style = styles.backBtn}
             >
-              <Icon name="chevronLeft" size={16} stroke="#0F2B4A" />
+              <Icon name="arrow-left" size={16} stroke="#0F2B4A" />
               Back
             </button>
           ) : (
@@ -1355,7 +1314,7 @@ case 4:
               onMouseLeave={(e) => e.target.style = styles.continueBtn}
             >
               Continue
-              <Icon name="chevronRight" size={18} stroke="#0F2B4A" />
+              <Icon name="arrow-right" size={18} stroke="#0F2B4A" />
             </button>
           ) : (
             <button
@@ -1376,7 +1335,7 @@ case 4:
               ) : (
                 <>
                   Create Order & Start Tracking
-                  <Icon name="arrowRight" size={18} stroke="white" />
+                  <Icon name="arrow-right" size={18} stroke="white" />
                 </>
               )}
             </button>
@@ -1396,4 +1355,4 @@ case 4:
       `}</style>
     </div>
   );
-          }
+              }
