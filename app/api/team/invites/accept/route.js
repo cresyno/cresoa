@@ -4,9 +4,15 @@ import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
+    const { invite_code } = await req.json();
+    if (!invite_code) {
+      return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
+    }
+
+    // ─── Get user from session (client will send token) ───
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing authorization' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -14,15 +20,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ─── REMOVED: "already owns a business" and "already a member of any business" checks ───
-    // We'll only check if they are already a member of THIS specific business.
-
-    const { invite_code } = await req.json();
-    if (!invite_code) {
-      return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
-    }
-
-    // ─── Look up the invite ───
+    // ─── Find the invite ───
     const { data: invite, error: inviteError } = await supabaseAdmin
       .from('business_invites')
       .select('*')
@@ -42,7 +40,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invite code has expired' }, { status: 410 });
     }
 
-    // ─── Check if user is already a member of THIS business ───
+    // ─── Check if user is already a member ───
     const { data: existing } = await supabaseAdmin
       .from('business_memberships')
       .select('id')
@@ -60,7 +58,7 @@ export async function POST(req) {
       .insert({
         business_id: invite.business_id,
         user_id: user.id,
-        role: invite.role
+        role: invite.role,
       });
 
     if (insertError) throw insertError;
@@ -76,16 +74,18 @@ export async function POST(req) {
       business_id: invite.business_id,
       performed_by: user.id,
       action: 'invite_accepted',
-      details: { email: user.email, role: invite.role }
+      details: { email: user.email, role: invite.role },
     });
 
+    // ─── Return redirect URL ───
+    const redirectUrl = `/dashboard?business_id=${invite.business_id}&t=${Date.now()}`;
     return NextResponse.json({
       success: true,
       message: 'You have successfully joined the business',
-      redirect: `/dashboard?business_id=${invite.business_id}`
+      redirect: redirectUrl,
     }, { status: 200 });
   } catch (error) {
     console.error('Accept invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-        }
+}
