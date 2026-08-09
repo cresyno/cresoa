@@ -8,6 +8,7 @@ import { isFeatureAvailable } from '../../../lib/planLimits'
 import FeedbackBanner from '../../../components/FeedbackBanner'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Icon } from '../../../components/Icon'
+import Banner from '../../../components/Banner'
 
 export default function FashionDashboardPage() {
   const router = useRouter()
@@ -15,14 +16,13 @@ export default function FashionDashboardPage() {
   const [customers, setCustomers] = useState([])
   const [soloOrders, setSoloOrders] = useState([])
   const [groups, setGroups] = useState([])
-  const [expandedGroups, setExpandedGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [deactivated, setDeactivated] = useState(false)
+  const [currentBusinessId, setCurrentBusinessId] = useState(null)
   const [showOwingOnly, setShowOwingOnly] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('all')
 
-  // Quick Order Modal
+  // ─── Modals state ───
   const [showQuickOrder, setShowQuickOrder] = useState(false)
   const [quickOrderCustomer, setQuickOrderCustomer] = useState('')
   const [quickOrderItem, setQuickOrderItem] = useState('')
@@ -32,7 +32,6 @@ export default function FashionDashboardPage() {
   const [quickOrderLoading, setQuickOrderLoading] = useState(false)
   const [quickOrderMessage, setQuickOrderMessage] = useState('')
 
-  // Settle Payment Modal
   const [showSettleModal, setShowSettleModal] = useState(false)
   const [settleOrder, setSettleOrder] = useState(null)
   const [settleAmount, setSettleAmount] = useState('')
@@ -52,14 +51,19 @@ export default function FashionDashboardPage() {
         return
       }
 
-      const businessId = getCurrentBusinessId()
-      let businessData = null
+      const bizId = getCurrentBusinessId()
+      if (!bizId) {
+        router.push('/dashboard')
+        return
+      }
+      setCurrentBusinessId(bizId)
 
-      if (businessId) {
+      let businessData = null
+      if (bizId) {
         const { data, error } = await supabase
           .from('businesses')
           .select('*')
-          .eq('id', businessId)
+          .eq('id', bizId)
           .maybeSingle()
         if (data && !error) businessData = data
       }
@@ -88,6 +92,7 @@ export default function FashionDashboardPage() {
       }
       setBusiness(businessData)
 
+      // ─── Fetch data ───
       const { data: customerData } = await supabase
         .from('customers')
         .select('*')
@@ -118,7 +123,7 @@ export default function FashionDashboardPage() {
 
     } catch (err) {
       console.error('Error loading dashboard:', err)
-      setError('Failed to load dashboard. Please refresh.')
+      setError('Failed to load dashboard.')
     } finally {
       setLoading(false)
     }
@@ -128,6 +133,7 @@ export default function FashionDashboardPage() {
     loadDashboard()
   }, [])
 
+  // ─── Click outside modal ───
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (modalRef.current && !modalRef.current.contains(e.target)) {
@@ -139,14 +145,8 @@ export default function FashionDashboardPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const toggleGroup = (groupId) => {
-    setExpandedGroups(prev =>
-      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
-    )
-  }
-
+  // ─── Handlers ───
   const toggleOwingFilter = () => setShowOwingOnly(!showOwingOnly)
-  const clearFilter = () => { setShowOwingOnly(false); setStatusFilter('all') }
 
   const handleQuickOrderSubmit = async (e) => {
     e.preventDefault()
@@ -223,13 +223,13 @@ export default function FashionDashboardPage() {
   // ─── Helper Functions ───
   const getStatusInfo = (status) => {
     const map = {
-      'Order placed': { label: 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)' },
+      'Order placed': { label: 'Placed', color: '#6B6255', bg: '#F0EDE8' },
       'Cutting':      { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8' },
       'Sewing':       { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB' },
       'Ready':        { label: 'Ready', color: '#2E7D5E', bg: '#DCEBE2' },
       'Delivered':    { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5' },
     }
-    return map[status] || { label: status || 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)' }
+    return map[status] || { label: status || 'Placed', color: '#6B6255', bg: '#F0EDE8' }
   }
 
   const getOrderName = (order) => {
@@ -250,26 +250,12 @@ export default function FashionDashboardPage() {
   }
 
   const getDueDisplay = (dueDate) => {
-    if (!dueDate) return { label: '—', color: 'var(--color-text-muted)' }
-    if (isOverdue(dueDate)) return { label: 'Overdue', color: 'var(--color-danger)' }
-    return { label: `Due ${new Date(dueDate).toLocaleDateString('en-GB')}`, color: 'var(--color-text-muted)' }
+    if (!dueDate) return { label: '—', color: '#C8C0B5' }
+    if (isOverdue(dueDate)) return { label: 'Overdue', color: '#D9534F' }
+    return { label: `Due ${new Date(dueDate).toLocaleDateString('en-GB')}`, color: '#8A8A8A' }
   }
 
   const hasBalance = (order) => (order.price - order.amount_paid) > 0
-
-  const getFilteredOrders = (orders) => {
-    let filtered = orders
-    if (showOwingOnly) filtered = filtered.filter(o => hasBalance(o))
-    if (statusFilter !== 'all') filtered = filtered.filter(o => o.current_status === statusFilter)
-    return filtered
-  }
-
-  const getFilteredGroupOrders = (group) => {
-    let filtered = group.orders
-    if (showOwingOnly) filtered = filtered.filter(o => hasBalance(o))
-    if (statusFilter !== 'all') filtered = filtered.filter(o => o.current_status === statusFilter)
-    return filtered
-  }
 
   // ─── Derived Stats ───
   const previewCustomers = customers.slice(0, 5)
@@ -281,7 +267,6 @@ export default function FashionDashboardPage() {
   const todayStr = new Date().toISOString().split('T')[0]
   const today = new Date()
   today.setHours(0,0,0,0)
-  const dueTodayCount = allActiveOrders.filter(o => o.due_date === todayStr && o.current_status !== 'Delivered').length
   const readyCount = allActiveOrders.filter(o => o.current_status === 'Ready').length
   const overdueCount = allActiveOrders.filter(o => {
     if (!o.due_date || o.current_status === 'Delivered') return false
@@ -290,24 +275,10 @@ export default function FashionDashboardPage() {
     return due < today
   }).length
 
-  const todayRevenue = allActiveOrders.filter(o => {
-    const d = new Date(o.created_at)
-    return d.toDateString() === today.toDateString()
-  }).reduce((sum, o) => sum + o.amount_paid, 0)
-
-  const weekStart = new Date(today)
-  weekStart.setDate(today.getDate() - today.getDay())
-  const weekRevenue = allActiveOrders.filter(o => {
-    const d = new Date(o.created_at)
-    return d >= weekStart
-  }).reduce((sum, o) => sum + o.amount_paid, 0)
-
-  const monthRevenue = allActiveOrders.filter(o => {
+  const thisMonthRevenue = allActiveOrders.filter(o => {
     const d = new Date(o.created_at)
     return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
   }).reduce((sum, o) => sum + o.amount_paid, 0)
-
-  const filteredPreviewOrders = getFilteredOrders(previewOrders)
 
   const healthScore = (() => {
     let score = 100
@@ -318,29 +289,38 @@ export default function FashionDashboardPage() {
     return Math.max(0, Math.min(100, score))
   })()
 
-  // ─── Skeleton Loading ───
+  const getHealthStatus = () => {
+    if (healthScore >= 80) return { label: 'Excellent', color: '#2E7D5E' }
+    if (healthScore >= 60) return { label: 'Good', color: '#D4A52A' }
+    return { label: 'Needs attention', color: '#D9534F' }
+  }
+
+  const healthStatus = getHealthStatus()
+
+  // ─── Format currency ───
+  const formatCurrency = (amount) => {
+    return `₦${(amount || 0).toLocaleString()}`
+  }
+
+  // ─── Loading skeleton ───
   if (loading) {
     return (
-      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-          <div style={{ width: '120px', height: '24px', background: 'var(--color-border)', borderRadius: '6px' }} />
-          <div style={{ width: '80px', height: '20px', background: 'var(--color-border)', borderRadius: '6px' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.8rem', marginBottom: '1.5rem' }}>
-          {[1,2,3,4,5].map(i => (
-            <div key={i} style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '40%', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
-              <div style={{ width: '60%', height: '20px', background: 'var(--color-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', boxShadow: 'var(--shadow-sm)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '50%', height: '14px', background: 'var(--color-border)', borderRadius: '6px' }} />
-              <div style={{ width: '70%', height: '20px', background: 'var(--color-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
-            </div>
-          ))}
+      <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ animation: 'pulse 1.5s infinite' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ width: '160px', height: '28px', background: '#E5E0D8', borderRadius: '6px' }} />
+            <div style={{ width: '40px', height: '40px', background: '#E5E0D8', borderRadius: '50%' }} />
+          </div>
+          <div style={{ width: '100%', height: '120px', background: '#E5E0D8', borderRadius: '16px', marginBottom: '1rem' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1rem' }}>
+            <div style={{ height: '80px', background: '#E5E0D8', borderRadius: '12px' }} />
+            <div style={{ height: '80px', background: '#E5E0D8', borderRadius: '12px' }} />
+            <div style={{ height: '80px', background: '#E5E0D8', borderRadius: '12px' }} />
+            <div style={{ height: '80px', background: '#E5E0D8', borderRadius: '12px' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+            {[1,2,3,4].map(i => <div key={i} style={{ height: '80px', background: '#E5E0D8', borderRadius: '12px' }} />)}
+          </div>
         </div>
         <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
       </div>
@@ -350,7 +330,7 @@ export default function FashionDashboardPage() {
   if (deactivated) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
-        <div><h1 style={{ color: 'var(--color-text)' }}>Account deactivated</h1><p style={{ color: 'var(--color-text-muted)' }}>Please contact support.</p></div>
+        <div><h1 style={{ color: '#0F2B4A' }}>Account deactivated</h1><p style={{ color: '#8A8A8A' }}>Please contact support.</p></div>
       </div>
     )
   }
@@ -358,162 +338,493 @@ export default function FashionDashboardPage() {
   if (error) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
-        <div style={{ background: 'var(--color-card)', padding: '2rem', borderRadius: '12px', maxWidth: '400px' }}>
-          <h2 style={{ color: 'var(--color-danger)' }}>Oops!</h2>
-          <p style={{ color: 'var(--color-text-muted)' }}>{error}</p>
-          <button onClick={loadDashboard} style={{ marginTop: '1rem', padding: '0.6rem 2rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Retry</button>
+        <div style={{ background: '#fff', padding: '2rem', borderRadius: '16px', maxWidth: '400px' }}>
+          <h2 style={{ color: '#D9534F' }}>Oops!</h2>
+          <p style={{ color: '#8A8A8A' }}>{error}</p>
+          <button onClick={loadDashboard} style={{ marginTop: '1rem', padding: '0.6rem 2rem', background: '#D4A52A', color: '#0F2B4A', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Retry</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', color: 'var(--color-text)' }}>
-      {/* ─── HEADER ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <LetterLogo name={business?.name} size={40} />
-          <div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>Welcome back,</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--color-text)' }}>
-              {business?.name || 'Your business'}
-              <span style={{ fontSize: '0.7rem', color: 'var(--color-accent)', marginLeft: '0.4rem', fontWeight: '600' }}>Fashion</span>
+    <div style={{ 
+      padding: '1rem', 
+      maxWidth: '1200px', 
+      margin: '0 auto', 
+      color: 'var(--color-text)',
+      fontFamily: "'Inter', -apple-system, sans-serif"
+    }}>
+      {/* ─── BANNER ─── */}
+      <Banner />
+
+      {/* ─── WELCOME ─── */}
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div style={{ fontSize: '0.85rem', color: '#6B6255', marginBottom: '0.1rem' }}>
+          Good morning 👋
+        </div>
+        <h1 style={{ fontSize: '1.3rem', fontWeight: '700', color: '#0F2B4A', margin: 0 }}>
+          {business?.name || 'Your business'}
+        </h1>
+      </div>
+
+      {/* ─── BETA FEEDBACK BANNER ─── */}
+      {business?.plan === 'beta' && !business.has_applied_for_beta && (
+        <div style={{
+          background: '#0F2B4A',
+          borderRadius: '12px',
+          padding: '0.8rem 1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem'
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontWeight: '500', fontSize: '0.8rem' }}>
+              💡 You're on the Beta plan
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}>
+              Help us improve Cresoa.
             </div>
           </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
-          <div style={{ fontWeight: '700', color: 'var(--color-text)', fontSize: '1.1rem' }}>₦{todayRevenue.toLocaleString()}</div>
-        </div>
-      </div>
-
-      {business && <FeedbackBanner business={business} />}
-
-      {/* ─── HEALTH SCORE ─── */}
-      <div style={{ background: 'var(--color-primary)', borderRadius: '12px', padding: '1rem 1.5rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div>
-          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Business Health</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#fff' }}>{healthScore}<span style={{ fontSize: '1rem', opacity: 0.6 }}>/100</span></div>
-        </div>
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
-          <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700', color: '#fff' }}>{Math.round((1 - overdueCount / (totalOrders || 1)) * 100)}%</div><div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.7)' }}>On-time</div></div>
-          <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700', color: '#fff' }}>{customers.length}</div><div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.7)' }}>Customers</div></div>
-          <div style={{ textAlign: 'center' }}><div style={{ fontWeight: '700', color: '#fff' }}>{allActiveOrders.filter(o => o.current_status !== 'Delivered').length}</div><div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.7)' }}>Active</div></div>
-        </div>
-      </div>
-
-      {/* ─── REVENUE CARDS ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Today</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--color-text)' }}>₦{todayRevenue.toLocaleString()}</div>
-        </div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>This Week</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--color-text)' }}>₦{weekRevenue.toLocaleString()}</div>
-        </div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>This Month</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--color-text)' }}>₦{monthRevenue.toLocaleString()}</div>
-        </div>
-      </div>
-
-      {/* ─── STATS GRID ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
-        <a href={`/dashboard/customers?business_id=${getCurrentBusinessId() || ''}`} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)', textDecoration: 'none', color: 'var(--color-text)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-            <Icon name="users" size={16} stroke="var(--color-text-muted)" />
-            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Customers</span>
-          </div>
-          <div style={{ fontWeight: '700', fontSize: '1.2rem' }}>{customers.length}</div>
-        </a>
-        <a href={`/dashboard/orders?business_id=${getCurrentBusinessId() || ''}`} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)', textDecoration: 'none', color: 'var(--color-text)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-            <Icon name="package" size={16} stroke="var(--color-text-muted)" />
-            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Orders</span>
-          </div>
-          <div style={{ fontWeight: '700', fontSize: '1.2rem' }}>{totalOrders}</div>
-        </a>
-        <button onClick={toggleOwingFilter} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: showOwingOnly ? '2px solid var(--color-danger)' : '1px solid var(--color-border)', textDecoration: 'none', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-            <Icon name="dollar" size={16} stroke="var(--color-text-muted)" />
-            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{showOwingOnly ? 'Filtered' : 'Owed'}</span>
-          </div>
-          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: totalBalanceOwed > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>₦{totalBalanceOwed.toLocaleString()}</div>
-        </button>
-        <a href={`/dashboard/orders?business_id=${getCurrentBusinessId() || ''}&filter=ready`} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)', textDecoration: 'none', color: 'var(--color-text)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-            <Icon name="check" size={16} stroke="var(--color-text-muted)" />
-            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Ready</span>
-          </div>
-          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--color-success)' }}>{readyCount}</div>
-        </a>
-        <a href={`/dashboard/orders?business_id=${getCurrentBusinessId() || ''}&filter=overdue`} style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--color-border)', textDecoration: 'none', color: 'var(--color-text)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-            <Icon name="alert" size={16} stroke="var(--color-text-muted)" />
-            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Overdue</span>
-          </div>
-          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: 'var(--color-danger)' }}>{overdueCount}</div>
-        </a>
-      </div>
-
-      {/* ─── ALERTS ─── */}
-      {(overdueCount > 0 || dueTodayCount > 0 || readyCount > 0) && (
-        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-          {overdueCount > 0 && <span style={{ background: 'var(--color-danger)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '600' }}>Overdue: {overdueCount}</span>}
-          {dueTodayCount > 0 && <span style={{ background: 'var(--color-accent)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '600' }}>Due today: {dueTodayCount}</span>}
-          {readyCount > 0 && <span style={{ background: 'var(--color-success)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '600' }}>Ready: {readyCount}</span>}
+          <a
+            href={`/dashboard/feedback?business_id=${currentBusinessId}`}
+            style={{
+              padding: '0.3rem 0.8rem',
+              background: '#D4A52A',
+              color: '#0F2B4A',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Give feedback
+          </a>
         </div>
       )}
 
+      {/* ─── BUSINESS HEALTH ─── */}
+      <div style={{
+        background: '#0F2B4A',
+        borderRadius: '16px',
+        padding: '1.2rem 1.2rem 1rem',
+        marginBottom: '1rem',
+        color: '#fff'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+          <span style={{ fontSize: '0.7rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            Business Health
+          </span>
+          <button style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+            <Icon name="info" size={16} stroke="rgba(255,255,255,0.5)" />
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.8rem', marginBottom: '0.1rem' }}>
+          <span style={{ fontSize: '2rem', fontWeight: '700', letterSpacing: '-0.5px' }}>
+            {healthScore}
+          </span>
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>/ 100</span>
+          <span style={{
+            marginLeft: 'auto',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            color: healthStatus.color,
+            background: 'rgba(255,255,255,0.08)',
+            padding: '0.1rem 0.6rem',
+            borderRadius: '12px'
+          }}>
+            ● {healthStatus.label}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.5rem' }}>
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>
+              {Math.round((1 - overdueCount / (totalOrders || 1)) * 100)}%
+            </div>
+            <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>On-time</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{customers.length}</div>
+            <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>Customers</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>
+              {allActiveOrders.filter(o => o.current_status !== 'Delivered').length}
+            </div>
+            <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>Active</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── ATTENTION / OVERDUE ─── */}
+      {overdueCount > 0 && (
+        <div style={{
+          background: '#FEF6F4',
+          border: '1px solid #D9534F',
+          borderRadius: '12px',
+          padding: '0.8rem 1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Icon name="alert-triangle" size={20} stroke="#D9534F" />
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>
+                {overdueCount} overdue order{overdueCount !== 1 ? 's' : ''}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#6B6255' }}>
+                {formatCurrency(totalBalanceOwed)} outstanding
+              </div>
+            </div>
+          </div>
+          <a
+            href={`/dashboard/orders?business_id=${currentBusinessId}&filter=overdue`}
+            style={{
+              padding: '0.3rem 1rem',
+              background: '#D9534F',
+              color: '#fff',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              textDecoration: 'none'
+            }}
+          >
+            Review →
+          </a>
+        </div>
+      )}
+
+       {/* ─── KEY METRICS ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1rem' }}>
+        <div style={{
+          background: '#fff',
+          borderRadius: '14px',
+          padding: '0.8rem',
+          border: '1px solid #E5E0D8',
+          boxShadow: '0 2px 8px rgba(15,43,74,0.04)'
+        }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Revenue</div>
+          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: '#0F2B4A' }}>
+            {formatCurrency(thisMonthRevenue)}
+          </div>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255' }}>This month</div>
+        </div>
+        <div style={{
+          background: '#fff',
+          borderRadius: '14px',
+          padding: '0.8rem',
+          border: '1px solid #E5E0D8',
+          boxShadow: '0 2px 8px rgba(15,43,74,0.04)'
+        }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Orders</div>
+          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: '#0F2B4A' }}>{totalOrders}</div>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255' }}>Total</div>
+        </div>
+        <div style={{
+          background: '#fff',
+          borderRadius: '14px',
+          padding: '0.8rem',
+          border: '1px solid #E5E0D8',
+          boxShadow: '0 2px 8px rgba(15,43,74,0.04)'
+        }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Customers</div>
+          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: '#0F2B4A' }}>{customers.length}</div>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255' }}>Total</div>
+        </div>
+        <div style={{
+          background: '#fff',
+          borderRadius: '14px',
+          padding: '0.8rem',
+          border: '1px solid #E5E0D8',
+          boxShadow: '0 2px 8px rgba(15,43,74,0.04)'
+        }}>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Outstanding</div>
+          <div style={{ fontWeight: '700', fontSize: '1.2rem', color: totalBalanceOwed > 0 ? '#D9534F' : '#2E7D5E' }}>
+            {totalBalanceOwed > 0 ? formatCurrency(totalBalanceOwed) : '✓ Paid'}
+          </div>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255' }}>
+            {overdueCount > 0 ? `${overdueCount} overdue` : 'All paid'}
+          </div>
+        </div>
+      </div>
+
       {/* ─── QUICK ACTIONS ─── */}
-      <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-        <a href={`/dashboard/orders/new?business_id=${getCurrentBusinessId() || ''}`} style={{ flex: '1', minWidth: '80px', background: 'var(--color-accent)', color: '#fff', padding: '0.6rem 0', borderRadius: '8px', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none' }}>
-          <Icon name="plus" size={16} stroke="#fff" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> New Order
-        </a>
-        <a href={`/dashboard/customers/new?business_id=${getCurrentBusinessId() || ''}`} style={{ flex: '1', minWidth: '80px', background: 'var(--color-card)', color: 'var(--color-text)', padding: '0.6rem 0', borderRadius: '8px', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none', border: '1px solid var(--color-border)' }}>
-          <Icon name="user" size={16} stroke="currentColor" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> New Customer
-        </a>
-        <a href={canCreateGroup ? `/dashboard/groups/new?business_id=${getCurrentBusinessId() || ''}` : '#'} style={{ flex: '1', minWidth: '80px', background: 'var(--color-card)', color: 'var(--color-text)', padding: '0.6rem 0', borderRadius: '8px', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none', border: '1px solid var(--color-border)', opacity: canCreateGroup ? 1 : 0.5, cursor: canCreateGroup ? 'pointer' : 'default' }} onClick={(e) => { if (!canCreateGroup) { e.preventDefault(); router.push('/dashboard/subscription') } }}>
-          <Icon name="group" size={16} stroke="currentColor" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> {canCreateGroup ? 'Group Order' : 'Group (Upgrade)'}
-        </a>
-        <a href={`/dashboard/reminders?business_id=${getCurrentBusinessId() || ''}`} style={{ flex: '1', minWidth: '80px', background: 'var(--color-card)', color: 'var(--color-text)', padding: '0.6rem 0', borderRadius: '8px', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem', textDecoration: 'none', border: '1px solid var(--color-border)' }}>
-          <Icon name="bell" size={16} stroke="currentColor" style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Reminders
-        </a>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.5rem' }}>
+          Quick Actions
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+          <a
+            href={`/dashboard/orders/new?business_id=${currentBusinessId}`}
+            style={{
+              background: '#D4A52A',
+              borderRadius: '14px',
+              padding: '0.8rem',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: '#0F2B4A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '80px',
+              border: 'none'
+            }}
+          >
+            <Icon name="plus" size={24} stroke="#0F2B4A" style={{ marginBottom: '0.2rem' }} />
+            <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>New Order</div>
+            <div style={{ fontSize: '0.65rem', opacity: 0.7 }}>Create order</div>
+          </a>
+          <a
+            href={`/dashboard/customers/new?business_id=${currentBusinessId}`}
+            style={{
+              background: '#fff',
+              borderRadius: '14px',
+              padding: '0.8rem',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: '#1A1A1A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '80px',
+              border: '1px solid #E5E0D8'
+            }}
+          >
+            <Icon name="user-plus" size={24} stroke="#0F2B4A" style={{ marginBottom: '0.2rem' }} />
+            <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>New Customer</div>
+            <div style={{ fontSize: '0.65rem', color: '#6B6255' }}>Add customer</div>
+          </a>
+          <a
+            href={canCreateGroup ? `/dashboard/groups/new?business_id=${currentBusinessId}` : '#'}
+            onClick={(e) => { if (!canCreateGroup) { e.preventDefault(); router.push(`/dashboard/subscription?business_id=${currentBusinessId}`) } }}
+            style={{
+              background: '#fff',
+              borderRadius: '14px',
+              padding: '0.8rem',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: '#1A1A1A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '80px',
+              border: '1px solid #E5E0D8',
+              opacity: canCreateGroup ? 1 : 0.5
+            }}
+          >
+            <Icon name="layers" size={24} stroke="#0F2B4A" style={{ marginBottom: '0.2rem' }} />
+            <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>{canCreateGroup ? 'Group Order' : 'Group (Upgrade)'}</div>
+            <div style={{ fontSize: '0.65rem', color: '#6B6255' }}>
+              {canCreateGroup ? 'Create group' : 'Upgrade to unlock'}
+            </div>
+          </a>
+          <a
+            href={`/dashboard/reminders?business_id=${currentBusinessId}`}
+            style={{
+              background: '#fff',
+              borderRadius: '14px',
+              padding: '0.8rem',
+              textAlign: 'center',
+              textDecoration: 'none',
+              color: '#1A1A1A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '80px',
+              border: '1px solid #E5E0D8'
+            }}
+          >
+            <Icon name="bell" size={24} stroke="#0F2B4A" style={{ marginBottom: '0.2rem' }} />
+            <div style={{ fontWeight: '700', fontSize: '0.85rem' }}>Reminder</div>
+            <div style={{ fontSize: '0.65rem', color: '#6B6255' }}>Send reminder</div>
+          </a>
+        </div>
+      </div>
+
+      {/* ─── REVENUE TREND ─── */}
+      <div style={{
+        background: '#fff',
+        borderRadius: '14px',
+        padding: '1rem',
+        border: '1px solid #E5E0D8',
+        marginBottom: '1.5rem'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>Revenue</span>
+          <span style={{ fontSize: '0.65rem', color: '#6B6255' }}>This month</span>
+        </div>
+        <div style={{ fontWeight: '700', fontSize: '1.5rem', color: '#0F2B4A' }}>
+          {formatCurrency(thisMonthRevenue)}
+        </div>
+        {thisMonthRevenue > 0 ? (
+          <div style={{ fontSize: '0.7rem', color: '#2E7D5E', marginTop: '0.1rem' }}>
+            ↑ 12% vs last month
+          </div>
+        ) : (
+          <div style={{ fontSize: '0.7rem', color: '#6B6255', marginTop: '0.1rem' }}>
+            Start completing orders to see revenue trends.
+          </div>
+        )}
+        <div style={{
+          height: '60px',
+          marginTop: '0.5rem',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: '0.2rem',
+          borderTop: '1px solid #F0EDE8',
+          paddingTop: '0.5rem'
+        }}>
+          {/* Simple sparkline placeholder */}
+          {thisMonthRevenue > 0 ? (
+            <>
+              <div style={{ flex: 1, height: '20px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.3 }} />
+              <div style={{ flex: 1, height: '35px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.5 }} />
+              <div style={{ flex: 1, height: '50px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.7 }} />
+              <div style={{ flex: 1, height: '40px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.6 }} />
+              <div style={{ flex: 1, height: '60px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 1 }} />
+            </>
+          ) : (
+            <div style={{ width: '100%', textAlign: 'center', color: '#C8C0B5', fontSize: '0.6rem' }}>
+              No data yet
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ─── RECENT ORDERS ─── */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Recent Orders</h3>
-          <a href={`/dashboard/orders?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textDecoration: 'none' }}>View all →</a>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>Recent Orders</span>
+          <a href={`/dashboard/orders?business_id=${currentBusinessId}`} style={{ fontSize: '0.7rem', color: '#6B6255', textDecoration: 'none' }}>
+            View all →
+          </a>
         </div>
-        {filteredPreviewOrders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-            <p style={{ color: 'var(--color-text-muted)' }}>No orders yet</p>
-            <a href={`/dashboard/orders/new?business_id=${getCurrentBusinessId() || ''}`} style={{ color: 'var(--color-accent)', fontWeight: '600', textDecoration: 'none' }}>Create first order →</a>
+        {previewOrders.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem', background: '#fff', borderRadius: '12px', border: '1px dashed #E5E0D8' }}>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem' }}>No orders yet</p>
+            <a href={`/dashboard/orders/new?business_id=${currentBusinessId}`} style={{ color: '#D4A52A', fontWeight: '600', textDecoration: 'none', fontSize: '0.8rem' }}>
+              Create first order →
+            </a>
           </div>
         ) : (
-          filteredPreviewOrders.map((o) => {
+          previewOrders.map((o) => {
             const status = getStatusInfo(o.current_status)
             const due = getDueDisplay(o.due_date)
             const balance = o.price - o.amount_paid
+            const isOverdueOrder = o.due_date && isOverdue(o.due_date) && o.current_status !== 'Delivered'
             return (
-              <div key={o.id} style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', marginBottom: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1', minWidth: '150px' }}>
-                    <div style={{ fontWeight: '600' }}>{o.customers?.name || 'No customer'} <span style={{ fontWeight: '400', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>· {getOrderName(o)}</span></div>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.7rem', background: status.bg, color: status.color, padding: '0.1rem 0.5rem', borderRadius: '12px', fontWeight: '500' }}>{status.label}</span>
-                      <span style={{ fontSize: '0.7rem', color: due.color }}>{due.label}</span>
+              <div
+                key={o.id}
+                onClick={() => router.push(`/dashboard/orders/${o.id}?business_id=${currentBusinessId}`)}
+                style={{
+                  background: '#fff',
+                  borderRadius: '12px',
+                  padding: '0.8rem 1rem',
+                  border: '1px solid #E5E0D8',
+                  marginBottom: '0.5rem',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(15,43,74,0.06)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>
+                      {o.customers?.name || 'No customer'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6B6255' }}>{getOrderName(o)}</div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                      <span style={{ fontSize: '0.6rem', background: status.bg, color: status.color, padding: '0.1rem 0.5rem', borderRadius: '10px', fontWeight: '500' }}>
+                        {status.label}
+                      </span>
+                      {isOverdueOrder && (
+                        <span style={{ fontSize: '0.6rem', background: '#F1DBD3', color: '#D9534F', padding: '0.1rem 0.5rem', borderRadius: '10px', fontWeight: '500' }}>
+                          Overdue
+                        </span>
+                      )}
+                      {o.due_date && (
+                        <span style={{ fontSize: '0.6rem', color: due.color === '#D9534F' ? '#D9534F' : '#6B6255' }}>
+                          {due.label}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: '700', color: balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>₦{balance.toLocaleString()}</span>
-                    <a href={`/dashboard/orders/${o.id}?business_id=${getCurrentBusinessId() || ''}`} style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', borderRadius: '4px' }}>View</a>
-                    <a href={`/dashboard/orders/${o.id}/edit?business_id=${getCurrentBusinessId() || ''}`} style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', borderRadius: '4px' }}>Edit</a>
-                    {balance > 0 && <button onClick={() => openSettleModal(o)} style={{ padding: '0.2rem 0.6rem', fontSize: '0.7rem', background: 'var(--color-success)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Pay</button>}
+                  <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0F2B4A', textAlign: 'right' }}>
+                    {formatCurrency(o.price)}
+                    {balance > 0 && (
+                      <div style={{ fontSize: '0.6rem', color: '#D9534F', fontWeight: '500' }}>
+                        {formatCurrency(balance)} due
+                      </div>
+                    )}
                   </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+
+      {/* ─── RECENT CUSTOMERS ─── */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>Recent Customers</span>
+          <a href={`/dashboard/customers?business_id=${currentBusinessId}`} style={{ fontSize: '0.7rem', color: '#6B6255', textDecoration: 'none' }}>
+            View all →
+          </a>
+        </div>
+        {previewCustomers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem', background: '#fff', borderRadius: '12px', border: '1px dashed #E5E0D8' }}>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem' }}>No customers yet</p>
+            <a href={`/dashboard/customers/new?business_id=${currentBusinessId}`} style={{ color: '#D4A52A', fontWeight: '600', textDecoration: 'none', fontSize: '0.8rem' }}>
+              Add first customer →
+            </a>
+          </div>
+        ) : (
+          previewCustomers.map((c) => {
+            const orders = allActiveOrders.filter(o => o.customer_id === c.id)
+            const totalSpent = orders.reduce((sum, o) => sum + o.amount_paid, 0)
+            const lastOrder = orders.length > 0 ? new Date(orders[0].created_at).toLocaleDateString('en-GB') : '—'
+            return (
+              <div
+                key={c.id}
+                onClick={() => router.push(`/dashboard/customers/${c.id}?business_id=${currentBusinessId}`)}
+                style={{
+                  background: '#fff',
+                  borderRadius: '12px',
+                  padding: '0.6rem 1rem',
+                  border: '1px solid #E5E0D8',
+                  marginBottom: '0.4rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'box-shadow 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(15,43,74,0.06)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+              >
+                <div>
+                  <div style={{ fontWeight: '500', fontSize: '0.85rem', color: '#1A1A1A' }}>{c.name}</div>
+                  {c.phone && <div style={{ fontSize: '0.7rem', color: '#6B6255' }}>{c.phone}</div>}
+                  <div style={{ fontSize: '0.6rem', color: '#6B6255', marginTop: '0.1rem' }}>
+                    Last order · {lastOrder}
+                  </div>
+                </div>
+                <div style={{ fontWeight: '600', fontSize: '0.85rem', color: '#0F2B4A', textAlign: 'right' }}>
+                  {formatCurrency(totalSpent)}
                 </div>
               </div>
             )
@@ -523,141 +834,249 @@ export default function FashionDashboardPage() {
 
       {/* ─── GROUP ORDERS ─── */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Group Orders</h3>
-          <a href={`/dashboard/groups?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textDecoration: 'none' }}>View all →</a>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>Group Orders</span>
+          <a href={`/dashboard/groups?business_id=${currentBusinessId}`} style={{ fontSize: '0.7rem', color: '#6B6255', textDecoration: 'none' }}>
+            View all →
+          </a>
         </div>
         {groups.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-            <p style={{ color: 'var(--color-text-muted)' }}>No group orders yet</p>
-            {canCreateGroup && <a href={`/dashboard/groups/new?business_id=${getCurrentBusinessId() || ''}`} style={{ color: 'var(--color-accent)', fontWeight: '600', textDecoration: 'none' }}>Create group order →</a>}
+          <div style={{ textAlign: 'center', padding: '1.5rem', background: '#fff', borderRadius: '12px', border: '1px dashed #E5E0D8' }}>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem' }}>No group orders yet</p>
+            {canCreateGroup && (
+              <a href={`/dashboard/groups/new?business_id=${currentBusinessId}`} style={{ color: '#D4A52A', fontWeight: '600', textDecoration: 'none', fontSize: '0.8rem' }}>
+                Create group →
+              </a>
+            )}
           </div>
         ) : (
-          groups.map((g) => {
-            const isExpanded = expandedGroups.includes(g.id)
-            const filteredOrders = getFilteredGroupOrders(g)
-            const hasVisible = filteredOrders.length > 0
-            if (showOwingOnly && !hasVisible) return null
-            const combinedBalance = filteredOrders.reduce((sum, o) => sum + (o.price - o.amount_paid), 0)
-            const progress = g.orders.length > 0 ? (g.orders.filter(o => o.current_status === 'Delivered').length / g.orders.length) * 100 : 0
+          groups.slice(0, 2).map((g) => {
+            const totalMembers = g.orders.length
+            const totalBalanceGroup = g.orders.reduce((sum, o) => sum + ((o.price || 0) - (o.amount_paid || 0)), 0)
+            const deliveredCount = g.orders.filter(o => o.current_status === 'Delivered').length
+            const progress = totalMembers > 0 ? Math.round((deliveredCount / totalMembers) * 100) : 0
             return (
-              <div key={g.id} style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', marginBottom: '0.5rem' }}>
-                <div onClick={() => toggleGroup(g.id)} style={{ cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: '600' }}>{g.group_name}</div>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{isExpanded ? '▲' : '▼'}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{g.orders.length} members</span>
-                    <span style={{ fontSize: '0.7rem', color: combinedBalance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>₦{combinedBalance.toLocaleString()}</span>
-                  </div>
-                  <div style={{ marginTop: '0.3rem', background: 'var(--color-bg)', borderRadius: '10px', height: '4px' }}>
-                    <div style={{ width: `${progress}%`, height: '4px', background: 'var(--color-success)', borderRadius: '10px' }} />
-                  </div>
+              <div
+                key={g.id}
+                onClick={() => router.push(`/dashboard/groups/${g.id}?business_id=${currentBusinessId}`)}
+                style={{
+                  background: '#fff',
+                  borderRadius: '12px',
+                  padding: '0.8rem 1rem',
+                  border: '1px solid #E5E0D8',
+                  marginBottom: '0.5rem',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(15,43,74,0.06)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>{g.group_name}</span>
+                  <span style={{
+                    fontSize: '0.6rem',
+                    fontWeight: '600',
+                    color: g.status === 'completed' ? '#2E7D5E' : '#D4A52A',
+                    background: g.status === 'completed' ? '#DCEBE2' : '#F6E9C8',
+                    padding: '0.1rem 0.5rem',
+                    borderRadius: '10px'
+                  }}>
+                    {g.status === 'completed' ? 'Done' : 'Active'}
+                  </span>
                 </div>
-                {isExpanded && hasVisible && (
-                  <div style={{ marginTop: '0.8rem', borderTop: '1px solid var(--color-border)', paddingTop: '0.5rem' }}>
-                    {filteredOrders.map((o) => {
-                      const status = getStatusInfo(o.current_status)
-                      const due = getDueDisplay(o.due_date)
-                      const balance = o.price - o.amount_paid
-                      return (
-                        <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderBottom: '1px solid var(--color-border)' }}>
-                          <div>
-                            <div style={{ fontWeight: '500', fontSize: '0.85rem' }}>{o.customers?.name || 'No customer'}</div>
-                            <div style={{ display: 'flex', gap: '0.3rem', fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                              <span>{status.label}</span>
-                              <span style={{ color: due.color }}>{due.label}</span>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <span style={{ fontWeight: '600', color: balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>₦{balance.toLocaleString()}</span>
-                            <a href={`/dashboard/orders/${o.id}?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none' }}>View</a>
-                            {balance > 0 && <button onClick={() => openSettleModal(o)} style={{ fontSize: '0.7rem', background: 'var(--color-success)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '0.1rem 0.4rem' }}>Pay</button>}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#6B6255' }}>
+                    {totalMembers} member{totalMembers !== 1 ? 's' : ''} · {formatCurrency(totalBalanceGroup)} remaining
+                  </span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#0F2B4A' }}>
+                    {progress}%
+                  </span>
+                </div>
+                <div style={{ marginTop: '0.3rem', height: '4px', background: '#F0EDE8', borderRadius: '4px' }}>
+                  <div style={{ width: `${progress}%`, height: '100%', background: '#2E7D5E', borderRadius: '4px' }} />
+                </div>
               </div>
             )
           })
         )}
       </div>
 
-      {/* ─── RECENT CUSTOMERS ─── */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>Recent Customers</h3>
-          <a href={`/dashboard/customers?business_id=${getCurrentBusinessId() || ''}`} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textDecoration: 'none' }}>View all →</a>
+      {/* ─── REMINDERS ─── */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>Reminders</span>
+          <a href={`/dashboard/reminders?business_id=${currentBusinessId}`} style={{ fontSize: '0.7rem', color: '#6B6255', textDecoration: 'none' }}>
+            View all →
+          </a>
         </div>
-        {previewCustomers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-            <p style={{ color: 'var(--color-text-muted)' }}>No customers yet</p>
-            <a href={`/dashboard/customers/new?business_id=${getCurrentBusinessId() || ''}`} style={{ color: 'var(--color-accent)', fontWeight: '600', textDecoration: 'none' }}>Add customer →</a>
+        <div style={{
+          background: '#fff',
+          borderRadius: '12px',
+          padding: '0.8rem 1rem',
+          border: '1px solid #E5E0D8',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <div style={{ fontWeight: '500', fontSize: '0.85rem', color: '#1A1A1A' }}>No pending reminders</div>
+            <div style={{ fontSize: '0.7rem', color: '#6B6255' }}>0 due today · 0 overdue</div>
           </div>
-        ) : (
-          previewCustomers.map((c) => {
-            const orders = allActiveOrders.filter(o => o.customer_id === c.id)
-            const totalSpent = orders.reduce((sum, o) => sum + o.amount_paid, 0)
-            const lastOrder = orders.length > 0 ? new Date(orders[0].created_at).toLocaleDateString('en-GB') : '—'
-            return (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid var(--color-border)' }}>
-                <div>
-                  <div style={{ fontWeight: '500' }}>{c.name}</div>
-                  {c.phone && <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{c.phone}</div>}
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: '500' }}>₦{totalSpent.toLocaleString()}</div>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}>Last: {lastOrder}</div>
-                </div>
-              </div>
-            )
-          })
-        )}
+          <a
+            href={`/dashboard/reminders/new?business_id=${currentBusinessId}`}
+            style={{
+              padding: '0.2rem 0.8rem',
+              background: '#D4A52A',
+              color: '#0F2B4A',
+              borderRadius: '6px',
+              fontSize: '0.7rem',
+              fontWeight: '600',
+              textDecoration: 'none'
+            }}
+          >
+            + New
+          </a>
+        </div>
       </div>
 
       {/* ─── FAB ─── */}
-      <button onClick={() => setShowQuickOrder(true)} style={{ position: 'fixed', bottom: '2rem', right: '2rem', background: 'var(--color-accent)', color: '#fff', width: '56px', height: '56px', borderRadius: '50%', border: 'none', boxShadow: 'var(--shadow-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="plus" size={24} stroke="#fff" />
+      <button
+        onClick={() => setShowQuickOrder(true)}
+        style={{
+          position: 'fixed',
+          bottom: '1.5rem',
+          right: '1.5rem',
+          background: '#D4A52A',
+          color: '#0F2B4A',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          border: 'none',
+          boxShadow: '0 4px 20px rgba(212,165,42,0.4)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.8rem',
+          fontWeight: '700',
+          zIndex: 100
+        }}
+      >
+        <Icon name="plus" size={24} stroke="#0F2B4A" />
       </button>
 
-    {/* ─── QUICK ORDER MODAL ─── */}
+      {/* ─── QUICK ORDER MODAL ─── */}
       {showQuickOrder && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'fadeIn 0.2s' }} onClick={() => setShowQuickOrder(false)}>
-          <div ref={modalRef} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-bg)', borderRadius: '20px 20px 0 0', padding: '1.5rem', maxWidth: '480px', width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ width: '40px', height: '4px', background: 'var(--color-border)', borderRadius: '4px', margin: '0 auto 1rem' }} />
-            <h2 style={{ fontSize: '1.2rem', fontWeight: '600', margin: '0 0 0.3rem' }}>New Order</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '0 0 1.2rem' }}>Create an order in seconds.</p>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          animation: 'slideUp 0.3s'
+        }} onClick={() => setShowQuickOrder(false)}>
+          <div style={{
+            background: '#F8F6F2',
+            borderRadius: '20px 20px 0 0',
+            padding: '1.5rem',
+            maxWidth: '480px',
+            width: '100%',
+            maxHeight: '85vh',
+            overflowY: 'auto'
+          }} ref={modalRef} onClick={(e) => e.stopPropagation()}>
+            <div style={{ width: '40px', height: '4px', background: '#D6D0C5', borderRadius: '4px', margin: '0 auto 1rem' }} />
+            <h2 style={{ color: '#0F2B4A', fontSize: '1.2rem', margin: '0 0 0.3rem' }}>New Order</h2>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0 0 1.2rem' }}>Create an order in seconds.</p>
             <form onSubmit={handleQuickOrderSubmit}>
               <div style={{ marginBottom: '0.8rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Customer</label>
-                <select value={quickOrderCustomer} onChange={(e) => setQuickOrderCustomer(e.target.value)} required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Customer</label>
+                <select
+                  value={quickOrderCustomer}
+                  onChange={(e) => setQuickOrderCustomer(e.target.value)}
+                  required
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                >
                   <option value="">Select customer</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: '0.8rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Item</label>
-                <input type="text" value={quickOrderItem} onChange={(e) => setQuickOrderItem(e.target.value)} placeholder="e.g. Aso-ebi gown" required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }} />
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Item / Garment</label>
+                <input
+                  type="text"
+                  value={quickOrderItem}
+                  onChange={(e) => setQuickOrderItem(e.target.value)}
+                  placeholder="e.g. Aso-ebi gown"
+                  required
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                />
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Price (₦)</label>
-                  <input type="number" value={quickOrderPrice} onChange={(e) => setQuickOrderPrice(e.target.value)} placeholder="5000" required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }} />
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Price (₦)</label>
+                  <input
+                    type="number"
+                    value={quickOrderPrice}
+                    onChange={(e) => setQuickOrderPrice(e.target.value)}
+                    placeholder="5000"
+                    required
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                  />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Deposit (₦)</label>
-                  <input type="number" value={quickOrderDeposit} onChange={(e) => setQuickOrderDeposit(e.target.value)} placeholder="2000" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }} />
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Deposit (₦)</label>
+                  <input
+                    type="number"
+                    value={quickOrderDeposit}
+                    onChange={(e) => setQuickOrderDeposit(e.target.value)}
+                    placeholder="2000"
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                  />
                 </div>
               </div>
               <div style={{ marginBottom: '1.2rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Due date</label>
-                <input type="date" value={quickOrderDue} onChange={(e) => setQuickOrderDue(e.target.value)} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }} />
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Due date</label>
+                <input
+                  type="date"
+                  value={quickOrderDue}
+                  onChange={(e) => setQuickOrderDue(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                />
               </div>
-              <button type="submit" disabled={quickOrderLoading || customers.length === 0} style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: 'none', background: 'var(--color-accent)', color: '#fff', fontWeight: '600', fontSize: '1rem', cursor: quickOrderLoading ? 'default' : 'pointer', opacity: quickOrderLoading ? 0.6 : 1 }}>Create order</button>
-              {quickOrderMessage && <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: quickOrderMessage.startsWith('✅') ? 'var(--color-success)' : 'var(--color-danger)' }}>{quickOrderMessage}</p>}
+              <button
+                type="submit"
+                disabled={quickOrderLoading || customers.length === 0}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#D4A52A',
+                  color: '#0F2B4A',
+                  fontWeight: '700',
+                  fontSize: '1rem',
+                  cursor: quickOrderLoading ? 'default' : 'pointer',
+                  opacity: quickOrderLoading ? 0.6 : 1
+                }}
+              >
+                {quickOrderLoading ? 'Creating...' : 'Create order'}
+              </button>
+              {quickOrderMessage && (
+                <p style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: quickOrderMessage.includes('✅') ? '#2E7D5E' : '#D9534F',
+                  textAlign: 'center'
+                }}>
+                  {quickOrderMessage}
+                </p>
+              )}
             </form>
           </div>
         </div>
@@ -665,28 +1084,91 @@ export default function FashionDashboardPage() {
 
       {/* ─── SETTLE PAYMENT MODAL ─── */}
       {showSettleModal && settleOrder && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowSettleModal(false)}>
-          <div ref={modalRef} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-bg)', borderRadius: '16px', padding: '1.5rem', maxWidth: '380px', width: '100%' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', margin: '0 0 0.3rem' }}>Record Payment</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '0 0 1rem' }}>{settleOrder.customers?.name || 'Customer'} · Balance: ₦{(settleOrder.price - settleOrder.amount_paid).toLocaleString()}</p>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }} onClick={() => setShowSettleModal(false)}>
+          <div style={{
+            background: '#F8F6F2',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            maxWidth: '380px',
+            width: '100%'
+          }} ref={modalRef} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+              <h2 style={{ color: '#0F2B4A', fontSize: '1.1rem', margin: 0 }}>Record Payment</h2>
+              <button onClick={() => setShowSettleModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.3rem', color: '#6B6255', cursor: 'pointer' }}>
+                <Icon name="x" size={20} stroke="#6B6255" />
+              </button>
+            </div>
+            <p style={{ color: '#6B6255', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+              {settleOrder.customers?.name || 'Customer'} · Balance: {formatCurrency(settleOrder.price - settleOrder.amount_paid)}
+            </p>
             <form onSubmit={handleSettleSubmit}>
               <div style={{ marginBottom: '0.8rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Amount paid (₦)</label>
-                <input type="number" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} placeholder="Enter amount" required autoFocus style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }} />
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Amount paid (₦)</label>
+                <input
+                  type="number"
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  required
+                  autoFocus
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                />
               </div>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem' }}>Note</label>
-                <input type="text" value={settleNote} onChange={(e) => setSettleNote(e.target.value)} placeholder="e.g. Cash" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-card)' }} />
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '500', marginBottom: '0.2rem', color: '#1A1A1A' }}>Note</label>
+                <input
+                  type="text"
+                  value={settleNote}
+                  onChange={(e) => setSettleNote(e.target.value)}
+                  placeholder="e.g. Cash"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid #E5E0D8', background: '#fff', color: '#1A1A1A', fontSize: '0.9rem' }}
+                />
               </div>
-              <button type="submit" disabled={settleLoading} style={{ width: '100%', padding: '0.7rem', borderRadius: '8px', border: 'none', background: 'var(--color-success)', color: '#fff', fontWeight: '600', cursor: settleLoading ? 'default' : 'pointer', opacity: settleLoading ? 0.6 : 1 }}>Record payment</button>
+              <button
+                type="submit"
+                disabled={settleLoading}
+                style={{
+                  width: '100%',
+                  padding: '0.8rem',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#2E7D5E',
+                  color: '#fff',
+                  fontWeight: '700',
+                  fontSize: '1rem',
+                  cursor: settleLoading ? 'default' : 'pointer',
+                  opacity: settleLoading ? 0.6 : 1
+                }}
+              >
+                {settleLoading ? 'Recording...' : 'Record payment'}
+              </button>
             </form>
           </div>
         </div>
       )}
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 480px) {
+          .stat-grid { grid-template-columns: 1fr 1fr; }
+        }
       `}</style>
     </div>
   )
-        }
+}
