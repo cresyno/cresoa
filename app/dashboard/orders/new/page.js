@@ -761,7 +761,20 @@ export default function NewOrderPage() {
     setError(null);
   };
 
-  <div style={styles.searchWrapper}>
+  // ─── RENDER STEP ────────────────────────────────────────
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <div>
+            <div style={styles.stepHeader}>
+              <div style={styles.stepIconWrapper}>
+                <Icon name="user" size={18} stroke="#D4A52A" />
+              </div>
+              <span>Who is this order for?</span>
+            </div>
+
+    <div style={styles.searchWrapper}>
               <div style={styles.searchIcon}>
                 <Icon name="search" size={18} stroke="#8A8A8A" />
               </div>
@@ -1108,7 +1121,7 @@ export default function NewOrderPage() {
           </div>
         );
 
-      case 4:
+case 4:
         const price = parseFloat(formData.price) || 0;
         const deposit = parseFloat(formData.amount_paid) || 0;
         const balance = price - deposit;
@@ -1375,4 +1388,4 @@ export default function NewOrderPage() {
       `}</style>
     </div>
   );
-                  }
+                                                  }
