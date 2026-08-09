@@ -1,42 +1,41 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [user, setUser] = useState(null);
-  const [businessName, setBusinessName] = useState('');
-  const [sector, setSector] = useState('Fashion & Custom Wear');
-  const [creating, setCreating] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
-  const [joining, setJoining] = useState(false);
-  const [joinMessage, setJoinMessage] = useState('');
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [user, setUser] = useState(null)
+  const [businessName, setBusinessName] = useState('')
+  const [sector, setSector] = useState('Fashion & Custom Wear')
+  const [creating, setCreating] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [joinMessage, setJoinMessage] = useState('')
 
-  // Check if user already has a business
+  // ─── Check if user already has a business ───
   useEffect(() => {
     const checkUserStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
-          router.push('/login');
-          return;
+          router.push('/login')
+          return
         }
-        setUser(user);
+        setUser(user)
 
         // Check if user owns a business
         const { data: owned } = await supabase
           .from('businesses')
           .select('id')
           .eq('owner_id', user.id)
-          .maybeSingle();
-
+          .maybeSingle()
         if (owned) {
-          router.push('/dashboard');
-          return;
+          router.push('/dashboard')
+          return
         }
 
         // Check if user is a member via memberships
@@ -44,29 +43,28 @@ export default function OnboardingPage() {
           .from('business_memberships')
           .select('business_id')
           .eq('user_id', user.id)
-          .maybeSingle();
-
+          .maybeSingle()
         if (membership) {
-          router.push('/dashboard');
-          return;
+          router.push('/dashboard')
+          return
         }
 
-        setLoading(false);
+        setLoading(false)
       } catch (err) {
-        console.error('Onboarding check error:', err);
-        setError('Something went wrong. Please refresh and try again.');
-        setLoading(false);
+        console.error('Onboarding check error:', err)
+        setError('Something went wrong. Please refresh and try again.')
+        setLoading(false)
       }
-    };
+    }
 
-    checkUserStatus();
-  }, [router]);
+    checkUserStatus()
+  }, [router])
 
   // ─── Create new business ───
   const handleCreateBusiness = async (e) => {
-    e.preventDefault();
-    setCreating(true);
-    setError('');
+    e.preventDefault()
+    setCreating(true)
+    setError('')
 
     try {
       // 1. Create the business
@@ -81,20 +79,20 @@ export default function OnboardingPage() {
           has_completed_onboarding: true,
         })
         .select()
-        .single();
+        .single()
 
-      if (bizError) throw bizError;
+      if (bizError) throw bizError
 
-      // 2. Add the owner as a member (Owner role) – NO STAFF TABLE
+      // 2. Add the owner as a member
       const { error: memberError } = await supabase
         .from('business_memberships')
         .insert({
           business_id: business.id,
           user_id: user.id,
           role: 'Owner',
-        });
+        })
 
-      if (memberError) throw memberError;
+      if (memberError) throw memberError
 
       // 3. Log activity
       await supabase.from('business_activity_logs').insert({
@@ -102,108 +100,52 @@ export default function OnboardingPage() {
         performed_by: user.id,
         action: 'business_created',
         details: { name: businessName, sector },
-      });
+      })
 
       // 4. Redirect to dashboard
-      router.push('/dashboard');
+      router.push(`/dashboard?business_id=${business.id}&t=${Date.now()}`)
     } catch (err) {
-      console.error('Create business error:', err);
-      setError(err.message || 'Failed to create business. Please try again.');
+      console.error('Create business error:', err)
+      setError(err.message || 'Failed to create business. Please try again.')
     } finally {
-      setCreating(false);
+      setCreating(false)
     }
-  };
+  }
 
   // ─── Join existing business via invite code ───
   const handleJoinBusiness = async (e) => {
-    e.preventDefault();
-    setJoining(true);
-    setJoinMessage('');
-    setError('');
+    e.preventDefault()
+    setJoining(true)
+    setJoinMessage('')
+    setError('')
 
     try {
-      // 1. Look up the invite
-      const { data: invite, error: inviteError } = await supabase
-        .from('business_invites')
-        .select('business_id, role, expires_at, status')
-        .eq('invite_code', inviteCode.toUpperCase())
-        .eq('status', 'pending')
-        .single();
+      const response = await fetch('/api/team/invites/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_code: inviteCode })
+      })
 
-      if (inviteError || !invite) {
-        setJoinMessage('❌ Invalid or expired invite code.');
-        setJoining(false);
-        return;
+      const result = await response.json()
+      if (response.ok && result.redirect) {
+        window.location.replace(result.redirect)
+      } else {
+        setJoinMessage('❌ ' + (result.error || 'Failed to join business'))
       }
-
-      // 2. Check expiry
-      const now = new Date();
-      const expires = new Date(invite.expires_at);
-      if (expires < now) {
-        await supabase
-          .from('business_invites')
-          .update({ status: 'expired' })
-          .eq('id', invite.id);
-        setJoinMessage('❌ This invite has expired. Please ask for a new one.');
-        setJoining(false);
-        return;
-      }
-
-      // 3. Check if user is already a member
-      const { data: existing } = await supabase
-        .from('business_memberships')
-        .select('id')
-        .eq('business_id', invite.business_id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (existing) {
-        setJoinMessage('❌ You are already a member of this business.');
-        setJoining(false);
-        return;
-      }
-
-      // 4. Add user as member – NO STAFF TABLE
-      const { error: memberError } = await supabase
-        .from('business_memberships')
-        .insert({
-          business_id: invite.business_id,
-          user_id: user.id,
-          role: invite.role,
-        });
-
-      if (memberError) throw memberError;
-
-      // 5. Mark invite as accepted
-      await supabase
-        .from('business_invites')
-        .update({ status: 'accepted' })
-        .eq('id', invite.id);
-
-      // 6. Log activity
-      await supabase.from('business_activity_logs').insert({
-        business_id: invite.business_id,
-        performed_by: user.id,
-        action: 'invite_accepted_from_onboarding',
-        details: { role: invite.role },
-      });
-
-      setJoinMessage('✅ Success! You have joined the business.');
-      setTimeout(() => router.push('/dashboard'), 1500);
     } catch (err) {
-      console.error('Join business error:', err);
-      setJoinMessage('❌ Something went wrong. Please try again.');
+      console.error(err)
+      setJoinMessage('❌ An unexpected error occurred.')
     } finally {
-      setJoining(false);
+      setJoining(false)
     }
-  };
+  }
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ color: 'var(--color-text-muted)' }}>Loading...</div>
       </div>
-    );
+    )
   }
 
   return (
@@ -222,9 +164,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Two options: Create or Join */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Option 1: Create new business */}
+          {/* ─── Create Business ─── */}
           <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
               🚀 Start a new business
@@ -272,7 +213,7 @@ export default function OnboardingPage() {
                   }}
                 >
                   <option value="Fashion & Custom Wear">👗 Fashion & Custom Wear</option>
-                  <option value="Repairs & Services">🔧 Repairs & Services</option>
+                  <option value="Repairs & Technical Services">🔧 Repairs & Technical Services</option>
                   <option value="Custom Products & Services">🛠️ Custom Products</option>
                 </select>
               </div>
@@ -297,7 +238,7 @@ export default function OnboardingPage() {
             </form>
           </div>
 
-          {/* Option 2: Join existing business */}
+          {/* ─── Join Business ─── */}
           <div>
             <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--color-text)', marginBottom: '0.5rem' }}>
               🔗 Join an existing business
@@ -363,5 +304,5 @@ export default function OnboardingPage() {
         </p>
       </div>
     </div>
-  );
-        }
+  )
+                       }
