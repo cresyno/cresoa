@@ -40,6 +40,15 @@ export default function FashionDashboardPage() {
 
   const modalRef = useRef(null)
 
+  // ─── Time-aware greeting ───
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return { text: 'Good morning', emoji: '☀️' }
+    if (hour < 17) return { text: 'Good afternoon', emoji: '🌤️' }
+    return { text: 'Good evening', emoji: '🌙' }
+  }
+  const greeting = getGreeting()
+
   // ─── Load Dashboard ───
   const loadDashboard = async () => {
     setLoading(true)
@@ -257,7 +266,7 @@ export default function FashionDashboardPage() {
 
   const hasBalance = (order) => (order.price - order.amount_paid) > 0
 
-  // ─── Derived Stats ───
+  // ─── Derived Stats (All Real Data) ───
   const previewCustomers = customers.slice(0, 5)
   const previewOrders = soloOrders.slice(0, 5)
   const allGroupOrders = groups.flatMap(g => g.orders)
@@ -275,17 +284,53 @@ export default function FashionDashboardPage() {
     return due < today
   }).length
 
+  // ─── Real Revenue Data ───
+  const currentMonth = today.getMonth()
+  const currentYear = today.getFullYear()
   const thisMonthRevenue = allActiveOrders.filter(o => {
     const d = new Date(o.created_at)
-    return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
-  }).reduce((sum, o) => sum + o.amount_paid, 0)
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  }).reduce((sum, o) => sum + (o.amount_paid || 0), 0)
 
+  // Previous month revenue (for comparison)
+  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1
+  const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear
+  const prevMonthRevenue = allActiveOrders.filter(o => {
+    const d = new Date(o.created_at)
+    return d.getMonth() === prevMonth && d.getFullYear() === prevYear
+  }).reduce((sum, o) => sum + (o.amount_paid || 0), 0)
+
+  // ─── Real On-Time % ───
+  const deliveredOrders = allActiveOrders.filter(o => o.current_status === 'Delivered')
+  const onTimeDelivered = deliveredOrders.filter(o => {
+    if (!o.due_date) return true // No due date counts as on-time
+    const due = new Date(o.due_date)
+    const delivered = new Date(o.created_at) // Fallback: use created_at
+    // If we have a delivered_at field, use it. Otherwise, use created_at as approximation.
+    return true // For now, we'll calculate differently
+  })
+
+  // Better: count orders that were delivered on or before due date
+  const onTimeCount = deliveredOrders.filter(o => {
+    if (!o.due_date) return true
+    const due = new Date(o.due_date)
+    due.setHours(0,0,0,0)
+    const delivered = new Date(o.updated_at || o.created_at) // Use updated_at if available
+    delivered.setHours(0,0,0,0)
+    return delivered <= due
+  }).length
+
+  const deliveredCount = deliveredOrders.length
+  const onTimePercentage = deliveredCount > 0 ? Math.round((onTimeCount / deliveredCount) * 100) : 0
+
+  // ─── Health Score ───
   const healthScore = (() => {
     let score = 100
     if (overdueCount > 0) score -= overdueCount * 5
     if (totalBalanceOwed > 0) score -= 5
     if (customers.length === 0) score -= 10
     if (totalOrders === 0) score -= 10
+    if (deliveredCount > 0 && onTimePercentage < 80) score -= 10
     return Math.max(0, Math.min(100, score))
   })()
 
@@ -294,8 +339,26 @@ export default function FashionDashboardPage() {
     if (healthScore >= 60) return { label: 'Good', color: '#D4A52A' }
     return { label: 'Needs attention', color: '#D9534F' }
   }
-
   const healthStatus = getHealthStatus()
+
+  // ─── Revenue trend (real data: last 6 months) ───
+  const getMonthlyRevenue = () => {
+    const months = []
+    for (let i = 5; i >= 0; i--) {
+      const m = new Date()
+      m.setMonth(m.getMonth() - i)
+      const month = m.getMonth()
+      const year = m.getFullYear()
+      const revenue = allActiveOrders.filter(o => {
+        const d = new Date(o.created_at)
+        return d.getMonth() === month && d.getFullYear() === year
+      }).reduce((sum, o) => sum + (o.amount_paid || 0), 0)
+      months.push(revenue)
+    }
+    return months
+  }
+  const monthlyRevenue = getMonthlyRevenue()
+  const maxRevenue = Math.max(...monthlyRevenue, 1)
 
   // ─── Format currency ───
   const formatCurrency = (amount) => {
@@ -361,7 +424,7 @@ export default function FashionDashboardPage() {
       {/* ─── WELCOME ─── */}
       <div style={{ marginBottom: '1.2rem' }}>
         <div style={{ fontSize: '0.85rem', color: '#6B6255', marginBottom: '0.1rem' }}>
-          Good morning 👋
+          {greeting.text} {greeting.emoji}
         </div>
         <h1 style={{ fontSize: '1.3rem', fontWeight: '700', color: '#0F2B4A', margin: 0 }}>
           {business?.name || 'Your business'}
@@ -442,7 +505,7 @@ export default function FashionDashboardPage() {
         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.5rem' }}>
           <div>
             <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>
-              {Math.round((1 - overdueCount / (totalOrders || 1)) * 100)}%
+              {onTimePercentage}%
             </div>
             <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>On-time</div>
           </div>
@@ -473,7 +536,7 @@ export default function FashionDashboardPage() {
           flexWrap: 'wrap',
           gap: '0.5rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Icon name="alert-triangle" size={20} stroke="#D9534F" />
             <div>
               <div style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>
@@ -501,7 +564,7 @@ export default function FashionDashboardPage() {
         </div>
       )}
 
-       {/* ─── KEY METRICS ─── */}
+      {/* ─── KEY METRICS ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1rem' }}>
         <div style={{
           background: '#fff',
@@ -514,7 +577,9 @@ export default function FashionDashboardPage() {
           <div style={{ fontWeight: '700', fontSize: '1.2rem', color: '#0F2B4A' }}>
             {formatCurrency(thisMonthRevenue)}
           </div>
-          <div style={{ fontSize: '0.6rem', color: '#6B6255' }}>This month</div>
+          <div style={{ fontSize: '0.6rem', color: '#6B6255' }}>
+            {prevMonthRevenue > 0 ? `↑ ${Math.round((thisMonthRevenue / prevMonthRevenue - 1) * 100)}% vs last month` : 'This month'}
+          </div>
         </div>
         <div style={{
           background: '#fff',
@@ -667,9 +732,9 @@ export default function FashionDashboardPage() {
         <div style={{ fontWeight: '700', fontSize: '1.5rem', color: '#0F2B4A' }}>
           {formatCurrency(thisMonthRevenue)}
         </div>
-        {thisMonthRevenue > 0 ? (
-          <div style={{ fontSize: '0.7rem', color: '#2E7D5E', marginTop: '0.1rem' }}>
-            ↑ 12% vs last month
+        {prevMonthRevenue > 0 ? (
+          <div style={{ fontSize: '0.7rem', color: thisMonthRevenue >= prevMonthRevenue ? '#2E7D5E' : '#D9534F', marginTop: '0.1rem' }}>
+            {thisMonthRevenue >= prevMonthRevenue ? '↑' : '↓'} {Math.round(Math.abs((thisMonthRevenue / prevMonthRevenue - 1) * 100))}% vs last month
           </div>
         ) : (
           <div style={{ fontSize: '0.7rem', color: '#6B6255', marginTop: '0.1rem' }}>
@@ -685,15 +750,20 @@ export default function FashionDashboardPage() {
           borderTop: '1px solid #F0EDE8',
           paddingTop: '0.5rem'
         }}>
-          {/* Simple sparkline placeholder */}
-          {thisMonthRevenue > 0 ? (
-            <>
-              <div style={{ flex: 1, height: '20px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.3 }} />
-              <div style={{ flex: 1, height: '35px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.5 }} />
-              <div style={{ flex: 1, height: '50px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.7 }} />
-              <div style={{ flex: 1, height: '40px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 0.6 }} />
-              <div style={{ flex: 1, height: '60px', background: '#D4A52A', borderRadius: '2px 2px 0 0', opacity: 1 }} />
-            </>
+          {monthlyRevenue.some(r => r > 0) ? (
+            monthlyRevenue.map((value, index) => (
+              <div
+                key={index}
+                style={{
+                  flex: 1,
+                  height: `${Math.max((value / maxRevenue) * 50, 4)}px`,
+                  background: index === monthlyRevenue.length - 1 ? '#D4A52A' : '#D4A52A',
+                  opacity: index === monthlyRevenue.length - 1 ? 1 : 0.4,
+                  borderRadius: '2px 2px 0 0',
+                  transition: 'height 0.3s ease'
+                }}
+              />
+            ))
           ) : (
             <div style={{ width: '100%', textAlign: 'center', color: '#C8C0B5', fontSize: '0.6rem' }}>
               No data yet
@@ -775,7 +845,6 @@ export default function FashionDashboardPage() {
           })
         )}
       </div>
-
 
       {/* ─── RECENT CUSTOMERS ─── */}
       <div style={{ marginBottom: '1.5rem' }}>
@@ -1082,7 +1151,7 @@ export default function FashionDashboardPage() {
         </div>
       )}
 
-      {/* ─── SETTLE PAYMENT MODAL ─── */}
+   {/* ─── SETTLE PAYMENT MODAL ─── */}
       {showSettleModal && settleOrder && (
         <div style={{
           position: 'fixed',
@@ -1171,4 +1240,4 @@ export default function FashionDashboardPage() {
       `}</style>
     </div>
   )
-}
+                                                                                     }
