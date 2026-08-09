@@ -7,6 +7,7 @@ import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
+import Banner from '../../components/Banner';
 
 // ─── Helper: page‑specific header content ───
 function getPageHeader(pathname, business, stats) {
@@ -751,26 +752,29 @@ function DashboardLayoutContent({ children }) {
         </div>
       </div>
 
-      <div className="main-content">
-        <div className="dashboard-header">
-          <div></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {business && !business.has_applied_for_beta && isOwner && (
-              <a href={baseUrl('/dashboard/beta-apply')} className="beta-btn">🧪 Join Beta</a>
-            )}
-            <span className="date">
-              {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-            </span>
-          </div>
-        </div>
+<div className="main-content">
+  <div className="dashboard-header">
+    <div></div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      {business && !business.has_applied_for_beta && isOwner && (
+        <a href={baseUrl('/dashboard/beta-apply')} className="beta-btn">🧪 Join Beta</a>
+      )}
+      <span className="date">
+        {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+      </span>
+    </div>
+  </div>
 
-        <div className="page-header">
-          <h1>{header.title}</h1>
-          <p>{header.subtitle}</p>
-        </div>
+  {/* ─── BANNER ─── */}
+  <Banner />
 
-        {children}
-      </div>
+  <div className="page-header">
+    <h1>{header.title}</h1>
+    <p>{header.subtitle}</p>
+  </div>
+
+  {children}
+</div>
     </div>
   )
 }
