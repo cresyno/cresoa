@@ -8,7 +8,6 @@ import { getCurrentBusinessId } from '../../../../lib/getBusinessId';
 import { getPlanLimits } from '../../../../lib/planLimits';
 import { Icon } from '../../../../components/Icon';
 
-// ─── Helper to format currency ───
 const formatCurrency = (amount) => {
   if (!amount && amount !== 0) return '₦0';
   return `₦${Number(amount).toLocaleString()}`;
@@ -25,13 +24,11 @@ export default function NewOrderPage() {
   const [customers, setCustomers] = useState([]);
   const [orderCount, setOrderCount] = useState(0);
 
-  // ─── Step state ───
   const [step, setStep] = useState(1);
   const [customerSearch, setCustomerSearch] = useState('');
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [customerStats, setCustomerStats] = useState(null);
 
-  // ─── Extended formData ───
   const [formData, setFormData] = useState({
     customer_id: '',
     customer_name: '',
@@ -43,7 +40,6 @@ export default function NewOrderPage() {
     due_date: '',
     current_status: 'Order placed',
     notes: '',
-    // new fields
     category: '',
     quantity: 1,
     fabric: '',
@@ -65,7 +61,6 @@ export default function NewOrderPage() {
 
   const [isNewCustomer, setIsNewCustomer] = useState(false);
 
-  // ─── Load initial data ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -82,7 +77,6 @@ export default function NewOrderPage() {
         }
         setBusinessId(bizId);
 
-        // Fetch business plan
         const { data: bizData } = await supabase
           .from('businesses')
           .select('plan')
@@ -90,7 +84,6 @@ export default function NewOrderPage() {
           .single();
         if (bizData) setBusinessPlan(bizData.plan || 'free');
 
-        // Fetch customers
         const { data: custData } = await supabase
           .from('customers')
           .select('id, name, phone, email')
@@ -98,7 +91,6 @@ export default function NewOrderPage() {
           .order('name');
         setCustomers(custData || []);
 
-        // Count existing orders
         const { count } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -114,7 +106,6 @@ export default function NewOrderPage() {
     load();
   }, [router]);
 
-  // ─── Fetch customer stats when customer_id changes ───
   useEffect(() => {
     if (!formData.customer_id || !businessId) {
       setCustomerStats(null);
@@ -140,7 +131,6 @@ export default function NewOrderPage() {
     fetchStats();
   }, [formData.customer_id, businessId]);
 
-  // ─── Handlers ───
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -181,16 +171,13 @@ export default function NewOrderPage() {
     }));
   };
 
-  // ─── Filtered customers for search ───
   const filteredCustomers = customers.filter((c) =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     (c.phone && c.phone.includes(customerSearch))
   );
 
-  // ─── Recent customers (last 5) ───
   const recentCustomers = customers.slice(0, 5);
 
-  // ─── Submit ───
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -203,7 +190,6 @@ export default function NewOrderPage() {
         return;
       }
 
-      // Plan limit check
       const limits = getPlanLimits(businessPlan);
       if (orderCount >= limits.orders) {
         setError(`You have reached the limit of ${limits.orders} orders on your current plan. Please upgrade to add more.`);
@@ -211,7 +197,6 @@ export default function NewOrderPage() {
         return;
       }
 
-      // Validate required fields
       if (!formData.title) {
         setError('Please enter an item / garment name.');
         setSaving(false);
@@ -230,7 +215,6 @@ export default function NewOrderPage() {
         return;
       }
 
-      // ─── Build payload (preserve all existing fields + new ones) ───
       const payload = {
         business_id: businessId,
         title: formData.title,
@@ -239,7 +223,6 @@ export default function NewOrderPage() {
         due_date: formData.due_date || null,
         current_status: formData.current_status,
         notes: formData.notes || null,
-        // new fields
         category: formData.category || null,
         quantity: parseInt(formData.quantity) || 1,
         fabric: formData.fabric || null,
@@ -248,7 +231,6 @@ export default function NewOrderPage() {
         measurements: Object.values(formData.measurements).some(v => v) ? formData.measurements : null,
       };
 
-      // Customer handling (existing logic)
       if (isNewCustomer || showNewCustomer) {
         if (!formData.customer_name) {
           setError('Customer name is required.');
@@ -280,8 +262,7 @@ export default function NewOrderPage() {
         throw new Error(result.error || 'Failed to create order');
       }
 
-      // Redirect to the order detail page (which we'll redesign later)
-      router.push(`/dashboard/orders/${result.id}?business_id=${businessId}`);
+      router.push(`/dashboard/orders/${result.order.id}?business_id=${businessId}`);
     } catch (err) {
       console.error('Error:', err);
       setError(err.message);
@@ -289,9 +270,7 @@ export default function NewOrderPage() {
     }
   };
 
-  // ─── Step navigation ───
   const nextStep = () => {
-    // Basic validation before moving forward
     if (step === 1 && !formData.customer_id && !isNewCustomer && !showNewCustomer) {
       setError('Please select or add a customer.');
       return;
@@ -306,20 +285,20 @@ export default function NewOrderPage() {
 
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
-  // ─── Render step content ───
   const renderStep = () => {
     switch (step) {
       case 1:
         return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-[#0F2B4A]">
-              <Icon name="user" size={20} stroke="#0F2B4A" />
+          <div className="space-y-5">
+            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
+              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+                <Icon name="user" size={18} stroke="#D4A52A" />
+              </div>
               <span>Who is this order for?</span>
             </div>
 
-            {/* Search input */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
                 <Icon name="search" size={18} stroke="#8A8A8A" />
               </div>
               <input
@@ -327,115 +306,110 @@ export default function NewOrderPage() {
                 placeholder="Search customers by name or phone"
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] text-base"
+                className="w-full pl-12 pr-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
               />
             </div>
 
-            {/* Search results / recent customers */}
             {customerSearch ? (
-              <div className="max-h-60 overflow-y-auto border border-[#E5E0D8] rounded-xl divide-y divide-[#E5E0D8] bg-white">
+              <div className="max-h-64 overflow-y-auto border border-[#E5E0D8] rounded-2xl divide-y divide-[#E5E0D8] bg-white shadow-sm">
                 {filteredCustomers.length === 0 ? (
-                  <div className="p-4 text-center text-[#8A8A8A]">No customers found</div>
+                  <div className="p-5 text-center text-[#8A8A8A]">No customers found</div>
                 ) : (
                   filteredCustomers.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => handleCustomerSelect(c.id)}
-                      className="w-full text-left px-4 py-3 hover:bg-[#F8F6F2] transition flex items-center justify-between"
+                      className="w-full text-left px-5 py-3.5 hover:bg-[#F8F6F2] transition-colors flex items-center justify-between group"
                     >
                       <div>
                         <div className="font-medium text-[#0F2B4A]">{c.name}</div>
                         {c.phone && <div className="text-sm text-[#8A8A8A]">{c.phone}</div>}
                       </div>
-                      <Icon name="chevronRight" size={16} stroke="#8A8A8A" />
+                      <Icon name="chevronRight" size={16} stroke="#D4A52A" className="opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   ))
                 )}
               </div>
             ) : (
-              // Recent customers
               <div>
-                <div className="text-xs uppercase tracking-wider text-[#8A8A8A] font-semibold mb-2">Recent customers</div>
-                <div className="space-y-2">
+                <div className="text-xs uppercase tracking-wider text-[#8A8A8A] font-semibold mb-3">Recent customers</div>
+                <div className="grid grid-cols-2 gap-2.5">
                   {recentCustomers.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => handleCustomerSelect(c.id)}
-                      className="w-full text-left px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white hover:border-[#D4A52A] transition flex items-center justify-between"
+                      className="text-left px-4 py-3 border border-[#E5E0D8] rounded-2xl bg-white hover:border-[#D4A52A] hover:shadow-sm transition-all group"
                     >
-                      <div>
-                        <div className="font-medium text-[#0F2B4A]">{c.name}</div>
-                        {c.phone && <div className="text-sm text-[#8A8A8A]">{c.phone}</div>}
-                      </div>
-                      <Icon name="chevronRight" size={16} stroke="#8A8A8A" />
+                      <div className="font-medium text-[#0F2B4A] text-sm">{c.name}</div>
+                      {c.phone && <div className="text-xs text-[#8A8A8A]">{c.phone}</div>}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Add new customer */}
             <button
               type="button"
               onClick={handleNewCustomerToggle}
-              className="flex items-center gap-2 text-[#D4A52A] font-medium hover:underline"
+              className="flex items-center gap-2 text-[#D4A52A] font-medium hover:text-[#B4881E] transition-colors group"
             >
-              <Icon name="plus" size={16} stroke="#D4A52A" />
+              <div className="w-6 h-6 rounded-full border-2 border-[#D4A52A] flex items-center justify-center group-hover:bg-[#D4A52A] group-hover:text-white transition-colors">
+                <Icon name="plus" size={12} stroke="#D4A52A" className="group-hover:stroke-white" />
+              </div>
               Add new customer
             </button>
 
-            {/* New customer form (inline) */}
             {showNewCustomer && (
-              <div className="border border-[#E5E0D8] rounded-xl p-4 bg-[#F8F6F2] space-y-3">
+              <div className="border border-[#D4A52A] rounded-2xl p-5 bg-[#F8F6F2] space-y-3.5 shadow-sm">
+                <div className="text-sm font-semibold text-[#0F2B4A]">New customer details</div>
                 <div>
-                  <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Name *</label>
+                  <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Name *</label>
                   <input
                     type="text"
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Phone</label>
+                  <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Phone</label>
                   <input
                     type="tel"
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Email</label>
+                  <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Email</label>
                   <input
                     type="email"
                     name="customer_email"
                     value={formData.customer_email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base"
                   />
                 </div>
               </div>
             )}
 
-            {/* Customer stats (if customer selected) */}
             {formData.customer_id && customerStats && (
-              <div className="bg-[#F8F6F2] rounded-xl p-4 border border-[#E5E0D8] grid grid-cols-3 gap-2 text-center">
+              <div className="bg-gradient-to-br from-[#F8F6F2] to-white rounded-2xl p-5 border border-[#E5E0D8] grid grid-cols-3 gap-3 text-center shadow-sm">
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-[#8A8A8A]">Orders</div>
-                  <div className="text-lg font-bold text-[#0F2B4A]">{customerStats.orderCount}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#8A8A8A] font-semibold">Orders</div>
+                  <div className="text-xl font-bold text-[#0F2B4A] mt-0.5">{customerStats.orderCount}</div>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-[#8A8A8A]">Total spent</div>
-                  <div className="text-lg font-bold text-[#0F2B4A]">{formatCurrency(customerStats.totalSpent)}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#8A8A8A] font-semibold">Total spent</div>
+                  <div className="text-xl font-bold text-[#0F2B4A] mt-0.5">{formatCurrency(customerStats.totalSpent)}</div>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-[#8A8A8A]">Outstanding</div>
-                  <div className="text-lg font-bold text-[#D9534F]">{formatCurrency(customerStats.outstanding)}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#8A8A8A] font-semibold">Outstanding</div>
+                  <div className="text-xl font-bold text-[#D9534F] mt-0.5">{formatCurrency(customerStats.outstanding)}</div>
                 </div>
               </div>
             )}
@@ -444,126 +418,103 @@ export default function NewOrderPage() {
 
       case 2:
         return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-[#0F2B4A]">
-              <Icon name="scissors" size={20} stroke="#0F2B4A" />
+          <div className="space-y-5">
+            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
+              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+                <Icon name="scissors" size={18} stroke="#D4A52A" />
+              </div>
               <span>What are you making?</span>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Garment name *</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Garment name *</label>
               <input
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="e.g. Aso-ebi Gown"
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Category</label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] appearance-none"
-              >
-                <option value="">Select category</option>
-                <option value="Gown">Gown</option>
-                <option value="Suit">Suit</option>
-                <option value="Shirt">Shirt</option>
-                <option value="Trousers">Trousers</option>
-                <option value="Skirt">Skirt</option>
-                <option value="Dress">Dress</option>
-                <option value="Agbada">Agbada</option>
-                <option value="Native">Native</option>
-                <option value="Other">Other</option>
-              </select>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Category</label>
+              <div className="relative">
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow appearance-none pr-12 shadow-sm text-base"
+                >
+                  <option value="">Select category</option>
+                  <option value="Gown">Gown</option>
+                  <option value="Suit">Suit</option>
+                  <option value="Shirt">Shirt</option>
+                  <option value="Trousers">Trousers</option>
+                  <option value="Skirt">Skirt</option>
+                  <option value="Dress">Dress</option>
+                  <option value="Agbada">Agbada</option>
+                  <option value="Native">Native</option>
+                  <option value="Other">Other</option>
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                  <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
+                </div>
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Quantity</label>
-              <div className="flex items-center gap-3">
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Quantity</label>
+              <div className="flex items-center gap-4">
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, quantity: Math.max(1, (prev.quantity || 1) - 1) }))}
-                  className="w-10 h-10 flex items-center justify-center border border-[#E5E0D8] rounded-xl bg-white hover:bg-[#F8F6F2]"
+                  className="w-11 h-11 flex items-center justify-center border border-[#E5E0D8] rounded-2xl bg-white hover:bg-[#F8F6F2] hover:border-[#D4A52A] transition-colors shadow-sm"
                 >
                   <Icon name="minus" size={16} stroke="#0F2B4A" />
                 </button>
-                <span className="text-lg font-semibold text-[#0F2B4A] w-8 text-center">{formData.quantity || 1}</span>
+                <span className="text-xl font-bold text-[#0F2B4A] w-8 text-center">{formData.quantity || 1}</span>
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, quantity: (prev.quantity || 1) + 1 }))}
-                  className="w-10 h-10 flex items-center justify-center border border-[#E5E0D8] rounded-xl bg-white hover:bg-[#F8F6F2]"
+                  className="w-11 h-11 flex items-center justify-center border border-[#E5E0D8] rounded-2xl bg-white hover:bg-[#F8F6F2] hover:border-[#D4A52A] transition-colors shadow-sm"
                 >
                   <Icon name="plus" size={16} stroke="#0F2B4A" />
                 </button>
               </div>
             </div>
 
+            
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Fabric</label>
-              <select
-                name="fabric"
-                value={formData.fabric}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] appearance-none"
-              >
-                <option value="">Select fabric</option>
-                <option value="Customer's fabric">Customer's fabric</option>
-                <option value="In-house fabric">In-house fabric</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Quantity</label>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, quantity: Math.max(1, (prev.quantity || 1) - 1) }))}
-                  className="w-10 h-10 flex items-center justify-center border border-[#E5E0D8] rounded-xl bg-white hover:bg-[#F8F6F2]"
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Fabric</label>
+              <div className="relative">
+                <select
+                  name="fabric"
+                  value={formData.fabric}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow appearance-none pr-12 shadow-sm text-base"
                 >
-                  <Icon name="minus" size={16} stroke="#0F2B4A" />
-                </button>
-                <span className="text-lg font-semibold text-[#0F2B4A] w-8 text-center">{formData.quantity || 1}</span>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, quantity: (prev.quantity || 1) + 1 }))}
-                  className="w-10 h-10 flex items-center justify-center border border-[#E5E0D8] rounded-xl bg-white hover:bg-[#F8F6F2]"
-                >
-                  <Icon name="plus" size={16} stroke="#0F2B4A" />
-                </button>
+                  <option value="">Select fabric</option>
+                  <option value="Customer's fabric">Customer's fabric</option>
+                  <option value="In-house fabric">In-house fabric</option>
+                  <option value="Other">Other</option>
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                  <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Fabric</label>
-              <select
-                name="fabric"
-                value={formData.fabric}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] appearance-none"
-              >
-                <option value="">Select fabric</option>
-                <option value="Customer's fabric">Customer's fabric</option>
-                <option value="In-house fabric">In-house fabric</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Style / description</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Style / description</label>
               <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
                 rows={3}
                 placeholder="Off-shoulder, fitted waist, long sleeve..."
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] resize-none"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow resize-none shadow-sm text-base"
               />
             </div>
           </div>
@@ -571,50 +522,52 @@ export default function NewOrderPage() {
 
       case 3:
         return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-[#0F2B4A]">
-              <Icon name="calendar" size={20} stroke="#0F2B4A" />
+          <div className="space-y-5">
+            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
+              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+                <Icon name="calendar" size={18} stroke="#D4A52A" />
+              </div>
               <span>When does it need to be ready?</span>
             </div>
 
-            {/* Dates */}
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Fitting date</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Fitting date</label>
               <input
                 type="date"
                 name="fitting_date"
                 value={formData.fitting_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow shadow-sm text-base"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Pickup / delivery date</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Pickup / delivery date</label>
               <input
                 type="date"
                 name="due_date"
                 value={formData.due_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow shadow-sm text-base"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Event date</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Event date</label>
               <input
                 type="date"
                 name="event_date"
                 value={formData.event_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow shadow-sm text-base"
               />
             </div>
 
-            {/* Measurements */}
             <div>
-              <div className="flex items-center gap-2 text-sm font-medium text-[#0F2B4A] mb-2">
-                <Icon name="ruler" size={20} stroke="#0F2B4A" />
+              <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A] mb-3">
+                <div className="w-8 h-8 rounded-full bg-[#2E7D5E]/10 flex items-center justify-center">
+                  <Icon name="ruler" size={18} stroke="#2E7D5E" />
+                </div>
                 <span>Measurements</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -631,13 +584,13 @@ export default function NewOrderPage() {
                   { key: 'thigh', label: 'Thigh' },
                 ].map(({ key, label }) => (
                   <div key={key}>
-                    <label className="block text-xs font-medium text-[#8A8A8A] mb-1">{label}</label>
+                    <label className="block text-[10px] font-medium text-[#8A8A8A] uppercase tracking-wider mb-1">{label}</label>
                     <input
                       type="number"
                       value={formData.measurements[key] || ''}
                       onChange={(e) => handleMeasurementChange(key, e.target.value)}
                       placeholder="cm"
-                      className="w-full px-3 py-2 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] text-sm"
+                      className="w-full px-3 py-2.5 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-sm shadow-sm"
                     />
                   </div>
                 ))}
@@ -648,96 +601,121 @@ export default function NewOrderPage() {
 
       case 4:
         return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-[#0F2B4A]">
-              <Icon name="creditCard" size={20} stroke="#0F2B4A" />
+          <div className="space-y-5">
+            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
+              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+                <Icon name="creditCard" size={18} stroke="#D4A52A" />
+              </div>
               <span>Payment</span>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Total price (₦) *</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Total price (₦) *</label>
               <input
                 type="number"
                 name="price"
                 value={formData.price}
                 onChange={handleChange}
                 placeholder="0"
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Deposit (₦)</label>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Deposit (₦)</label>
               <input
                 type="number"
                 name="amount_paid"
                 value={formData.amount_paid}
                 onChange={handleChange}
                 placeholder="0"
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A]"
+                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
               />
             </div>
 
-            {/* Auto‑calculated balance */}
             {formData.price && (
-              <div className="bg-[#F8F6F2] rounded-xl p-4 border border-[#E5E0D8]">
+              <div className="bg-gradient-to-br from-[#F8F6F2] to-white rounded-2xl p-5 border border-[#E5E0D8] shadow-sm">
                 <div className="flex justify-between text-sm">
                   <span className="text-[#8A8A8A]">Balance</span>
-                  <span className="font-semibold text-[#0F2B4A]">
+                  <span className="font-bold text-[#0F2B4A] text-lg">
                     {formatCurrency((parseFloat(formData.price) || 0) - (parseFloat(formData.amount_paid) || 0))}
                   </span>
                 </div>
-                <div className="mt-1 text-xs text-[#8A8A8A]">
-                  Payment status:{' '}
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="text-[#8A8A8A]">Payment status:</span>
                   {!formData.amount_paid || parseFloat(formData.amount_paid) === 0 ? (
-                    <span className="text-[#D9534F] font-medium">Unpaid</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#D9534F]/10 text-[#D9534F] rounded-full font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D9534F]"></span>
+                      Unpaid
+                    </span>
                   ) : parseFloat(formData.amount_paid) >= parseFloat(formData.price) ? (
-                    <span className="text-[#2E7D5E] font-medium">Paid in full</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#2E7D5E]/10 text-[#2E7D5E] rounded-full font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D5E]"></span>
+                      Paid in full
+                    </span>
                   ) : (
-                    <span className="text-[#D4A52A] font-medium">Partially paid</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#D4A52A]/10 text-[#D4A52A] rounded-full font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A52A]"></span>
+                      Partially paid
+                    </span>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Status (existing) */}
             <div>
-              <label className="block text-sm font-medium text-[#0F2B4A] mb-1">Current status</label>
-              <select
-                name="current_status"
-                value={formData.current_status}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] appearance-none"
-              >
-                <option value="Order placed">Order placed</option>
-                <option value="Cutting">Cutting</option>
-                <option value="Sewing">Sewing</option>
-                <option value="Ready">Ready</option>
-                <option value="Delivered">Delivered</option>
-              </select>
+              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Current status</label>
+              <div className="relative">
+                <select
+                  name="current_status"
+                  value={formData.current_status}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow appearance-none pr-12 shadow-sm text-base"
+                >
+                  <option value="Order placed">Order placed</option>
+                  <option value="Cutting">Cutting</option>
+                  <option value="Sewing">Sewing</option>
+                  <option value="Ready">Ready</option>
+                  <option value="Delivered">Delivered</option>
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                  <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
+                </div>
+              </div>
             </div>
 
-            {/* Summary card */}
-            <div className="bg-[#0F2B4A] text-white rounded-xl p-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="opacity-70">Customer</span>
+            {/* Summary Card */}
+            <div className="bg-[#0F2B4A] text-white rounded-2xl p-6 space-y-2.5 shadow-xl">
+              <div className="text-xs uppercase tracking-wider text-white/50 font-semibold">Order summary</div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/70">Customer</span>
                 <span className="font-medium">{formData.customer_name || '—'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="opacity-70">Garment</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/70">Garment</span>
                 <span className="font-medium">{formData.title || '—'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="opacity-70">Total</span>
+              {formData.category && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/70">Category</span>
+                  <span className="font-medium">{formData.category}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-white/70">Quantity</span>
+                <span className="font-medium">{formData.quantity || 1}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/70">Total</span>
                 <span className="font-medium">{formatCurrency(formData.price)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="opacity-70">Deposit</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/70">Deposit</span>
                 <span className="font-medium">{formatCurrency(formData.amount_paid)}</span>
               </div>
-              <div className="flex justify-between border-t border-white/20 pt-2">
-                <span className="opacity-70">Balance</span>
-                <span className="font-bold text-[#D4A52A]">
+              <div className="flex justify-between border-t border-white/20 pt-2.5 mt-1">
+                <span className="text-white/70">Balance</span>
+                <span className="font-bold text-[#D4A52A] text-lg">
                   {formatCurrency((parseFloat(formData.price) || 0) - (parseFloat(formData.amount_paid) || 0))}
                 </span>
               </div>
@@ -750,14 +728,14 @@ export default function NewOrderPage() {
     }
   };
 
-  // ─── Skeleton ───
   if (loading) {
     return (
-      <div className="p-4 max-w-2xl mx-auto">
-        <div className="h-6 w-32 bg-[#E5E0D8] rounded mb-4 animate-pulse" />
-        <div className="space-y-3">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="h-8 w-48 bg-[#E5E0D8] rounded-2xl mb-2 animate-pulse" />
+        <div className="h-4 w-32 bg-[#E5E0D8] rounded mb-8 animate-pulse" />
+        <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-12 bg-[#E5E0D8] rounded animate-pulse" />
+            <div key={i} className="h-14 bg-[#E5E0D8] rounded-2xl animate-pulse" />
           ))}
         </div>
       </div>
@@ -766,12 +744,12 @@ export default function NewOrderPage() {
 
   if (error && !loading) {
     return (
-      <div className="p-4 max-w-2xl mx-auto text-center">
-        <div className="text-[#D9534F]">{error}</div>
+      <div className="max-w-2xl mx-auto px-4 py-8 text-center">
+        <div className="text-[#D9534F] bg-[#F1DBD3] p-4 rounded-2xl">{error}</div>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-4 px-6 py-2 bg-[#D4A52A] text-[#0F2B4A] rounded-xl font-semibold"
+          className="mt-4 px-6 py-3 bg-[#D4A52A] text-[#0F2B4A] rounded-2xl font-semibold hover:bg-[#C49A24] transition-colors"
         >
           Retry
         </button>
@@ -782,38 +760,45 @@ export default function NewOrderPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
-      <h1 className="text-2xl font-bold text-[#0F2B4A] mb-1">Create a new job</h1>
-      <p className="text-sm text-[#8A8A8A] mb-6">
-        {orderCount} orders used · {getPlanLimits(businessPlan).orders === Infinity ? 'Unlimited' : getPlanLimits(businessPlan).orders} max
-      </p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#0F2B4A]">Create a new job</h1>
+        <p className="text-sm text-[#8A8A8A] mt-0.5">
+          {orderCount} orders used · {getPlanLimits(businessPlan).orders === Infinity ? 'Unlimited' : getPlanLimits(businessPlan).orders} max
+        </p>
+      </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-8">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center gap-2">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                 i === step
-                  ? 'bg-[#D4A52A] text-[#0F2B4A]'
+                  ? 'bg-[#D4A52A] text-[#0F2B4A] shadow-md shadow-[#D4A52A]/30'
                   : i < step
-                  ? 'bg-[#2E7D5E] text-white'
+                  ? 'bg-[#2E7D5E] text-white shadow-sm shadow-[#2E7D5E]/20'
                   : 'bg-[#E5E0D8] text-[#8A8A8A]'
               }`}
             >
               {i < step ? <Icon name="check" size={14} stroke="white" /> : i}
             </div>
-            {i < 4 && <div className={`w-8 h-0.5 ${i < step ? 'bg-[#2E7D5E]' : 'bg-[#E5E0D8]'}`} />}
+            {i < 4 && (
+              <div className={`w-10 h-0.5 rounded-full ${i < step ? 'bg-[#2E7D5E]' : 'bg-[#E5E0D8]'}`} />
+            )}
           </div>
         ))}
       </div>
 
       <form onSubmit={handleSubmit}>
-        {renderStep()}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E5E0D8]">
+          {renderStep()}
 
-        {/* Error message */}
-        {error && (
-          <div className="mt-4 text-sm text-[#D9534F] bg-[#F1DBD3] p-3 rounded-xl">{error}</div>
-        )}
+          {error && (
+            <div className="mt-5 text-sm text-[#D9534F] bg-[#F1DBD3] p-4 rounded-2xl">
+              {error}
+            </div>
+          )}
+        </div>
 
         {/* Navigation */}
         <div className="flex justify-between items-center mt-6 pt-4 border-t border-[#E5E0D8]">
@@ -821,8 +806,9 @@ export default function NewOrderPage() {
             <button
               type="button"
               onClick={prevStep}
-              className="px-4 py-2 text-[#0F2B4A] font-medium hover:underline"
+              className="px-5 py-2.5 text-[#0F2B4A] font-medium hover:bg-[#F8F6F2] rounded-xl transition-colors flex items-center gap-1.5"
             >
+              <Icon name="chevronLeft" size={16} stroke="#0F2B4A" />
               Back
             </button>
           ) : (
@@ -833,7 +819,7 @@ export default function NewOrderPage() {
             <button
               type="button"
               onClick={nextStep}
-              className="px-6 py-3 bg-[#D4A52A] text-[#0F2B4A] font-semibold rounded-xl hover:bg-[#C49A24] transition flex items-center gap-2"
+              className="px-6 py-3 bg-[#D4A52A] text-[#0F2B4A] font-semibold rounded-2xl hover:bg-[#C49A24] hover:shadow-lg hover:shadow-[#D4A52A]/30 transition-all flex items-center gap-2"
             >
               Continue
               <Icon name="chevronRight" size={18} stroke="#0F2B4A" />
@@ -842,10 +828,22 @@ export default function NewOrderPage() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-3 bg-[#0F2B4A] text-white font-semibold rounded-xl hover:bg-[#1A3A5A] transition disabled:opacity-50 flex items-center gap-2"
+              className="px-8 py-3 bg-[#0F2B4A] text-white font-semibold rounded-2xl hover:bg-[#1A3A5A] hover:shadow-lg hover:shadow-[#0F2B4A]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {saving ? 'Creating...' : 'Create Order & Start Tracking'}
-              {!saving && <Icon name="arrowRight" size={18} stroke="white" />}
+              {saving ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  Create Order & Start Tracking
+                  <Icon name="arrowRight" size={18} stroke="white" />
+                </>
+              )}
             </button>
           )}
         </div>
