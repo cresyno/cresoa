@@ -8,13 +8,12 @@ import { getCurrentBusinessId } from '../../../../lib/getBusinessId';
 import { getPlanLimits } from '../../../../lib/planLimits';
 import { Icon } from '../../../../components/Icon';
 
-// ─── Helpers ──────────────────────────────────────────────
 const formatCurrency = (amount) => {
   if (!amount && amount !== 0) return '₦0';
   return `₦${Number(amount).toLocaleString()}`;
 };
 
-// ─── Inline Styles (no Tailwind needed) ─────────────────
+// ─── Styles ──────────────────────────────────────────────
 const styles = {
   container: {
     maxWidth: '640px',
@@ -51,12 +50,12 @@ const styles = {
   stepDotActive: {
     background: '#D4A52A',
     color: '#0F2B4A',
-    boxShadow: '0 4px 12px rgba(212, 165, 42, 0.3)',
+    boxShadow: '0 4px 12px rgba(212,165,42,0.3)',
   },
   stepDotCompleted: {
     background: '#2E7D5E',
     color: 'white',
-    boxShadow: '0 2px 8px rgba(46, 125, 94, 0.2)',
+    boxShadow: '0 2px 8px rgba(46,125,94,0.2)',
   },
   stepDotPending: {
     background: '#E5E0D8',
@@ -89,7 +88,7 @@ const styles = {
     width: '32px',
     height: '32px',
     borderRadius: '50%',
-    background: 'rgba(212, 165, 42, 0.1)',
+    background: 'rgba(212,165,42,0.1)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -237,6 +236,7 @@ const styles = {
     appearance: 'none',
     transition: 'all 0.2s',
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+    cursor: 'pointer',
   },
   selectWrapper: { position: 'relative' },
   selectArrow: {
@@ -407,11 +407,11 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    boxShadow: '0 2px 8px rgba(212, 165, 42, 0.3)',
+    boxShadow: '0 2px 8px rgba(212,165,42,0.3)',
   },
   continueBtnHover: {
     background: '#C49A24',
-    boxShadow: '0 4px 16px rgba(212, 165, 42, 0.4)',
+    boxShadow: '0 4px 16px rgba(212,165,42,0.4)',
     transform: 'translateY(-1px)',
   },
   createBtn: {
@@ -427,11 +427,11 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    boxShadow: '0 2px 8px rgba(15, 43, 74, 0.3)',
+    boxShadow: '0 2px 8px rgba(15,43,74,0.3)',
   },
   createBtnHover: {
     background: '#1A3A5A',
-    boxShadow: '0 4px 16px rgba(15, 43, 74, 0.4)',
+    boxShadow: '0 4px 16px rgba(15,43,74,0.4)',
     transform: 'translateY(-1px)',
   },
   createBtnDisabled: {
@@ -474,9 +474,14 @@ const styles = {
     marginBottom: '16px',
     animation: 'pulse 1.5s ease-in-out infinite',
   },
+  supportLink: {
+    marginTop: '20px',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#8A8A8A',
+  },
 };
 
-// ─── Component ──────────────────────────────────────────
 export default function NewOrderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -525,7 +530,6 @@ export default function NewOrderPage() {
 
   const [isNewCustomer, setIsNewCustomer] = useState(false);
 
-  // ─── Load data ──────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
@@ -564,7 +568,6 @@ export default function NewOrderPage() {
     load();
   }, [router]);
 
-  // ─── Fetch customer stats ──────────────────────────────
   useEffect(() => {
     if (!formData.customer_id || !businessId) {
       setCustomerStats(null);
@@ -590,7 +593,6 @@ export default function NewOrderPage() {
     fetchStats();
   }, [formData.customer_id, businessId]);
 
-  // ─── Handlers ──────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -638,7 +640,14 @@ export default function NewOrderPage() {
 
   const recentCustomers = customers.slice(0, 5);
 
-  // ─── Submit ────────────────────────────────────────────
+  // ─── PREVENT ENTER KEY FROM SUBMITTING ──────────────────
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+    }
+  };
+
+  // ─── SUBMIT ──────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -731,8 +740,9 @@ export default function NewOrderPage() {
     }
   };
 
-  // ─── Navigation ────────────────────────────────────────
-  const nextStep = () => {
+  // ─── NAVIGATION ──────────────────────────────────────────
+  const nextStep = (e) => {
+    if (e) e.preventDefault();
     if (step === 1 && !formData.customer_id && !isNewCustomer && !showNewCustomer) {
       setError('Please select or add a customer.');
       return;
@@ -745,22 +755,13 @@ export default function NewOrderPage() {
     setStep((s) => Math.min(s + 1, 4));
   };
 
-  const prevStep = () => setStep((s) => Math.max(s - 1, 1));
+  const prevStep = (e) => {
+    if (e) e.preventDefault();
+    setStep((s) => Math.max(s - 1, 1));
+    setError(null);
+  };
 
-// ─── Render Step ──────────────────────────────────────
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <div>
-            <div style={styles.stepHeader}>
-              <div style={styles.stepIconWrapper}>
-                <Icon name="user" size={18} stroke="#D4A52A" />
-              </div>
-              <span>Who is this order for?</span>
-            </div>
-
-            <div style={styles.searchWrapper}>
+  <div style={styles.searchWrapper}>
               <div style={styles.searchIcon}>
                 <Icon name="search" size={18} stroke="#8A8A8A" />
               </div>
@@ -769,6 +770,7 @@ export default function NewOrderPage() {
                 placeholder="Search customers by name or phone"
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
                 style={styles.searchInput}
                 onFocus={(e) => e.target.style = { ...styles.searchInput, ...styles.searchInputFocus }}
                 onBlur={(e) => e.target.style = styles.searchInput}
@@ -842,6 +844,7 @@ export default function NewOrderPage() {
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleChange}
+                    onKeyDown={handleKeyDown}
                     style={styles.input}
                     onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
                     onBlur={(e) => e.target.style = styles.input}
@@ -854,6 +857,7 @@ export default function NewOrderPage() {
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleChange}
+                    onKeyDown={handleKeyDown}
                     style={styles.input}
                     onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
                     onBlur={(e) => e.target.style = styles.input}
@@ -866,6 +870,7 @@ export default function NewOrderPage() {
                     name="customer_email"
                     value={formData.customer_email}
                     onChange={handleChange}
+                    onKeyDown={handleKeyDown}
                     style={styles.input}
                     onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
                     onBlur={(e) => e.target.style = styles.input}
@@ -910,6 +915,7 @@ export default function NewOrderPage() {
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 placeholder="e.g. Aso-ebi Gown"
                 style={styles.input}
                 onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
@@ -924,6 +930,7 @@ export default function NewOrderPage() {
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   style={styles.select}
                   onFocus={(e) => e.target.style = { ...styles.select, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
                   onBlur={(e) => e.target.style = styles.select}
@@ -977,6 +984,7 @@ export default function NewOrderPage() {
                   name="fabric"
                   value={formData.fabric}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   style={styles.select}
                   onFocus={(e) => e.target.style = { ...styles.select, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
                   onBlur={(e) => e.target.style = styles.select}
@@ -998,6 +1006,7 @@ export default function NewOrderPage() {
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 rows={3}
                 placeholder="Off-shoulder, fitted waist, long sleeve..."
                 style={styles.textarea}
@@ -1025,6 +1034,7 @@ export default function NewOrderPage() {
                 name="fitting_date"
                 value={formData.fitting_date}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 style={styles.input}
                 onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
                 onBlur={(e) => e.target.style = styles.input}
@@ -1038,6 +1048,7 @@ export default function NewOrderPage() {
                 name="due_date"
                 value={formData.due_date}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 style={styles.input}
                 onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
                 onBlur={(e) => e.target.style = styles.input}
@@ -1051,6 +1062,7 @@ export default function NewOrderPage() {
                 name="event_date"
                 value={formData.event_date}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 style={styles.input}
                 onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
                 onBlur={(e) => e.target.style = styles.input}
@@ -1083,6 +1095,7 @@ export default function NewOrderPage() {
                       type="number"
                       value={formData.measurements[key] || ''}
                       onChange={(e) => handleMeasurementChange(key, e.target.value)}
+                      onKeyDown={handleKeyDown}
                       placeholder="cm"
                       style={styles.measurementInput}
                       onFocus={(e) => e.target.style = { ...styles.measurementInput, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
@@ -1125,6 +1138,7 @@ export default function NewOrderPage() {
                 name="price"
                 value={formData.price}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 placeholder="0"
                 style={styles.input}
                 onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
@@ -1139,6 +1153,7 @@ export default function NewOrderPage() {
                 name="amount_paid"
                 value={formData.amount_paid}
                 onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 placeholder="0"
                 style={styles.input}
                 onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
@@ -1159,13 +1174,14 @@ export default function NewOrderPage() {
               </div>
             )}
 
- <div style={styles.fieldGroup}>
+            <div style={styles.fieldGroup}>
               <label style={styles.label}>Current status</label>
               <div style={styles.selectWrapper}>
                 <select
                   name="current_status"
                   value={formData.current_status}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   style={styles.select}
                   onFocus={(e) => e.target.style = { ...styles.select, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
                   onBlur={(e) => e.target.style = styles.select}
@@ -1225,7 +1241,7 @@ export default function NewOrderPage() {
     }
   };
 
-  // ─── Loading / Error ──────────────────────────────────
+  // ─── LOADING ────────────────────────────────────────────
   if (loading) {
     return (
       <div style={styles.skeleton}>
@@ -1239,13 +1255,14 @@ export default function NewOrderPage() {
     );
   }
 
+  // ─── ERROR ──────────────────────────────────────────────
   if (error && !loading) {
     return (
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 16px', textAlign: 'center' }}>
         <div style={{ color: '#D9534F', background: '#F1DBD3', padding: '16px', borderRadius: '16px' }}>{error}</div>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={() => { setError(null); window.location.reload(); }}
           style={{ marginTop: '16px', padding: '12px 24px', background: '#D4A52A', color: '#0F2B4A', border: 'none', borderRadius: '16px', fontWeight: '600', cursor: 'pointer' }}
         >
           Retry
@@ -1254,7 +1271,7 @@ export default function NewOrderPage() {
     );
   }
 
-  // ─── Main Render ──────────────────────────────────────
+  // ─── MAIN ──────────────────────────────────────────────
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -1283,6 +1300,7 @@ export default function NewOrderPage() {
         ))}
       </div>
 
+      {/* ─── FORM ──────────────────────────────────────── */}
       <form onSubmit={handleSubmit}>
         <div style={styles.formCard}>
           {renderStep()}
@@ -1343,6 +1361,8 @@ export default function NewOrderPage() {
         </div>
       </form>
 
+      <div style={styles.supportLink}>Support</div>
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.5; }
@@ -1355,4 +1375,4 @@ export default function NewOrderPage() {
       `}</style>
     </div>
   );
-              }
+                  }
