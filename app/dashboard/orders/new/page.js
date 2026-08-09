@@ -13,6 +13,512 @@ const formatCurrency = (amount) => {
   return `₦${Number(amount).toLocaleString()}`;
 };
 
+// ─── Styles ───
+const styles = {
+  container: {
+    maxWidth: '640px',
+    margin: '0 auto',
+    padding: '24px 16px 32px',
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+    color: '#1A1A1A',
+  },
+  header: {
+    marginBottom: '24px',
+  },
+  title: {
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#0F2B4A',
+    marginBottom: '4px',
+  },
+  subtitle: {
+    fontSize: '14px',
+    color: '#8A8A8A',
+  },
+  stepIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '32px',
+  },
+  stepDot: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: '700',
+    transition: 'all 0.2s',
+  },
+  stepDotActive: {
+    background: '#D4A52A',
+    color: '#0F2B4A',
+    boxShadow: '0 4px 12px rgba(212, 165, 42, 0.3)',
+  },
+  stepDotCompleted: {
+    background: '#2E7D5E',
+    color: 'white',
+    boxShadow: '0 2px 8px rgba(46, 125, 94, 0.2)',
+  },
+  stepDotPending: {
+    background: '#E5E0D8',
+    color: '#8A8A8A',
+  },
+  stepLine: {
+    width: '32px',
+    height: '2px',
+    borderRadius: '999px',
+  },
+  stepLineCompleted: {
+    background: '#2E7D5E',
+  },
+  stepLinePending: {
+    background: '#E5E0D8',
+  },
+  formCard: {
+    background: 'white',
+    borderRadius: '24px',
+    padding: '24px',
+    border: '1px solid #E5E0D8',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+  },
+  stepHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#0F2B4A',
+    marginBottom: '20px',
+  },
+  stepIconWrapper: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    background: 'rgba(212, 165, 42, 0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchInput: {
+    width: '100%',
+    padding: '14px 16px 14px 48px',
+    border: '1px solid #E5E0D8',
+    borderRadius: '16px',
+    fontSize: '16px',
+    color: '#1A1A1A',
+    background: 'white',
+    outline: 'none',
+    transition: 'all 0.2s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  },
+  searchInputFocus: {
+    borderColor: '#D4A52A',
+    boxShadow: '0 0 0 3px rgba(212, 165, 42, 0.2)',
+  },
+  searchWrapper: {
+    position: 'relative',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '16px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    pointerEvents: 'none',
+  },
+  customerGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '10px',
+  },
+  customerCard: {
+    padding: '12px 16px',
+    border: '1px solid #E5E0D8',
+    borderRadius: '16px',
+    background: 'white',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  customerCardHover: {
+    borderColor: '#D4A52A',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  },
+  customerName: {
+    fontWeight: '500',
+    color: '#0F2B4A',
+    fontSize: '14px',
+  },
+  customerPhone: {
+    fontSize: '12px',
+    color: '#8A8A8A',
+    marginTop: '2px',
+  },
+  addButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    color: '#D4A52A',
+    fontWeight: '500',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '0',
+    fontSize: '14px',
+    transition: 'color 0.2s',
+  },
+  addButtonHover: {
+    color: '#B4881E',
+  },
+  addIcon: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    border: '2px solid #D4A52A',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
+  },
+  newCustomerForm: {
+    border: '1px solid #D4A52A',
+    borderRadius: '16px',
+    padding: '20px',
+    background: '#F8F6F2',
+    marginTop: '12px',
+  },
+  newCustomerTitle: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#0F2B4A',
+    marginBottom: '14px',
+  },
+  label: {
+    display: 'block',
+    fontSize: '12px',
+    fontWeight: '500',
+    color: '#0F2B4A',
+    marginBottom: '6px',
+  },
+  input: {
+    width: '100%',
+    padding: '12px 16px',
+    border: '1px solid #E5E0D8',
+    borderRadius: '12px',
+    fontSize: '16px',
+    color: '#1A1A1A',
+    background: 'white',
+    outline: 'none',
+    transition: 'all 0.2s',
+  },
+  inputFocus: {
+    borderColor: '#D4A52A',
+    boxShadow: '0 0 0 3px rgba(212, 165, 42, 0.15)',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    gap: '12px',
+    padding: '20px',
+    background: '#F8F6F2',
+    borderRadius: '16px',
+    border: '1px solid #E5E0D8',
+    marginTop: '16px',
+    textAlign: 'center',
+  },
+  statsLabel: {
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    color: '#8A8A8A',
+    fontWeight: '600',
+  },
+  statsValue: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#0F2B4A',
+    marginTop: '2px',
+  },
+  statsValueRed: {
+    color: '#D9534F',
+  },
+  fieldGroup: {
+    marginBottom: '20px',
+  },
+  select: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '1px solid #E5E0D8',
+    borderRadius: '16px',
+    fontSize: '16px',
+    color: '#1A1A1A',
+    background: 'white',
+    outline: 'none',
+    appearance: 'none',
+    transition: 'all 0.2s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  },
+  selectWrapper: {
+    position: 'relative',
+  },
+  selectArrow: {
+    position: 'absolute',
+    right: '16px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    pointerEvents: 'none',
+  },
+  quantityGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  },
+  quantityBtn: {
+    width: '44px',
+    height: '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid #E5E0D8',
+    borderRadius: '16px',
+    background: 'white',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  },
+  quantityBtnHover: {
+    background: '#F8F6F2',
+    borderColor: '#D4A52A',
+  },
+  quantityValue: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#0F2B4A',
+    width: '32px',
+    textAlign: 'center',
+  },
+  textarea: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '1px solid #E5E0D8',
+    borderRadius: '16px',
+    fontSize: '16px',
+    color: '#1A1A1A',
+    background: 'white',
+    outline: 'none',
+    resize: 'vertical',
+    minHeight: '80px',
+    fontFamily: 'inherit',
+    transition: 'all 0.2s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  },
+  measurementGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+    marginTop: '4px',
+  },
+  measurementLabel: {
+    display: 'block',
+    fontSize: '10px',
+    fontWeight: '500',
+    color: '#8A8A8A',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    marginBottom: '4px',
+  },
+  measurementInput: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #E5E0D8',
+    borderRadius: '12px',
+    fontSize: '14px',
+    color: '#1A1A1A',
+    background: 'white',
+    outline: 'none',
+    transition: 'all 0.2s',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+  },
+  paymentSummary: {
+    padding: '20px',
+    background: '#F8F6F2',
+    borderRadius: '16px',
+    border: '1px solid #E5E0D8',
+  },
+  balanceRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '14px',
+  },
+  balanceLabel: {
+    color: '#8A8A8A',
+  },
+  balanceValue: {
+    fontWeight: '700',
+    color: '#0F2B4A',
+    fontSize: '18px',
+  },
+  statusBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '4px 10px',
+    borderRadius: '999px',
+    fontSize: '12px',
+    fontWeight: '500',
+    marginTop: '8px',
+  },
+  statusDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+  },
+  summaryCard: {
+    background: '#0F2B4A',
+    color: 'white',
+    borderRadius: '16px',
+    padding: '24px',
+    marginTop: '16px',
+  },
+  summaryTitle: {
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    marginBottom: '12px',
+  },
+  summaryRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '14px',
+    padding: '4px 0',
+  },
+  summaryLabel: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+  summaryValue: {
+    fontWeight: '500',
+  },
+  summaryDivider: {
+    borderTop: '1px solid rgba(255,255,255,0.2)',
+    margin: '8px 0 4px',
+    paddingTop: '10px',
+  },
+  summaryBalance: {
+    fontWeight: '700',
+    color: '#D4A52A',
+    fontSize: '18px',
+  },
+  nav: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: '24px',
+    paddingTop: '16px',
+    borderTop: '1px solid #E5E0D8',
+  },
+  backBtn: {
+    padding: '10px 20px',
+    color: '#0F2B4A',
+    fontWeight: '500',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: '12px',
+    transition: 'background 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '14px',
+  },
+  backBtnHover: {
+    background: '#F8F6F2',
+  },
+  continueBtn: {
+    padding: '12px 24px',
+    background: '#D4A52A',
+    color: '#0F2B4A',
+    fontWeight: '600',
+    border: 'none',
+    borderRadius: '16px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    boxShadow: '0 2px 8px rgba(212, 165, 42, 0.3)',
+  },
+  continueBtnHover: {
+    background: '#C49A24',
+    boxShadow: '0 4px 16px rgba(212, 165, 42, 0.4)',
+    transform: 'translateY(-1px)',
+  },
+  createBtn: {
+    padding: '12px 32px',
+    background: '#0F2B4A',
+    color: 'white',
+    fontWeight: '600',
+    border: 'none',
+    borderRadius: '16px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    boxShadow: '0 2px 8px rgba(15, 43, 74, 0.3)',
+  },
+  createBtnHover: {
+    background: '#1A3A5A',
+    boxShadow: '0 4px 16px rgba(15, 43, 74, 0.4)',
+    transform: 'translateY(-1px)',
+  },
+  createBtnDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+    transform: 'none',
+  },
+  errorBox: {
+    padding: '16px',
+    background: '#F1DBD3',
+    color: '#D9534F',
+    borderRadius: '16px',
+    fontSize: '14px',
+    marginTop: '20px',
+  },
+  skeleton: {
+    padding: '32px 16px',
+    maxWidth: '640px',
+    margin: '0 auto',
+  },
+  skeletonBar: {
+    height: '32px',
+    background: '#E5E0D8',
+    borderRadius: '16px',
+    marginBottom: '8px',
+    animation: 'pulse 1.5s ease-in-out infinite',
+  },
+  skeletonBarSmall: {
+    height: '16px',
+    background: '#E5E0D8',
+    borderRadius: '12px',
+    marginBottom: '32px',
+    width: '50%',
+    animation: 'pulse 1.5s ease-in-out infinite',
+  },
+  skeletonField: {
+    height: '56px',
+    background: '#E5E0D8',
+    borderRadius: '16px',
+    marginBottom: '16px',
+    animation: 'pulse 1.5s ease-in-out infinite',
+  },
+};
+
 export default function NewOrderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -289,16 +795,16 @@ export default function NewOrderPage() {
     switch (step) {
       case 1:
         return (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
-              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+          <div>
+            <div style={styles.stepHeader}>
+              <div style={styles.stepIconWrapper}>
                 <Icon name="user" size={18} stroke="#D4A52A" />
               </div>
               <span>Who is this order for?</span>
             </div>
 
-            <div className="relative">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <div style={styles.searchWrapper}>
+              <div style={styles.searchIcon}>
                 <Icon name="search" size={18} stroke="#8A8A8A" />
               </div>
               <input
@@ -306,44 +812,50 @@ export default function NewOrderPage() {
                 placeholder="Search customers by name or phone"
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
+                style={styles.searchInput}
+                onFocus={(e) => e.target.style = { ...styles.searchInput, ...styles.searchInputFocus }}
+                onBlur={(e) => e.target.style = styles.searchInput}
               />
             </div>
 
             {customerSearch ? (
-              <div className="max-h-64 overflow-y-auto border border-[#E5E0D8] rounded-2xl divide-y divide-[#E5E0D8] bg-white shadow-sm">
+              <div style={{ maxHeight: '256px', overflowY: 'auto', border: '1px solid #E5E0D8', borderRadius: '16px', marginTop: '12px', background: 'white' }}>
                 {filteredCustomers.length === 0 ? (
-                  <div className="p-5 text-center text-[#8A8A8A]">No customers found</div>
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#8A8A8A' }}>No customers found</div>
                 ) : (
                   filteredCustomers.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => handleCustomerSelect(c.id)}
-                      className="w-full text-left px-5 py-3.5 hover:bg-[#F8F6F2] transition-colors flex items-center justify-between group"
+                      style={{ width: '100%', textAlign: 'left', padding: '14px 20px', borderBottom: '1px solid #E5E0D8', background: 'none', borderLeft: 'none', borderRight: 'none', borderTop: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      onMouseEnter={(e) => e.target.style.background = '#F8F6F2'}
+                      onMouseLeave={(e) => e.target.style.background = 'white'}
                     >
                       <div>
-                        <div className="font-medium text-[#0F2B4A]">{c.name}</div>
-                        {c.phone && <div className="text-sm text-[#8A8A8A]">{c.phone}</div>}
+                        <div style={{ fontWeight: '500', color: '#0F2B4A' }}>{c.name}</div>
+                        {c.phone && <div style={{ fontSize: '12px', color: '#8A8A8A' }}>{c.phone}</div>}
                       </div>
-                      <Icon name="chevronRight" size={16} stroke="#D4A52A" className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Icon name="chevronRight" size={16} stroke="#D4A52A" />
                     </button>
                   ))
                 )}
               </div>
             ) : (
-              <div>
-                <div className="text-xs uppercase tracking-wider text-[#8A8A8A] font-semibold mb-3">Recent customers</div>
-                <div className="grid grid-cols-2 gap-2.5">
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#8A8A8A', fontWeight: '600', marginBottom: '12px' }}>Recent customers</div>
+                <div style={styles.customerGrid}>
                   {recentCustomers.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => handleCustomerSelect(c.id)}
-                      className="text-left px-4 py-3 border border-[#E5E0D8] rounded-2xl bg-white hover:border-[#D4A52A] hover:shadow-sm transition-all group"
+                      style={styles.customerCard}
+                      onMouseEnter={(e) => e.target.style = { ...styles.customerCard, ...styles.customerCardHover }}
+                      onMouseLeave={(e) => e.target.style = styles.customerCard}
                     >
-                      <div className="font-medium text-[#0F2B4A] text-sm">{c.name}</div>
-                      {c.phone && <div className="text-xs text-[#8A8A8A]">{c.phone}</div>}
+                      <div style={styles.customerName}>{c.name}</div>
+                      {c.phone && <div style={styles.customerPhone}>{c.phone}</div>}
                     </button>
                   ))}
                 </div>
@@ -353,63 +865,71 @@ export default function NewOrderPage() {
             <button
               type="button"
               onClick={handleNewCustomerToggle}
-              className="flex items-center gap-2 text-[#D4A52A] font-medium hover:text-[#B4881E] transition-colors group"
+              style={styles.addButton}
+              onMouseEnter={(e) => e.target.style = { ...styles.addButton, ...styles.addButtonHover }}
+              onMouseLeave={(e) => e.target.style = styles.addButton}
             >
-              <div className="w-6 h-6 rounded-full border-2 border-[#D4A52A] flex items-center justify-center group-hover:bg-[#D4A52A] group-hover:text-white transition-colors">
-                <Icon name="plus" size={12} stroke="#D4A52A" className="group-hover:stroke-white" />
-              </div>
+              <span style={styles.addIcon}>
+                <Icon name="plus" size={12} stroke="#D4A52A" />
+              </span>
               Add new customer
             </button>
 
             {showNewCustomer && (
-              <div className="border border-[#D4A52A] rounded-2xl p-5 bg-[#F8F6F2] space-y-3.5 shadow-sm">
-                <div className="text-sm font-semibold text-[#0F2B4A]">New customer details</div>
-                <div>
-                  <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Name *</label>
+              <div style={styles.newCustomerForm}>
+                <div style={styles.newCustomerTitle}>New customer details</div>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={styles.label}>Name *</label>
                   <input
                     type="text"
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base"
+                    style={styles.input}
+                    onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                    onBlur={(e) => e.target.style = styles.input}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Phone</label>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={styles.label}>Phone</label>
                   <input
                     type="tel"
                     name="customer_phone"
                     value={formData.customer_phone}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base"
+                    style={styles.input}
+                    onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                    onBlur={(e) => e.target.style = styles.input}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Email</label>
+                  <label style={styles.label}>Email</label>
                   <input
                     type="email"
                     name="customer_email"
                     value={formData.customer_email}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base"
+                    style={styles.input}
+                    onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                    onBlur={(e) => e.target.style = styles.input}
                   />
                 </div>
               </div>
             )}
 
             {formData.customer_id && customerStats && (
-              <div className="bg-gradient-to-br from-[#F8F6F2] to-white rounded-2xl p-5 border border-[#E5E0D8] grid grid-cols-3 gap-3 text-center shadow-sm">
+              <div style={styles.statsGrid}>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#8A8A8A] font-semibold">Orders</div>
-                  <div className="text-xl font-bold text-[#0F2B4A] mt-0.5">{customerStats.orderCount}</div>
+                  <div style={styles.statsLabel}>Orders</div>
+                  <div style={styles.statsValue}>{customerStats.orderCount}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#8A8A8A] font-semibold">Total spent</div>
-                  <div className="text-xl font-bold text-[#0F2B4A] mt-0.5">{formatCurrency(customerStats.totalSpent)}</div>
+                  <div style={styles.statsLabel}>Total spent</div>
+                  <div style={styles.statsValue}>{formatCurrency(customerStats.totalSpent)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[#8A8A8A] font-semibold">Outstanding</div>
-                  <div className="text-xl font-bold text-[#D9534F] mt-0.5">{formatCurrency(customerStats.outstanding)}</div>
+                  <div style={styles.statsLabel}>Outstanding</div>
+                  <div style={{ ...styles.statsValue, ...styles.statsValueRed }}>{formatCurrency(customerStats.outstanding)}</div>
                 </div>
               </div>
             )}
@@ -418,34 +938,38 @@ export default function NewOrderPage() {
 
       case 2:
         return (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
-              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+          <div>
+            <div style={styles.stepHeader}>
+              <div style={styles.stepIconWrapper}>
                 <Icon name="scissors" size={18} stroke="#D4A52A" />
               </div>
               <span>What are you making?</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Garment name *</label>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Garment name *</label>
               <input
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="e.g. Aso-ebi Gown"
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
+                style={styles.input}
+                onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                onBlur={(e) => e.target.style = styles.input}
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Category</label>
-              <div className="relative">
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Category</label>
+              <div style={styles.selectWrapper}>
                 <select
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
-                  className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow appearance-none pr-12 shadow-sm text-base"
+                  style={styles.select}
+                  onFocus={(e) => e.target.style = { ...styles.select, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
+                  onBlur={(e) => e.target.style = styles.select}
                 >
                   <option value="">Select category</option>
                   <option value="Gown">Gown</option>
@@ -458,63 +982,70 @@ export default function NewOrderPage() {
                   <option value="Native">Native</option>
                   <option value="Other">Other</option>
                 </select>
-                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                <div style={styles.selectArrow}>
                   <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Quantity</label>
-              <div className="flex items-center gap-4">
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Quantity</label>
+              <div style={styles.quantityGroup}>
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, quantity: Math.max(1, (prev.quantity || 1) - 1) }))}
-                  className="w-11 h-11 flex items-center justify-center border border-[#E5E0D8] rounded-2xl bg-white hover:bg-[#F8F6F2] hover:border-[#D4A52A] transition-colors shadow-sm"
+                  style={styles.quantityBtn}
+                  onMouseEnter={(e) => e.target.style = { ...styles.quantityBtn, ...styles.quantityBtnHover }}
+                  onMouseLeave={(e) => e.target.style = styles.quantityBtn}
                 >
                   <Icon name="minus" size={16} stroke="#0F2B4A" />
                 </button>
-                <span className="text-xl font-bold text-[#0F2B4A] w-8 text-center">{formData.quantity || 1}</span>
+                <span style={styles.quantityValue}>{formData.quantity || 1}</span>
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, quantity: (prev.quantity || 1) + 1 }))}
-                  className="w-11 h-11 flex items-center justify-center border border-[#E5E0D8] rounded-2xl bg-white hover:bg-[#F8F6F2] hover:border-[#D4A52A] transition-colors shadow-sm"
+                  style={styles.quantityBtn}
+                  onMouseEnter={(e) => e.target.style = { ...styles.quantityBtn, ...styles.quantityBtnHover }}
+                  onMouseLeave={(e) => e.target.style = styles.quantityBtn}
                 >
                   <Icon name="plus" size={16} stroke="#0F2B4A" />
                 </button>
               </div>
             </div>
 
-            
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Fabric</label>
-              <div className="relative">
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Fabric</label>
+              <div style={styles.selectWrapper}>
                 <select
                   name="fabric"
                   value={formData.fabric}
                   onChange={handleChange}
-                  className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow appearance-none pr-12 shadow-sm text-base"
+                  style={styles.select}
+                  onFocus={(e) => e.target.style = { ...styles.select, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
+                  onBlur={(e) => e.target.style = styles.select}
                 >
                   <option value="">Select fabric</option>
                   <option value="Customer's fabric">Customer's fabric</option>
                   <option value="In-house fabric">In-house fabric</option>
                   <option value="Other">Other</option>
                 </select>
-                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                <div style={styles.selectArrow}>
                   <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Style / description</label>
+              <label style={styles.label}>Style / description</label>
               <textarea
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
                 rows={3}
                 placeholder="Off-shoulder, fitted waist, long sleeve..."
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow resize-none shadow-sm text-base"
+                style={styles.textarea}
+                onFocus={(e) => e.target.style = { ...styles.textarea, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
+                onBlur={(e) => e.target.style = styles.textarea}
               />
             </div>
           </div>
@@ -522,55 +1053,61 @@ export default function NewOrderPage() {
 
       case 3:
         return (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
-              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+          <div>
+            <div style={styles.stepHeader}>
+              <div style={styles.stepIconWrapper}>
                 <Icon name="calendar" size={18} stroke="#D4A52A" />
               </div>
               <span>When does it need to be ready?</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Fitting date</label>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Fitting date</label>
               <input
                 type="date"
                 name="fitting_date"
                 value={formData.fitting_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow shadow-sm text-base"
+                style={styles.input}
+                onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                onBlur={(e) => e.target.style = styles.input}
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Pickup / delivery date</label>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Pickup / delivery date</label>
               <input
                 type="date"
                 name="due_date"
                 value={formData.due_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow shadow-sm text-base"
+                style={styles.input}
+                onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                onBlur={(e) => e.target.style = styles.input}
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Event date</label>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Event date</label>
               <input
                 type="date"
                 name="event_date"
                 value={formData.event_date}
                 onChange={handleChange}
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow shadow-sm text-base"
+                style={styles.input}
+                onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                onBlur={(e) => e.target.style = styles.input}
               />
             </div>
 
             <div>
-              <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A] mb-3">
-                <div className="w-8 h-8 rounded-full bg-[#2E7D5E]/10 flex items-center justify-center">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(46,125,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name="ruler" size={18} stroke="#2E7D5E" />
                 </div>
-                <span>Measurements</span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#0F2B4A' }}>Measurements</span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div style={styles.measurementGrid}>
                 {[
                   { key: 'bust', label: 'Bust' },
                   { key: 'waist', label: 'Waist' },
@@ -584,13 +1121,15 @@ export default function NewOrderPage() {
                   { key: 'thigh', label: 'Thigh' },
                 ].map(({ key, label }) => (
                   <div key={key}>
-                    <label className="block text-[10px] font-medium text-[#8A8A8A] uppercase tracking-wider mb-1">{label}</label>
+                    <label style={styles.measurementLabel}>{label}</label>
                     <input
                       type="number"
                       value={formData.measurements[key] || ''}
                       onChange={(e) => handleMeasurementChange(key, e.target.value)}
                       placeholder="cm"
-                      className="w-full px-3 py-2.5 border border-[#E5E0D8] rounded-xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-sm shadow-sm"
+                      style={styles.measurementInput}
+                      onFocus={(e) => e.target.style = { ...styles.measurementInput, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
+                      onBlur={(e) => e.target.style = styles.measurementInput}
                     />
                   </div>
                 ))}
@@ -599,78 +1138,80 @@ export default function NewOrderPage() {
           </div>
         );
 
-      case 4:
+case 4:
+        const price = parseFloat(formData.price) || 0;
+        const deposit = parseFloat(formData.amount_paid) || 0;
+        const balance = price - deposit;
+        let paymentStatus = 'Unpaid';
+        let statusColor = '#D9534F';
+        if (deposit > 0 && deposit < price) {
+          paymentStatus = 'Partially paid';
+          statusColor = '#D4A52A';
+        } else if (deposit >= price && price > 0) {
+          paymentStatus = 'Paid in full';
+          statusColor = '#2E7D5E';
+        }
+
         return (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F2B4A]">
-              <div className="w-8 h-8 rounded-full bg-[#D4A52A]/10 flex items-center justify-center">
+          <div>
+            <div style={styles.stepHeader}>
+              <div style={styles.stepIconWrapper}>
                 <Icon name="creditCard" size={18} stroke="#D4A52A" />
               </div>
               <span>Payment</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Total price (₦) *</label>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Total price (₦) *</label>
               <input
                 type="number"
                 name="price"
                 value={formData.price}
                 onChange={handleChange}
                 placeholder="0"
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
+                style={styles.input}
+                onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                onBlur={(e) => e.target.style = styles.input}
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Deposit (₦)</label>
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Deposit (₦)</label>
               <input
                 type="number"
                 name="amount_paid"
                 value={formData.amount_paid}
                 onChange={handleChange}
                 placeholder="0"
-                className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] placeholder-[#8A8A8A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow text-base shadow-sm"
+                style={styles.input}
+                onFocus={(e) => e.target.style = { ...styles.input, ...styles.inputFocus }}
+                onBlur={(e) => e.target.style = styles.input}
               />
             </div>
 
             {formData.price && (
-              <div className="bg-gradient-to-br from-[#F8F6F2] to-white rounded-2xl p-5 border border-[#E5E0D8] shadow-sm">
-                <div className="flex justify-between text-sm">
-                  <span className="text-[#8A8A8A]">Balance</span>
-                  <span className="font-bold text-[#0F2B4A] text-lg">
-                    {formatCurrency((parseFloat(formData.price) || 0) - (parseFloat(formData.amount_paid) || 0))}
-                  </span>
+              <div style={styles.paymentSummary}>
+                <div style={styles.balanceRow}>
+                  <span style={styles.balanceLabel}>Balance</span>
+                  <span style={styles.balanceValue}>{formatCurrency(balance)}</span>
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-[#8A8A8A]">Payment status:</span>
-                  {!formData.amount_paid || parseFloat(formData.amount_paid) === 0 ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#D9534F]/10 text-[#D9534F] rounded-full font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D9534F]"></span>
-                      Unpaid
-                    </span>
-                  ) : parseFloat(formData.amount_paid) >= parseFloat(formData.price) ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#2E7D5E]/10 text-[#2E7D5E] rounded-full font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D5E]"></span>
-                      Paid in full
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#D4A52A]/10 text-[#D4A52A] rounded-full font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A52A]"></span>
-                      Partially paid
-                    </span>
-                  )}
+                <div style={{ ...styles.statusBadge, background: `${statusColor}15` }}>
+                  <span style={{ ...styles.statusDot, background: statusColor }}></span>
+                  <span style={{ color: statusColor }}>{paymentStatus}</span>
                 </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-medium text-[#0F2B4A] mb-1.5">Current status</label>
-              <div className="relative">
+            <div style={styles.fieldGroup}>
+              <label style={styles.label}>Current status</label>
+              <div style={styles.selectWrapper}>
                 <select
                   name="current_status"
                   value={formData.current_status}
                   onChange={handleChange}
-                  className="w-full px-4 py-3.5 border border-[#E5E0D8] rounded-2xl bg-white text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#D4A52A] focus:border-transparent transition-shadow appearance-none pr-12 shadow-sm text-base"
+                  style={styles.select}
+                  onFocus={(e) => e.target.style = { ...styles.select, borderColor: '#D4A52A', boxShadow: '0 0 0 3px rgba(212,165,42,0.15)' }}
+                  onBlur={(e) => e.target.style = styles.select}
                 >
                   <option value="Order placed">Order placed</option>
                   <option value="Cutting">Cutting</option>
@@ -678,46 +1219,45 @@ export default function NewOrderPage() {
                   <option value="Ready">Ready</option>
                   <option value="Delivered">Delivered</option>
                 </select>
-                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                <div style={styles.selectArrow}>
                   <Icon name="chevronDown" size={16} stroke="#8A8A8A" />
                 </div>
               </div>
             </div>
 
-            {/* Summary Card */}
-            <div className="bg-[#0F2B4A] text-white rounded-2xl p-6 space-y-2.5 shadow-xl">
-              <div className="text-xs uppercase tracking-wider text-white/50 font-semibold">Order summary</div>
-              <div className="flex justify-between text-sm">
-                <span className="text-white/70">Customer</span>
-                <span className="font-medium">{formData.customer_name || '—'}</span>
+            <div style={styles.summaryCard}>
+              <div style={styles.summaryTitle}>Order summary</div>
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>Customer</span>
+                <span style={styles.summaryValue}>{formData.customer_name || '—'}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-white/70">Garment</span>
-                <span className="font-medium">{formData.title || '—'}</span>
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>Garment</span>
+                <span style={styles.summaryValue}>{formData.title || '—'}</span>
               </div>
               {formData.category && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/70">Category</span>
-                  <span className="font-medium">{formData.category}</span>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Category</span>
+                  <span style={styles.summaryValue}>{formData.category}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm">
-                <span className="text-white/70">Quantity</span>
-                <span className="font-medium">{formData.quantity || 1}</span>
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>Quantity</span>
+                <span style={styles.summaryValue}>{formData.quantity || 1}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-white/70">Total</span>
-                <span className="font-medium">{formatCurrency(formData.price)}</span>
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>Total</span>
+                <span style={styles.summaryValue}>{formatCurrency(formData.price)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-white/70">Deposit</span>
-                <span className="font-medium">{formatCurrency(formData.amount_paid)}</span>
+              <div style={styles.summaryRow}>
+                <span style={styles.summaryLabel}>Deposit</span>
+                <span style={styles.summaryValue}>{formatCurrency(formData.amount_paid)}</span>
               </div>
-              <div className="flex justify-between border-t border-white/20 pt-2.5 mt-1">
-                <span className="text-white/70">Balance</span>
-                <span className="font-bold text-[#D4A52A] text-lg">
-                  {formatCurrency((parseFloat(formData.price) || 0) - (parseFloat(formData.amount_paid) || 0))}
-                </span>
+              <div style={styles.summaryDivider}>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>Balance</span>
+                  <span style={styles.summaryBalance}>{formatCurrency(balance)}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -730,26 +1270,25 @@ export default function NewOrderPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="h-8 w-48 bg-[#E5E0D8] rounded-2xl mb-2 animate-pulse" />
-        <div className="h-4 w-32 bg-[#E5E0D8] rounded mb-8 animate-pulse" />
-        <div className="space-y-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-14 bg-[#E5E0D8] rounded-2xl animate-pulse" />
-          ))}
-        </div>
+      <div style={styles.skeleton}>
+        <div style={styles.skeletonBar}></div>
+        <div style={styles.skeletonBarSmall}></div>
+        <div style={styles.skeletonField}></div>
+        <div style={styles.skeletonField}></div>
+        <div style={styles.skeletonField}></div>
+        <div style={styles.skeletonField}></div>
       </div>
     );
   }
 
   if (error && !loading) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8 text-center">
-        <div className="text-[#D9534F] bg-[#F1DBD3] p-4 rounded-2xl">{error}</div>
+      <div style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 16px', textAlign: 'center' }}>
+        <div style={{ color: '#D9534F', background: '#F1DBD3', padding: '16px', borderRadius: '16px' }}>{error}</div>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-4 px-6 py-3 bg-[#D4A52A] text-[#0F2B4A] rounded-2xl font-semibold hover:bg-[#C49A24] transition-colors"
+          style={{ marginTop: '16px', padding: '12px 24px', background: '#D4A52A', color: '#0F2B4A', border: 'none', borderRadius: '16px', fontWeight: '600', cursor: 'pointer' }}
         >
           Retry
         </button>
@@ -758,55 +1297,47 @@ export default function NewOrderPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#0F2B4A]">Create a new job</h1>
-        <p className="text-sm text-[#8A8A8A] mt-0.5">
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Create a new job</h1>
+        <p style={styles.subtitle}>
           {orderCount} orders used · {getPlanLimits(businessPlan).orders === Infinity ? 'Unlimited' : getPlanLimits(businessPlan).orders} max
         </p>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-8">
+      <div style={styles.stepIndicator}>
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                i === step
-                  ? 'bg-[#D4A52A] text-[#0F2B4A] shadow-md shadow-[#D4A52A]/30'
-                  : i < step
-                  ? 'bg-[#2E7D5E] text-white shadow-sm shadow-[#2E7D5E]/20'
-                  : 'bg-[#E5E0D8] text-[#8A8A8A]'
-              }`}
-            >
-              {i < step ? <Icon name="check" size={14} stroke="white" /> : i}
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              ...styles.stepDot,
+              ...(i === step ? styles.stepDotActive : i < step ? styles.stepDotCompleted : styles.stepDotPending),
+            }}>
+              {i < step ? '✓' : i}
             </div>
             {i < 4 && (
-              <div className={`w-10 h-0.5 rounded-full ${i < step ? 'bg-[#2E7D5E]' : 'bg-[#E5E0D8]'}`} />
+              <div style={{
+                ...styles.stepLine,
+                ...(i < step ? styles.stepLineCompleted : styles.stepLinePending),
+              }} />
             )}
           </div>
         ))}
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-[#E5E0D8]">
+        <div style={styles.formCard}>
           {renderStep()}
-
-          {error && (
-            <div className="mt-5 text-sm text-[#D9534F] bg-[#F1DBD3] p-4 rounded-2xl">
-              {error}
-            </div>
-          )}
+          {error && <div style={styles.errorBox}>{error}</div>}
         </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center mt-6 pt-4 border-t border-[#E5E0D8]">
+        <div style={styles.nav}>
           {step > 1 ? (
             <button
               type="button"
               onClick={prevStep}
-              className="px-5 py-2.5 text-[#0F2B4A] font-medium hover:bg-[#F8F6F2] rounded-xl transition-colors flex items-center gap-1.5"
+              style={styles.backBtn}
+              onMouseEnter={(e) => e.target.style = { ...styles.backBtn, ...styles.backBtnHover }}
+              onMouseLeave={(e) => e.target.style = styles.backBtn}
             >
               <Icon name="chevronLeft" size={16} stroke="#0F2B4A" />
               Back
@@ -819,7 +1350,9 @@ export default function NewOrderPage() {
             <button
               type="button"
               onClick={nextStep}
-              className="px-6 py-3 bg-[#D4A52A] text-[#0F2B4A] font-semibold rounded-2xl hover:bg-[#C49A24] hover:shadow-lg hover:shadow-[#D4A52A]/30 transition-all flex items-center gap-2"
+              style={styles.continueBtn}
+              onMouseEnter={(e) => e.target.style = { ...styles.continueBtn, ...styles.continueBtnHover }}
+              onMouseLeave={(e) => e.target.style = styles.continueBtn}
             >
               Continue
               <Icon name="chevronRight" size={18} stroke="#0F2B4A" />
@@ -828,14 +1361,16 @@ export default function NewOrderPage() {
             <button
               type="submit"
               disabled={saving}
-              className="px-8 py-3 bg-[#0F2B4A] text-white font-semibold rounded-2xl hover:bg-[#1A3A5A] hover:shadow-lg hover:shadow-[#0F2B4A]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              style={{
+                ...styles.createBtn,
+                ...(saving ? styles.createBtnDisabled : {}),
+              }}
+              onMouseEnter={(e) => !saving && (e.target.style = { ...styles.createBtn, ...styles.createBtnHover })}
+              onMouseLeave={(e) => !saving && (e.target.style = styles.createBtn)}
             >
               {saving ? (
                 <>
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
                   Creating...
                 </>
               ) : (
@@ -848,6 +1383,17 @@ export default function NewOrderPage() {
           )}
         </div>
       </form>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
-                    }
+          }
