@@ -1,0 +1,8 @@
+{
+  "show": true,
+  "dismissible": true,
+  "type": "promotion",
+  "message": "🎉 Upgrade to Starter or Pro and get 20% off your first 3 months!",
+  "link": "/dashboard/subscription",
+  "linkText": "Upgrade now →"
+}
