@@ -184,13 +184,13 @@ export default function OrderDetailPage() {
   }, [orderId])
 
   const statusIndex = useMemo(() => {
-    if (!order) return 0
-    const index = STATUS_FLOW.findIndex(
-      item => item.value === order.current_status
-    )
-    return index >= 0 ? index : 0
-  }, [order])
-
+  if (!order) return 0
+  const index = STATUS_FLOW.findIndex(
+    item => item.value === (order.current_status || 'Order placed')
+  )
+  return index >= 0 ? index : 0
+}, [order])
+  
   const balance = useMemo(() => {
     if (!order) return 0
     return Math.max(
