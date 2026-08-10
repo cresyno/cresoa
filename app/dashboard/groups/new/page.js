@@ -444,9 +444,7 @@ export default function NewGroupPage() {
         return
       }
 
-      // Group creation continues in the next section.
-      // No database records are created before this point.
-          // ─────────────────────────────────────────────
+      // ─────────────────────────────────────────────
       // 1. CREATE GROUP HEADER
       // ─────────────────────────────────────────────
 
@@ -837,7 +835,7 @@ export default function NewGroupPage() {
           letter-spacing: -0.02em;
         }
 
-        .group-subtitle {
+           .group-subtitle {
           margin: 0.35rem 0 0;
           color: var(--color-text-muted);
           font-size: 0.85rem;
@@ -1154,7 +1152,7 @@ export default function NewGroupPage() {
           </button>
         </div>
 
-        <div className="group-steps">
+<div className="group-steps">
           {STEPS.map((item) => {
             const active = step === item.id
             const done = step > item.id
@@ -1212,7 +1210,7 @@ export default function NewGroupPage() {
           </div>
         )}
 
-        {/* STEP 1 CONTINUES NEXT */}
+        {/* STEP 1 - Group details */}
         {step === 1 && (
           <div className="group-card">
             <div className="group-card-header">
@@ -1351,10 +1349,7 @@ export default function NewGroupPage() {
           </div>
         )}
 
-        {/* ─────────────────────────────────────────
-            STEP 2 — MEMBERS
-        ───────────────────────────────────────── */}
-
+        {/* STEP 2 - Members */}
         {step === 2 && (
           <div className="group-card">
             <div className="group-card-header">
@@ -1466,7 +1461,7 @@ export default function NewGroupPage() {
                     part of this group order.
                   </p>
 
-                  <button
+<button
                     type="button"
                     className="group-button accent"
                     onClick={openAddMember}
@@ -1822,30 +1817,11 @@ export default function NewGroupPage() {
                   />
                 </button>
               </div>
-
-              <div className="group-footer-right">
-                <button
-                  type="button"
-                  className="group-button primary"
-                  disabled={members.length === 0}
-                  onClick={handleNext}
-                >
-                  Review group
-                  <Icon
-                    name="arrow-right"
-                    size={14}
-                  />
-                </button>
-              </div>
             </div>
           </div>
         )}
 
-        {/* STEP 3 CONTINUES NEXT */}
-        {/* ─────────────────────────────────────────
-            STEP 3 — REVIEW & CREATE
-        ───────────────────────────────────────── */}
-
+        {/* STEP 3 - Review & Create */}
         {step === 3 && (
           <div className="group-card">
             <div className="group-card-header">
@@ -1954,7 +1930,7 @@ export default function NewGroupPage() {
                     Due date
                   </span>
 
-                  <strong
+<strong
                     style={{
                       display: 'block',
                       marginTop: '0.25rem',
@@ -2255,7 +2231,7 @@ export default function NewGroupPage() {
                 <button
                   type="button"
                   className="group-button accent"
-                  onClick={handleSubmit}
+                  onClick={handleCreateGroup}
                   disabled={
                     saving ||
                     members.length === 0
@@ -2279,15 +2255,15 @@ export default function NewGroupPage() {
           </div>
         )}
 
-        {/* ─────────────────────────────────────────
+        {/* ─────────────────────────────────────────────
             MEMBER MODAL
-        ───────────────────────────────────────── */}
+        ───────────────────────────────────────────── */}
 
-        {showMemberModal && (
+        {memberModalOpen && (
           <div
             className="group-modal-overlay"
             onClick={() =>
-              setShowMemberModal(false)
+              setMemberModalOpen(false)
             }
           >
             <div
@@ -2299,7 +2275,7 @@ export default function NewGroupPage() {
               <div className="group-modal-header">
                 <div>
                   <h2>
-                    {editingMemberIndex !== null
+                    {editingIndex !== null
                       ? 'Edit member'
                       : 'Add member'}
                   </h2>
@@ -2313,7 +2289,7 @@ export default function NewGroupPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setShowMemberModal(false)
+                    setMemberModalOpen(false)
                   }
                   className="group-modal-close"
                 >
@@ -2361,7 +2337,8 @@ export default function NewGroupPage() {
                       })
                     }}
                   >
-                    <option value="">
+
+<option value="">
                       New customer
                     </option>
 
@@ -2396,7 +2373,12 @@ export default function NewGroupPage() {
                       className="group-input"
                       name="name"
                       value={memberForm.name}
-                      onChange={handleMemberChange}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          name: e.target.value
+                        })
+                      }
                       required
                       placeholder="Customer name"
                     />
@@ -2411,7 +2393,12 @@ export default function NewGroupPage() {
                       className="group-input"
                       name="phone"
                       value={memberForm.phone}
-                      onChange={handleMemberChange}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          phone: e.target.value
+                        })
+                      }
                       inputMode="tel"
                       placeholder="08012345678"
                     />
@@ -2426,7 +2413,12 @@ export default function NewGroupPage() {
                       className="group-input"
                       name="item"
                       value={memberForm.item}
-                      onChange={handleMemberChange}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          item: e.target.value
+                        })
+                      }
                       required
                       placeholder="e.g. Senator outfit"
                     />
@@ -2444,7 +2436,12 @@ export default function NewGroupPage() {
                       step="0.01"
                       name="price"
                       value={memberForm.price}
-                      onChange={handleMemberChange}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          price: e.target.value
+                        })
+                      }
                       required
                       placeholder="0"
                     />
@@ -2462,7 +2459,12 @@ export default function NewGroupPage() {
                       step="0.01"
                       name="deposit"
                       value={memberForm.deposit}
-                      onChange={handleMemberChange}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          deposit: e.target.value
+                        })
+                      }
                       placeholder="0"
                     />
                   </div>
@@ -2477,32 +2479,32 @@ export default function NewGroupPage() {
                       type="date"
                       name="dueDate"
                       value={memberForm.dueDate}
-                      onChange={handleMemberChange}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          dueDate: e.target.value
+                        })
+                      }
                     />
                   </div>
 
-                  <div className="group-form-group">
-  <label className="group-label">
-    Measurements
-  </label>
+                  <div className="group-form-group full">
+                    <label className="group-label">
+                      Measurements / fitting notes
+                    </label>
 
-  <input
-    className="group-input"
-    type="text"
-    name="measurements"
-    value={memberForm.measurements}
-    onChange={handleMemberChange}
-    placeholder="Measurements or fitting notes"
-  />
-</div>
                     <input
                       className="group-input"
+                      type="text"
                       name="measurements"
-                      value={
-                        memberForm.measurements
+                      value={memberForm.measurements}
+                      onChange={(e) =>
+                        setMemberForm({
+                          ...memberForm,
+                          measurements: e.target.value
+                        })
                       }
-                      onChange={handleMemberChange}
-                      placeholder="Optional"
+                      placeholder="Measurements or fitting notes"
                     />
                   </div>
                 </div>
@@ -2513,7 +2515,7 @@ export default function NewGroupPage() {
                   type="button"
                   className="group-button"
                   onClick={() =>
-                    setShowMemberModal(false)
+                    setMemberModalOpen(false)
                   }
                 >
                   Cancel
@@ -2529,7 +2531,7 @@ export default function NewGroupPage() {
                     size={14}
                   />
 
-                  {editingMemberIndex !== null
+                  {editingIndex !== null
                     ? 'Save changes'
                     : 'Add member'}
                 </button>
@@ -2537,7 +2539,8 @@ export default function NewGroupPage() {
             </div>
           </div>
         )}
-              
+      </div>
+
       <style jsx>{`
         .field-label {
           display: block;
@@ -2586,9 +2589,8 @@ export default function NewGroupPage() {
           padding-left: 0.7rem;
           color: var(--color-text-muted);
           font-size: 0.85rem;
-        }
-
-        .money-input input {
+                            }
+                             .money-input input {
           width: 100%;
           border: none;
           outline: none;
@@ -2646,4 +2648,4 @@ export default function NewGroupPage() {
       `}</style>
     </div>
   )
-                        }
+}
