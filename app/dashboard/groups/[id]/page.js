@@ -1224,10 +1224,12 @@ const styles = `
   @keyframes pulse { 0%,100% { opacity:.3 } 50% { opacity:.6 } }
 
   @media (max-width: 760px) {
-    .group-page { padding: 16px; }
-    .group-header { align-items: flex-start; }
-    .group-header,
-    .group-header-left {
+    .group-page {
+      padding: 16px;
+    }
+
+    .group-header {
+      align-items: flex-start;
       flex-direction: column;
     }
 
