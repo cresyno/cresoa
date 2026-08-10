@@ -242,9 +242,19 @@ export default function FashionDashboardPage() {
           }
         `}</style>
       </div>
-    )
-  }
-
+} catch (err) {
+  console.error('Render error:', err)
+  return (
+    <div className="dashboard-error">
+      <div className="error-card">
+        <Icon name="alert-circle" size={32} stroke="var(--color-danger)" />
+        <h2>Something went wrong</h2>
+        <p>{err.message}</p>
+        <button onClick={() => window.location.reload()}>Reload</button>
+      </div>
+    </div>
+  )
+}
   if (deactivated) {
     return (
       <div className="dashboard-error">
