@@ -1930,5 +1930,3 @@ export default function NewOrderPage() {
       </div>
     )
   }
-                    }
-
