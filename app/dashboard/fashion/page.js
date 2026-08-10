@@ -2080,9 +2080,7 @@ export default function FashionDashboardPage() {
                 </div>
 
                 <div>
-                  <span>
-                    Orders
-                  </span>
+  <span>Orders</span>
 
                   <strong>
                     {selectedDayOrders}
