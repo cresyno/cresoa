@@ -1780,9 +1780,6 @@ export default function NewOrderPage() {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-      
-          
-          <style jsx>{`
   .selected-customer,
   .new-customer-card,
   .saved-measurements {
