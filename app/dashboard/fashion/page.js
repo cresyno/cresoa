@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../lib/getBusinessId'
-import { isFeatureAvailable } from '../../lib/planLimits'
-import { Icon } from '../../components/Icon'
+import { supabase } from '../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
+import { isFeatureAvailable } from '../../../lib/planLimits'
+import { Icon } from '../../../components/Icon'
 
 const currencyFormatter = new Intl.NumberFormat('en-NG', {
   style: 'currency',
