@@ -1232,10 +1232,10 @@ const styles = `
     .group-header-actions .group-button { flex: 1; }
     .group-summary { grid-template-columns: 1fr; }
     .group-metrics { grid-template-columns: 1fr 1fr; }
+    <style>{`
     .form-grid { grid-template-columns: 1fr; }
     .field.full { grid-column: auto; }
-  }
-      `}</style>
+`}</style>
     </div>
   )
 }
