@@ -546,12 +546,11 @@ export default function NewCustomerPage() {
     Other
   </option>
 </select>
-                </label>
+</label>
+<label className="field">
+  <span>Age category</span>
 
-                <label className="field">
-                  <span>Age category</span>
-
-                  <select
+    <select
   value={form.age_category}
   onChange={event =>
     updateField(
@@ -571,8 +570,8 @@ export default function NewCustomerPage() {
   <option value="adult">
     Adult
   </option>
-</select>
-                </label>
+  </select>
+  </label>
               </div>
             </section>
           )}
