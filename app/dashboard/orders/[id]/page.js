@@ -1,16 +1,58 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { isFeatureAvailable } from '../../../../lib/planLimits'
 import { Icon } from '../../../../components/Icon'
 
+const STATUS_FLOW = [
+  {
+    value: 'Order placed',
+    label: 'Order placed',
+    short: 'Placed',
+    icon: 'clipboard',
+    description: 'The customer has placed this order and production has not started yet.',
+    customerMessage: 'Your order has been received and is now in our production queue.'
+  },
+  {
+    value: 'Cutting',
+    label: 'Cutting',
+    short: 'Cutting',
+    icon: 'scissors',
+    description: 'Fabric is being prepared and cut according to the order.',
+    customerMessage: 'Good news! Your outfit is now in the cutting stage. We are carefully preparing the fabric for production.'
+  },
+  {
+    value: 'Sewing',
+    label: 'Sewing',
+    short: 'Sewing',
+    icon: 'edit-2',
+    description: 'Your tailor is currently sewing and assembling the outfit.',
+    customerMessage: 'Your outfit is currently being sewn and assembled. We are making sure the details come together properly.'
+  },
+  {
+    value: 'Ready',
+    label: 'Ready for pickup',
+    short: 'Ready',
+    icon: 'check-circle',
+    description: 'The outfit is finished and ready for the customer.',
+    customerMessage: 'Your outfit is ready! You can now arrange pickup or delivery with us.'
+  },
+  {
+    value: 'Delivered',
+    label: 'Delivered',
+    short: 'Delivered',
+    icon: 'package',
+    description: 'The customer has received the finished order.',
+    customerMessage: 'Your order has been marked as delivered. Thank you for choosing us!'
+  }
+]
+
 export default function OrderDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const searchParams = useSearchParams()
   const orderId = params.id
 
   const [loading, setLoading] = useState(true)
@@ -19,8 +61,8 @@ export default function OrderDetailPage() {
   const [customer, setCustomer] = useState(null)
   const [payments, setPayments] = useState([])
   const [businessId, setBusinessId] = useState(null)
-  const [businessPlan, setBusinessPlan] = useState('free')
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
+  const [businessPlan, setBusinessPlan] = useState('free')
   const [userRole, setUserRole] = useState(null)
 
   const [notes, setNotes] = useState('')
@@ -32,39 +74,55 @@ export default function OrderDetailPage() {
   const [recordingPayment, setRecordingPayment] = useState(false)
 
   const [showStatusModal, setShowStatusModal] = useState(false)
-  const [newStatus, setNewStatus] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState(null)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
+  const [showEditModal, setShowEditModal] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({
     title: '',
     price: '',
-    due_date: '',
+    due_date: ''
   })
 
-  const statusOptions = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+  const [copied, setCopied] = useState(false)
 
   const loadOrder = async () => {
     setLoading(true)
     setError(null)
+
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
+
       if (!session) {
         router.push('/login')
         return
       }
 
       const bizId = getCurrentBusinessId()
+
       if (!bizId) {
         router.push('/dashboard')
         return
       }
+
       setCurrentBusinessId(bizId)
 
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
-          customers (id, name, phone, email, address)
+          customers (
+            id,
+            name,
+            first_name,
+            last_name,
+            phone,
+            email,
+            address
+          )
         `)
         .eq('id', orderId)
         .eq('business_id', bizId)
@@ -76,10 +134,11 @@ export default function OrderDetailPage() {
       setCustomer(orderData.customers)
       setBusinessId(bizId)
       setNotes(orderData.notes || '')
+
       setEditForm({
         title: orderData.title || '',
         price: orderData.price || '',
-        due_date: orderData.due_date || '',
+        due_date: orderData.due_date || ''
       })
 
       const { data: bizData } = await supabase
@@ -87,7 +146,10 @@ export default function OrderDetailPage() {
         .select('plan')
         .eq('id', bizId)
         .single()
-      if (bizData) setBusinessPlan(bizData.plan || 'free')
+
+      if (bizData) {
+        setBusinessPlan(bizData.plan || 'free')
+      }
 
       const { data: roleData } = await supabase
         .from('business_memberships')
@@ -95,7 +157,10 @@ export default function OrderDetailPage() {
         .eq('business_id', bizId)
         .eq('user_id', session.user.id)
         .maybeSingle()
-      if (roleData) setUserRole(roleData.role)
+
+      if (roleData) {
+        setUserRole(roleData.role)
+      }
 
       const { data: paymentData, error: paymentError } = await supabase
         .from('payment_records')
@@ -104,32 +169,60 @@ export default function OrderDetailPage() {
         .order('created_at', { ascending: false })
 
       if (paymentError) throw paymentError
-      setPayments(paymentData || [])
 
+      setPayments(paymentData || [])
     } catch (err) {
       console.error('Error loading order:', err)
-      setError('Failed to load order details.')
+      setError('We could not load this order.')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadOrder()
-  }, [orderId, router])
+    if (orderId) loadOrder()
+  }, [orderId])
 
+  const statusIndex = useMemo(() => {
+    if (!order) return 0
+    const index = STATUS_FLOW.findIndex(
+      item => item.value === order.current_status
+    )
+    return index >= 0 ? index : 0
+  }, [order])
+
+  const balance = useMemo(() => {
+    if (!order) return 0
+    return Math.max(
+      0,
+      Number(order.price || 0) - Number(order.amount_paid || 0)
+    )
+  }, [order])
+
+  const isFullyPaid = balance <= 0
+  const canTracking = isFeatureAvailable(
+    businessPlan,
+    'tracking_links'
+  )
+  const canWhatsApp = isFeatureAvailable(
+    businessPlan,
+    'whatsapp_reminders'
+  )
   const saveNotes = async () => {
     setSavingNotes(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
+
       if (!session) return
 
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('orders')
         .update({ notes })
         .eq('id', orderId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
@@ -139,103 +232,228 @@ export default function OrderDetailPage() {
       })
     } catch (err) {
       console.error('Error saving notes:', err)
-      alert('Failed to save notes.')
+      alert('Could not save the note. Please try again.')
     } finally {
       setSavingNotes(false)
     }
   }
 
-  const handleRecordPayment = async (e) => {
-    e.preventDefault()
+  const handleRecordPayment = async (event) => {
+    event.preventDefault()
+
+    const amount = parseFloat(paymentAmount)
+
+    if (!amount || amount <= 0) {
+      alert('Enter a valid payment amount.')
+      return
+    }
+
+    if (amount > balance) {
+      alert(`The remaining balance is ₦${balance.toLocaleString()}.`)
+      return
+    }
+
     setRecordingPayment(true)
 
     try {
-      const amount = parseFloat(paymentAmount)
-      if (!amount || amount <= 0) {
-        alert('Please enter a valid amount.')
-        setRecordingPayment(false)
-        return
-      }
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
 
-      const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         router.push('/login')
         return
       }
 
-      const response = await fetch(`/api/orders/${orderId}/payments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          amount: amount,
-          note: paymentNote || 'Payment recorded',
-        })
-      })
+      const response = await fetch(
+        `/api/orders/${orderId}/payments`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            amount,
+            note: paymentNote || 'Payment recorded'
+          })
+        }
+      )
 
       const result = await response.json()
+
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to record payment')
+        throw new Error(
+          result.error || 'Failed to record payment'
+        )
       }
 
       await loadOrder()
-      setShowPaymentModal(false)
+
       setPaymentAmount('')
       setPaymentNote('')
+      setShowPaymentModal(false)
     } catch (err) {
       console.error('Payment error:', err)
-      alert(err.message)
+      alert(err.message || 'Could not record payment.')
     } finally {
       setRecordingPayment(false)
     }
   }
 
-  const handleUpdateStatus = async (status) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+  const updateStatus = async (status) => {
+    if (!status || status === order.current_status) {
+      setShowStatusModal(false)
+      return
+    }
 
-      const { error } = await supabase
+    setUpdatingStatus(true)
+
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
+
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const { error: updateError } = await supabase
         .from('orders')
         .update({ current_status: status })
         .eq('id', orderId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
         performed_by: session.user.id,
         action: 'order_status_updated',
-        details: { order_id: orderId, new_status: status }
+        details: {
+          order_id: orderId,
+          previous_status: order.current_status,
+          new_status: status
+        }
       })
 
       await loadOrder()
       setShowStatusModal(false)
-      setNewStatus('')
+      setSelectedStatus(null)
     } catch (err) {
       console.error('Status update error:', err)
-      alert('Failed to update status.')
+      alert('Could not update the order status.')
+    } finally {
+      setUpdatingStatus(false)
     }
   }
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault()
+  const getCustomerStatusMessage = (status) => {
+    const item = STATUS_FLOW.find(
+      entry => entry.value === status
+    )
+
+    if (!item) {
+      return `Hi ${customer?.first_name || customer?.name || ''}, there is an update on your order "${order?.title || 'order'}".`
+    }
+
+    return `Hi ${customer?.first_name || customer?.name || ''}, ${item.customerMessage} Your order is currently marked as "${item.label}".`
+  }
+
+  const sendStatusUpdate = (status) => {
+    if (!customer?.phone) {
+      alert('This customer does not have a phone number.')
+      return
+    }
+
+    const message = getCustomerStatusMessage(status)
+
+    const url =
+      `https://wa.me/${customer.phone.replace(/\D/g, '')}` +
+      `?text=${encodeURIComponent(message)}`
+
+    window.open(url, '_blank')
+  }
+
+  const sendWhatsApp = () => {
+    if (!customer?.phone) {
+      alert('This customer does not have a phone number.')
+      return
+    }
+
+    const message = getCustomerStatusMessage(
+      order.current_status
+    )
+
+    const url =
+      `https://wa.me/${customer.phone.replace(/\D/g, '')}` +
+      `?text=${encodeURIComponent(message)}`
+
+    window.open(url, '_blank')
+  }
+
+  const getTrackingLink = () => {
+    if (typeof window === 'undefined') return ''
+
+    return (
+      `${window.location.origin}/track/${orderId}` +
+      `?business_id=${currentBusinessId}`
+    )
+  }
+
+  const copyTrackingLink = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      await navigator.clipboard.writeText(getTrackingLink())
+      setCopied(true)
+
+      window.setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    } catch (err) {
+      console.error('Copy error:', err)
+      alert('Could not copy the tracking link.')
+    }
+  }
+
+  const sendTrackingLink = () => {
+    if (!customer?.phone) {
+      alert('This customer does not have a phone number.')
+      return
+    }
+
+    const message =
+      `Hi ${customer?.first_name || customer?.name || ''}, ` +
+      `you can follow the progress of your order "${order.title}" ` +
+      `using this tracking link:\n\n${getTrackingLink()}`
+
+    const url =
+      `https://wa.me/${customer.phone.replace(/\D/g, '')}` +
+      `?text=${encodeURIComponent(message)}`
+
+    window.open(url, '_blank')
+  }
+
+  const handleEditSubmit = async (event) => {
+    event.preventDefault()
+    setEditing(true)
+
+    try {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
+
       if (!session) return
 
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('orders')
         .update({
           title: editForm.title,
           price: parseFloat(editForm.price) || 0,
-          due_date: editForm.due_date || null,
+          due_date: editForm.due_date || null
         })
         .eq('id', orderId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
@@ -245,20 +463,28 @@ export default function OrderDetailPage() {
       })
 
       await loadOrder()
-      setEditing(false)
+      setShowEditModal(false)
     } catch (err) {
       console.error('Edit error:', err)
-      alert('Failed to update order.')
+      alert('Could not update this order.')
+    } finally {
+      setEditing(false)
     }
   }
 
   const handleDuplicate = async () => {
-    if (!confirm('Duplicate this order?')) return
+    if (!confirm('Create a new order using this order as a starting point?')) {
+      return
+    }
+
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
+
       if (!session) return
 
-      const { data, error } = await supabase
+      const { data, error: duplicateError } = await supabase
         .from('orders')
         .insert({
           business_id: businessId,
@@ -268,483 +494,2258 @@ export default function OrderDetailPage() {
           amount_paid: 0,
           due_date: order.due_date,
           current_status: 'Order placed',
-          notes: order.notes,
+          notes: order.notes || null
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (duplicateError) throw duplicateError
 
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
         performed_by: session.user.id,
         action: 'order_duplicated',
-        details: { original_id: orderId, new_id: data.id }
+        details: {
+          original_id: orderId,
+          new_id: data.id
+        }
       })
 
-      router.push(`/dashboard/orders/${data.id}?business_id=${currentBusinessId}`)
+      router.push(
+        `/dashboard/orders/${data.id}?business_id=${currentBusinessId}`
+      )
     } catch (err) {
       console.error('Duplicate error:', err)
-      alert('Failed to duplicate order.')
+      alert('Could not duplicate this order.')
     }
   }
 
-  const sendWhatsApp = () => {
-    if (!customer?.phone) {
-      alert('Customer has no phone number.')
-      return
-    }
-    const msg = `Hi ${customer.name || ''}, your order "${order.title || 'Untitled'}" is ${order.current_status || 'in progress'}.`
-    const url = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
-    window.open(url, '_blank')
+  const openStatusModal = () => {
+    setSelectedStatus(null)
+    setShowStatusModal(true)
   }
 
-  const copyTrackingLink = () => {
-    const trackingLink = `${window.location.origin}/track/${orderId}?business_id=${currentBusinessId}`
-    navigator.clipboard?.writeText(trackingLink)
-    alert('Tracking link copied to clipboard!')
+  const selectStatus = (status) => {
+    if (status === order.current_status) return
+    setSelectedStatus(status)
   }
 
-  const sendTrackingLink = () => {
-    if (!customer?.phone) {
-      alert('Customer has no phone number.')
-      return
-    }
-    const trackingLink = `${window.location.origin}/track/${orderId}?business_id=${currentBusinessId}`
-    const msg = `Hi ${customer.name || ''}, track your order here: ${trackingLink}`
-    const url = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
-    window.open(url, '_blank')
+  const currentStatusInfo =
+    STATUS_FLOW.find(
+      item => item.value === order.current_status
+    ) || STATUS_FLOW[0]
+
+  const selectedStatusInfo =
+    STATUS_FLOW.find(
+      item => item.value === selectedStatus
+    ) || null
+
+  const isOverdue =
+    order.due_date &&
+    new Date(order.due_date) < new Date() &&
+    order.current_status !== 'Delivered'
+
+  const formatMoney = value =>
+    `₦${Number(value || 0).toLocaleString('en-NG')}`
+
+  const formatDate = value => {
+    if (!value) return 'Not set'
+
+    return new Date(value).toLocaleDateString(
+      'en-NG',
+      {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }
+    )
   }
 
-  const getStatusInfo = (status) => {
-    const map = {
-      'Order placed': { label: 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' },
-      'Cutting':      { label: 'Cutting', color: '#B4881E', bg: '#F6E9C8', icon: '✂️' },
-      'Sewing':       { label: 'Sewing', color: '#1E3A5F', bg: '#D6E0EB', icon: '🧵' },
-      'Ready':        { label: 'Ready', color: '#2E7D5E', bg: '#DCEBE2', icon: '✅' },
-      'Delivered':    { label: 'Delivered', color: '#6B6255', bg: '#E8E0D5', icon: '📦' },
-    }
-    return map[status] || { label: status || 'Placed', color: 'var(--color-text-muted)', bg: 'var(--color-bg)', icon: '📋' }
-  }
-
-  const canTracking = isFeatureAvailable(businessPlan, 'tracking_links')
-  const canWhatsApp = isFeatureAvailable(businessPlan, 'whatsapp_reminders')
+  const customerName =
+    customer?.first_name ||
+    customer?.name ||
+    'Customer'
 
   if (loading) {
     return (
-      <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto' }}>
-        <div style={{ width: '200px', height: '24px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: '100px', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
-            <div style={{ width: '80px', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
-          </div>
-          <div style={{ width: '100%', height: '100px', background: 'var(--color-border)', borderRadius: '8px' }} />
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {[1,2,3,4,5].map(i => <div key={i} style={{ width: '60px', height: '32px', background: 'var(--color-border)', borderRadius: '20px' }} />)}
-          </div>
+      <main className="order-page">
+        <div className="loading-card">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-large" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-large" />
         </div>
-      </div>
+
+        <style jsx>{`
+          .order-page {
+            min-height: 100vh;
+            padding: 24px 16px;
+            background: var(--color-bg);
+          }
+
+          .loading-card {
+            max-width: 720px;
+            margin: 0 auto;
+          }
+
+          .skeleton {
+            background: var(--color-border);
+            border-radius: 12px;
+            animation: pulse 1.4s ease-in-out infinite;
+          }
+
+          .skeleton-title {
+            width: 45%;
+            height: 22px;
+            margin-bottom: 20px;
+          }
+
+          .skeleton-large {
+            width: 100%;
+            height: 120px;
+            margin-bottom: 14px;
+          }
+
+          .skeleton-row {
+            width: 100%;
+            height: 70px;
+            margin-bottom: 14px;
+          }
+
+          @keyframes pulse {
+            0%, 100% { opacity: .45; }
+            50% { opacity: .8; }
+          }
+        `}</style>
+      </main>
     )
   }
 
-  if (error) {
+  if (error || !order) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
-        {error}
-        <button onClick={loadOrder} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Retry</button>
-      </div>
+      <main className="order-page">
+        <div className="error-card">
+          <Icon
+            name="alert-circle"
+            size={32}
+            stroke="var(--color-danger)"
+          />
+
+          <h1>
+            {error || 'Order not found'}
+          </h1>
+
+          <p>
+            We could not load this order. Please try again.
+          </p>
+
+          <button
+            type="button"
+            onClick={loadOrder}
+            className="retry-button"
+          >
+            Try again
+          </button>
+        </div>
+
+        <style jsx>{`
+          .order-page {
+            min-height: 100vh;
+            padding: 32px 16px;
+            background: var(--color-bg);
+            color: var(--color-text);
+          }
+
+          .error-card {
+            max-width: 520px;
+            margin: 80px auto;
+            padding: 32px 22px;
+            text-align: center;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+          }
+
+          .error-card h1 {
+            margin: 16px 0 8px;
+            font-size: 20px;
+          }
+
+          .error-card p {
+            margin: 0 0 20px;
+            color: var(--color-text-muted);
+          }
+
+          .retry-button {
+            border: 0;
+            border-radius: 10px;
+            padding: 12px 22px;
+            background: var(--color-accent);
+            color: var(--color-primary);
+            font-weight: 700;
+            cursor: pointer;
+          }
+        `}</style>
+      </main>
     )
   }
-
-  if (!order) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-        Order not found.
-      </div>
-    )
-  }
-
-  const statusInfo = getStatusInfo(order.current_status)
-  const balance = (order.price || 0) - (order.amount_paid || 0)
-  const isOverdue = order.due_date && new Date(order.due_date) < new Date() && order.current_status !== 'Delivered'
-  const isFullyPaid = balance <= 0
-  const statusIndex = statusOptions.indexOf(order.current_status)
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', color: 'var(--color-text)' }}>
+    <main className="order-page">
+      <section className="page-shell">
 
-      {/* ─── Header Row ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+        <header className="page-header">
           <button
-            onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId || ''}`)}
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.3rem' }}
+            type="button"
+            className="back-button"
+            onClick={() =>
+              router.push(
+                `/dashboard/orders?business_id=${currentBusinessId || ''}`
+              )
+            }
+            aria-label="Back to orders"
           >
-            <Icon name="arrow-left" size={20} stroke="currentColor" />
+            <Icon
+              name="arrow-left"
+              size={21}
+              stroke="var(--color-primary)"
+            />
           </button>
-          <div>
-            <h1 style={{ fontSize: '1.1rem', fontWeight: '600', margin: 0 }}>
-              {order.title || 'Untitled'}
-            </h1>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', margin: 0 }}>
-              #{orderId.slice(0, 8)} · {customer?.name || 'No customer'}
+
+          <div className="header-copy">
+            <span className="eyebrow">
+              ORDER DETAILS
+            </span>
+
+            <h1>{order.title || 'Untitled order'}</h1>
+
+            <p>
+              #{orderId.slice(0, 8)} · {customerName}
             </p>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={handleDuplicate}
-            style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-          >
-            <Icon name="copy" size={14} stroke="#fff" /> Duplicate
-          </button>
-          <button
-            onClick={() => setEditing(!editing)}
-            style={{ padding: '0.3rem 1rem', background: 'var(--color-accent)', color: '#0F2B4A', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-          >
-            <Icon name="edit-2" size={14} stroke="#0F2B4A" /> {editing ? 'Close' : 'Edit'}
-          </button>
-        </div>
-      </div>
 
-      {/* ─── Status & Quick Actions ─── */}
-      <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-            <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: '0.3rem 1rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '600' }}>
-              {statusInfo.icon} {statusInfo.label}
-            </span>
-            {isOverdue && <span style={{ background: 'var(--color-danger)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '500' }}>Overdue</span>}
-            {isFullyPaid && <span style={{ background: 'var(--color-success)', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: '500' }}>Paid ✓</span>}
+          <button
+            type="button"
+            className="edit-button"
+            onClick={() => setShowEditModal(true)}
+          >
+            <Icon
+              name="edit-2"
+              size={16}
+              stroke="var(--color-primary)"
+            />
+            Edit order
+          </button>
+        </header>
+
+        <section className="status-hero">
+          <div className="status-heading">
+            <div>
+              <span className="section-label">
+                CURRENT ORDER STATUS
+              </span>
+
+              <h2>
+                {currentStatusInfo.label}
+              </h2>
+
+              <p>
+                {currentStatusInfo.description}
+              </p>
+            </div>
+
+            <div className="status-icon">
+              <Icon
+                name={currentStatusInfo.icon}
+                size={25}
+                stroke="var(--color-accent)"
+              />
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {order.current_status !== 'Ready' && (
-              <button
-                onClick={() => handleUpdateStatus('Ready')}
-                style={{ padding: '0.3rem 1rem', background: 'var(--color-success)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
-              >
-                Mark Ready
-              </button>
+
+          <div className="progress-track">
+            {STATUS_FLOW.map((status, index) => {
+              const completed = index <= statusIndex
+              const active = index === statusIndex
+
+              return (
+                <div
+                  className="progress-item"
+                  key={status.value}
+                >
+                  <div
+                    className={[
+                      'progress-dot',
+                      completed ? 'completed' : '',
+                      active ? 'active' : ''
+                    ].join(' ')}
+                  >
+                    {completed && (
+                      <Icon
+                        name={
+                          active
+                            ? status.icon
+                            : 'check'
+                        }
+                        size={13}
+                        stroke="currentColor"
+                      />
+                    )}
+                  </div>
+
+                  <span
+                    className={
+                      active
+                        ? 'progress-label active'
+                        : 'progress-label'
+                    }
+                  >
+                    {status.short}
+                  </span>
+
+                  {index < STATUS_FLOW.length - 1 && (
+                    <div
+                      className={
+                        index < statusIndex
+                          ? 'progress-line filled'
+                          : 'progress-line'
+                      }
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <button
+            type="button"
+            className="primary-action"
+            onClick={openStatusModal}
+          >
+            <Icon
+              name="arrow-right-circle"
+              size={19}
+              stroke="var(--color-primary)"
+            />
+
+            Update order progress
+          </button>
+
+          <p className="action-hint">
+            Choose where the order is now. Cresoa can
+            prepare a customer update for you.
+          </p>
+        </section>
+
+        <section className="money-grid">
+          <div className="money-card">
+            <span>Total</span>
+            <strong>{formatMoney(order.price)}</strong>
+          </div>
+
+          <div className="money-card paid">
+            <span>Paid</span>
+            <strong>{formatMoney(order.amount_paid)}</strong>
+          </div>
+
+          <div
+            className={
+              balance > 0
+                ? 'money-card balance'
+                : 'money-card balance settled'
+            }
+          >
+            <span>Balance</span>
+            <strong>{formatMoney(balance)}</strong>
+
+            {isFullyPaid && (
+              <small>
+                Fully paid
+              </small>
             )}
-            {order.current_status !== 'Delivered' && order.current_status === 'Ready' && (
-              <button
-                onClick={() => handleUpdateStatus('Delivered')}
-                style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
-              >
-                Mark Delivered
-              </button>
+          </div>
+
+          <div
+            className={
+              isOverdue
+                ? 'money-card due overdue'
+                : 'money-card due'
+            }
+          >
+            <span>Due date</span>
+            <strong>
+              {formatDate(order.due_date)}
+            </strong>
+
+            {isOverdue && (
+              <small>Overdue</small>
             )}
+          </div>
+        </section>
+
+        <section className="next-action-card">
+          <div className="next-action-icon">
+            <Icon
+              name={
+                isFullyPaid
+                  ? 'check-circle'
+                  : 'credit-card'
+              }
+              size={22}
+              stroke={
+                isFullyPaid
+                  ? 'var(--color-secondary)'
+                  : 'var(--color-primary)'
+              }
+            />
+          </div>
+
+          <div className="next-action-copy">
+            <span className="section-label">
+              {isFullyPaid
+                ? 'PAYMENT COMPLETE'
+                : 'PAYMENT'}
+            </span>
+
+            <h2>
+              {isFullyPaid
+                ? 'This order is fully paid'
+                : `₦${Number(balance).toLocaleString('en-NG')} still outstanding`}
+            </h2>
+
+            <p>
+              {isFullyPaid
+                ? 'No further payment is required for this order.'
+                : 'Record a payment whenever the customer makes another payment.'}
+            </p>
+          </div>
+
+          {!isFullyPaid && (
             <button
-              onClick={() => { setNewStatus(order.current_status); setShowStatusModal(true) }}
-              style={{ padding: '0.3rem 1rem', background: 'var(--color-accent)', color: '#0F2B4A', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+              type="button"
+              className="secondary-action"
+              onClick={() =>
+                setShowPaymentModal(true)
+              }
             >
-              Update Status
+              <Icon
+                name="plus"
+                size={17}
+                stroke="currentColor"
+              />
+              Record payment
+            </button>
+          )}
+        </section>
+
+        <section className="customer-card">
+          <div className="customer-top">
+            <div className="customer-avatar">
+              {customerName
+                .charAt(0)
+                .toUpperCase()}
+            </div>
+
+            <div className="customer-copy">
+              <span className="section-label">
+                CUSTOMER
+              </span>
+
+              <h2>{customerName}</h2>
+
+              {customer?.phone && (
+                <p>{customer.phone}</p>
+              )}
+
+              {customer?.email && (
+                <p>{customer.email}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="customer-actions">
+            {customer?.phone && (
+              <a
+                href={`tel:${customer.phone}`}
+                className="contact-action"
+              >
+                <Icon
+                  name="phone"
+                  size={17}
+                  stroke="currentColor"
+                />
+                Call customer
+              </a>
+            )}
+
+            {customer?.phone && (
+              <button
+                type="button"
+                className="contact-action whatsapp"
+                onClick={sendWhatsApp}
+                disabled={!canWhatsApp}
+              >
+                <Icon
+                  name="message-circle"
+                  size={17}
+                  stroke="currentColor"
+                />
+                Message on WhatsApp
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="communication-card">
+          <div className="section-header">
+            <div>
+              <span className="section-label">
+                CUSTOMER UPDATES
+              </span>
+
+              <h2>
+                Keep the customer informed
+              </h2>
+            </div>
+
+            <Icon
+              name="message-circle"
+              size={22}
+              stroke="var(--color-primary)"
+            />
+          </div>
+
+          <p className="section-description">
+            Send a clear update about where this order
+            is in the production process.
+          </p>
+
+          <div className="communication-actions">
+            <button
+              type="button"
+              className="communication-button"
+              onClick={openStatusModal}
+            >
+              <Icon
+                name="send"
+                size={18}
+                stroke="currentColor"
+              />
+
+              <span>
+                Update order & notify customer
+                <small>
+                  Change the status and prepare a
+                  WhatsApp message
+                </small>
+              </span>
+            </button>
+
+            {canTracking && (
+              <button
+                type="button"
+                className="communication-button"
+                onClick={sendTrackingLink}
+              >
+                <Icon
+                  name="link"
+                  size={18}
+                  stroke="currentColor"
+                />
+
+                <span>
+                  Send tracking link
+                  <small>
+                    Let the customer check progress
+                    themselves
+                  </small>
+                </span>
+              </button>
+            )}
+          </div>
+        </section>
+
+
+        <section className="tracking-card">
+          <div className="section-header">
+            <div>
+              <span className="section-label">
+                CUSTOMER TRACKING
+              </span>
+
+              <h2>
+                Let customers follow their order
+              </h2>
+            </div>
+
+            <Icon
+              name="globe"
+              size={22}
+              stroke="var(--color-primary)"
+            />
+          </div>
+
+          <p className="section-description">
+            Customers can use this private link to
+            see the latest status without contacting you.
+          </p>
+
+          <div className="tracking-box">
+            <Icon
+              name="link"
+              size={18}
+              stroke="var(--color-text-muted)"
+            />
+
+            <span>
+              {getTrackingLink()}
+            </span>
+
+            <button
+              type="button"
+              onClick={copyTrackingLink}
+              aria-label="Copy tracking link"
+            >
+              <Icon
+                name={copied ? 'check' : 'copy'}
+                size={17}
+                stroke={
+                  copied
+                    ? 'var(--color-secondary)'
+                    : 'currentColor'
+                }
+              />
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* ─── Status Timeline ─── */}
-      <div style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', minWidth: '450px' }}>
-          {statusOptions.map((s, idx) => {
-            const isActive = idx <= statusIndex
-            const isCurrent = s === order.current_status
-            return (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                <button
-                  onClick={() => handleUpdateStatus(s)}
-                  style={{
-                    flex: 1,
-                    padding: '0.3rem 0.2rem',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: isActive ? 'var(--color-accent)' : 'var(--color-border)',
-                    color: isActive ? '#0F2B4A' : 'var(--color-text-muted)',
-                    fontWeight: isCurrent ? '700' : '400',
-                    fontSize: '0.65rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    opacity: isActive ? 1 : 0.5,
-                  }}
-                >
-                  {s.split(' ').pop()}
-                </button>
-                {idx < statusOptions.length - 1 && (
-                  <div style={{ flex: 1, height: '2px', background: isActive && idx < statusIndex ? 'var(--color-accent)' : 'var(--color-border)', margin: '0 0.2rem' }} />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+          <div className="tracking-actions">
+            <button
+              type="button"
+              className="outline-action"
+              onClick={copyTrackingLink}
+            >
+              <Icon
+                name={copied ? 'check' : 'copy'}
+                size={17}
+                stroke="currentColor"
+              />
 
-      {/* ─── Stats Grid ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Total</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>₦{order.price?.toLocaleString() || 0}</div>
-        </div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Paid</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--color-success)' }}>₦{order.amount_paid?.toLocaleString() || 0}</div>
-        </div>
-        <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Balance</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-            {balance > 0 ? `₦${balance.toLocaleString()}` : '✓'}
+              {copied
+                ? 'Tracking link copied'
+                : 'Copy tracking link'}
+            </button>
+
+            {customer?.phone && (
+              <button
+                type="button"
+                className="outline-action"
+                onClick={sendTrackingLink}
+              >
+                <Icon
+                  name="send"
+                  size={17}
+                  stroke="currentColor"
+                />
+
+                Share with customer
+              </button>
+            )}
           </div>
-        </div>
-             {order.due_date && (
-          <div style={{ background: 'var(--color-card)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Due Date</div>
-            <div style={{ fontWeight: '600', fontSize: '0.9rem', color: isOverdue ? 'var(--color-danger)' : 'var(--color-text)' }}>
-              {new Date(order.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </div>
-          </div>
-        )}
-      </div>
+        </section>
 
-      {/* ─── Customer Info ─── */}
-      {customer && (
-        <div style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+        <section className="details-card">
+          <div className="section-header">
             <div>
-              <div style={{ fontWeight: '600', fontSize: '1rem' }}>{customer.name}</div>
-              {customer.phone && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{customer.phone}</div>}
-              {customer.email && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{customer.email}</div>}
-              {customer.address && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{customer.address}</div>}
+              <span className="section-label">
+                ORDER INFORMATION
+              </span>
+
+              <h2>
+                Production details
+              </h2>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {customer.phone && (
-                <button
-                  onClick={() => window.location.href = `tel:${customer.phone.replace(/\D/g, '')}`}
-                  style={{ background: 'var(--color-success)', color: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+
+            <Icon
+              name="file-text"
+              size={22}
+              stroke="var(--color-primary)"
+            />
+          </div>
+
+          <div className="details-list">
+            <div className="detail-row">
+              <span>Order title</span>
+              <strong>
+                {order.title || 'Not specified'}
+              </strong>
+            </div>
+
+            <div className="detail-row">
+              <span>Category</span>
+              <strong>
+                {order.category || 'Fashion'}
+              </strong>
+            </div>
+
+            <div className="detail-row">
+              <span>Quantity</span>
+              <strong>
+                {order.quantity || 1}
+              </strong>
+            </div>
+
+            <div className="detail-row">
+              <span>Fabric</span>
+              <strong>
+                {order.fabric || 'Not specified'}
+              </strong>
+            </div>
+
+            <div className="detail-row">
+              <span>Fitting date</span>
+              <strong>
+                {formatDate(order.fitting_date)}
+              </strong>
+            </div>
+
+            <div className="detail-row">
+              <span>Event date</span>
+              <strong>
+                {formatDate(order.event_date)}
+              </strong>
+            </div>
+
+            <div className="detail-row">
+              <span>Delivery date</span>
+              <strong>
+                {formatDate(order.delivery_date)}
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        <section className="notes-card">
+          <div className="section-header">
+            <div>
+              <span className="section-label">
+                PRIVATE NOTES
+              </span>
+
+              <h2>
+                Notes for you and your team
+              </h2>
+            </div>
+
+            <Icon
+              name="lock"
+              size={20}
+              stroke="var(--color-primary)"
+            />
+          </div>
+
+          <p className="section-description">
+            These notes are private. The customer will
+            not see them.
+          </p>
+
+          <textarea
+            value={notes}
+            onChange={event =>
+              setNotes(event.target.value)
+            }
+            placeholder="Add fitting instructions, design details, fabric notes, or anything your team needs to remember..."
+            rows={5}
+          />
+
+          <div className="notes-footer">
+            <span>
+              Private to your business
+            </span>
+
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={saveNotes}
+              disabled={savingNotes}
+            >
+              {savingNotes
+                ? 'Saving...'
+                : 'Save notes'}
+            </button>
+          </div>
+        </section>
+
+        <section className="payments-card">
+          <div className="section-header">
+            <div>
+              <span className="section-label">
+                PAYMENT HISTORY
+              </span>
+
+              <h2>
+                Payments
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              className="small-add-button"
+              onClick={() =>
+                setShowPaymentModal(true)
+              }
+              disabled={isFullyPaid}
+            >
+              <Icon
+                name="plus"
+                size={16}
+                stroke="currentColor"
+              />
+              Add payment
+            </button>
+          </div>
+
+          {payments.length === 0 ? (
+            <div className="empty-payments">
+              <Icon
+                name="credit-card"
+                size={24}
+                stroke="var(--color-text-muted)"
+              />
+
+              <p>
+                No payments have been recorded yet.
+              </p>
+            </div>
+          ) : (
+            <div className="payment-list">
+              {payments.map(payment => (
+                <div
+                  className="payment-row"
+                  key={payment.id}
                 >
-                  <Icon name="phone" size={16} stroke="#fff" />
-                </button>
-              )}
-              {customer.phone && (
-                <button
-                  onClick={sendWhatsApp}
-                  style={{ background: '#25D366', color: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Icon name="message-circle" size={16} stroke="#fff" />
-                </button>
-              )}
+                  <div>
+                    <strong>
+                      {formatMoney(payment.amount)}
+                    </strong>
+
+                    <span>
+                      {formatDate(
+                        payment.created_at
+                      )}
+                    </span>
+                  </div>
+
+                  <span>
+                    {payment.note ||
+                      'Payment received'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="secondary-tools">
+          <button
+            type="button"
+            onClick={handleDuplicate}
+            className="tool-button"
+          >
+            <Icon
+              name="copy"
+              size={18}
+              stroke="currentColor"
+            />
+
+            <span>
+              Duplicate order
+              <small>
+                Create another order using these
+                details
+              </small>
+            </span>
+          </button>
+        </section>
+
+        <section className="danger-zone">
+          <button
+            type="button"
+            className="tool-button"
+            onClick={() =>
+              alert(
+                'Delete functionality remains protected. Use the existing delete flow from the order menu.'
+              )
+            }
+          >
+            <Icon
+              name="trash-2"
+              size={18}
+              stroke="var(--color-danger)"
+            />
+
+            <span>
+              Delete order
+              <small>
+                Permanently remove this order
+              </small>
+            </span>
+          </button>
+        </section>
+
+      </section>
+
+      {showStatusModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() =>
+            !updatingStatus &&
+            setShowStatusModal(false)
+          }
+        >
+          <div
+            className="modal"
+            onMouseDown={event =>
+              event.stopPropagation()
+            }
+          >
+            <div className="modal-header">
+              <div>
+                <span className="section-label">
+                  ORDER PROGRESS
+                </span>
+
+                <h2>
+                  Where is this order now?
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="close-button"
+                onClick={() =>
+                  setShowStatusModal(false)
+                }
+                disabled={updatingStatus}
+                aria-label="Close"
+              >
+                <Icon
+                  name="x"
+                  size={20}
+                  stroke="currentColor"
+                />
+              </button>
+            </div>
+
+            <p className="modal-description">
+              Choose the stage that best describes
+              where the order is right now.
+            </p>
+
+            <div className="status-options">
+              {STATUS_FLOW.map((status, index) => {
+                const selected =
+                  selectedStatus === status.value
+
+                const current =
+                  order.current_status ===
+                  status.value
+
+                const passed =
+                  index < statusIndex
+
+                return (
+                  <button
+                    type="button"
+                    key={status.value}
+                    className={[
+                      'status-option',
+                      selected ? 'selected' : '',
+                      current ? 'current' : '',
+                      passed ? 'passed' : ''
+                    ].join(' ')}
+                    onClick={() =>
+                      selectStatus(status.value)
+                    }
+                    disabled={
+                      updatingStatus || current
+                    }
+                  >
+                    <div className="status-option-icon">
+                      <Icon
+                        name={status.icon}
+                        size={19}
+                        stroke={
+                          selected
+                            ? 'var(--color-primary)'
+                            : current
+                              ? 'var(--color-secondary)'
+                              : 'var(--color-text-muted)'
+                        }
+                      />
+                    </div>
+
+                    <div className="status-option-copy">
+                      <strong>
+                        {status.label}
+                      </strong>
+
+                      <span>
+                        {status.description}
+                      </span>
+                    </div>
+
+                    {current && (
+                      <span className="current-badge">
+                        Current
+                      </span>
+                    )}
+
+                    {selected && (
+                      <Icon
+                        name="check-circle"
+                        size={20}
+                        stroke="var(--color-primary)"
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedStatusInfo && (
+              <div className="customer-preview">
+                <div className="preview-icon">
+                  <Icon
+                    name="message-circle"
+                    size={19}
+                    stroke="var(--color-primary)"
+                  />
+                </div>
+
+                <div>
+                  <strong>
+                    Customer message
+                  </strong>
+
+                  <p>
+                    Hi {customerName},{' '}
+                    {selectedStatusInfo.customerMessage}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() => {
+                  setSelectedStatus(null)
+                  setShowStatusModal(false)
+                }}
+                disabled={updatingStatus}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="confirm-status-button"
+                disabled={
+                  !selectedStatus ||
+                  updatingStatus
+                }
+                onClick={() =>
+                  updateStatus(selectedStatus)
+                }
+              >
+                {updatingStatus
+                  ? 'Updating...'
+                  : selectedStatus
+                    ? `Move order to ${selectedStatusInfo?.short || selectedStatus}`
+                    : 'Choose a status'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ─── Tracking Links ─── */}
-      <div style={{ background: 'var(--color-card)', padding: '0.8rem 1rem', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <span style={{ fontWeight: '500', fontSize: '0.85rem' }}>🔗 Tracking Link</span>
-          {canTracking ? (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+      {showPaymentModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() =>
+            !recordingPayment &&
+            setShowPaymentModal(false)
+          }
+        >
+          <form
+            className="modal payment-modal"
+            onSubmit={handleRecordPayment}
+            onMouseDown={event =>
+              event.stopPropagation()
+            }
+          >
+            <div className="modal-header">
+              <div>
+                <span className="section-label">
+                  PAYMENT
+                </span>
+
+                <h2>
+                  Record a payment
+                </h2>
+              </div>
+
               <button
-                onClick={copyTrackingLink}
-                style={{ padding: '0.3rem 1rem', background: 'var(--color-primary)', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
+                type="button"
+                className="close-button"
+                onClick={() =>
+                  setShowPaymentModal(false)
+                }
+                disabled={recordingPayment}
               >
-                Copy Link
-              </button>
-              <button
-                onClick={sendTrackingLink}
-                style={{ padding: '0.3rem 1rem', background: '#25D366', color: '#fff', borderRadius: '6px', fontSize: '0.8rem', border: 'none', cursor: 'pointer' }}
-              >
-                Send via WhatsApp
+                <Icon
+                  name="x"
+                  size={20}
+                  stroke="currentColor"
+                />
               </button>
             </div>
-          ) : (
-            <a
-              href={`/dashboard/subscription?business_id=${currentBusinessId}`}
-              style={{ color: 'var(--color-accent)', fontSize: '0.8rem', fontWeight: '500', textDecoration: 'underline' }}
-            >
-              Upgrade to enable tracking links →
-            </a>
-          )}
-        </div>
-      </div>
 
-      {/* ─── Record Payment ─── */}
-      <button
-        onClick={() => setShowPaymentModal(true)}
-        disabled={balance <= 0}
-        style={{
-          width: '100%',
-          padding: '0.7rem',
-          background: balance > 0 ? 'var(--color-accent)' : 'var(--color-border)',
-          color: balance > 0 ? '#0F2B4A' : 'var(--color-text-muted)',
-          border: 'none',
-          borderRadius: '8px',
-          fontWeight: '600',
-          fontSize: '0.9rem',
-          cursor: balance > 0 ? 'pointer' : 'not-allowed',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          marginBottom: '1rem'
-        }}
-      >
-        <Icon name="plus" size={16} stroke={balance > 0 ? '#0F2B4A' : 'var(--color-text-muted)'} />
-        {balance > 0 ? 'Record Payment' : 'Fully Paid ✓'}
-      </button>
+            <div className="balance-banner">
+              <span>Remaining balance</span>
+              <strong>
+                {formatMoney(balance)}
+              </strong>
+            </div>
 
-      {/* ─── Payments History ─── */}
-      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
-        <div style={{ padding: '0.7rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
-          Payments History
-        </div>
-        {payments.length === 0 ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-            No payments recorded yet.
-          </div>
-        ) : (
-          <div>
-            {payments.map((p) => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 1rem', borderBottom: '1px solid var(--color-border)' }}>
-                <div>
-                  <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>₦{p.amount?.toLocaleString() || 0}</div>
-                  {p.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{p.note}</div>}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
-                  {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
+            <label className="field">
+              <span>
+                Amount received
+              </span>
+
+              <div className="amount-input">
+                <span>₦</span>
+
+                <input
+                  type="number"
+                  min="1"
+                  max={balance}
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={event =>
+                    setPaymentAmount(
+                      event.target.value
+                    )
+                  }
+                  placeholder="0"
+                  required
+                />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </label>
 
-      {/* ─── Edit Order (Collapsible) ─── */}
-      {editing && (
-        <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', marginBottom: '1rem', overflow: 'hidden' }}>
-          <div style={{ padding: '0.8rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600' }}>
-            ✏️ Edit Order
-          </div>
-          <form onSubmit={handleEditSubmit} style={{ padding: '1rem' }}>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Item / Garment</label>
+            <label className="field">
+              <span>
+                Payment note
+              </span>
+
               <input
                 type="text"
-                value={editForm.title}
-                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                required
-                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
+                value={paymentNote}
+                onChange={event =>
+                  setPaymentNote(
+                    event.target.value
+                  )
+                }
+                placeholder="e.g. Cash payment, transfer"
               />
-            </div>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Total Price (₦)</label>
-              <input
-                type="number"
-                value={editForm.price}
-                onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                required
-                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
-              />
-            </div>
-            <div style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Due Date</label>
-              <input
-                type="date"
-                value={editForm.due_date}
-                onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem' }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="submit" style={{ padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Save Changes</button>
-              <button type="button" onClick={() => setEditing(false)} style={{ padding: '0.5rem 1.5rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
+            </label>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() =>
+                  setShowPaymentModal(false)
+                }
+                disabled={recordingPayment}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="confirm-status-button"
+                disabled={recordingPayment}
+              >
+                {recordingPayment
+                  ? 'Recording...'
+                  : 'Save payment'}
+              </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* ─── Internal Notes ─── */}
-      <div style={{ background: 'var(--color-card)', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
-        <div style={{ padding: '0.7rem 1rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', fontWeight: '600', fontSize: '0.9rem' }}>
-          📝 Internal Notes
-          <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: '400', marginLeft: '0.5rem' }}>(only you see these)</span>
-        </div>
-        <div style={{ padding: '1rem' }}>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            placeholder="Add internal notes about this order..."
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'vertical' }}
-          />
-          <button
-            onClick={saveNotes}
-            disabled={savingNotes}
-            style={{ marginTop: '0.5rem', padding: '0.4rem 1.5rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', cursor: savingNotes ? 'default' : 'pointer', opacity: savingNotes ? 0.6 : 1 }}
+      {showEditModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() =>
+            !editing &&
+            setShowEditModal(false)
+          }
+        >
+          <form
+            className="modal"
+            onSubmit={handleEditSubmit}
+            onMouseDown={event =>
+              event.stopPropagation()
+            }
           >
-            {savingNotes ? 'Saving...' : 'Save Notes'}
-          </button>
-        </div>
-      </div>
+            <div className="modal-header">
+              <div>
+                <span className="section-label">
+                  ORDER DETAILS
+                </span>
 
-      {/* ─── Status Modal ─── */}
-      {showStatusModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowStatusModal(false)}>
-          <div style={{ background: 'var(--color-bg)', borderRadius: '16px', padding: '1.5rem', maxWidth: '400px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', margin: '0 0 0.5rem' }}>Update Status</h2>
-            <select
-              value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value)}
-              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-card)', color: 'var(--color-text)', fontSize: '0.9rem', marginBottom: '1rem' }}
-            >
-              {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <div style={{ display: 'flex', gap: '0.8rem' }}>
-              <button onClick={() => handleUpdateStatus(newStatus)} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Update</button>
-              <button onClick={() => setShowStatusModal(false)} style={{ padding: '0.6rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
+                <h2>
+                  Edit order
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="close-button"
+                onClick={() =>
+                  setShowEditModal(false)
+                }
+                disabled={editing}
+              >
+                <Icon
+                  name="x"
+                  size={20}
+                  stroke="currentColor"
+                />
+              </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* ─── Payment Modal ─── */}
-      {showPaymentModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowPaymentModal(false)}>
-          <div style={{ background: 'var(--color-bg)', borderRadius: '16px', padding: '1.5rem', maxWidth: '400px', width: '100%' }} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '600', margin: '0 0 0.5rem' }}>Record Payment</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '0 0 1rem' }}>Balance: ₦{balance.toLocaleString()}</p>
-            <form onSubmit={handleRecordPayment}>
-              <div style={{ marginBottom: '0.8rem' }}>
-                <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Amount (₦)</label>
+            <p className="modal-description">
+              Update the basic information for this
+              order. Production status and payments
+              are managed separately.
+            </p>
+
+            <label className="field">
+              <span>Order name</span>
+
+              <input
+                type="text"
+                value={editForm.title}
+                onChange={event =>
+                  setEditForm({
+                    ...editForm,
+                    title: event.target.value
+                  })
+                }
+                placeholder="e.g. Aso-ebi dress"
+                required
+              />
+            </label>
+
+            <label className="field">
+              <span>Total price</span>
+
+              <div className="amount-input">
+                <span>₦</span>
+
                 <input
                   type="number"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  value={editForm.price}
+                  onChange={event =>
+                    setEditForm({
+                      ...editForm,
+                      price: event.target.value
+                    })
+                  }
+                  placeholder="0"
                   required
-                  placeholder="Enter amount"
-                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-card)', color: 'var(--color-text)', fontSize: '0.9rem' }}
                 />
               </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.2rem' }}>Note (optional)</label>
-                <input
-                  type="text"
-                  value={paymentNote}
-                  onChange={(e) => setPaymentNote(e.target.value)}
-                  placeholder="e.g. Cash payment"
-                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-card)', color: 'var(--color-text)', fontSize: '0.9rem' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.8rem' }}>
-                <button type="submit" disabled={recordingPayment} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-accent)', color: '#0F2B4A', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: recordingPayment ? 'default' : 'pointer', opacity: recordingPayment ? 0.6 : 1 }}>
-                  {recordingPayment ? 'Recording...' : 'Record Payment'}
-                </button>
-                <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.6rem 1rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--color-text)' }}>Cancel</button>
-              </div>
-            </form>
-          </div>
+            </label>
+
+            <label className="field">
+              <span>Due date</span>
+
+              <input
+                type="date"
+                value={editForm.due_date}
+                onChange={event =>
+                  setEditForm({
+                    ...editForm,
+                    due_date: event.target.value
+                  })
+                }
+              />
+            </label>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() =>
+                  setShowEditModal(false)
+                }
+                disabled={editing}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="confirm-status-button"
+                disabled={editing}
+              >
+                {editing
+                  ? 'Saving...'
+                  : 'Save changes'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
-    </div>
+
+      <style jsx>{`
+        .order-page {
+          min-height: 100vh;
+          background: var(--color-bg);
+          color: var(--color-text);
+          padding: 0 16px 48px;
+        }
+
+        .page-shell {
+          width: 100%;
+          max-width: 760px;
+          margin: 0 auto;
+        }
+
+        .page-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 20px 0 22px;
+        }
+
+        .back-button,
+        .close-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          width: 42px;
+          height: 42px;
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          background: var(--color-card);
+          color: var(--color-primary);
+          cursor: pointer;
+        }
+
+        .header-copy {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .eyebrow,
+        .section-label {
+          display: block;
+          color: var(--color-text-muted);
+          font-size: 10px;
+          line-height: 1.2;
+          font-weight: 800;
+          letter-spacing: .11em;
+        }
+
+        .header-copy h1 {
+          overflow: hidden;
+          margin: 4px 0 2px;
+          font-size: 21px;
+          line-height: 1.25;
+          font-weight: 800;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .header-copy p {
+          margin: 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+        }
+
+        .edit-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          flex-shrink: 0;
+          border: 1px solid var(--color-border);
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: var(--color-card);
+          color: var(--color-primary);
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .status-hero,
+        .customer-card,
+        .communication-card,
+        .tracking-card,
+        .details-card,
+        .notes-card,
+        .payments-card,
+        .next-action-card {
+          margin-bottom: 14px;
+          border: 1px solid var(--color-border);
+          border-radius: 20px;
+          background: var(--color-card);
+          box-shadow: var(--shadow);
+        }
+
+        .status-hero {
+          padding: 20px;
+        }
+
+        .status-heading {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+        }
+
+        .status-heading h2 {
+          margin: 7px 0 5px;
+          font-size: 24px;
+          line-height: 1.15;
+        }
+
+        .status-heading p {
+          max-width: 540px;
+          margin: 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .status-icon,
+        .next-action-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 48px;
+          height: 48px;
+          flex-shrink: 0;
+          border-radius: 15px;
+          background: rgba(212, 165, 42, .12);
+        }
+
+        .progress-track {
+          display: flex;
+          align-items: flex-start;
+          margin: 26px 0 20px;
+        }
+
+        .progress-item {
+          position: relative;
+          display: flex;
+          align-items: center;
+          flex: 1;
+        }
+
+        .progress-item:last-child {
+          flex: 0;
+        }
+
+        .progress-dot {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          flex-shrink: 0;
+          border: 2px solid var(--color-border);
+          border-radius: 50%;
+          background: var(--color-card);
+          color: var(--color-text-muted);
+        }
+
+        .progress-dot.completed {
+          border-color: var(--color-secondary);
+          background: var(--color-secondary);
+          color: white;
+        }
+
+        .progress-dot.active {
+          border-color: var(--color-accent);
+          background: var(--color-accent);
+          color: var(--color-primary);
+          box-shadow: 0 0 0 5px rgba(212, 165, 42, .12);
+        }
+
+        .progress-line {
+          width: 100%;
+          height: 2px;
+          background: var(--color-border);
+        }
+
+        .progress-line.filled {
+          background: var(--color-secondary);
+        }
+
+        .progress-label {
+          position: absolute;
+          top: 35px;
+          left: 0;
+          color: var(--color-text-muted);
+          font-size: 9px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .progress-label.active {
+          color: var(--color-primary);
+        }
+      `}</style>
+
+        .primary-action {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 18px;
+          padding: 14px;
+          border: 0;
+          border-radius: 14px;
+          background: var(--color-accent);
+          color: var(--color-primary);
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .action-hint {
+          margin: 10px 0 0;
+          text-align: center;
+          color: var(--color-text-muted);
+          font-size: 12px;
+        }
+
+        .money-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .money-card {
+          padding: 16px;
+          border-radius: 18px;
+          border: 1px solid var(--color-border);
+          background: var(--color-card);
+          box-shadow: var(--shadow);
+        }
+
+        .money-card span {
+          display: block;
+          color: var(--color-text-muted);
+          font-size: 12px;
+          margin-bottom: 7px;
+        }
+
+        .money-card strong {
+          display: block;
+          font-size: 19px;
+          font-weight: 800;
+        }
+
+        .money-card small {
+          display: block;
+          margin-top: 6px;
+          font-size: 12px;
+          color: var(--color-secondary);
+          font-weight: 700;
+        }
+
+        .money-card.balance.overdue,
+        .overdue {
+          border-color: rgba(217,83,79,.4);
+        }
+
+        .settled {
+          border-color: rgba(46,125,94,.3);
+        }
+
+        .next-action-card {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 18px;
+        }
+
+        .next-action-copy {
+          flex: 1;
+        }
+
+        .next-action-copy h2 {
+          margin: 5px 0;
+          font-size: 16px;
+        }
+
+        .next-action-copy p {
+          margin: 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+        }
+
+        .secondary-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          border: 0;
+          border-radius: 12px;
+          padding: 11px 14px;
+          background: var(--color-primary);
+          color: white;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .customer-card,
+        .communication-card,
+        .tracking-card,
+        .details-card,
+        .notes-card,
+        .payments-card {
+          padding: 18px;
+        }
+
+        .customer-top {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .customer-avatar {
+          width: 52px;
+          height: 52px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: var(--color-primary);
+          color: white;
+          font-size: 22px;
+          font-weight: 800;
+        }
+
+        .customer-copy h2,
+        .section-header h2 {
+          margin: 5px 0;
+          font-size: 17px;
+        }
+
+        .customer-copy p {
+          margin: 2px 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+        }
+
+        .customer-actions,
+        .tracking-actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 16px;
+          flex-wrap: wrap;
+        }
+
+        .contact-action,
+        .outline-action {
+          flex: 1;
+          min-width: 140px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid var(--color-border);
+          background: var(--color-card);
+          color: var(--color-primary);
+          font-size: 12px;
+          font-weight: 700;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .whatsapp {
+          color: var(--color-secondary);
+        }
+
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .section-description {
+          margin: 10px 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .communication-actions {
+          display: grid;
+          gap: 10px;
+        }
+
+        .communication-button,
+        .tool-button {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px;
+          border-radius: 14px;
+          border: 1px solid var(--color-border);
+          background: var(--color-card);
+          color: var(--color-primary);
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .communication-button span,
+        .tool-button span {
+          display: flex;
+          flex-direction: column;
+          font-weight: 700;
+        }
+
+        .communication-button small,
+        .tool-button small {
+          margin-top: 4px;
+          color: var(--color-text-muted);
+          font-weight: 400;
+          line-height: 1.3;
+        }
+
+        .tracking-box {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          border-radius: 12px;
+          background: var(--color-bg);
+          border: 1px solid var(--color-border);
+        }
+
+        .tracking-box span {
+          overflow: hidden;
+          flex: 1;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          font-size: 12px;
+        }
+
+        .tracking-box button {
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+                                        }
+
+        .details-list {
+          margin-top: 14px;
+        }
+
+        .detail-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          padding: 13px 0;
+          border-bottom: 1px solid var(--color-border);
+        }
+
+        .detail-row:last-child {
+          border-bottom: 0;
+        }
+
+        .detail-row span {
+          color: var(--color-text-muted);
+          font-size: 13px;
+        }
+
+        .detail-row strong {
+          text-align: right;
+          font-size: 13px;
+        }
+
+        .notes-card textarea {
+          width: 100%;
+          box-sizing: border-box;
+          margin-top: 12px;
+          padding: 13px;
+          resize: vertical;
+          min-height: 120px;
+          border: 1px solid var(--color-border);
+          border-radius: 12px;
+          outline: none;
+          background: var(--color-bg);
+          color: var(--color-text);
+          font: inherit;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .notes-card textarea:focus,
+        .field input:focus {
+          border-color: var(--color-primary);
+          box-shadow: 0 0 0 3px rgba(15,43,74,.08);
+        }
+
+        .notes-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 10px;
+        }
+
+        .notes-footer span {
+          color: var(--color-text-muted);
+          font-size: 11px;
+        }
+
+        .payment-list {
+          margin-top: 12px;
+        }
+
+        .payment-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 13px 0;
+          border-bottom: 1px solid var(--color-border);
+        }
+
+        .payment-row:last-child {
+          border-bottom: 0;
+        }
+
+        .payment-row div {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+
+        .payment-row strong {
+          font-size: 14px;
+        }
+
+        .payment-row span {
+          color: var(--color-text-muted);
+          font-size: 11px;
+        }
+
+        .empty-payments {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 14px;
+          padding: 18px;
+          border-radius: 12px;
+          background: var(--color-bg);
+        }
+
+        .empty-payments p {
+          margin: 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+        }
+
+        .small-add-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          border: 0;
+          border-radius: 9px;
+          padding: 9px 11px;
+          background: var(--color-primary);
+          color: white;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .secondary-tools,
+        .danger-zone {
+          margin-bottom: 12px;
+        }
+
+        .danger-zone {
+          padding-top: 4px;
+        }
+
+        .danger-zone .tool-button {
+          color: var(--color-danger);
+        }
+
+        .modal-backdrop {
+          position: fixed;
+          z-index: 1000;
+          inset: 0;
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          padding: 16px;
+          background: rgba(10,22,40,.48);
+        }
+
+        .modal {
+          width: 100%;
+          max-width: 560px;
+          max-height: calc(100vh - 32px);
+          overflow-y: auto;
+          padding: 20px;
+          box-sizing: border-box;
+          border-radius: 22px 22px 16px 16px;
+          background: var(--color-card);
+          box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 15px;
+        }
+
+        .modal-header h2 {
+          margin: 6px 0 0;
+          font-size: 20px;
+        }
+
+        .modal-description {
+          margin: 12px 0 18px;
+          color: var(--color-text-muted);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .status-options {
+          display: grid;
+          gap: 8px;
+        }
+
+        .status-option {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          width: 100%;
+          padding: 12px;
+          border: 1px solid var(--color-border);
+          border-radius: 13px;
+          background: var(--color-card);
+          color: var(--color-text);
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .status-option.selected {
+          border-color: var(--color-accent);
+          background: rgba(212,165,42,.09);
+        }
+
+        .status-option.current {
+          cursor: default;
+          background: var(--color-bg);
+        }
+
+        .status-option-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          flex-shrink: 0;
+          border-radius: 10px;
+          background: var(--color-bg);
+        }
+
+        .status-option-copy {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .status-option-copy strong {
+          display: block;
+          font-size: 13px;
+        }
+
+        .status-option-copy span {
+          display: block;
+          margin-top: 3px;
+          color: var(--color-text-muted);
+          font-size: 11px;
+          line-height: 1.35;
+        }
+
+        .current-badge {
+          padding: 4px 7px;
+          border-radius: 20px;
+          background: rgba(46,125,94,.1);
+          color: var(--color-secondary);
+          font-size: 9px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        .customer-preview {
+          display: flex;
+          gap: 10px;
+          margin-top: 14px;
+          padding: 13px;
+          border: 1px solid var(--color-border);
+          border-radius: 13px;
+          background: var(--color-bg);
+        }
+
+        .preview-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 34px;
+          height: 34px;
+          flex-shrink: 0;
+          border-radius: 9px;
+          background: rgba(212,165,42,.12);
+        }
+
+        .customer-preview strong {
+          font-size: 12px;
+        }
+
+        .customer-preview p {
+          margin: 5px 0 0;
+          color: var(--color-text-muted);
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 20px;
+        }
+
+        .cancel-button,
+        .confirm-status-button {
+          border: 0;
+          border-radius: 11px;
+          padding: 12px 15px;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .cancel-button {
+          border: 1px solid var(--color-border);
+          background: var(--color-card);
+          color: var(--color-text);
+        }
+
+        .confirm-status-button {
+          background: var(--color-accent);
+          color: var(--color-primary);
+        }
+
+        .confirm-status-button:disabled,
+        .secondary-action:disabled,
+        .small-add-button:disabled,
+        .contact-action:disabled {
+          opacity: .5;
+          cursor: not-allowed;
+        }
+
+        .field {
+          display: block;
+          margin-top: 15px;
+        }
+
+        .field > span {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--color-text);
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .field input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: 12px;
+          border: 1px solid var(--color-border);
+          border-radius: 11px;
+          outline: none;
+          background: var(--color-card);
+          color: var(--color-text);
+          font: inherit;
+          font-size: 13px;
+        }
+
+        .amount-input {
+          display: flex;
+          align-items: center;
+          border: 1px solid var(--color-border);
+          border-radius: 11px;
+          background: var(--color-card);
+          overflow: hidden;
+        }
+
+        .amount-input span {
+          padding-left: 12px;
+          color: var(--color-text-muted);
+          font-weight: 700;
+        }
+
+        .amount-input input {
+          border: 0;
+          flex: 1;
+        }
+
+        .balance-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin: 16px 0;
+          padding: 13px;
+          border-radius: 11px;
+          background: rgba(212,165,42,.1);
+        }
+
+        .balance-banner span {
+          color: var(--color-text-muted);
+          font-size: 12px;
+        }
+
+        .balance-banner strong {
+          color: var(--color-primary);
+          font-size: 16px;
+        }
+
+        @media (min-width: 640px) {
+          .order-page {
+            padding: 0 24px 64px;
+          }
+
+          .page-header {
+            padding-top: 28px;
+          }
+
+          .money-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+
+          .modal-backdrop {
+            align-items: center;
+          }
+
+          .modal {
+            border-radius: 22px;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .edit-button {
+            width: 42px;
+            height: 42px;
+            padding: 0;
+            font-size: 0;
+          }
+
+          .edit-button :global(svg) {
+            width: 17px;
+            height: 17px;
+          }
+
+          .status-hero {
+            padding: 17px;
+          }
+
+          .status-heading h2 {
+            font-size: 21px;
+          }
+
+          .progress-label {
+            font-size: 8px;
+          }
+
+          .money-card {
+            padding: 13px;
+          }
+
+          .money-card strong {
+            font-size: 16px;
+          }
+
+          .next-action-card {
+            align-items: flex-start;
+            flex-wrap: wrap;
+          }
+
+          .next-action-copy {
+            min-width: calc(100% - 68px);
+          }
+
+          .next-action-card .secondary-action {
+            width: 100%;
+          }
+
+          .customer-actions,
+          .tracking-actions {
+            flex-direction: column;
+          }
+
+          .contact-action,
+          .outline-action {
+            width: 100%;
+          }
+
+          .modal {
+            padding: 17px;
+          }
+
+          .modal-footer {
+            flex-direction: column-reverse;
+          }
+
+          .cancel-button,
+          .confirm-status-button {
+            width: 100%;
+          }
+        }
+      `}</style>
+    </main>
   )
-               }
+          }
