@@ -521,7 +521,8 @@ export default function NewCustomerPage() {
                 <span>OPTIONAL</span>
               </div>
 
-              <div className="field-grid">
+              
+                    <div className="field-grid">
   <label className="field">
     <span>Gender</span>
 
@@ -578,9 +579,8 @@ export default function NewCustomerPage() {
     </select>
   </label>
 </div>
-              </div>
-            </section>
-          )}
+</section>
+)}
 
           {step === 1 && (
             <section className="form-card">
