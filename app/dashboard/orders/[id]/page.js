@@ -397,11 +397,13 @@ export default function OrderDetailPage() {
   }
 
   const getTrackingLink = () => {
-    if (typeof window === 'undefined') return ''
-    return (
-      `${window.location.origin}/track/${orderId}` +
-      `?business_id=${currentBusinessId}`
-    )
+  if (typeof window === 'undefined') return ''
+
+  if (!order?.tracking_token) {
+    return ''
+  }
+
+  return `${window.location.origin}/track/${order.tracking_token}`
   }
 
   const copyTrackingLink = async () => {
