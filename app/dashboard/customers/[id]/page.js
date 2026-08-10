@@ -149,10 +149,12 @@ export default function CustomerDetailPage({ params }) {
           'Failed to load customer details.'
         )
 
-      } finally {
-        setLoading(false)
-      }
-    }
+        } finally {
+    setSaving(false)
+  }
+}
+
+const handleDelete = async () => {
 
     load()
 
