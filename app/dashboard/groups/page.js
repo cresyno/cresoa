@@ -1,28 +1,55 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'
 
+const formatMoney = (value) =>
+  `₦${Number(value || 0).toLocaleString('en-NG', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`
+
+const formatDate = (value) => {
+  if (!value) return 'No due date'
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const getStatusLabel = (status) => {
+  if (!status) return 'Active'
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
 export default function GroupsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [business, setBusiness] = useState(null)
-  const [businessName, setBusinessName] = useState('')
+  const [error, setError] = useState('')
   const [sector, setSector] = useState('')
   const [plan, setPlan] = useState('free')
   const [canUseGroups, setCanUseGroups] = useState(false)
   const [memberLimit, setMemberLimit] = useState(0)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [deletingId, setDeletingId] = useState(null)
 
-  const loadGroups = async () => {
+  const businessId = useMemo(
+    () => getCurrentBusinessId() || searchParams.get('business_id') || '',
+    [searchParams]
+  )
+
+  const loadGroups = useCallback(async () => {
     setLoading(true)
-    setError(null)
+    setError('')
 
     try {
       const {
@@ -34,91 +61,98 @@ export default function GroupsPage() {
         return
       }
 
-      const bizId = getCurrentBusinessId()
-
-      if (!bizId) {
+      if (!businessId) {
         router.push('/dashboard')
         return
       }
 
-      const { data: bizData, error: bizError } = await supabase
+      const { data: business, error: businessError } = await supabase
         .from('businesses')
         .select('id, name, sector, plan')
-        .eq('id', bizId)
+        .eq('id', businessId)
         .single()
 
-      if (bizError || !bizData) {
+      if (businessError || !business) {
         router.push('/onboarding')
         return
       }
 
-      setBusiness(bizData)
-      setBusinessName(bizData.name || '')
-      setSector(bizData.sector || '')
-      setPlan(bizData.plan || 'free')
+      const nextSector = business.sector || ''
+      const nextPlan = business.plan || 'free'
+      const allowed =
+        nextSector === 'Fashion & Custom Wear' &&
+        isFeatureAvailable(nextPlan, 'groups')
 
-      const isFashion = bizData.sector === 'Fashion & Custom Wear'
-      const groupsAllowed = isFeatureAvailable(
-        bizData.plan || 'free',
-        'groups'
-      )
-      const canUse = isFashion && groupsAllowed
+      setSector(nextSector)
+      setPlan(nextPlan)
+      setCanUseGroups(allowed)
+      setMemberLimit(getPlanLimits(nextPlan).maxGroupMembers || 0)
 
-      setCanUseGroups(canUse)
-
-      if (!canUse) {
-        setLoading(false)
+      if (!allowed) {
+        setGroups([])
         return
       }
 
-      const limits = getPlanLimits(bizData.plan || 'free')
-      setMemberLimit(limits.maxGroupMembers || 0)
-
-      const { data: groupsData, error: groupsError } = await supabase
+      const { data: groupRows, error: groupError } = await supabase
         .from('group_orders')
         .select(`
-          *,
-          coordinator:coordinator_customer_id (
-            name,
-            phone
-          )
+          id,
+          business_id,
+          group_name,
+          coordinator_customer_id,
+          due_date,
+          status,
+          created_at,
+          updated_at,
+          coordinator:coordinator_customer_id (name, phone)
         `)
-        .eq('business_id', bizId)
+        .eq('business_id', businessId)
         .order('created_at', { ascending: false })
-
-      if (groupsError) {
-        throw groupsError
-      }
+            if (groupError) throw groupError
 
       const groupsWithStats = await Promise.all(
-        (groupsData || []).map(async (group) => {
+        (groupRows || []).map(async (group) => {
           const { data: orders, error: ordersError } = await supabase
             .from('orders')
-            .select('price, amount_paid, current_status')
+            .select('id, price, amount_paid, current_status')
             .eq('group_order_id', group.id)
 
           if (ordersError) {
+            console.error(
+              `Failed to load orders for group ${group.id}:`,
+              ordersError
+            )
+
             return {
               ...group,
               memberCount: 0,
               totalBalance: 0,
               deliveredCount: 0,
+              totalOrderValue: 0,
             }
           }
 
-          const memberCount = orders.length
+          const rows = orders || []
 
-          const totalBalance = orders.reduce(
+          const memberCount = rows.length
+
+          const totalBalance = rows.reduce(
             (sum, order) =>
               sum +
               Math.max(
                 0,
-                (order.price || 0) - (order.amount_paid || 0)
+                Number(order.price || 0) -
+                  Number(order.amount_paid || 0)
               ),
             0
           )
 
-          const deliveredCount = orders.filter(
+          const totalOrderValue = rows.reduce(
+            (sum, order) => sum + Number(order.price || 0),
+            0
+          )
+
+          const deliveredCount = rows.filter(
             (order) => order.current_status === 'Delivered'
           ).length
 
@@ -127,239 +161,743 @@ export default function GroupsPage() {
             memberCount,
             totalBalance,
             deliveredCount,
+            totalOrderValue,
           }
         })
       )
 
       setGroups(groupsWithStats)
-    } catch (err) {
-      console.error('Error loading groups:', err)
-      setError('Failed to load groups.')
+    } catch (loadError) {
+      console.error('Error loading groups:', loadError)
+      setError('We could not load your groups. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [businessId, router])
 
   useEffect(() => {
     loadGroups()
-  }, [router, searchParams])
+  }, [loadGroups])
 
-  const handleDelete = async (groupId) => {
-    if (
-      !confirm(
-        'Delete this group? All linked orders will be unassigned.'
-      )
-    ) {
-      return
-    }
+  const handleDelete = async (group) => {
+    const confirmed = window.confirm(
+      `Delete "${group.group_name}"?\n\nLinked orders will remain in your system but will no longer belong to this group.`
+    )
+
+    if (!confirmed) return
+
+    setDeletingId(group.id)
 
     try {
-      await supabase
+      const { error: unlinkError } = await supabase
         .from('orders')
         .update({ group_order_id: null })
-        .eq('group_order_id', groupId)
-            const { error } = await supabase
+        .eq('group_order_id', group.id)
+
+      if (unlinkError) throw unlinkError
+
+      const { error: deleteError } = await supabase
         .from('group_orders')
         .delete()
-        .eq('id', groupId)
+        .eq('id', group.id)
+        .eq('business_id', businessId)
 
-      if (error) {
-        throw error
-      }
+      if (deleteError) throw deleteError
 
-      await loadGroups()
-    } catch (err) {
-      console.error('Error deleting group:', err)
-      alert('Failed to delete group.')
+      setGroups((current) =>
+        current.filter((item) => item.id !== group.id)
+      )
+    } catch (deleteError) {
+      console.error('Error deleting group:', deleteError)
+      window.alert(
+        'We could not delete this group. Please try again.'
+      )
+    } finally {
+      setDeletingId(null)
     }
   }
+
+  const filteredGroups = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return groups.filter((group) => {
+      const matchesSearch =
+        !query ||
+        group.group_name?.toLowerCase().includes(query) ||
+        group.coordinator?.name?.toLowerCase().includes(query) ||
+        group.coordinator?.phone?.toLowerCase().includes(query)
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (group.status || 'pending').toLowerCase() === statusFilter
+
+      return matchesSearch && matchesStatus
+    })
+  }, [groups, search, statusFilter])
+
+  const stats = useMemo(() => {
+    const totalGroups = groups.length
+
+    const totalMembers = groups.reduce(
+      (sum, group) => sum + group.memberCount,
+      0
+    )
+
+    const totalBalance = groups.reduce(
+      (sum, group) => sum + group.totalBalance,
+      0
+    )
+
+    const totalOrders = groups.reduce(
+      (sum, group) => sum + group.memberCount,
+      0
+    )
+
+    const totalDelivered = groups.reduce(
+      (sum, group) => sum + group.deliveredCount,
+      0
+    )
+
+    const progress =
+      totalOrders > 0
+        ? Math.round((totalDelivered / totalOrders) * 100)
+        : 0
+
+    return {
+      totalGroups,
+      totalMembers,
+      totalBalance,
+      totalOrders,
+      totalDelivered,
+      progress,
+    }
+  }, [groups])
+
+  const isAtMemberLimit =
+    memberLimit > 0 && stats.totalMembers >= memberLimit
 
   if (loading) {
     return (
-      <div
-        style={{
-          padding: '1.5rem',
-          maxWidth: '1200px',
-          margin: '0 auto',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: '1rem',
-          }}
-        >
-          <div
-            style={{
-              width: '140px',
-              height: '24px',
-              background: 'var(--color-border)',
-              borderRadius: '6px',
-            }}
-          />
-
-          <div
-            style={{
-              width: '100px',
-              height: '32px',
-              background: 'var(--color-border)',
-              borderRadius: '6px',
-            }}
-          />
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns:
-              'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '1rem',
-          }}
-        >
-          {[1, 2, 3].map((item) => (
-            <div
-              key={item}
-              style={{
-                background: 'var(--color-card)',
-                padding: '1rem',
-                borderRadius: '8px',
-                boxShadow: 'var(--shadow-sm)',
-                animation: 'pulse 1.5s infinite',
-              }}
-            >
-              <div
-                style={{
-                  width: '60%',
-                  height: '16px',
-                  background: 'var(--color-border)',
-                  borderRadius: '6px',
-                }}
-              />
-
-              <div
-                style={{
-                  width: '40%',
-                  height: '12px',
-                  background: 'var(--color-border)',
-                  borderRadius: '6px',
-                  marginTop: '0.5rem',
-                }}
-              />
-
-              <div
-                style={{
-                  width: '30%',
-                  height: '12px',
-                  background: 'var(--color-border)',
-                  borderRadius: '6px',
-                  marginTop: '0.5rem',
-                }}
-              />
-            </div>
-          ))}
-        </div>
-
+      <div className="groups-page">
         <style>{`
-          @keyframes pulse {
-            0% {
-              opacity: 0.6;
+          .groups-page {
+            min-height: 100%;
+            padding: 28px;
+            background: var(--color-bg);
+            color: var(--color-text);
+          }
+
+          .groups-shell {
+            max-width: 1180px;
+            margin: 0 auto;
+          }
+
+          .skeleton {
+            background: var(--color-border);
+            border-radius: 10px;
+            animation: groupPulse 1.3s ease-in-out infinite;
+          }
+
+          .skeleton-header {
+            height: 34px;
+            width: 230px;
+            margin-bottom: 10px;
+          }
+
+          .skeleton-subtitle {
+            height: 14px;
+            width: 330px;
+            margin-bottom: 28px;
+          }
+
+          .skeleton-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 22px;
+          }
+
+          .skeleton-stat {
+            height: 96px;
+          }
+
+          .skeleton-toolbar {
+            height: 58px;
+            margin-bottom: 18px;
+          }
+
+          .skeleton-card {
+            height: 190px;
+            margin-bottom: 14px;
+          }
+
+          @keyframes groupPulse {
+            0%, 100% { opacity: .35; }
+            50% { opacity: .7; }
+          }
+
+          @media (max-width: 760px) {
+            .groups-page {
+              padding: 18px 14px;
             }
 
-            50% {
-              opacity: 1;
-            }
-
-            100% {
-              opacity: 0.6;
+            .skeleton-stats {
+              grid-template-columns: repeat(2, 1fr);
             }
           }
         `}</style>
+
+        <div className="groups-shell">
+          <div className="skeleton skeleton-header" />
+          <div className="skeleton skeleton-subtitle" />
+
+          <div className="skeleton-stats">
+            <div className="skeleton skeleton-stat" />
+            <div className="skeleton skeleton-stat" />
+            <div className="skeleton skeleton-stat" />
+            <div className="skeleton skeleton-stat" />
+          </div>
+
+          <div className="skeleton skeleton-toolbar" />
+
+          <div className="skeleton skeleton-card" />
+          <div className="skeleton skeleton-card" />
+          <div className="skeleton skeleton-card" />
+        </div>
       </div>
     )
-  }
-
+}
   if (!canUseGroups) {
     const isFashion = sector === 'Fashion & Custom Wear'
 
-    const reason = !isFashion
-      ? 'Group orders are only available for Fashion businesses.'
-      : 'Your current plan does not support group orders.'
-
     return (
-      <div
-        style={{
-          padding: '1.5rem',
-          maxWidth: '1200px',
-          margin: '0 auto',
-          textAlign: 'center',
-        }}
-      >
-        <div
-          style={{
-            padding: '3rem 2rem',
-            background: 'var(--color-card)',
-            borderRadius: '16px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '3rem',
-              display: 'block',
-              marginBottom: '0.5rem',
-            }}
-          >
-            👥
-          </span>
+      <div className="groups-page">
+        <style>{`
+          .groups-page {
+            min-height: 100%;
+            padding: 28px;
+            background: var(--color-bg);
+            color: var(--color-text);
+          }
 
-          <h2
-            style={{
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: '0 0 0.5rem',
-            }}
-          >
-            Group Orders
-          </h2>
+          .groups-shell {
+            max-width: 1180px;
+            margin: 0 auto;
+          }
 
-          <p
-            style={{
-              color: 'var(--color-text-muted)',
-              margin: '0 0 1rem',
-            }}
-          >
-            {reason}
-          </p>
+          .access-card {
+            max-width: 620px;
+            margin: 70px auto;
+            padding: 42px 30px;
+            text-align: center;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 18px;
+            box-shadow: var(--shadow-sm);
+          }
 
-          {!isFashion ? (
-            <p
-              style={{
-                fontSize: '0.9rem',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              This feature is exclusively for{' '}
-              <strong>Fashion & Custom Wear</strong> businesses.
+          .access-icon {
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 18px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            background: rgba(216, 178, 76, .12);
+            color: var(--color-accent);
+            font-size: 28px;
+          }
+
+          .access-card h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            font-weight: 700;
+          }
+
+          .access-card p {
+            margin: 0 auto 22px;
+            max-width: 480px;
+            color: var(--color-text-muted);
+            line-height: 1.6;
+            font-size: 13px;
+          }
+
+          .access-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 18px;
+            border-radius: 9px;
+            background: var(--color-accent);
+            color: #fff;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 700;
+          }
+
+          .groups-topbar {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 24px;
+          }
+
+          .groups-heading {
+            min-width: 0;
+          }
+
+          .eyebrow {
+            margin: 0 0 7px;
+            color: var(--color-accent);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+          }
+
+          .groups-heading h1 {
+            margin: 0;
+            font-size: clamp(24px, 4vw, 32px);
+            line-height: 1.1;
+            font-weight: 750;
+            letter-spacing: -.02em;
+          }
+
+          .groups-heading p {
+            margin: 8px 0 0;
+            color: var(--color-text-muted);
+            font-size: 13px;
+          }
+
+          .primary-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            min-height: 42px;
+            padding: 0 16px;
+            border: 0;
+            border-radius: 9px;
+            background: var(--color-accent);
+            color: #fff;
+            text-decoration: none;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+          }
+
+          .primary-button:hover {
+            filter: brightness(.96);
+          }
+
+          .primary-button.disabled {
+            opacity: .55;
+            pointer-events: none;
+          }
+
+          .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+          }
+
+          .stat-card {
+            padding: 16px;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 13px;
+          }
+
+          .stat-label {
+            margin-bottom: 8px;
+            color: var(--color-text-muted);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+          }
+
+          .stat-value {
+            font-size: 22px;
+            line-height: 1;
+            font-weight: 750;
+          }
+
+          .stat-note {
+            margin-top: 7px;
+            color: var(--color-text-muted);
+            font-size: 11px;
+          }
+
+          .progress-track {
+            width: 100%;
+            height: 7px;
+            overflow: hidden;
+            border-radius: 99px;
+            background: var(--color-bg);
+          }
+
+          .progress-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: var(--color-success);
+            transition: width .25s ease;
+          }
+
+          .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding: 10px;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+          }
+
+          .search-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 180px;
+          }
+
+          .search-wrap input {
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 38px;
+            padding: 0 12px 0 36px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            background: var(--color-bg);
+            color: var(--color-text);
+            outline: none;
+            font: inherit;
+            font-size: 12px;
+          }
+
+          .search-wrap input:focus {
+            border-color: var(--color-accent);
+          }
+
+          .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-text-muted);
+            pointer-events: none;
+          }
+
+          .filter-wrap {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+          }
+
+          .filter-button {
+            min-height: 36px;
+            padding: 0 11px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            background: var(--color-bg);
+            color: var(--color-text-muted);
+            font: inherit;
+            font-size: 11px;
+            font-weight: 650;
+            cursor: pointer;
+          }
+
+          .filter-button.active {
+            border-color: var(--color-accent);
+            background: rgba(216, 178, 76, .10);
+            color: var(--color-text);
+          }
+
+          .results-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: var(--color-text-muted);
+            font-size: 11px;
+          }
+
+          .group-list {
+            display: grid;
+            gap: 12px;
+          }
+
+          .group-card {
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 15px;
+            overflow: hidden;
+            transition: border-color .18s ease, box-shadow .18s ease;
+          }
+
+          .group-card:hover {
+            border-color: rgba(216, 178, 76, .45);
+            box-shadow: var(--shadow-sm);
+          }
+
+          .group-card-main {
+            padding: 17px;
+          }
+
+          .group-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+          }
+
+          .group-title-wrap {
+            min-width: 0;
+          }
+
+          .group-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 720;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+          }
+
+          .group-coordinator {
+            margin-top: 5px;
+            color: var(--color-text-muted);
+            font-size: 11px;
+          }
+
+          .status-badge {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            min-height: 25px;
+            padding: 0 9px;
+            border-radius: 99px;
+            background: rgba(216, 178, 76, .13);
+            color: var(--color-accent);
+            font-size: 10px;
+            font-weight: 800;
+          }
+
+          .status-badge.completed {
+            background: rgba(52, 168, 83, .12);
+            color: var(--color-success);
+          }
+
+          .group-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+          }
+
+          .meta-item {
+            min-width: 0;
+          }
+
+          .meta-label {
+            margin-bottom: 3px;
+            color: var(--color-text-muted);
+            font-size: 9px;
+            font-weight: 750;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+          }
+
+          .meta-value {
+            color: var(--color-text);
+            font-size: 12px;
+            font-weight: 650;
+            overflow-wrap: anywhere;
+          }
+
+          .meta-value.owed {
+            color: var(--color-danger);
+          }
+
+          .meta-value.paid {
+            color: var(--color-success);
+          }
+
+          .group-progress {
+            margin-top: 15px;
+          }
+
+          .group-progress-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+            color: var(--color-text-muted);
+            font-size: 10px;
+          }
+
+          .group-actions {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 16px;
+            padding-top: 13px;
+            border-top: 1px solid var(--color-border);
+          }
+
+          .action-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 31px;
+            padding: 0 10px;
+            border: 1px solid var(--color-border);
+            border-radius: 7px;
+            background: var(--color-bg);
+            color: var(--color-text);
+            text-decoration: none;
+            font: inherit;
+            font-size: 10px;
+            font-weight: 650;
+            cursor: pointer;
+          }
+
+          .action-button:hover {
+            border-color: var(--color-accent);
+          }
+
+          .action-button.danger {
+            color: var(--color-danger);
+          }
+
+          .action-button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+          }
+
+          .empty-state {
+            padding: 60px 25px;
+            text-align: center;
+            background: var(--color-card);
+            border: 1px dashed var(--color-border);
+            border-radius: 15px;
+          }
+
+          .empty-icon {
+            width: 54px;
+            height: 54px;
+            margin: 0 auto 15px;
+            display: grid;
+            place-items: center;
+            border-radius: 15px;
+            background: var(--color-bg);
+            color: var(--color-text-muted);
+            font-size: 25px;
+          }
+
+          .empty-state h2 {
+            margin: 0 0 7px;
+            font-size: 17px;
+          }
+
+          .empty-state p {
+            max-width: 430px;
+            margin: 0 auto 19px;
+            color: var(--color-text-muted);
+            font-size: 12px;
+            line-height: 1.6;
+          }
+
+          .error-state {
+            padding: 35px 20px;
+            text-align: center;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 15px;
+          }
+
+          .error-state h2 {
+            margin: 0 0 7px;
+            font-size: 17px;
+          }
+
+          .error-state p {
+            margin: 0 0 18px;
+            color: var(--color-text-muted);
+            font-size: 12px;
+          }
+
+          @media (max-width: 820px) {
+            .stats-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .groups-topbar {
+              align-items: stretch;
+              flex-direction: column;
+            }
+
+            .primary-button {
+              align-self: flex-start;
+            }
+          }
+
+          @media (max-width: 620px) {
+            .groups-page {
+              padding: 18px 13px 30px;
+            }
+
+            .toolbar {
+              align-items: stretch;
+              flex-direction: column;
+            }
+
+            .search-wrap {
+              width: 100%;
+            }
+
+            .filter-wrap {
+              width: 100%;
+            }
+
+            .filter-button {
+              flex: 1;
+            }
+
+            .group-meta {
+              grid-template-columns: 1fr 1fr;
+            }
+
+            .group-meta .meta-item:last-child {
+              grid-column: 1 / -1;
+            }
+          }
+        `}</style>
+
+        <div className="groups-shell">
+          <div className="access-card">
+            <div className="access-icon">👥</div>
+            <h1>Group Orders</h1>
+            <p>
+              {!isFashion
+                ? 'Group orders are currently available only to Fashion & Custom Wear businesses.'
+                : `Your ${plan} plan does not include group orders. Upgrade your plan to manage groups and their members.`}
             </p>
-          ) : (
-            <a
-              href={`/dashboard/subscription?business_id=${
-                getCurrentBusinessId() || ''
-              }`}
-              style={{
-                display: 'inline-block',
-                padding: '0.6rem 1.5rem',
-                background: 'var(--color-accent)',
-                color: '#fff',
-                borderRadius: '6px',
-                textDecoration: 'none',
-                fontWeight: '600',
-              }}
-            >
-              Upgrade to Starter or Pro
-            </a>
-          )}
+
+            {isFashion && (
+              <Link
+                href={`/dashboard/subscription?business_id=${businessId}`}
+                className="access-button"
+              >
+                Upgrade plan
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -367,571 +905,461 @@ export default function GroupsPage() {
 
   if (error) {
     return (
-      <div
-        style={{
-          padding: '1.5rem',
-          maxWidth: '1200px',
-          margin: '0 auto',
-          textAlign: 'center',
-        }}
-      >
-        <div
-          style={{
-            background: 'var(--color-card)',
-            padding: '2rem',
-            borderRadius: '12px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <p style={{ color: 'var(--color-danger)' }}>
-            {error}
-          </p>
+      <div className="groups-page">
+        <style>{`
+          .groups-page {
+            min-height: 100%;
+            padding: 28px;
+            background: var(--color-bg);
+            color: var(--color-text);
+          }
 
-          <button
-            onClick={loadGroups}
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem 1.5rem',
-              background: 'var(--color-accent)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-            }}
-          >
-            Retry
-          </button>
+          .groups-shell {
+            max-width: 1180px;
+            margin: 0 auto;
+          }
+
+          .error-state {
+            max-width: 560px;
+            margin: 70px auto;
+            padding: 40px 25px;
+            text-align: center;
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 16px;
+          }
+
+          .error-state h1 {
+            margin: 0 0 8px;
+            font-size: 20px;
+          }
+
+          .error-state p {
+            margin: 0 0 20px;
+            color: var(--color-text-muted);
+            font-size: 13px;
+          }
+
+          .retry-button {
+            min-height: 40px;
+            padding: 0 17px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--color-accent);
+            color: #fff;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+          }
+        `}</style>
+
+        <div className="groups-shell">
+          <div className="error-state">
+            <h1>Unable to load groups</h1>
+            <p>{error}</p>
+            <button
+              type="button"
+              className="retry-button"
+              onClick={loadGroups}
+            >
+              Try again
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
-  const totalGroups = groups.length
-
-  const totalMembers = groups.reduce(
-    (sum, group) => sum + group.memberCount,
-    0
-  )
-
-  const totalBalance = groups.reduce(
-    (sum, group) => sum + group.totalBalance,
-    0
-  )
-
-  const totalDelivered = groups.reduce(
-    (sum, group) => sum + group.deliveredCount,
-    0
-  )
-
-  const totalOrders = groups.reduce(
-    (sum, group) => sum + group.memberCount,
-    0
-  )
-
-  const progress =
-    totalOrders > 0
-      ? Math.round((totalDelivered / totalOrders) * 100)
-      : 0
-
   return (
-    <div
-      style={{
-        padding: '1.5rem',
-        maxWidth: '1200px',
-        margin: '0 auto',
-        color: 'var(--color-text)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          marginBottom: '1rem',
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              margin: 0,
-              color: 'var(--color-text)',
-            }}
-          >
-            Group Orders
-          </h1>
-
-          <p
-            style={{
-              color: 'var(--color-text-muted)',
-              margin: '0.1rem 0 0',
-              fontSize: '0.85rem',
-            }}
-          >
-            {totalGroups} group
-            {totalGroups !== 1 ? 's' : ''} · {totalMembers}{' '}
-            members · ₦{totalBalance.toLocaleString()} total owed
-          </p>
-        </div>
-
-        <a
-          href={`/dashboard/groups/new?business_id=${
-            getCurrentBusinessId() || ''
-          }`}
-          style={{
-            padding: '0.4rem 1rem',
-            background: 'var(--color-accent)',
-            color: '#fff',
-            borderRadius: '6px',
-            fontWeight: '500',
-            fontSize: '0.85rem',
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.3rem',
-          }}
-        >
-          <Icon name="plus" size={14} stroke="#fff" />
-          New Group
-        </a>
-      </div>
-
-      {/* ─── Stats bar ─── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns:
-            'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: '0.5rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div
-          style={{
-            background: 'var(--color-card)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.65rem',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase',
-            }}
-          >
-            Groups
+    <div className="groups-page">
+      <div className="groups-shell">
+        <header className="groups-topbar">
+          <div className="groups-heading">
+            <div className="eyebrow">Orders management</div>
+            <h1>Group Orders</h1>
+            <p>
+              Manage group orders, members, payments and delivery progress.
+            </p>
           </div>
 
-          <div
-            style={{
-              fontWeight: '700',
-              fontSize: '1.1rem',
-            }}
+          <Link
+            href={`/dashboard/groups/new?business_id=${businessId}`}
+            className={`primary-button${isAtMemberLimit ? ' disabled' : ''}`}
           >
-            {totalGroups}
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: 'var(--color-card)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.65rem',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase',
-            }}
-          >
-            Members
+            <Icon name="plus" size={15} stroke="#fff" />
+            New group
+          </Link>
+        </header>
+        <section className="stats-grid" aria-label="Group order summary">
+          <div className="stat-card">
+            <div className="stat-label">Groups</div>
+            <div className="stat-value">{stats.totalGroups}</div>
+            <div className="stat-note">
+              {filteredGroups.length} currently shown
+            </div>
           </div>
 
-          <div
-            style={{
-              fontWeight: '700',
-              fontSize: '1.1rem',
-            }}
-          >
-            {totalMembers}
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: 'var(--color-card)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.65rem',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase',
-            }}
-          >
-            Owed
+          <div className="stat-card">
+            <div className="stat-label">Members</div>
+            <div className="stat-value">{stats.totalMembers}</div>
+            <div className="stat-note">
+              {memberLimit > 0
+                ? `${Math.max(0, memberLimit - stats.totalMembers)} member slots left`
+                : 'No member limit shown'}
+            </div>
           </div>
 
-          <div
-            style={{
-              fontWeight: '700',
-              fontSize: '1.1rem',
-              color:
-                totalBalance > 0
-                  ? 'var(--color-danger)'
-                  : 'var(--color-success)',
-            }}
-          >
-            ₦{totalBalance.toLocaleString()}
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: 'var(--color-card)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.65rem',
-              color: 'var(--color-text-muted)',
-              textTransform: 'uppercase',
-            }}
-          >
-            Progress
+          <div className="stat-card">
+            <div className="stat-label">Outstanding</div>
+            <div
+              className="stat-value"
+              style={{
+                color:
+                  stats.totalBalance > 0
+                    ? 'var(--color-danger)'
+                    : 'var(--color-success)',
+              }}
+            >
+              {formatMoney(stats.totalBalance)}
+            </div>
+            <div className="stat-note">Balance still owed</div>
           </div>
 
+          <div className="stat-card">
+            <div className="stat-label">Delivery progress</div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                marginBottom: '8px',
+              }}
+            >
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${stats.progress}%` }}
+                />
+              </div>
+
+              <strong
+                style={{
+                  fontSize: '13px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {stats.progress}%
+              </strong>
+            </div>
+
+            <div className="stat-note">
+              {stats.totalDelivered} of {stats.totalOrders} orders delivered
+            </div>
+          </div>
+        </section>
+
+        {isAtMemberLimit && (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.3rem',
+              justifyContent: 'space-between',
+              gap: '15px',
+              marginBottom: '18px',
+              padding: '11px 14px',
+              border: '1px solid rgba(216, 178, 76, .35)',
+              borderRadius: '10px',
+              background: 'rgba(216, 178, 76, .08)',
             }}
           >
-            <div
-              style={{
-                flex: 1,
-                height: '6px',
-                background: 'var(--color-bg)',
-                borderRadius: '4px',
-              }}
-            >
+            <div>
               <div
                 style={{
-                  width: `${progress}%`,
-                  height: '100%',
-                  background: 'var(--color-success)',
-                  borderRadius: '4px',
-                }}
-              />
-            </div>
-
-            <span
-              style={{
-                fontWeight: '600',
-                fontSize: '0.9rem',
-              }}
-            >
-              {progress}%
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Groups List ─── */}
-      {groups.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '3rem 2rem',
-            background: 'var(--color-card)',
-            borderRadius: '12px',
-            border: '1px dashed var(--color-border)',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '3rem',
-              display: 'block',
-              marginBottom: '0.5rem',
-            }}
-          >
-            👥
-          </span>
-
-          <h3
-            style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              margin: '0 0 0.3rem',
-            }}
-          >
-            No groups yet
-          </h3>
-
-          <p
-            style={{
-              color: 'var(--color-text-muted)',
-              margin: '0 0 1rem',
-            }}
-          >
-            Create your first group to manage Aso-Ebi or bulk orders.
-          </p>
-
-          <a
-            href={`/dashboard/groups/new?business_id=${
-              getCurrentBusinessId() || ''
-            }`}
-            style={{
-              display: 'inline-block',
-              padding: '0.6rem 1.5rem',
-              background: 'var(--color-accent)',
-              color: '#fff',
-              borderRadius: '6px',
-              textDecoration: 'none',
-              fontWeight: '600',
-            }}
-          >
-            Create Group
-          </a>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns:
-              'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '1rem',
-          }}
-        >
-          {groups.map((group) => {
-            const groupProgress =
-              group.memberCount > 0
-                ? Math.round(
-                    (group.deliveredCount /
-                      group.memberCount) *
-                      100
-                  )
-                : 0
-
-            const isOverdue =
-              group.due_date &&
-              new Date(group.due_date) < new Date()
-
-            return (
-              <div
-                key={group.id}
-                style={{
-                  background: 'var(--color-card)',
-                  borderRadius: '12px',
-                  padding: '1rem',
-                  border: '1px solid var(--color-border)',
-                  boxShadow: 'var(--shadow-sm)',
-                  transition: 'box-shadow 0.2s',
-                  display: 'flex',
-                  flexDirection: 'column',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  marginBottom: '2px',
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: '600',
-                      fontSize: '1rem',
-                      color: 'var(--color-text)',
-                    }}
-                  >
-                    {group.group_name}
-                  </div>
-
-                  <span
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: '600',
-                      padding: '0.1rem 0.6rem',
-                      borderRadius: '12px',
-                      background:
-                        group.status === 'completed'
-                          ? 'var(--color-success)'
-                          : 'var(--color-accent)',
-                      color: '#fff',
-                    }}
-                  >
-                    {group.status === 'completed'
-                      ? 'Completed'
-                      : 'Active'}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--color-text-muted)',
-                    marginTop: '0.2rem',
-                  }}
-                >
-                  {group.coordinator?.name
-                    ? `Coordinator: ${group.coordinator.name}`
-                    : 'No coordinator'}
-                </div>
-
-                {group.due_date && (
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: isOverdue
-                        ? 'var(--color-danger)'
-                        : 'var(--color-text-muted)',
-                      marginTop: '0.2rem',
-                    }}
-                  >
-                    Due:{' '}
-                    {new Date(
-                      group.due_date
-                    ).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                    {isOverdue && ' ⚠️ Overdue'}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginTop: '0.3rem',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--color-text-muted)',
-                    }}
-                  >
-                    {group.memberCount} members
-                  </span>
-
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      fontWeight: '500',
-                      color:
-                        group.totalBalance > 0
-                          ? 'var(--color-danger)'
-                          : 'var(--color-success)',
-                    }}
-                  >
-                    ₦{group.totalBalance.toLocaleString()}{' '}
-                    {group.totalBalance > 0
-                      ? 'owed'
-                      : '✓ paid'}
-                  </span>
-                </div>
-
-                           <div
-                  style={{
-                    marginTop: '0.3rem',
-                    height: '4px',
-                    background: 'var(--color-bg)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${groupProgress}%`,
-                      height: '100%',
-                      background: 'var(--color-success)',
-                      borderRadius: '4px',
-                    }}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    marginTop: '0.8rem',
-                    display: 'flex',
-                    gap: '0.5rem',
-                    flexWrap: 'wrap',
-                    borderTop:
-                      '1px solid var(--color-border)',
-                    paddingTop: '0.5rem',
-                  }}
-                >
-                  <a
-                    href={`/dashboard/groups/${group.id}?business_id=${
-                      getCurrentBusinessId() || ''
-                    }`}
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--color-text-muted)',
-                      textDecoration: 'none',
-                      border:
-                        '1px solid var(--color-border)',
-                      padding: '0.1rem 0.6rem',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    View
-                  </a>
-
-                  <a
-                    href={`/dashboard/groups/${group.id}/edit?business_id=${
-                      getCurrentBusinessId() || ''
-                    }`}
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--color-text-muted)',
-                      textDecoration: 'none',
-                      border:
-                        '1px solid var(--color-border)',
-                      padding: '0.1rem 0.6rem',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    Edit
-                  </a>
-
-                  <button
-                    onClick={() => handleDelete(group.id)}
-                    style={{
-                      fontSize: '0.7rem',
-                      color: 'var(--color-danger)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '0.1rem 0.6rem',
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
+                Group member limit reached
               </div>
-            )
-          })}
+
+              <div
+                style={{
+                  color: 'var(--color-text-muted)',
+                  fontSize: '11px',
+                  lineHeight: 1.5,
+                }}
+              >
+                Your current plan allows up to {memberLimit} group members.
+              </div>
+            </div>
+
+            <Link
+              href={`/dashboard/subscription?business_id=${businessId}`}
+              className="action-button"
+            >
+              Upgrade
+            </Link>
+          </div>
+        )}
+
+        <section className="toolbar">
+          <div className="search-wrap">
+            <span className="search-icon">
+              <Icon
+                name="search"
+                size={15}
+                stroke="currentColor"
+              />
+            </span>
+
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search groups or coordinators..."
+              aria-label="Search groups"
+            />
+          </div>
+
+          <div className="filter-wrap">
+            {[
+              ['all', 'All'],
+              ['pending', 'Pending'],
+              ['active', 'Active'],
+              ['completed', 'Completed'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`filter-button${
+                  statusFilter === value ? ' active' : ''
+                }`}
+                onClick={() => setStatusFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="results-row">
+          <span>
+            {filteredGroups.length}{' '}
+            {filteredGroups.length === 1 ? 'group' : 'groups'}
+          </span>
+
+          {(search || statusFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('')
+                setStatusFilter('all')
+              }}
+              style={{
+                border: 0,
+                padding: 0,
+                background: 'transparent',
+                color: 'var(--color-accent)',
+                font: 'inherit',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+              }}
+            >
+              Clear filters
+            </button>
+          )}
         </div>
-      )}
+
+        {filteredGroups.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">👥</div>
+
+            {groups.length === 0 ? (
+              <>
+                <h2>No groups yet</h2>
+                <p>
+                  Create your first group to organise Aso-Ebi,
+                  coordinated orders or other bulk customer orders.
+                </p>
+
+                <Link
+                  href={`/dashboard/groups/new?business_id=${businessId}`}
+                  className="primary-button"
+                >
+                  <Icon name="plus" size={15} stroke="#fff" />
+                  Create first group
+                </Link>
+              </>
+            ) : (
+              <>
+                <h2>No matching groups</h2>
+                <p>
+                  Try another search term or change the status filter
+                  to find the group you are looking for.
+                </p>
+
+                <button
+                  type="button"
+                  className="action-button"
+                  onClick={() => {
+                    setSearch('')
+                    setStatusFilter('all')
+                  }}
+                >
+                  Show all groups
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="group-list">
+            {filteredGroups.map((group) => {
+              const groupProgress =
+                group.memberCount > 0
+                  ? Math.round(
+                      (group.deliveredCount / group.memberCount) * 100
+                    )
+                  : 0
+
+              const isCompleted =
+                (group.status || '').toLowerCase() === 'completed'
+
+              const isOverdue =
+                group.due_date &&
+                new Date(`${group.due_date}T23:59:59`) < new Date() &&
+                !isCompleted
+
+              return (
+                <article
+                  key={group.id}
+                  className="group-card"
+                >
+                  <div className="group-card-main">
+                    <div className="group-card-head">
+                      <div className="group-title-wrap">
+                        <h2 className="group-title">
+                          {group.group_name}
+                        </h2>
+
+                        <div className="group-coordinator">
+                          {group.coordinator?.name
+                            ? `Coordinator: ${group.coordinator.name}`
+                            : 'No coordinator assigned'}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`status-badge${
+                          isCompleted ? ' completed' : ''
+                        }`}
+                      >
+                        {getStatusLabel(group.status || 'active')}
+                      </span>
+                    </div>
+
+                    <div className="group-meta">
+                      <div className="meta-item">
+                        <div className="meta-label">
+                          Members
+                        </div>
+                        <div className="meta-value">
+                          {group.memberCount}
+                          {memberLimit > 0
+                            ? ` / ${memberLimit}`
+                            : ''}
+                        </div>
+                      </div>
+
+                      <div className="meta-item">
+                        <div className="meta-label">
+                          Outstanding
+                        </div>
+                        <div
+                          className={`meta-value ${
+                            group.totalBalance > 0
+                              ? 'owed'
+                              : 'paid'
+                          }`}
+                        >
+                          {formatMoney(group.totalBalance)}
+                        </div>
+                      </div>
+
+                      <div className="meta-item">
+                        <div className="meta-label">
+                          Due date
+                        </div>
+                        <div
+                          className="meta-value"
+                          style={{
+                            color: isOverdue
+                              ? 'var(--color-danger)'
+                              : undefined,
+                          }}
+                        >
+                          {isOverdue
+                            ? `${formatDate(group.due_date)} · Overdue`
+                            : formatDate(group.due_date)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="group-progress">
+                      <div className="group-progress-head">
+                        <span>Delivery progress</span>
+                        <span>
+                          {group.deliveredCount} /{' '}
+                          {group.memberCount} delivered
+                        </span>
+                      </div>
+
+                      <div className="progress-track">
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${groupProgress}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="group-actions">
+                      <Link
+                        href={`/dashboard/groups/${group.id}?business_id=${businessId}`}
+                        className="action-button"
+                      >
+                        View group
+                      </Link>
+
+                      <Link
+                        href={`/dashboard/groups/${group.id}/edit?business_id=${businessId}`}
+                        className="action-button"
+                      >
+                        Edit
+                      </Link>
+
+                      <button
+                        type="button"
+                        className="action-button danger"
+                        disabled={deletingId === group.id}
+                        onClick={() => handleDelete(group)}
+                      >
+                        {deletingId === group.id
+                          ? 'Deleting...'
+                          : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
