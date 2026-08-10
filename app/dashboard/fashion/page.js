@@ -2101,11 +2101,8 @@ export default function FashionDashboardPage() {
       </strong>
     </div>
   </div>
-)}
-                  </strong>
-                </div>
-              </div>
-            )}
+   )}
+
           </article>
 
           <aside className="dashboard-panel health-panel">
