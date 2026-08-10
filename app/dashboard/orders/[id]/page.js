@@ -2020,7 +2020,6 @@ export default function OrderDetailPage() {
         .progress-label.active {
           color: var(--color-primary);
         }
-      `}</style>
 
         .primary-action {
           width: 100%;
