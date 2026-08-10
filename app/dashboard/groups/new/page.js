@@ -2550,16 +2550,14 @@ export default function NewGroupPage() {
                   </label>
 
                   <input
-                    type="text"
-                    name="name"
-                    value={memberForm.name}
-                    onChange={handleMemberChange}
-                    placeholder="Full name"
-                    className="field-input"
-                    required
-                  />
-                </div>
-
+    type="text"
+    name="name"
+    value={memberForm.name}
+    onChange={handleMemberChange}
+    placeholder="Full name"
+    className="field-input"
+    required
+/>
                 <div>
                   <label className="field-label">
                     Phone number
