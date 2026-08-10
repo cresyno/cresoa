@@ -1235,3 +1235,4 @@ const styles = `
     .form-grid { grid-template-columns: 1fr; }
     .field.full { grid-column: auto; }
   }
+}
