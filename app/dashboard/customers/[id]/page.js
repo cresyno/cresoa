@@ -37,129 +37,115 @@ export default function CustomerDetailPage({ params }) {
 
   // ─── Load data ───
   useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      setError(null)
+  const load = async () => {
+    setLoading(true)
+    setError(null)
 
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-        if (!user) {
-          router.push('/login')
-          return
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const bizId = getCurrentBusinessId()
+
+      if (!bizId) {
+        router.push('/dashboard')
+        return
+      }
+
+      setBusinessId(bizId)
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      // Fetch customer via API
+      const response = await fetch(
+        `/api/customers/${params.id}?business_id=${bizId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         }
+      )
 
-        const bizId = getCurrentBusinessId()
+      const result = await response.json()
 
-        if (!bizId) {
-          router.push('/dashboard')
-          return
-        }
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load customer')
+      }
 
-        setBusinessId(bizId)
+      const customerData = result.customer
+      const ordersData = result.orders || []
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+      setCustomer(customerData)
+      setOrders(ordersData)
+      setName(customerData.name || '')
+      setPhone(customerData.phone || '')
+      setNotes(customerData.notes || '')
+      setMeasurements(customerData.measurements || {})
 
-        if (!session) {
-          router.push('/login')
-          return
-        }
+      // Get sector for measurements
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('sector')
+        .eq('id', bizId)
+        .single()
 
-        // ─── Fetch customer via API ───
-        const response = await fetch(
-          `/api/customers/${params.id}?business_id=${bizId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          }
+      if (business) {
+        setSector(business.sector)
+      }
+
+      // Calculate stats
+      if (ordersData.length > 0) {
+        const totalSpent = ordersData.reduce(
+          (sum, o) => sum + (o.amount_paid || 0),
+          0
         )
 
-        const result = await response.json()
-
-        if (!response.ok) {
-          throw new Error(
-            result.error || 'Failed to load customer'
-          )
-        }
-
-        const customerData = result.customer
-        const ordersData = result.orders || []
-
-        setCustomer(customerData)
-        setOrders(ordersData)
-        setName(customerData.name || '')
-        setPhone(customerData.phone || '')
-        setNotes(customerData.notes || '')
-        setMeasurements(customerData.measurements || {})
-
-        // ─── Get sector for measurements ───
-        const { data: business } = await supabase
-          .from('businesses')
-          .select('sector')
-          .eq('id', bizId)
-          .single()
-
-        if (business) {
-          setSector(business.sector)
-        }
-
-        // ─── Calculate stats ───
-        if (ordersData.length > 0) {
-          const totalSpent = ordersData.reduce(
-            (sum, o) => sum + (o.amount_paid || 0),
-            0
-          )
-
-          const totalPrice = ordersData.reduce(
-            (sum, o) => sum + (o.price || 0),
-            0
-          )
-
-          const totalOwing = totalPrice - totalSpent
-
-          setStats({
-            totalSpent,
-            totalPaid: totalSpent,
-            totalOwing,
-            count: ordersData.length,
-            avg: Math.round(
-              totalPrice / ordersData.length
-            ),
-          })
-        } else {
-          setStats({
-            totalSpent: 0,
-            totalPaid: 0,
-            totalOwing: 0,
-            count: 0,
-            avg: 0,
-          })
-        }
-
-      } catch (err) {
-        console.error('Error loading customer:', err)
-
-        setError(
-          err.message ||
-          'Failed to load customer details.'
+        const totalPrice = ordersData.reduce(
+          (sum, o) => sum + (o.price || 0),
+          0
         )
 
-        } finally {
-    setSaving(false)
+        const totalOwing = totalPrice - totalSpent
+
+        setStats({
+          totalSpent,
+          totalPaid: totalSpent,
+          totalOwing,
+          count: ordersData.length,
+          avg: Math.round(totalPrice / ordersData.length),
+        })
+      } else {
+        setStats({
+          totalSpent: 0,
+          totalPaid: 0,
+          totalOwing: 0,
+          count: 0,
+          avg: 0,
+        })
+      }
+    } catch (err) {
+      console.error('Error loading customer:', err)
+      setError(err.message || 'Failed to load customer details.')
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
-const handleDelete = async () => {
-
-    load()
-
-  }, [params.id, router])
-
+  load()
+}, [params.id, router])
 
   // ─── Helpers ───
 
