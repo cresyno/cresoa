@@ -349,7 +349,6 @@ const handleDelete = async () => {
     setSaving(false)
   }
 }
-
 const handleDelete = async () => {
     const confirmed = window.confirm(
       'Delete this customer and all their orders? This cannot be undone.'
