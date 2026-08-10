@@ -223,118 +223,68 @@ export default function CustomerDetailPage({ params }) {
     }
   }
 
+const handleSave = async (event) => {
+  event.preventDefault()
 
-  const handleSave = async (event) => {
-    event.preventDefault()
+  setSaving(true)
+  setMessage('')
 
-    setSaving(true)
-    setMessage('')
+  const phoneDigits = phone.replace(/\D/g, '')
 
+  if (!name.trim() || phoneDigits.length !== 11) {
+    setMessage('Please provide a name and valid 11-digit phone number.')
+    setSaving(false)
+    return
+  }
 
-    const phoneDigits = phone.replace(
-      /\D/g,
-      ''
-    )
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
-
-    if (
-      !name.trim() ||
-      phoneDigits.length !== 11
-    ) {
-      setMessage(
-        'Please provide a name and valid 11-digit phone number.'
-      )
-
-      setSaving(false)
-
+    if (!session) {
+      router.push('/login')
       return
     }
 
+    const updateData = {
+      name: name.trim(),
+      phone: phoneDigits,
+      notes: notes.trim(),
+      measurements: sector === 'Fashion & Custom Wear' ? measurements : {},
+    }
 
-    try {
+    const response = await fetch(`/api/customers/${params.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(updateData),
+    })
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+    const result = await response.json()
 
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update customer')
+    }
 
-      if (!session) {
-        router.push('/login')
-        return
-      }
+    await refreshCustomer()
 
+    setEditing(false)
+    setMessage('Customer updated successfully')
 
-      const updateData = {
-        name: name.trim(),
-        phone: phoneDigits,
-        notes: notes.trim(),
-
-        measurements:
-          sector === 'Fashion & Custom Wear'
-            ? measurements
-            : {},
-      }
-
-
-      const response = await fetch(
-        `/api/customers/${params.id}`,
-        {
-          method: 'PATCH',
-
-          headers: {
-            'Content-Type':
-              'application/json',
-
-            Authorization:
-              `Bearer ${session.access_token}`,
-          },
-
-          body: JSON.stringify(updateData),
-        }
-      )
-
-
-      const result = await response.json()
-
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-          'Failed to update customer'
-        )
-      }
-
-
-      await refreshCustomer()
-
-
-      setEditing(false)
-
-      setMessage(
-        'Customer updated successfully'
-      )
-
-
-      setTimeout(() => {
-        setMessage('')
-      }, 3000)
-
-
-    } catch (err) {
-
-      console.error(
-        'Update error:',
-        err
-      )
-
-      setMessage(
-        `Error: ${err.message}`
-      )
-
+    setTimeout(() => {
+      setMessage('')
+    }, 3000)
+  } catch (err) {
+    console.error('Update error:', err)
+    setMessage(`Error: ${err.message}`)
   } finally {
     setSaving(false)
   }
-}
+                                 }
+  
 const handleDelete = async () => {
     const confirmed = window.confirm(
       'Delete this customer and all their orders? This cannot be undone.'
