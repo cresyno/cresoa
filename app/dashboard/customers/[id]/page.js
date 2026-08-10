@@ -233,85 +233,94 @@ export default function CustomerDetailPage({ params }) {
   }
 
   const handleSave = async (event) => {
-    event.preventDefault()
+  event.preventDefault()
 
-    setSaving(true)
-    setMessage('')
+  setSaving(true)
+  setMessage('')
 
-    // Remove leading zeros for API (e.g., 09164971382 → 9164971382)
-    const phoneDigits = phone.replace(/\D/g, '').replace(/^0+/, '')
+  const phoneDigits = phone.replace(/\D/g, '')
 
-    if (!name.trim() || phoneDigits.length !== 10) {
-      setMessage(
-        'Please provide a name and valid 10-digit phone number (without leading 0).'
-      )
-      setSaving(false)
+  if (!name.trim() || phoneDigits.length !== 11) {
+    setMessage(
+      'Please provide a name and valid 11-digit phone number.'
+    )
+    setSaving(false)
+    return
+  }
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      router.push('/login')
       return
     }
 
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        router.push('/login')
-        return
-      }
-
-      const updateData = {
-        name: name.trim(),
-        phone: phoneDigits,
-        notes: notes.trim(),
-        measurements:
-          sector === 'Fashion & Custom Wear'
-            ? measurements
-            : {},
-      }
-
-      const response = await fetch(
-        `/api/customers/${params.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type':
-              'application/json',
-            Authorization:
-              `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(updateData),
-        }
-      )
-
-      // Handle empty response safely
-      const text = await response.text()
-      let result = null
-      try {
-        result = JSON.parse(text)
-      } catch (_) {
-        // Response is empty or not JSON – that's OK if status is 200
-      }
-
-      if (!response.ok) {
-        const errorMsg = result?.error || result?.message || text || 'Failed to update customer'
-        throw new Error(errorMsg)
-      }
-
-      await refreshCustomer()
-      setEditing(false)
-      setMessage('Customer updated successfully')
-      setTimeout(() => {
-        setMessage('')
-      }, 3000)
-
-    } catch (err) {
-      console.error('Update error:', err)
-      setMessage(`Error: ${err.message}`)
-    } finally {
-      setSaving(false)
+    const updateData = {
+      name: name.trim(),
+      phone: phoneDigits,
+      notes: notes.trim(),
+      measurements:
+        sector === 'Fashion & Custom Wear'
+          ? measurements
+          : {},
     }
-  }
 
+    const response = await fetch(
+      `/api/customers/${params.id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type':
+            'application/json',
+          Authorization:
+            `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(updateData),
+      }
+    )
+
+    // Handle empty response safely
+    const text = await response.text()
+    let result = null
+    try {
+      result = JSON.parse(text)
+    } catch (_) {
+      // Response is empty or not JSON – that's OK if status is 200
+    }
+
+    if (!response.ok) {
+      const errorMsg = result?.error || result?.message || text || 'Failed to update customer'
+      throw new Error(errorMsg)
+    }
+
+    await refreshCustomer()
+
+    setEditing(false)
+
+    setMessage(
+      'Customer updated successfully'
+    )
+
+    setTimeout(() => {
+      setMessage('')
+    }, 3000)
+
+  } catch (err) {
+    console.error(
+      'Update error:',
+      err
+    )
+
+    setMessage(
+      `Error: ${err.message}`
+    )
+  } finally {
+    setSaving(false)
+  }
+  }
   const handleDelete = async () => {
     const confirmed = window.confirm(
       'Delete this customer and all their orders? This cannot be undone.'
