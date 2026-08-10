@@ -171,65 +171,70 @@ export default function CustomerDetailPage({ params }) {
   }
 
   const handleSave = async (event) => {
-    event.preventDefault()
-    setSaving(true)
-    setMessage('')
+  event.preventDefault()
+  setSaving(true)
+  setMessage('')
 
-    const phoneDigits = phone.replace(/\D/g, '')
+  const phoneDigits = phone.replace(/\D/g, '')
 
-    if (!name.trim() || phoneDigits.length !== 11) {
-      setMessage('Please provide a name and valid 11-digit phone number.')
-      setSaving(false)
+  if (!name.trim() || phoneDigits.length !== 11) {
+    setMessage('Please provide a name and valid 11-digit phone number.')
+    setSaving(false)
+    return
+  }
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
       return
     }
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-        return
-      }
-
-      const updateData = {
-        name: name.trim(),
-        phone: phoneDigits,
-        notes: notes.trim(),
-        measurements: sector === 'Fashion & Custom Wear' ? measurements : {},
-      }
-
-      const response = await fetch(`/api/customers/${params.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(updateData),
-      })
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to update customer'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-        } catch (_) {
-          errorMessage = response.statusText || errorMessage
-        }
-        throw new Error(errorMessage)
-      }
-
-      // Even if response has no body, the update succeeded.
-      await refreshCustomer()
-      setEditing(false)
-      setMessage('Customer updated successfully')
-      setTimeout(() => setMessage(''), 3000)
-    } catch (err) {
-      console.error('Update error:', err)
-      setMessage(`Error: ${err.message}`)
-    } finally {
-      setSaving(false)
+    const updateData = {
+      name: name.trim(),
+      phone: phoneDigits,
+      notes: notes.trim(),
+      measurements: sector === 'Fashion & Custom Wear' ? measurements : {},
     }
-  }
 
+    const response = await fetch(`/api/customers/${params.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(updateData),
+    })
+
+    // Read the response body (it might be JSON or plain text)
+    const text = await response.text()
+    let result = null
+    try {
+      result = JSON.parse(text)
+    } catch (_) {
+      // not JSON
+    }
+
+    if (!response.ok) {
+      const errorMsg = result?.error || result?.message || text || 'Failed to update customer'
+      throw new Error(errorMsg)
+    }
+
+    await refreshCustomer()
+    setEditing(false)
+    setMessage('Customer updated successfully')
+    setTimeout(() => setMessage(''), 3000)
+
+  } catch (err) {
+    console.error('Update error:', err)
+    // Show the actual error message from the server
+    setMessage(`❌ ${err.message}`)
+    // Also show a temporary alert to help debugging (remove later)
+    alert(`Server error: ${err.message}`)
+  } finally {
+    setSaving(false)
+  }
+  }
   const handleDelete = async () => {
     const confirmed = window.confirm(
       'Delete this customer and all their orders? This cannot be undone.'
