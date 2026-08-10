@@ -1131,7 +1131,7 @@ const handleDelete = async () => {
       </div>
 
 
-      <style>{`
+      <style>{
         .stats-grid {
           display: grid;
           grid-template-columns:
@@ -1226,7 +1226,6 @@ const handleDelete = async () => {
           border-color:
             var(--color-accent);
         }
-
 
         .measurement-grid {
           display: grid;
