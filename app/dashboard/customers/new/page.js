@@ -556,34 +556,26 @@ export default function NewCustomerPage() {
                   <span>Age category</span>
 
                   <select
-                    value={form.age_category}
-                    onChange={event =>
-                      updateField(
-                        'age_category',
-                        event.target.value
-                      )
-                    }
-                  >
-                    <option value="">
-                      Not specified
-                    </option>
+  value={form.age_category}
+  onChange={event =>
+    updateField(
+      'age_category',
+      event.target.value
+    )
+  }
+>
+  <option value="">
+    Not specified
+  </option>
 
-                    <option value="Child">
-                      Child
-                    </option>
+  <option value="child">
+    Child
+  </option>
 
-                    <option value="Teen">
-                      Teen
-                    </option>
-
-                    <option value="Adult">
-                      Adult
-                    </option>
-
-                    <option value="Senior">
-                      Senior
-                    </option>
-                  </select>
+  <option value="adult">
+    Adult
+  </option>
+</select>
                 </label>
               </div>
             </section>
