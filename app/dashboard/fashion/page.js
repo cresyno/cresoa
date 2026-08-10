@@ -359,10 +359,22 @@ export default function FashionDashboardPage() {
   }
   const monthlyRevenue = getMonthlyRevenue()
   const maxRevenue = Math.max(...monthlyRevenue, 1)
+  const monthlyLabels = (() => {
+    const labels = []
+    for (let i = 5; i >= 0; i--) {
+      const m = new Date()
+      m.setMonth(m.getMonth() - i)
+      labels.push(m.toLocaleDateString('en-GB', { month: 'short' }))
+    }
+    return labels
+  })()
 
   // ─── Format currency ───
+  // Note: the ₦ glyph's double horizontal bar visually merges with the
+  // first digit at small sizes/weights, reading like a strikethrough price.
+  // A hair-space + tabular-nums keeps the symbol legibly separate from the amount.
   const formatCurrency = (amount) => {
-    return `₦${(amount || 0).toLocaleString()}`
+    return `₦\u200A${(amount || 0).toLocaleString()}`
   }
 
   // ─── Loading skeleton ───
@@ -416,7 +428,8 @@ export default function FashionDashboardPage() {
       maxWidth: '1200px', 
       margin: '0 auto', 
       color: 'var(--color-text)',
-      fontFamily: "'Inter', -apple-system, sans-serif"
+      fontFamily: "'Inter', -apple-system, sans-serif",
+      fontVariantNumeric: 'tabular-nums'
     }}>
       {/* ─── BANNER ─── */}
       <Banner />
@@ -469,7 +482,7 @@ export default function FashionDashboardPage() {
         </div>
       )}
 
-      {/* ─── BUSINESS HEALTH ─── */}
+            {/* ─── BUSINESS HEALTH ─── */}
       <div style={{
         background: '#0F2B4A',
         borderRadius: '16px',
@@ -481,7 +494,7 @@ export default function FashionDashboardPage() {
           <span style={{ fontSize: '0.7rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
             Business Health
           </span>
-          <button style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+          <button aria-label="What is Business Health?" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
             <Icon name="info" size={16} stroke="rgba(255,255,255,0.5)" />
           </button>
         </div>
@@ -505,9 +518,11 @@ export default function FashionDashboardPage() {
         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.5rem' }}>
           <div>
             <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>
-              {onTimePercentage}%
+              {deliveredCount > 0 ? `${onTimePercentage}%` : '—'}
             </div>
-            <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>On-time</div>
+            <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>
+              {deliveredCount > 0 ? 'On-time' : 'On-time (no data yet)'}
+            </div>
           </div>
           <div>
             <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{customers.length}</div>
@@ -620,7 +635,7 @@ export default function FashionDashboardPage() {
         </div>
       </div>
 
-      {/* ─── QUICK ACTIONS ─── */}
+{/* ─── QUICK ACTIONS ─── */}
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ fontSize: '0.6rem', color: '#6B6255', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.5rem' }}>
           Quick Actions
@@ -717,7 +732,7 @@ export default function FashionDashboardPage() {
         </div>
       </div>
 
-      {/* ─── REVENUE TREND ─── */}
+{/* ─── REVENUE TREND ─── */}
       <div style={{
         background: '#fff',
         borderRadius: '14px',
@@ -752,17 +767,18 @@ export default function FashionDashboardPage() {
         }}>
           {monthlyRevenue.some(r => r > 0) ? (
             monthlyRevenue.map((value, index) => (
-              <div
-                key={index}
-                style={{
-                  flex: 1,
-                  height: `${Math.max((value / maxRevenue) * 50, 4)}px`,
-                  background: index === monthlyRevenue.length - 1 ? '#D4A52A' : '#D4A52A',
-                  opacity: index === monthlyRevenue.length - 1 ? 1 : 0.4,
-                  borderRadius: '2px 2px 0 0',
-                  transition: 'height 0.3s ease'
-                }}
-              />
+              <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }} title={`${monthlyLabels[index]}: ${formatCurrency(value)}`}>
+                <div
+                  style={{
+                    width: '100%',
+                    height: `${Math.max((value / maxRevenue) * 50, 4)}px`,
+                    background: '#D4A52A',
+                    opacity: index === monthlyRevenue.length - 1 ? 1 : 0.4,
+                    borderRadius: '2px 2px 0 0',
+                    transition: 'height 0.3s ease'
+                  }}
+                />
+              </div>
             ))
           ) : (
             <div style={{ width: '100%', textAlign: 'center', color: '#C8C0B5', fontSize: '0.6rem' }}>
@@ -770,6 +786,13 @@ export default function FashionDashboardPage() {
             </div>
           )}
         </div>
+        {monthlyRevenue.some(r => r > 0) && (
+          <div style={{ display: 'flex', gap: '0.2rem', marginTop: '0.2rem' }}>
+            {monthlyLabels.map((label, i) => (
+              <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '0.55rem', color: '#B0A99C' }}>{label}</div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ─── RECENT ORDERS ─── */}
@@ -833,8 +856,9 @@ export default function FashionDashboardPage() {
                   </div>
                   <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0F2B4A', textAlign: 'right' }}>
                     {formatCurrency(o.price)}
+                    <div style={{ fontSize: '0.55rem', color: '#8A8A8A', fontWeight: '400' }}>Total</div>
                     {balance > 0 && (
-                      <div style={{ fontSize: '0.6rem', color: '#D9534F', fontWeight: '500' }}>
+                      <div style={{ fontSize: '0.6rem', color: '#D9534F', fontWeight: '500', marginTop: '0.15rem' }}>
                         {formatCurrency(balance)} due
                       </div>
                     )}
@@ -901,7 +925,7 @@ export default function FashionDashboardPage() {
         )}
       </div>
 
-      {/* ─── GROUP ORDERS ─── */}
+{/* ─── GROUP ORDERS ─── */}
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#1A1A1A' }}>Group Orders</span>
@@ -955,13 +979,13 @@ export default function FashionDashboardPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.2rem' }}>
                   <span style={{ fontSize: '0.7rem', color: '#6B6255' }}>
-                    {totalMembers} member{totalMembers !== 1 ? 's' : ''} · {formatCurrency(totalBalanceGroup)} remaining
+                    {totalMembers} member{totalMembers !== 1 ? 's' : ''} · {formatCurrency(totalBalanceGroup)} balance remaining
                   </span>
                   <span style={{ fontSize: '0.7rem', fontWeight: '600', color: '#0F2B4A' }}>
-                    {progress}%
+                    {progress}% delivered
                   </span>
                 </div>
-                <div style={{ marginTop: '0.3rem', height: '4px', background: '#F0EDE8', borderRadius: '4px' }}>
+                <div style={{ marginTop: '0.3rem', height: '4px', background: '#F0EDE8', borderRadius: '4px' }} title={`${deliveredCount} of ${totalMembers} orders delivered`}>
                   <div style={{ width: `${progress}%`, height: '100%', background: '#2E7D5E', borderRadius: '4px' }} />
                 </div>
               </div>
@@ -1011,6 +1035,7 @@ export default function FashionDashboardPage() {
       {/* ─── FAB ─── */}
       <button
         onClick={() => setShowQuickOrder(true)}
+        aria-label="Create new order"
         style={{
           position: 'fixed',
           bottom: '1.5rem',
@@ -1176,7 +1201,7 @@ export default function FashionDashboardPage() {
           }} ref={modalRef} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
               <h2 style={{ color: '#0F2B4A', fontSize: '1.1rem', margin: 0 }}>Record Payment</h2>
-              <button onClick={() => setShowSettleModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.3rem', color: '#6B6255', cursor: 'pointer' }}>
+              <button onClick={() => setShowSettleModal(false)} aria-label="Close" style={{ background: 'none', border: 'none', fontSize: '1.3rem', color: '#6B6255', cursor: 'pointer' }}>
                 <Icon name="x" size={20} stroke="#6B6255" />
               </button>
             </div>
@@ -1240,4 +1265,4 @@ export default function FashionDashboardPage() {
       `}</style>
     </div>
   )
-                                                                                     }
+                                                                                    
