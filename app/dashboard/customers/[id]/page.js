@@ -1214,7 +1214,7 @@ const handleDelete = async () => {
           border-color:
             var(--color-accent);
         }
-      `}</style>
+
 
         .measurement-grid {
           display: grid;
