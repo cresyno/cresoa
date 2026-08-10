@@ -2069,23 +2069,23 @@ export default function FashionDashboardPage() {
             </div>
 
             {selectedAnalyticsDay && (
-              <div className="selected-day">
-                <div>
-                  <span>
-                  <strong>
-                    {formatLongDate(
-                      selectedAnalyticsDay.key
-                    )}
-                  </strong>
-                </div>
+  <div className="selected-day">
+    <div>
+      <span>
+        <strong>
+          {formatLongDate(
+            selectedAnalyticsDay.key
+          )}
+        </strong>
+      </span>
+    </div>
 
-                <div>
-  <span>Orders</span>
-
-                  <strong>
-                    {selectedDayOrders}
-                  </strong>
-                </div>
+    <div>
+      <span>Orders</span>
+      <strong>
+        {selectedDayOrders}
+      </strong>
+    </div>
 
                 <div>
                   <span>
