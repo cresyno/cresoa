@@ -397,225 +397,149 @@ export default function NewGroupPage() {
     router.back()
   }
 
-  // ─────────────────────────────────────────────
-  // CREATE GROUP
-  // ─────────────────────────────────────────────
-
   const handleCreateGroup = async () => {
-    if (!businessId || !business) {
-      setError('Business information is missing.')
-      return
-    }
-
-    if (!groupName.trim()) {
-      setError('Please enter a group name.')
-      setStep(1)
-      return
-    }
-
-    if (members.length === 0) {
-      setError('Please add at least one member.')
-      setStep(2)
-      return
-    }
-
-    if (
-      maxMembers > 0 &&
-      members.length > maxMembers
-    ) {
-      setError(
-        `Your plan allows a maximum of ${maxMembers} members per group.`
-      )
-      setStep(2)
-      return
-    }
-
-    setSaving(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const {
-        data: { user }
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      // ─────────────────────────────────────────────
-      // 1. CREATE GROUP HEADER
-      // ─────────────────────────────────────────────
-
-      const { data: group, error: groupError } =
-        await supabase
-          .from('group_orders')
-          .insert({
-            business_id: businessId,
-            group_name: groupName.trim(),
-            coordinator_customer_id:
-              coordinatorId || null,
-            due_date: groupDueDate || null,
-            status: 'pending'
-          })
-          .select()
-          .single()
-
-      if (groupError) {
-        throw groupError
-      }
-
-      if (!group?.id) {
-        throw new Error(
-          'The group was created but no group ID was returned.'
-        )
-      }
-
-      // ─────────────────────────────────────────────
-      // 2. CREATE / FIND CUSTOMERS
-      // ─────────────────────────────────────────────
-
-      for (const member of members) {
-        let customerId = member.customerId || null
-
-        // Existing customer selected
-        if (!customerId) {
-          const normalizedName =
-            member.name.trim()
-
-          const normalizedPhone =
-            member.phone
-              ?.replace(/\D/g, '')
-              .trim() || ''
-
-          // Try phone first because names are not unique.
-          if (normalizedPhone) {
-            const { data: existingByPhone } =
-              await supabase
-                .from('customers')
-                .select('id')
-                .eq('business_id', businessId)
-                .eq('phone', normalizedPhone)
-                .maybeSingle()
-
-            if (existingByPhone) {
-              customerId = existingByPhone.id
-            }
-          }
-
-         // If no phone match, create a new customer
-if (!customerId) {
-  // Split the full name into first and last name
-  const nameParts = normalizedName.trim().split(/\s+/);
-  const firstName = nameParts[0] || normalizedName;
-  const lastName = nameParts.slice(1).join(' ') || firstName;
-
-  const { data: newCustomer, error: customerError } =
-    await supabase
-      .from('customers')
-      .insert({
-        business_id: businessId,
-        name: normalizedName,
-        first_name: firstName,
-        last_name: lastName,
-        phone: normalizedPhone || null
-      })
-      .select('id')
-      .single()
-
-  if (customerError) {
-    throw customerError
+  if (!businessId || !business) {
+    setError('Business information is missing.')
+    return
   }
 
-  customerId = newCustomer.id
-}
-          
-        // ─────────────────────────────────────────────
-        // 3. CREATE MEMBER ORDER
-        // ─────────────────────────────────────────────
+  if (!groupName.trim()) {
+    setError('Please enter a group name.')
+    setStep(1)
+    return
+  }
 
-        const measurementValue =
-          member.measurements?.trim()
+  if (members.length === 0) {
+    setError('Please add at least one member.')
+    setStep(2)
+    return
+  }
 
-        const { error: orderError } =
-          await supabase
-            .from('orders')
+  if (maxMembers > 0 && members.length > maxMembers) {
+    setError(`Your plan allows a maximum of ${maxMembers} members per group.`)
+    setStep(2)
+    return
+  }
+
+  setSaving(true)
+  setError('')
+  setSuccess('')
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    // 1. Create group header
+    const { data: group, error: groupError } = await supabase
+      .from('group_orders')
+      .insert({
+        business_id: businessId,
+        group_name: groupName.trim(),
+        coordinator_customer_id: coordinatorId || null,
+        due_date: groupDueDate || null,
+        status: 'pending'
+      })
+      .select()
+      .single()
+
+    if (groupError) throw groupError
+    if (!group?.id) throw new Error('The group was created but no group ID was returned.')
+
+    // 2. Process members
+    for (const member of members) {
+      let customerId = member.customerId || null
+
+      if (!customerId) {
+        const normalizedName = member.name.trim()
+        const normalizedPhone = member.phone?.replace(/\D/g, '').trim() || ''
+
+        // Try to find existing customer by phone
+        if (normalizedPhone) {
+          const { data: existingByPhone } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('business_id', businessId)
+            .eq('phone', normalizedPhone)
+            .maybeSingle()
+
+          if (existingByPhone) {
+            customerId = existingByPhone.id
+          }
+        }
+
+        // If no match, create a new customer
+        if (!customerId) {
+          const nameParts = normalizedName.trim().split(/\s+/)
+          const firstName = nameParts[0] || normalizedName
+          const lastName = nameParts.slice(1).join(' ') || firstName
+
+          const { data: newCustomer, error: customerError } = await supabase
+            .from('customers')
             .insert({
               business_id: businessId,
-              group_order_id: group.id,
-              customer_id: customerId,
-              title: member.item.trim(),
-              price: Number(member.price) || 0,
-              amount_paid:
-                Number(member.deposit) || 0,
-              due_date:
-                member.dueDate ||
-                groupDueDate ||
-                null,
-              current_status: 'Order placed',
-              measurements: measurementValue
-                ? {
-                    notes: measurementValue
-                  }
-                : null
+              name: normalizedName,
+              first_name: firstName,
+              last_name: lastName,
+              phone: normalizedPhone || null
             })
+            .select('id')
+            .single()
 
-        if (orderError) {
-          throw orderError
+          if (customerError) throw customerError
+          customerId = newCustomer.id
         }
       }
 
-      // ─────────────────────────────────────────────
-      // 4. ACTIVITY LOG
-      // ─────────────────────────────────────────────
+      // Create order for this member
+      const measurementValue = member.measurements?.trim()
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          business_id: businessId,
+          group_order_id: group.id,
+          customer_id: customerId,
+          title: member.item.trim(),
+          price: Number(member.price) || 0,
+          amount_paid: Number(member.deposit) || 0,
+          due_date: member.dueDate || groupDueDate || null,
+          current_status: 'Order placed',
+          measurements: measurementValue ? { notes: measurementValue } : null
+        })
 
-      const { error: activityError } =
-        await supabase
-          .from('business_activity_logs')
-          .insert({
-            business_id: businessId,
-            performed_by: user.id,
-            action: 'group_created',
-            details: {
-              group_name: groupName.trim(),
-              member_count: members.length,
-              total_value: totals.total,
-              total_deposits: totals.deposits
-            }
-          })
-
-      if (activityError) {
-        console.warn(
-          'Activity log could not be created:',
-          activityError
-        )
-      }
-
-      setSuccess('Group order created successfully.')
-
-      // Give the success state a moment before
-      // navigating so the user receives confirmation.
-      setTimeout(() => {
-        router.push(
-          `/dashboard/groups/${group.id}?business_id=${businessId}`
-        )
-      }, 500)
-    } catch (err) {
-      console.error(
-        'Create group order error:',
-        err
-      )
-
-      setError(
-        err?.message ||
-        'Unable to create the group order.'
-      )
-    } finally {
-      setSaving(false)
+      if (orderError) throw orderError
     }
-  }
 
+    // 3. Activity log
+    await supabase.from('business_activity_logs').insert({
+      business_id: businessId,
+      performed_by: user.id,
+      action: 'group_created',
+      details: {
+        group_name: groupName.trim(),
+        member_count: members.length,
+        total_value: totals.total,
+        total_deposits: totals.deposits
+      }
+    })
+
+    setSuccess('Group order created successfully.')
+
+    setTimeout(() => {
+      router.push(`/dashboard/groups/${group.id}?business_id=${businessId}`)
+    }, 500)
+
+  } catch (err) {
+    console.error('Create group order error:', err)
+    setError(err?.message || 'Unable to create the group order.')
+  } finally {
+    setSaving(false)
+  }
+  }
+      
   // ─────────────────────────────────────────────
   // LOADING
   // ─────────────────────────────────────────────
