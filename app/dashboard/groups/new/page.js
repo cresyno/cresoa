@@ -2482,10 +2482,19 @@ export default function NewGroupPage() {
                   </div>
 
                   <div className="group-form-group">
-                    <label className="group-label"
-Measurements
-                    </label>
+  <label className="group-label">
+    Measurements
+  </label>
 
+  <input
+    className="group-input"
+    type="text"
+    name="measurements"
+    value={memberForm.measurements}
+    onChange={handleMemberChange}
+    placeholder="Measurements or fitting notes"
+  />
+</div>
                     <input
                       className="group-input"
                       name="measurements"
