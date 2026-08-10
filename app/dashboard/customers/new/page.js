@@ -521,35 +521,31 @@ export default function NewCustomerPage() {
                 <span>OPTIONAL</span>
               </div>
 
-              <div className="field-grid">
-                <label className="field">
-                  <span>Gender</span>
+              <select
+  value={form.gender}
+  onChange={event =>
+    updateField(
+      'gender',
+      event.target.value
+    )
+  }
+>
+  <option value="">
+    Not specified
+  </option>
 
-                  <select
-                    value={form.gender}
-                    onChange={event =>
-                      updateField(
-                        'gender',
-                        event.target.value
-                      )
-                    }
-                  >
-                    <option value="">
-                      Not specified
-                    </option>
+  <option value="female">
+    Female
+  </option>
 
-                    <option value="Female">
-                      Female
-                    </option>
+  <option value="male">
+    Male
+  </option>
 
-                    <option value="Male">
-                      Male
-                    </option>
-
-                    <option value="Other">
-                      Other
-                    </option>
-                  </select>
+  <option value="other">
+    Other
+  </option>
+</select>
                 </label>
 
                 <label className="field">
