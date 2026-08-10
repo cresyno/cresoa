@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
@@ -8,46 +8,22 @@ import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'
 
-const formatMoney = (value) =>
-  `₦${Number(value || 0).toLocaleString('en-NG', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`
-
-const formatDate = (value) => {
-  if (!value) return 'No due date'
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-const getStatusLabel = (status) => {
-  if (!status) return 'Active'
-  return status.charAt(0).toUpperCase() + status.slice(1)
-}
-
 export default function GroupsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [sector, setSector] = useState('')
-  const [plan, setPlan] = useState('free')
-  const [canUseGroups, setCanUseGroups] = useState(false)
-  const [memberLimit, setMemberLimit] = useState(0)
+  const [business, setBusiness] = useState(null)
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [deletingId, setDeletingId] = useState(null)
 
-  const businessId = useMemo(
-    () => getCurrentBusinessId() || searchParams.get('business_id') || '',
-    [searchParams]
-  )
+  const businessId = getCurrentBusinessId()
 
-  const loadGroups = useCallback(async () => {
+  const loadGroups = async () => {
     setLoading(true)
     setError('')
 
@@ -61,39 +37,42 @@ export default function GroupsPage() {
         return
       }
 
-      if (!businessId) {
+      const bizId = getCurrentBusinessId()
+
+      if (!bizId) {
         router.push('/dashboard')
         return
       }
 
-      const { data: business, error: businessError } = await supabase
+      const { data: businessData, error: businessError } = await supabase
         .from('businesses')
         .select('id, name, sector, plan')
-        .eq('id', businessId)
+        .eq('id', bizId)
         .single()
 
-      if (businessError || !business) {
+      if (businessError || !businessData) {
+        console.error('Business loading error:', businessError)
         router.push('/onboarding')
         return
       }
 
-      const nextSector = business.sector || ''
-      const nextPlan = business.plan || 'free'
-      const allowed =
-        nextSector === 'Fashion & Custom Wear' &&
-        isFeatureAvailable(nextPlan, 'groups')
+      setBusiness(businessData)
 
-      setSector(nextSector)
-      setPlan(nextPlan)
-      setCanUseGroups(allowed)
-      setMemberLimit(getPlanLimits(nextPlan).maxGroupMembers || 0)
+      const isFashion =
+        businessData.sector === 'Fashion & Custom Wear'
 
-      if (!allowed) {
+      const groupsAllowed = isFeatureAvailable(
+        businessData.plan || 'free',
+        'groups'
+      )
+
+      if (!isFashion || !groupsAllowed) {
         setGroups([])
+        setLoading(false)
         return
       }
 
-      const { data: groupRows, error: groupError } = await supabase
+      const { data: groupData, error: groupError } = await supabase
         .from('group_orders')
         .select(`
           id,
@@ -104,14 +83,23 @@ export default function GroupsPage() {
           status,
           created_at,
           updated_at,
-          coordinator:coordinator_customer_id (name, phone)
+          coordinator:coordinator_customer_id (
+            id,
+            name,
+            first_name,
+            last_name,
+            phone
+          )
         `)
-        .eq('business_id', businessId)
+        .eq('business_id', bizId)
         .order('created_at', { ascending: false })
-            if (groupError) throw groupError
 
-      const groupsWithStats = await Promise.all(
-        (groupRows || []).map(async (group) => {
+      if (groupError) {
+        throw groupError
+      }
+
+      const enrichedGroups = await Promise.all(
+        (groupData || []).map(async (group) => {
           const { data: orders, error: ordersError } = await supabase
             .from('orders')
             .select('id, price, amount_paid, current_status')
@@ -119,7 +107,7 @@ export default function GroupsPage() {
 
           if (ordersError) {
             console.error(
-              `Failed to load orders for group ${group.id}:`,
+              `Orders loading error for group ${group.id}:`,
               ordersError
             )
 
@@ -128,17 +116,16 @@ export default function GroupsPage() {
               memberCount: 0,
               totalBalance: 0,
               deliveredCount: 0,
-              totalOrderValue: 0,
             }
           }
 
-          const rows = orders || []
+          const orderRows = orders || []
 
-          const memberCount = rows.length
+          const memberCount = orderRows.length
 
-          const totalBalance = rows.reduce(
-            (sum, order) =>
-              sum +
+          const totalBalance = orderRows.reduce(
+            (total, order) =>
+              total +
               Math.max(
                 0,
                 Number(order.price || 0) -
@@ -147,13 +134,10 @@ export default function GroupsPage() {
             0
           )
 
-          const totalOrderValue = rows.reduce(
-            (sum, order) => sum + Number(order.price || 0),
-            0
-          )
-
-          const deliveredCount = rows.filter(
-            (order) => order.current_status === 'Delivered'
+          const deliveredCount = orderRows.filter(
+            (order) =>
+              String(order.current_status || '').toLowerCase() ===
+              'delivered'
           ).length
 
           return {
@@ -161,100 +145,54 @@ export default function GroupsPage() {
             memberCount,
             totalBalance,
             deliveredCount,
-            totalOrderValue,
           }
         })
       )
 
-      setGroups(groupsWithStats)
+      setGroups(enrichedGroups)
     } catch (loadError) {
       console.error('Error loading groups:', loadError)
-      setError('We could not load your groups. Please try again.')
+      setError('We could not load your groups right now.')
     } finally {
       setLoading(false)
     }
-  }, [businessId, router])
+  }
 
   useEffect(() => {
     loadGroups()
-  }, [loadGroups])
+  }, [router, searchParams])
 
-  const handleDelete = async (group) => {
-    const confirmed = window.confirm(
-      `Delete "${group.group_name}"?\n\nLinked orders will remain in your system but will no longer belong to this group.`
-    )
+  const planLimits = getPlanLimits(
+    business?.plan || 'free'
+  )
 
-    if (!confirmed) return
+  const memberLimit = planLimits?.maxGroupMembers || 0
 
-    setDeletingId(group.id)
-
-    try {
-      const { error: unlinkError } = await supabase
-        .from('orders')
-        .update({ group_order_id: null })
-        .eq('group_order_id', group.id)
-
-      if (unlinkError) throw unlinkError
-
-      const { error: deleteError } = await supabase
-        .from('group_orders')
-        .delete()
-        .eq('id', group.id)
-        .eq('business_id', businessId)
-
-      if (deleteError) throw deleteError
-
-      setGroups((current) =>
-        current.filter((item) => item.id !== group.id)
-      )
-    } catch (deleteError) {
-      console.error('Error deleting group:', deleteError)
-      window.alert(
-        'We could not delete this group. Please try again.'
-      )
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  const filteredGroups = useMemo(() => {
-    const query = search.trim().toLowerCase()
-
-    return groups.filter((group) => {
-      const matchesSearch =
-        !query ||
-        group.group_name?.toLowerCase().includes(query) ||
-        group.coordinator?.name?.toLowerCase().includes(query) ||
-        group.coordinator?.phone?.toLowerCase().includes(query)
-
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (group.status || 'pending').toLowerCase() === statusFilter
-
-      return matchesSearch && matchesStatus
-    })
-  }, [groups, search, statusFilter])
+  const canUseGroups =
+    business &&
+    business.sector === 'Fashion & Custom Wear' &&
+    isFeatureAvailable(business.plan || 'free', 'groups')
 
   const stats = useMemo(() => {
     const totalGroups = groups.length
 
     const totalMembers = groups.reduce(
-      (sum, group) => sum + group.memberCount,
+      (sum, group) => sum + Number(group.memberCount || 0),
       0
     )
 
     const totalBalance = groups.reduce(
-      (sum, group) => sum + group.totalBalance,
+      (sum, group) => sum + Number(group.totalBalance || 0),
       0
     )
 
     const totalOrders = groups.reduce(
-      (sum, group) => sum + group.memberCount,
+      (sum, group) => sum + Number(group.memberCount || 0),
       0
     )
 
     const totalDelivered = groups.reduce(
-      (sum, group) => sum + group.deliveredCount,
+      (sum, group) => sum + Number(group.deliveredCount || 0),
       0
     )
 
@@ -273,202 +211,410 @@ export default function GroupsPage() {
     }
   }, [groups])
 
-  const isAtMemberLimit =
-    memberLimit > 0 && stats.totalMembers >= memberLimit
+  const filteredGroups = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return groups.filter((group) => {
+      const groupStatus = String(
+        group.status || 'pending'
+      ).toLowerCase()
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' &&
+          groupStatus !== 'completed') ||
+        groupStatus === statusFilter
+
+      const coordinatorName = [
+        group.coordinator?.name,
+        group.coordinator?.first_name,
+        group.coordinator?.last_name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      const groupName = String(
+        group.group_name || ''
+      ).toLowerCase()
+
+      const matchesSearch =
+        !query ||
+        groupName.includes(query) ||
+        coordinatorName.includes(query)
+
+      return matchesStatus && matchesSearch
+    })
+  }, [groups, search, statusFilter])
+    const formatMoney = (value) => {
+    return `₦${Number(value || 0).toLocaleString('en-NG')}`
+  }
+
+  const formatDate = (value) => {
+    if (!value) return 'No due date'
+
+    const date = new Date(`${value}T00:00:00`)
+
+    if (Number.isNaN(date.getTime())) {
+      return 'No due date'
+    }
+
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+
+  const getStatusLabel = (status) => {
+    const normalized = String(status || 'pending').toLowerCase()
+
+    if (normalized === 'completed') return 'Completed'
+    if (normalized === 'active') return 'Active'
+    if (normalized === 'cancelled') return 'Cancelled'
+    if (normalized === 'pending') return 'Pending'
+
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  }
+
+  const handleDelete = async (group) => {
+    const confirmed = window.confirm(
+      `Delete "${group.group_name}"?\n\nLinked orders will be unassigned from this group, but the orders themselves will not be deleted.`
+    )
+
+    if (!confirmed) return
+
+    setDeletingId(group.id)
+
+    try {
+      const { error: unlinkError } = await supabase
+        .from('orders')
+        .update({ group_order_id: null })
+        .eq('group_order_id', group.id)
+
+      if (unlinkError) {
+        throw unlinkError
+      }
+
+      const { error: deleteError } = await supabase
+        .from('group_orders')
+        .delete()
+        .eq('id', group.id)
+        .eq('business_id', businessId)
+
+      if (deleteError) {
+        throw deleteError
+      }
+
+      setGroups((current) =>
+        current.filter((item) => item.id !== group.id)
+      )
+    } catch (deleteError) {
+      console.error('Error deleting group:', deleteError)
+      window.alert(
+        'We could not delete this group. Please try again.'
+      )
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   if (loading) {
     return (
       <div className="groups-page">
-        <style>{`
-          .groups-page {
-            min-height: 100%;
-            padding: 28px;
-            background: var(--color-bg);
-            color: var(--color-text);
-          }
-
-          .groups-shell {
-            max-width: 1180px;
-            margin: 0 auto;
-          }
-
-          .skeleton {
-            background: var(--color-border);
-            border-radius: 10px;
-            animation: groupPulse 1.3s ease-in-out infinite;
-          }
-
-          .skeleton-header {
-            height: 34px;
-            width: 230px;
-            margin-bottom: 10px;
-          }
-
-          .skeleton-subtitle {
-            height: 14px;
-            width: 330px;
-            margin-bottom: 28px;
-          }
-
-          .skeleton-stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 22px;
-          }
-
-          .skeleton-stat {
-            height: 96px;
-          }
-
-          .skeleton-toolbar {
-            height: 58px;
-            margin-bottom: 18px;
-          }
-
-          .skeleton-card {
-            height: 190px;
-            margin-bottom: 14px;
-          }
-
-          @keyframes groupPulse {
-            0%, 100% { opacity: .35; }
-            50% { opacity: .7; }
-          }
-
-          @media (max-width: 760px) {
-            .groups-page {
-              padding: 18px 14px;
-            }
-
-            .skeleton-stats {
-              grid-template-columns: repeat(2, 1fr);
-            }
-          }
-        `}</style>
-
         <div className="groups-shell">
-          <div className="skeleton skeleton-header" />
-          <div className="skeleton skeleton-subtitle" />
+          <div className="groups-loading-header">
+            <div>
+              <div className="skeleton skeleton-eyebrow" />
+              <div className="skeleton skeleton-title" />
+              <div className="skeleton skeleton-subtitle" />
+            </div>
 
-          <div className="skeleton-stats">
-            <div className="skeleton skeleton-stat" />
-            <div className="skeleton skeleton-stat" />
-            <div className="skeleton skeleton-stat" />
-            <div className="skeleton skeleton-stat" />
+            <div className="skeleton skeleton-button" />
+          </div>
+
+          <div className="stats-grid">
+            {[1, 2, 3, 4].map((item) => (
+              <div className="stat-card skeleton-card" key={item}>
+                <div className="skeleton skeleton-small" />
+                <div className="skeleton skeleton-number" />
+                <div className="skeleton skeleton-note" />
+              </div>
+            ))}
           </div>
 
           <div className="skeleton skeleton-toolbar" />
 
-          <div className="skeleton skeleton-card" />
-          <div className="skeleton skeleton-card" />
-          <div className="skeleton skeleton-card" />
+          <div className="group-list">
+            {[1, 2, 3].map((item) => (
+              <div className="group-card skeleton-group" key={item}>
+                <div className="skeleton skeleton-group-title" />
+                <div className="skeleton skeleton-group-line" />
+                <div className="skeleton skeleton-group-line short" />
+                <div className="skeleton skeleton-group-progress" />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    )
-}
-  if (!canUseGroups) {
-    const isFashion = sector === 'Fashion & Custom Wear'
 
-    return (
-      <div className="groups-page">
-        <style>{`
+        <style jsx>{`
           .groups-page {
-            min-height: 100%;
-            padding: 28px;
-            background: var(--color-bg);
-            color: var(--color-text);
+            min-height: 100vh;
+            background: var(--color-bg, #f7f7f5);
+            color: var(--color-text, #202020);
+            padding: 30px 22px 70px;
           }
 
           .groups-shell {
-            max-width: 1180px;
+            width: min(1180px, 100%);
             margin: 0 auto;
           }
 
-          .access-card {
-            max-width: 620px;
-            margin: 70px auto;
-            padding: 42px 30px;
-            text-align: center;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 18px;
-            box-shadow: var(--shadow-sm);
-          }
-
-          .access-icon {
-            width: 58px;
-            height: 58px;
-            margin: 0 auto 18px;
-            display: grid;
-            place-items: center;
-            border-radius: 16px;
-            background: rgba(216, 178, 76, .12);
-            color: var(--color-accent);
-            font-size: 28px;
-          }
-
-          .access-card h1 {
-            margin: 0 0 8px;
-            font-size: 22px;
-            font-weight: 700;
-          }
-
-          .access-card p {
-            margin: 0 auto 22px;
-            max-width: 480px;
-            color: var(--color-text-muted);
-            line-height: 1.6;
-            font-size: 13px;
-          }
-
-          .access-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 42px;
-            padding: 0 18px;
-            border-radius: 9px;
-            background: var(--color-accent);
-            color: #fff;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 700;
-          }
-
-          .groups-topbar {
+          .groups-loading-header {
             display: flex;
-            align-items: flex-end;
             justify-content: space-between;
-            gap: 20px;
+            align-items: center;
+            gap: 24px;
             margin-bottom: 24px;
           }
 
-          .groups-heading {
-            min-width: 0;
+          .skeleton {
+            background: linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.1),
+              rgba(0, 0, 0, 0.06)
+            );
+            background-size: 200% 100%;
+            animation: skeletonMove 1.4s infinite;
+            border-radius: 8px;
           }
 
-          .eyebrow {
-            margin: 0 0 7px;
-            color: var(--color-accent);
-            font-size: 11px;
+          .skeleton-eyebrow {
+            width: 110px;
+            height: 12px;
+            margin-bottom: 10px;
+          }
+
+          .skeleton-title {
+            width: 240px;
+            height: 34px;
+            margin-bottom: 10px;
+          }
+
+          .skeleton-subtitle {
+            width: 330px;
+            height: 14px;
+          }
+
+          .skeleton-button {
+            width: 125px;
+            height: 42px;
+            border-radius: 10px;
+          }
+
+          .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 22px;
+          }
+
+          .skeleton-card {
+            min-height: 125px;
+            padding: 18px;
+          }
+
+          .skeleton-small {
+            width: 65px;
+            height: 10px;
+            margin-bottom: 16px;
+          }
+
+          .skeleton-number {
+            width: 90px;
+            height: 25px;
+            margin-bottom: 12px;
+          }
+
+          .skeleton-note {
+            width: 125px;
+            height: 10px;
+          }
+
+          .skeleton-toolbar {
+            width: 100%;
+            height: 48px;
+            margin-bottom: 18px;
+          }
+
+          .group-list {
+            display: grid;
+            gap: 14px;
+          }
+
+          .skeleton-group {
+            min-height: 190px;
+            padding: 22px;
+          }
+
+          .skeleton-group-title {
+            width: 210px;
+            height: 22px;
+            margin-bottom: 16px;
+          }
+
+          .skeleton-group-line {
+            width: 55%;
+            height: 12px;
+            margin-bottom: 10px;
+          }
+
+          .skeleton-group-line.short {
+            width: 35%;
+          }
+
+          .skeleton-group-progress {
+            width: 100%;
+            height: 7px;
+            margin-top: 25px;
+          }
+
+          @keyframes skeletonMove {
+            0% {
+              background-position: 200% 0;
+            }
+
+            100% {
+              background-position: -200% 0;
+            }
+          }
+
+          @media (max-width: 760px) {
+            .groups-page {
+              padding: 20px 14px 60px;
+            }
+
+            .groups-loading-header {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+
+            .stats-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .skeleton-button {
+              width: 100%;
+            }
+          }
+        `}</style>
+      </div>
+    )
+  }
+
+  if (!canUseGroups) {
+    const isFashion =
+      business?.sector === 'Fashion & Custom Wear'
+
+    return (
+      <div className="groups-page">
+        <div className="groups-shell">
+          <div className="restricted-card">
+            <div className="restricted-icon">
+              <Icon
+                name="users"
+                size={28}
+                stroke="currentColor"
+              />
+            </div>
+
+            <div className="restricted-content">
+              <div className="section-eyebrow">
+                Orders management
+              </div>
+
+              <h1>Group Orders</h1>
+
+              <p>
+                {isFashion
+                  ? 'Group orders are not included in your current plan.'
+                  : 'Group orders are currently available only for Fashion & Custom Wear businesses.'}
+              </p>
+
+              {isFashion && (
+                <Link
+                  href={`/dashboard/subscription?business_id=${businessId}`}
+                  className="primary-button"
+                >
+                  Upgrade plan
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <style jsx>{`
+          .groups-page {
+            min-height: 100vh;
+            background: var(--color-bg, #f7f7f5);
+            color: var(--color-text, #202020);
+            padding: 30px 22px 70px;
+          }
+
+          .groups-shell {
+            width: min(1180px, 100%);
+            margin: 0 auto;
+          }
+
+          .restricted-card {
+            min-height: 380px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 45px;
+            background: var(--color-card, #fff);
+            border: 1px solid var(--color-border, #e7e4dc);
+            border-radius: 18px;
+            box-shadow: var(--shadow-sm, 0 5px 20px rgba(0,0,0,.04));
+          }
+
+          .restricted-icon {
+            width: 64px;
+            height: 64px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            border-radius: 16px;
+            background: rgba(216, 178, 76, .12);
+            color: var(--color-accent, #d8b24c);
+          }
+
+          .restricted-content {
+            max-width: 520px;
+          }
+
+          .section-eyebrow {
+            margin-bottom: 8px;
+            color: var(--color-text-muted, #888);
+            font-size: 10px;
             font-weight: 800;
-            letter-spacing: .08em;
+            letter-spacing: .12em;
             text-transform: uppercase;
           }
 
-          .groups-heading h1 {
-            margin: 0;
-            font-size: clamp(24px, 4vw, 32px);
+          .restricted-content h1 {
+            margin: 0 0 10px;
+            font-size: 30px;
             line-height: 1.1;
-            font-weight: 750;
-            letter-spacing: -.02em;
           }
 
-          .groups-heading p {
-            margin: 8px 0 0;
-            color: var(--color-text-muted);
+          .restricted-content p {
+            margin: 0 0 20px;
+            color: var(--color-text-muted, #777);
             font-size: 13px;
+            line-height: 1.6;
           }
 
           .primary-button {
@@ -476,655 +622,180 @@ export default function GroupsPage() {
             align-items: center;
             justify-content: center;
             gap: 7px;
-            min-height: 42px;
+            min-height: 40px;
             padding: 0 16px;
             border: 0;
             border-radius: 9px;
-            background: var(--color-accent);
+            background: var(--color-accent, #d8b24c);
             color: #fff;
             text-decoration: none;
-            font: inherit;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
-            cursor: pointer;
-            white-space: nowrap;
           }
 
-          .primary-button:hover {
-            filter: brightness(.96);
-          }
-
-          .primary-button.disabled {
-            opacity: .55;
-            pointer-events: none;
-          }
-
-          .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-          }
-
-          .stat-card {
-            padding: 16px;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 13px;
-          }
-
-          .stat-label {
-            margin-bottom: 8px;
-            color: var(--color-text-muted);
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-          }
-
-          .stat-value {
-            font-size: 22px;
-            line-height: 1;
-            font-weight: 750;
-          }
-
-          .stat-note {
-            margin-top: 7px;
-            color: var(--color-text-muted);
-            font-size: 11px;
-          }
-
-          .progress-track {
-            width: 100%;
-            height: 7px;
-            overflow: hidden;
-            border-radius: 99px;
-            background: var(--color-bg);
-          }
-
-          .progress-fill {
-            height: 100%;
-            border-radius: inherit;
-            background: var(--color-success);
-            transition: width .25s ease;
-          }
-
-          .toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 18px;
-            padding: 10px;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 12px;
-          }
-
-          .search-wrap {
-            position: relative;
-            flex: 1;
-            min-width: 180px;
-          }
-
-          .search-wrap input {
-            width: 100%;
-            box-sizing: border-box;
-            min-height: 38px;
-            padding: 0 12px 0 36px;
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            background: var(--color-bg);
-            color: var(--color-text);
-            outline: none;
-            font: inherit;
-            font-size: 12px;
-          }
-
-          .search-wrap input:focus {
-            border-color: var(--color-accent);
-          }
-
-          .search-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--color-text-muted);
-            pointer-events: none;
-          }
-
-          .filter-wrap {
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-          }
-
-          .filter-button {
-            min-height: 36px;
-            padding: 0 11px;
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            background: var(--color-bg);
-            color: var(--color-text-muted);
-            font: inherit;
-            font-size: 11px;
-            font-weight: 650;
-            cursor: pointer;
-          }
-
-          .filter-button.active {
-            border-color: var(--color-accent);
-            background: rgba(216, 178, 76, .10);
-            color: var(--color-text);
-          }
-
-          .results-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            color: var(--color-text-muted);
-            font-size: 11px;
-          }
-
-          .group-list {
-            display: grid;
-            gap: 12px;
-          }
-
-          .group-card {
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 15px;
-            overflow: hidden;
-            transition: border-color .18s ease, box-shadow .18s ease;
-          }
-
-          .group-card:hover {
-            border-color: rgba(216, 178, 76, .45);
-            box-shadow: var(--shadow-sm);
-          }
-
-          .group-card-main {
-            padding: 17px;
-          }
-
-          .group-card-head {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 16px;
-          }
-
-          .group-title-wrap {
-            min-width: 0;
-          }
-
-          .group-title {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 720;
-            line-height: 1.25;
-            overflow-wrap: anywhere;
-          }
-
-          .group-coordinator {
-            margin-top: 5px;
-            color: var(--color-text-muted);
-            font-size: 11px;
-          }
-
-          .status-badge {
-            flex: 0 0 auto;
-            display: inline-flex;
-            align-items: center;
-            min-height: 25px;
-            padding: 0 9px;
-            border-radius: 99px;
-            background: rgba(216, 178, 76, .13);
-            color: var(--color-accent);
-            font-size: 10px;
-            font-weight: 800;
-          }
-
-          .status-badge.completed {
-            background: rgba(52, 168, 83, .12);
-            color: var(--color-success);
-          }
-
-          .group-meta {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 16px;
-          }
-
-          .meta-item {
-            min-width: 0;
-          }
-
-          .meta-label {
-            margin-bottom: 3px;
-            color: var(--color-text-muted);
-            font-size: 9px;
-            font-weight: 750;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-          }
-
-          .meta-value {
-            color: var(--color-text);
-            font-size: 12px;
-            font-weight: 650;
-            overflow-wrap: anywhere;
-          }
-
-          .meta-value.owed {
-            color: var(--color-danger);
-          }
-
-          .meta-value.paid {
-            color: var(--color-success);
-          }
-
-          .group-progress {
-            margin-top: 15px;
-          }
-
-          .group-progress-head {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 6px;
-            color: var(--color-text-muted);
-            font-size: 10px;
-          }
-
-          .group-actions {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            margin-top: 16px;
-            padding-top: 13px;
-            border-top: 1px solid var(--color-border);
-          }
-
-          .action-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 31px;
-            padding: 0 10px;
-            border: 1px solid var(--color-border);
-            border-radius: 7px;
-            background: var(--color-bg);
-            color: var(--color-text);
-            text-decoration: none;
-            font: inherit;
-            font-size: 10px;
-            font-weight: 650;
-            cursor: pointer;
-          }
-
-          .action-button:hover {
-            border-color: var(--color-accent);
-          }
-
-          .action-button.danger {
-            color: var(--color-danger);
-          }
-
-          .action-button:disabled {
-            opacity: .5;
-            cursor: not-allowed;
-          }
-
-          .empty-state {
-            padding: 60px 25px;
-            text-align: center;
-            background: var(--color-card);
-            border: 1px dashed var(--color-border);
-            border-radius: 15px;
-          }
-
-          .empty-icon {
-            width: 54px;
-            height: 54px;
-            margin: 0 auto 15px;
-            display: grid;
-            place-items: center;
-            border-radius: 15px;
-            background: var(--color-bg);
-            color: var(--color-text-muted);
-            font-size: 25px;
-          }
-
-          .empty-state h2 {
-            margin: 0 0 7px;
-            font-size: 17px;
-          }
-
-          .empty-state p {
-            max-width: 430px;
-            margin: 0 auto 19px;
-            color: var(--color-text-muted);
-            font-size: 12px;
-            line-height: 1.6;
-          }
-
-          .error-state {
-            padding: 35px 20px;
-            text-align: center;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 15px;
-          }
-
-          .error-state h2 {
-            margin: 0 0 7px;
-            font-size: 17px;
-          }
-
-          .error-state p {
-            margin: 0 0 18px;
-            color: var(--color-text-muted);
-            font-size: 12px;
-          }
-
-          @media (max-width: 820px) {
-            .stats-grid {
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
-            .groups-topbar {
-              align-items: stretch;
-              flex-direction: column;
-            }
-
-            .primary-button {
-              align-self: flex-start;
-            }
-          }
-
-          @media (max-width: 620px) {
+          @media (max-width: 700px) {
             .groups-page {
-              padding: 18px 13px 30px;
+              padding: 18px 14px 60px;
             }
 
-            .toolbar {
-              align-items: stretch;
+            .restricted-card {
+              min-height: 320px;
               flex-direction: column;
-            }
-
-            .search-wrap {
-              width: 100%;
-            }
-
-            .filter-wrap {
-              width: 100%;
-            }
-
-            .filter-button {
-              flex: 1;
-            }
-
-            .group-meta {
-              grid-template-columns: 1fr 1fr;
-            }
-
-            .group-meta .meta-item:last-child {
-              grid-column: 1 / -1;
+              text-align: center;
+              padding: 30px 20px;
             }
           }
         `}</style>
-
-        <div className="groups-shell">
-          <div className="access-card">
-            <div className="access-icon">👥</div>
-            <h1>Group Orders</h1>
-            <p>
-              {!isFashion
-                ? 'Group orders are currently available only to Fashion & Custom Wear businesses.'
-                : `Your ${plan} plan does not include group orders. Upgrade your plan to manage groups and their members.`}
-            </p>
-
-            {isFashion && (
-              <Link
-                href={`/dashboard/subscription?business_id=${businessId}`}
-                className="access-button"
-              >
-                Upgrade plan
-              </Link>
-            )}
-          </div>
-        </div>
       </div>
     )
-  }
-
-  if (error) {
-    return (
-      <div className="groups-page">
-        <style>{`
-          .groups-page {
-            min-height: 100%;
-            padding: 28px;
-            background: var(--color-bg);
-            color: var(--color-text);
-          }
-
-          .groups-shell {
-            max-width: 1180px;
-            margin: 0 auto;
-          }
-
-          .error-state {
-            max-width: 560px;
-            margin: 70px auto;
-            padding: 40px 25px;
-            text-align: center;
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: 16px;
-          }
-
-          .error-state h1 {
-            margin: 0 0 8px;
-            font-size: 20px;
-          }
-
-          .error-state p {
-            margin: 0 0 20px;
-            color: var(--color-text-muted);
-            font-size: 13px;
-          }
-
-          .retry-button {
-            min-height: 40px;
-            padding: 0 17px;
-            border: 0;
-            border-radius: 8px;
-            background: var(--color-accent);
-            color: #fff;
-            font: inherit;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-          }
-        `}</style>
-
-        <div className="groups-shell">
-          <div className="error-state">
-            <h1>Unable to load groups</h1>
-            <p>{error}</p>
-            <button
-              type="button"
-              className="retry-button"
-              onClick={loadGroups}
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+      }
   return (
     <div className="groups-page">
       <div className="groups-shell">
-        <header className="groups-topbar">
-          <div className="groups-heading">
-            <div className="eyebrow">Orders management</div>
+        <header className="page-header">
+          <div className="page-heading">
+            <div className="section-eyebrow">Orders management</div>
+
             <h1>Group Orders</h1>
+
             <p>
-              Manage group orders, members, payments and delivery progress.
+              Manage group orders, members, payments and delivery
+              progress in one place.
             </p>
           </div>
 
           <Link
-            href={`/dashboard/groups/new?business_id=${businessId}`}
-            className={`primary-button${isAtMemberLimit ? ' disabled' : ''}`}
+            href={`/dashboard/groups/new?business_id=${businessId || ''}`}
+            className="new-group-button"
           >
-            <Icon name="plus" size={15} stroke="#fff" />
-            New group
+            <Icon name="plus" size={16} stroke="#fff" />
+            <span>New group</span>
           </Link>
         </header>
-        <section className="stats-grid" aria-label="Group order summary">
+
+        <section className="stats-grid">
           <div className="stat-card">
-            <div className="stat-label">Groups</div>
-            <div className="stat-value">{stats.totalGroups}</div>
+            <div className="stat-top">
+              <span className="stat-label">Groups</span>
+              <span className="stat-icon">
+                <Icon
+                  name="users"
+                  size={15}
+                  stroke="currentColor"
+                />
+              </span>
+            </div>
+
+            <div className="stat-value">
+              {stats.totalGroups}
+            </div>
+
             <div className="stat-note">
               {filteredGroups.length} currently shown
             </div>
           </div>
 
           <div className="stat-card">
-            <div className="stat-label">Members</div>
-            <div className="stat-value">{stats.totalMembers}</div>
+            <div className="stat-top">
+              <span className="stat-label">Members</span>
+              <span className="stat-icon">
+                <Icon
+                  name="user"
+                  size={15}
+                  stroke="currentColor"
+                />
+              </span>
+            </div>
+
+            <div className="stat-value">
+              {stats.totalMembers}
+            </div>
+
             <div className="stat-note">
               {memberLimit > 0
-                ? `${Math.max(0, memberLimit - stats.totalMembers)} member slots left`
-                : 'No member limit shown'}
+                ? `${Math.max(
+                    0,
+                    memberLimit - stats.totalMembers
+                  )} member slots available`
+                : 'Across all groups'}
             </div>
           </div>
 
           <div className="stat-card">
-            <div className="stat-label">Outstanding</div>
-            <div
-              className="stat-value"
-              style={{
-                color:
-                  stats.totalBalance > 0
-                    ? 'var(--color-danger)'
-                    : 'var(--color-success)',
-              }}
-            >
+            <div className="stat-top">
+              <span className="stat-label">Outstanding</span>
+              <span className="stat-icon danger-icon">
+                ₦
+              </span>
+            </div>
+
+            <div className="stat-value money">
               {formatMoney(stats.totalBalance)}
-            </div>
-            <div className="stat-note">Balance still owed</div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-label">Delivery progress</div>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '8px',
-              }}
-            >
-              <div className="progress-track">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${stats.progress}%` }}
-                />
-              </div>
-
-              <strong
-                style={{
-                  fontSize: '13px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {stats.progress}%
-              </strong>
             </div>
 
             <div className="stat-note">
-              {stats.totalDelivered} of {stats.totalOrders} orders delivered
+              Balance still owed
+            </div>
+          </div>
+
+          <div className="stat-card progress-stat">
+            <div className="stat-top">
+              <span className="stat-label">
+                Delivery progress
+              </span>
+
+              <span className="progress-percent">
+                {stats.progress}%
+              </span>
+            </div>
+
+            <div className="progress-track">
+              <div
+                className="progress-fill"
+                style={{
+                  width: `${stats.progress}%`,
+                }}
+              />
+            </div>
+
+            <div className="stat-note">
+              {stats.totalDelivered} of {stats.totalOrders}{' '}
+              orders delivered
             </div>
           </div>
         </section>
 
-        {isAtMemberLimit && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '15px',
-              marginBottom: '18px',
-              padding: '11px 14px',
-              border: '1px solid rgba(216, 178, 76, .35)',
-              borderRadius: '10px',
-              background: 'rgba(216, 178, 76, .08)',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  marginBottom: '2px',
-                }}
-              >
-                Group member limit reached
-              </div>
-
-              <div
-                style={{
-                  color: 'var(--color-text-muted)',
-                  fontSize: '11px',
-                  lineHeight: 1.5,
-                }}
-              >
-                Your current plan allows up to {memberLimit} group members.
-              </div>
-            </div>
-
-            <Link
-              href={`/dashboard/subscription?business_id=${businessId}`}
-              className="action-button"
-            >
-              Upgrade
-            </Link>
-          </div>
-        )}
-
-        <section className="toolbar">
-          <div className="search-wrap">
-            <span className="search-icon">
-              <Icon
-                name="search"
-                size={15}
-                stroke="currentColor"
-              />
-            </span>
+        <section className="groups-toolbar">
+          <div className="search-box">
+            <Icon
+              name="search"
+              size={15}
+              stroke="currentColor"
+            />
 
             <input
               type="search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search groups or coordinators..."
-              aria-label="Search groups"
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
+              placeholder="Search groups or coordinator"
+              aria-label="Search groups or coordinator"
             />
+
+            {search && (
+              <button
+                type="button"
+                className="clear-search"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
 
-          <div className="filter-wrap">
+          <div className="filter-tabs" role="tablist">
             {[
               ['all', 'All'],
               ['pending', 'Pending'],
@@ -1134,8 +805,10 @@ export default function GroupsPage() {
               <button
                 key={value}
                 type="button"
-                className={`filter-button${
-                  statusFilter === value ? ' active' : ''
+                role="tab"
+                aria-selected={statusFilter === value}
+                className={`filter-tab ${
+                  statusFilter === value ? 'selected' : ''
                 }`}
                 onClick={() => setStatusFilter(value)}
               >
@@ -1146,27 +819,22 @@ export default function GroupsPage() {
         </section>
 
         <div className="results-row">
-          <span>
-            {filteredGroups.length}{' '}
-            {filteredGroups.length === 1 ? 'group' : 'groups'}
-          </span>
+          <div>
+            <strong>
+              {filteredGroups.length}
+            </strong>{' '}
+            {filteredGroups.length === 1
+              ? 'group'
+              : 'groups'}
+          </div>
 
           {(search || statusFilter !== 'all') && (
             <button
               type="button"
+              className="reset-filters"
               onClick={() => {
                 setSearch('')
                 setStatusFilter('all')
-              }}
-              style={{
-                border: 0,
-                padding: 0,
-                background: 'transparent',
-                color: 'var(--color-accent)',
-                font: 'inherit',
-                fontSize: '11px',
-                fontWeight: '700',
-                cursor: 'pointer',
               }}
             >
               Clear filters
@@ -1175,149 +843,180 @@ export default function GroupsPage() {
         </div>
 
         {filteredGroups.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">👥</div>
+          <section className="empty-state">
+            <div className="empty-icon">
+              <Icon
+                name="users"
+                size={28}
+                stroke="currentColor"
+              />
+            </div>
+
+            <h2>
+              {groups.length === 0
+                ? 'No groups yet'
+                : 'No matching groups'}
+            </h2>
+
+            <p>
+              {groups.length === 0
+                ? 'Create your first group to manage Aso-Ebi, bulk orders and coordinated deliveries.'
+                : 'Try a different search term or remove the current filter.'}
+            </p>
 
             {groups.length === 0 ? (
-              <>
-                <h2>No groups yet</h2>
-                <p>
-                  Create your first group to organise Aso-Ebi,
-                  coordinated orders or other bulk customer orders.
-                </p>
-
-                <Link
-                  href={`/dashboard/groups/new?business_id=${businessId}`}
-                  className="primary-button"
-                >
-                  <Icon name="plus" size={15} stroke="#fff" />
-                  Create first group
-                </Link>
-              </>
+              <Link
+                href={`/dashboard/groups/new?business_id=${businessId || ''}`}
+                className="empty-action"
+              >
+                <Icon
+                  name="plus"
+                  size={15}
+                  stroke="#fff"
+                />
+                Create your first group
+              </Link>
             ) : (
-              <>
-                <h2>No matching groups</h2>
-                <p>
-                  Try another search term or change the status filter
-                  to find the group you are looking for.
-                </p>
-
-                <button
-                  type="button"
-                  className="action-button"
-                  onClick={() => {
-                    setSearch('')
-                    setStatusFilter('all')
-                  }}
-                >
-                  Show all groups
-                </button>
-              </>
+              <button
+                type="button"
+                className="empty-action"
+                onClick={() => {
+                  setSearch('')
+                  setStatusFilter('all')
+                }}
+              >
+                Show all groups
+              </button>
             )}
-          </div>
+          </section>
         ) : (
-          <div className="group-list">
+          <section className="group-list">
             {filteredGroups.map((group) => {
+              const memberCount = Number(
+                group.memberCount || 0
+              )
+
+              const deliveredCount = Number(
+                group.deliveredCount || 0
+              )
+
               const groupProgress =
-                group.memberCount > 0
+                memberCount > 0
                   ? Math.round(
-                      (group.deliveredCount / group.memberCount) * 100
+                      (deliveredCount / memberCount) * 100
                     )
                   : 0
 
-              const isCompleted =
-                (group.status || '').toLowerCase() === 'completed'
+              const status = String(
+                group.status || 'pending'
+              ).toLowerCase()
 
               const isOverdue =
                 group.due_date &&
-                new Date(`${group.due_date}T23:59:59`) < new Date() &&
-                !isCompleted
+                new Date(
+                  `${group.due_date}T23:59:59`
+                ) < new Date() &&
+                status !== 'completed'
+
+              const coordinator =
+                group.coordinator?.name ||
+                [
+                  group.coordinator?.first_name,
+                  group.coordinator?.last_name,
+                ]
+                  .filter(Boolean)
+                  .join(' ') ||
+                'No coordinator'
 
               return (
                 <article
-                  key={group.id}
                   className="group-card"
+                  key={group.id}
                 >
                   <div className="group-card-main">
-                    <div className="group-card-head">
-                      <div className="group-title-wrap">
-                        <h2 className="group-title">
-                          {group.group_name}
-                        </h2>
+                    <div className="group-card-heading">
+                      <div>
+                        <h2>{group.group_name}</h2>
 
-                        <div className="group-coordinator">
-                          {group.coordinator?.name
-                            ? `Coordinator: ${group.coordinator.name}`
-                            : 'No coordinator assigned'}
+                        <div className="coordinator">
+                          Coordinator:{' '}
+                          <strong>{coordinator}</strong>
                         </div>
                       </div>
 
                       <span
-                        className={`status-badge${
-                          isCompleted ? ' completed' : ''
-                        }`}
+                        className={`status-badge status-${status}`}
                       >
-                        {getStatusLabel(group.status || 'active')}
+                        <span className="status-dot" />
+                        {getStatusLabel(status)}
                       </span>
                     </div>
 
-                    <div className="group-meta">
-                      <div className="meta-item">
-                        <div className="meta-label">
+                    <div className="group-details">
+                      <div className="detail-item">
+                        <span className="detail-label">
                           Members
-                        </div>
-                        <div className="meta-value">
-                          {group.memberCount}
-                          {memberLimit > 0
-                            ? ` / ${memberLimit}`
-                            : ''}
-                        </div>
+                        </span>
+                        <strong>
+                          {memberCount}
+                          {memberLimit > 0 &&
+                            ` / ${memberLimit}`}
+                        </strong>
                       </div>
 
-                      <div className="meta-item">
-                        <div className="meta-label">
+                      <div className="detail-item">
+                        <span className="detail-label">
                           Outstanding
-                        </div>
-                        <div
-                          className={`meta-value ${
-                            group.totalBalance > 0
-                              ? 'owed'
-                              : 'paid'
-                          }`}
+                        </span>
+                        <strong
+                          className={
+                            Number(group.totalBalance) > 0
+                              ? 'amount-due'
+                              : 'amount-paid'
+                          }
                         >
-                          {formatMoney(group.totalBalance)}
-                        </div>
+                          {formatMoney(
+                            group.totalBalance
+                          )}
+                        </strong>
                       </div>
 
-                      <div className="meta-item">
-                        <div className="meta-label">
+                      <div className="detail-item">
+                        <span className="detail-label">
                           Due date
-                        </div>
-                        <div
-                          className="meta-value"
-                          style={{
-                            color: isOverdue
-                              ? 'var(--color-danger)'
-                              : undefined,
-                          }}
+                        </span>
+                        <strong
+                          className={
+                            isOverdue ? 'overdue' : ''
+                          }
                         >
-                          {isOverdue
-                            ? `${formatDate(group.due_date)} · Overdue`
-                            : formatDate(group.due_date)}
-                        </div>
+                          {isOverdue && '⚠ '}
+                          {formatDate(group.due_date)}
+                        </strong>
+                      </div>
+
+                      <div className="detail-item">
+                        <span className="detail-label">
+                          Delivery
+                        </span>
+                        <strong>
+                          {groupProgress}%
+                        </strong>
                       </div>
                     </div>
 
-                    <div className="group-progress">
-                      <div className="group-progress-head">
-                        <span>Delivery progress</span>
+                    <div className="delivery-progress">
+                      <div className="delivery-progress-head">
                         <span>
-                          {group.deliveredCount} /{' '}
-                          {group.memberCount} delivered
+                          Delivery progress
+                        </span>
+                        <span>
+                          {deliveredCount} of {memberCount}{' '}
+                          delivered
                         </span>
                       </div>
 
-                      <div className="progress-track">
+                      <div className="progress-track large">
                         <div
                           className="progress-fill"
                           style={{
@@ -1326,40 +1025,610 @@ export default function GroupsPage() {
                         />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="group-actions">
-                      <Link
-                        href={`/dashboard/groups/${group.id}?business_id=${businessId}`}
-                        className="action-button"
-                      >
-                        View group
-                      </Link>
+                  <div className="group-card-actions">
+                    <Link
+                      href={`/dashboard/groups/${group.id}?business_id=${businessId || ''}`}
+                      className="card-action primary-action"
+                    >
+                      View group
+                    </Link>
 
-                      <Link
-                        href={`/dashboard/groups/${group.id}/edit?business_id=${businessId}`}
-                        className="action-button"
-                      >
-                        Edit
-                      </Link>
+                    <Link
+                      href={`/dashboard/groups/${group.id}/edit?business_id=${businessId || ''}`}
+                      className="card-action"
+                    >
+                      Edit
+                    </Link>
 
-                      <button
-                        type="button"
-                        className="action-button danger"
-                        disabled={deletingId === group.id}
-                        onClick={() => handleDelete(group)}
-                      >
-                        {deletingId === group.id
-                          ? 'Deleting...'
-                          : 'Delete'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="card-action delete-action"
+                      disabled={deletingId === group.id}
+                      onClick={() => handleDelete(group)}
+                    >
+                      {deletingId === group.id
+                        ? 'Deleting…'
+                        : 'Delete'}
+                    </button>
                   </div>
                 </article>
               )
             })}
-          </div>
+          </section>
         )}
       </div>
+
+      <style jsx>{`
+        .groups-page {
+          min-height: 100%;
+          padding: 28px 22px 48px;
+          background: var(--color-bg);
+          color: var(--color-text);
+        }
+
+        .groups-shell {
+          width: 100%;
+          max-width: 1180px;
+          margin: 0 auto;
+        }
+
+        .page-header {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 24px;
+          margin-bottom: 24px;
+        }
+
+        .page-heading {
+          min-width: 0;
+        }
+
+        .section-eyebrow {
+          margin-bottom: 7px;
+          color: var(--color-accent);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          line-height: 1;
+          text-transform: uppercase;
+        }
+
+        .page-heading h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: 750;
+          letter-spacing: -0.025em;
+          line-height: 1.15;
+        }
+
+        .page-heading p {
+          max-width: 620px;
+          margin: 8px 0 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .new-group-button {
+          display: inline-flex;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          min-height: 38px;
+          padding: 0 15px;
+          border: 1px solid var(--color-accent);
+          border-radius: 8px;
+          background: var(--color-accent);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          text-decoration: none;
+          box-shadow: var(--shadow-sm);
+          transition:
+            transform 0.15s ease,
+            box-shadow 0.15s ease,
+            opacity 0.15s ease;
+        }
+
+        .new-group-button:hover {
+          transform: translateY(-1px);
+          box-shadow: var(--shadow-md);
+          opacity: 0.96;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+
+        .stat-card {
+          min-width: 0;
+          padding: 14px;
+          border: 1px solid var(--color-border);
+          border-radius: 11px;
+          background: var(--color-card);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .stat-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .stat-label {
+          color: var(--color-text-muted);
+          font-size: 10px;
+          font-weight: 750;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .stat-icon {
+          display: grid;
+          width: 27px;
+          height: 27px;
+          place-items: center;
+          border: 1px solid var(--color-border);
+          border-radius: 7px;
+          color: var(--color-accent);
+          background: var(--color-bg);
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .danger-icon {
+          color: var(--color-danger);
+        }
+
+        .stat-value {
+          margin-top: 9px;
+          font-size: 22px;
+          font-weight: 750;
+          letter-spacing: -0.025em;
+          line-height: 1;
+        }
+
+        .stat-value.money {
+          font-size: 19px;
+        }
+
+        .stat-note {
+          min-height: 16px;
+          margin-top: 7px;
+          color: var(--color-text-muted);
+          font-size: 10px;
+          line-height: 1.4;
+        }
+
+        .progress-stat .stat-top {
+          margin-bottom: 12px;
+        }
+
+        .progress-percent {
+          color: var(--color-success);
+          font-size: 12px;
+          font-weight: 750;
+        }
+
+        .progress-track {
+          width: 100%;
+          height: 6px;
+          overflow: hidden;
+          border-radius: 999px;
+          background: var(--color-bg);
+        }
+
+        .progress-track.large {
+          height: 7px;
+        }
+
+        .progress-fill {
+          height: 100%;
+          min-width: 0;
+          border-radius: inherit;
+          background: var(--color-success);
+          transition: width 0.25s ease;
+        }
+
+        .groups-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 10px;
+          padding: 10px;
+          border: 1px solid var(--color-border);
+          border-radius: 10px;
+          background: var(--color-card);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .search-box {
+          display: flex;
+          flex: 1;
+          align-items: center;
+          gap: 8px;
+          max-width: 420px;
+          min-height: 35px;
+          padding: 0 10px;
+          border: 1px solid var(--color-border);
+          border-radius: 7px;
+          background: var(--color-bg);
+          color: var(--color-text-muted);
+        }
+
+        .search-box:focus-within {
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px rgba(216, 178, 76, 0.1);
+        }
+
+        .search-box input {
+          width: 100%;
+          min-width: 0;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: var(--color-text);
+          font: inherit;
+          font-size: 11px;
+        }
+
+        .search-box input::placeholder {
+          color: var(--color-text-muted);
+        }
+
+        .clear-search {
+          display: grid;
+          flex-shrink: 0;
+          width: 20px;
+          height: 20px;
+          place-items: center;
+          padding: 0;
+          border: 0;
+          border-radius: 50%;
+          background: var(--color-border);
+          color: var(--color-text-muted);
+          cursor: pointer;
+          font-size: 14px;
+          line-height: 1;
+        }
+
+        .filter-tabs {
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          padding: 3px;
+          border-radius: 8px;
+          background: var(--color-bg);
+        }
+
+        .filter-tab {
+          min-height: 29px;
+          padding: 0 11px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--color-text-muted);
+          cursor: pointer;
+          font: inherit;
+          font-size: 10px;
+          font-weight: 700;
+          transition:
+            background 0.15s ease,
+            color 0.15s ease;
+        }
+
+        .filter-tab:hover {
+          color: var(--color-text);
+        }
+
+        .filter-tab.selected {
+          background: var(--color-card);
+          color: var(--color-text);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .results-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          min-height: 28px;
+          margin-bottom: 9px;
+          padding: 0 2px;
+          color: var(--color-text-muted);
+          font-size: 10px;
+        }
+
+        .results-row strong {
+          color: var(--color-text);
+          font-weight: 750;
+        }
+
+        .reset-filters {
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: var(--color-accent);
+          cursor: pointer;
+          font: inherit;
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .group-list {
+          display: grid;
+          gap: 9px;
+        }
+
+        .group-card {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 18px;
+          padding: 15px;
+          border: 1px solid var(--color-border);
+          border-radius: 11px;
+          background: var(--color-card);
+          box-shadow: var(--shadow-sm);
+          transition:
+            border-color 0.15s ease,
+            box-shadow 0.15s ease,
+            transform 0.15s ease;
+        }
+
+        .group-card:hover {
+          border-color: rgba(216, 178, 76, 0.45);
+          box-shadow: var(--shadow-md);
+          transform: translateY(-1px);
+        }
+
+        .group-card-main {
+          min-width: 0;
+        }
+
+        .group-card-heading {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .group-card-heading h2 {
+          overflow: hidden;
+          margin: 0;
+          color: var(--color-text);
+          font-size: 15px;
+          font-weight: 750;
+          line-height: 1.3;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .coordinator {
+          margin-top: 4px;
+          color: var(--color-text-muted);
+          font-size: 10px;
+          line-height: 1.4;
+        }
+
+        .coordinator strong {
+          color: var(--color-text);
+          font-weight: 650;
+        }
+
+        .status-badge {
+          display: inline-flex;
+          flex-shrink: 0;
+          align-items: center;
+          gap: 5px;
+          min-height: 23px;
+          padding: 0 8px;
+          border: 1px solid var(--color-border);
+          border-radius: 999px;
+          background: var(--color-bg);
+          color: var(--color-text-muted);
+          font-size: 9px;
+          font-weight: 750;
+          text-transform: capitalize;
+        }
+
+        .status-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: currentColor;
+        }
+
+        .status-active {
+          color: var(--color-success);
+        }
+
+        .status-completed {
+          color: var(--color-accent);
+        }
+
+        .status-pending {
+          color: var(--color-text-muted);
+        }
+
+        .group-details {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(90px, 1fr));
+          gap: 10px;
+          margin-top: 14px;
+        }
+
+        .detail-item {
+          min-width: 0;
+        }
+
+        .detail-label {
+          display: block;
+          margin-bottom: 4px;
+          color: var(--color-text-muted);
+          font-size: 9px;
+          font-weight: 650;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .detail-item strong {
+          display: block;
+          overflow: hidden;
+          color: var(--color-text);
+          font-size: 11px;
+          font-weight: 750;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .detail-item .amount-due {
+          color: var(--color-danger);
+        }
+
+        .detail-item .amount-paid {
+          color: var(--color-success);
+        }
+
+        .detail-item .overdue {
+          color: var(--color-danger);
+        }
+
+        .delivery-progress {
+          margin-top: 13px;
+        }
+
+        .delivery-progress-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 5px;
+          color: var(--color-text-muted);
+          font-size: 9px;
+        }
+
+        .group-card-actions {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 5px;
+          min-width: 84px;
+          padding-left: 14px;
+          border-left: 1px solid var(--color-border);
+        }
+
+        .card-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 29px;
+          padding: 0 10px;
+          border: 1px solid var(--color-border);
+          border-radius: 6px;
+          background: var(--color-bg);
+          color: var(--color-text-muted);
+          cursor: pointer;
+          font: inherit;
+          font-size: 10px;
+          font-weight: 700;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .card-action:hover {
+          border-color: var(--color-accent);
+          color: var(--color-text);
+        }
+
+        .primary-action {
+          border-color: var(--color-accent);
+          background: var(--color-accent);
+          color: #fff;
+        }
+
+        .primary-action:hover {
+          color: #fff;
+        }
+
+        .delete-action {
+          border-color: transparent;
+          background: transparent;
+          color: var(--color-danger);
+        }
+
+        .delete-action:hover {
+          border-color: rgba(220, 80, 80, 0.2);
+          background: rgba(220, 80, 80, 0.05);
+        }
+
+        .delete-action:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+
+        .empty-state {
+          display: grid;
+          justify-items: center;
+          padding: 58px 24px;
+          border: 1px dashed var(--color-border);
+          border-radius: 12px;
+          background: var(--color-card);
+          text-align: center;
+        }
+
+        .empty-icon {
+          display: grid;
+          width: 52px;
+          height: 52px;
+          margin-bottom: 13px;
+          place-items: center;
+          border: 1px solid var(--color-border);
+          border-radius: 14px;
+          background: var(--color-bg);
+          color: var(--color-accent);
+        }
+
+        .empty-state h2 {
+          margin: 0;
+          color: var(--color-text);
+          font-size: 16px;
+          font-weight: 750;
+        }
+
+        .empty-state p {
+          max-width: 450px;
+          margin: 7px 0 17px;
+          color: var(--color-text-muted);
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
+        .empty-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          min-height: 34px;
+          padding: 0 13px;
+          border: 1px solid var(--color-accent);
+          border-radius: 7px;
+          background: var(--color-accent);
+          color: #fff;
+          cursor: pointer;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 700;
+          text-decoration: none;
+        }
+      `}</style>
     </div>
   )
-}
+                        }
