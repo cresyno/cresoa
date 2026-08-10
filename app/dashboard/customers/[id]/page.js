@@ -224,8 +224,8 @@ export default function CustomerDetailPage({ params }) {
   }
 
 const handleSave = async (event) => {
+const handleSave = async (event) => {
   event.preventDefault()
-
   setSaving(true)
   setMessage('')
 
@@ -238,10 +238,7 @@ const handleSave = async (event) => {
   }
 
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
+    const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
       return
@@ -263,28 +260,43 @@ const handleSave = async (event) => {
       body: JSON.stringify(updateData),
     })
 
-    const result = await response.json()
-
+    // First, check if the response is OK
     if (!response.ok) {
-      throw new Error(result.error || 'Failed to update customer')
+      // Try to get error message from response body (if any)
+      let errorMessage = 'Failed to update customer'
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorMessage
+      } catch (_) {
+        // If response body is not JSON, use status text
+        errorMessage = response.statusText || errorMessage
+      }
+      throw new Error(errorMessage)
+    }
+
+    // If response has content, try to parse JSON; otherwise assume success
+    let result = null
+    const contentLength = response.headers.get('content-length')
+    if (contentLength && parseInt(contentLength, 10) > 0) {
+      try {
+        result = await response.json()
+      } catch (_) {
+        // If parsing fails but response was OK, we can ignore
+      }
     }
 
     await refreshCustomer()
-
     setEditing(false)
     setMessage('Customer updated successfully')
+    setTimeout(() => setMessage(''), 3000)
 
-    setTimeout(() => {
-      setMessage('')
-    }, 3000)
   } catch (err) {
     console.error('Update error:', err)
     setMessage(`Error: ${err.message}`)
   } finally {
     setSaving(false)
   }
-                                 }
-  
+}
 const handleDelete = async () => {
     const confirmed = window.confirm(
       'Delete this customer and all their orders? This cannot be undone.'
