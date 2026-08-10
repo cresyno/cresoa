@@ -170,7 +170,7 @@ export default function CustomerDetailPage({ params }) {
     }
   }
 
-  const handleSave = async (event) => {
+const handleSave = async (event) => {
   event.preventDefault()
   setSaving(true)
   setMessage('')
@@ -206,13 +206,13 @@ export default function CustomerDetailPage({ params }) {
       body: JSON.stringify(updateData),
     })
 
-    // Read the response body (it might be JSON or plain text)
+    // Read response as text (not JSON) to catch any error message
     const text = await response.text()
     let result = null
     try {
       result = JSON.parse(text)
     } catch (_) {
-      // not JSON
+      // not JSON – use raw text
     }
 
     if (!response.ok) {
@@ -227,14 +227,13 @@ export default function CustomerDetailPage({ params }) {
 
   } catch (err) {
     console.error('Update error:', err)
-    // Show the actual error message from the server
+    // Show the actual error from the server
+    alert(`❌ Server error: ${err.message}`)
     setMessage(`❌ ${err.message}`)
-    // Also show a temporary alert to help debugging (remove later)
-    alert(`Server error: ${err.message}`)
   } finally {
     setSaving(false)
   }
-  }
+}
   const handleDelete = async () => {
     const confirmed = window.confirm(
       'Delete this customer and all their orders? This cannot be undone.'
