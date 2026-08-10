@@ -242,6 +242,8 @@ export default function FashionDashboardPage() {
           }
         `}</style>
       </div>
+)
+}
 } catch (err) {
   console.error('Render error:', err)
   return (
