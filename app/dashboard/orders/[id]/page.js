@@ -530,10 +530,9 @@ export default function OrderDetailPage() {
     setSelectedStatus(status)
   }
 
-  const currentStatusInfo =
-    STATUS_FLOW.find(
-      item => item.value === order.current_status
-    ) || STATUS_FLOW[0]
+  const currentStatusInfo = STATUS_FLOW.find(
+  item => item.value === (order?.current_status || 'Order placed')
+) || STATUS_FLOW[0]
 
   const selectedStatusInfo =
     STATUS_FLOW.find(
