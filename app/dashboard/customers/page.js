@@ -1,148 +1,244 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { Icon } from '../../../components/Icon'
 
+const formatMoney = value =>
+  `₦${Number(value || 0).toLocaleString('en-NG')}`
+
+const formatDate = value => {
+  if (!value) return 'No order yet'
+  return new Date(value).toLocaleDateString('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
 export default function CustomersPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [businessName, setBusinessName] = useState('')
+  const [businessId, setBusinessId] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('last_added')
-  const [currentBusinessId, setCurrentBusinessId] = useState(null)
 
   const loadCustomers = async () => {
     setLoading(true)
     setError(null)
+
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session }
+      } = await supabase.auth.getSession()
+
       if (!session) {
         router.push('/login')
         return
       }
 
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user }
+      } = await supabase.auth.getUser()
+
       if (!user) {
         router.push('/login')
         return
       }
 
-      // ─── Get business ID from URL ───
-      const urlBizId = searchParams.get('business_id')
-      let businessId = urlBizId
+      const urlBusinessId =
+        searchParams.get('business_id')
 
-      if (!businessId || businessId.length < 20) {
+      let resolvedBusinessId = urlBusinessId
+
+      if (
+        !resolvedBusinessId ||
+        resolvedBusinessId.length < 20
+      ) {
         const { data: owned } = await supabase
           .from('businesses')
           .select('id, name')
           .eq('owner_id', user.id)
           .single()
+
         if (owned) {
-          businessId = owned.id
+          resolvedBusinessId = owned.id
           setBusinessName(owned.name)
         } else {
-          const { data: membership } = await supabase
-            .from('business_memberships')
-            .select('business_id')
-            .eq('user_id', user.id)
-            .maybeSingle()
+          const { data: membership } =
+            await supabase
+              .from('business_memberships')
+              .select('business_id')
+              .eq('user_id', user.id)
+              .maybeSingle()
+
           if (membership) {
-            businessId = membership.business_id
-            const { data: biz } = await supabase
-              .from('businesses')
-              .select('name')
-              .eq('id', businessId)
-              .single()
-            if (biz) setBusinessName(biz.name)
+            resolvedBusinessId =
+              membership.business_id
+
+            const { data: business } =
+              await supabase
+                .from('businesses')
+                .select('name')
+                .eq(
+                  'id',
+                  resolvedBusinessId
+                )
+                .single()
+
+            if (business) {
+              setBusinessName(business.name)
+            }
           }
         }
       } else {
-        const { data: biz } = await supabase
-          .from('businesses')
-          .select('name')
-          .eq('id', businessId)
-          .single()
-        if (biz) setBusinessName(biz.name)
+        const { data: business } =
+          await supabase
+            .from('businesses')
+            .select('name')
+            .eq('id', resolvedBusinessId)
+            .single()
+
+        if (business) {
+          setBusinessName(business.name)
+        }
       }
 
-      if (!businessId) {
+      if (!resolvedBusinessId) {
         router.push('/onboarding')
         return
       }
 
-      setCurrentBusinessId(businessId)
+      setBusinessId(resolvedBusinessId)
 
-      // ─── Fetch customers via API ───
-      const response = await fetch(`/api/customers?business_id=${businessId}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      })
-
-      const result = await response.json()
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to load customers')
-      }
-
-      // ─── Fetch order stats for each customer ───
-      const customersWithStats = await Promise.all(
-        (result.customers || []).map(async (c) => {
-          const { data: orders } = await supabase
-            .from('orders')
-            .select('price, amount_paid')
-            .eq('customer_id', c.id)
-
-          const orderCount = orders?.length || 0
-          const totalSpent = orders?.reduce((sum, o) => sum + (o.amount_paid || 0), 0) || 0
-          const balance = orders?.reduce((sum, o) => sum + ((o.price || 0) - (o.amount_paid || 0)), 0) || 0
-
-          // Get last order date
-          let lastOrder = null
-          if (orders && orders.length > 0) {
-            const { data: last } = await supabase
-              .from('orders')
-              .select('created_at')
-              .eq('customer_id', c.id)
-              .order('created_at', { ascending: false })
-              .limit(1)
-            if (last && last.length > 0) {
-              lastOrder = last[0].created_at
-            }
+      const response = await fetch(
+        `/api/customers?business_id=${resolvedBusinessId}`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`
           }
-
-          return {
-            ...c,
-            orderCount,
-            totalSpent,
-            balance,
-            lastOrder,
-          }
-        })
+        }
       )
 
-      // ─── Apply sorting ───
-      const sorted = [...customersWithStats].sort((a, b) => {
-        switch (sortBy) {
-          case 'last_added':
-            return new Date(b.created_at) - new Date(a.created_at)
-          case 'most_orders':
-            return b.orderCount - a.orderCount
-          case 'most_spent':
-            return b.totalSpent - a.totalSpent
-          case 'name_asc':
-            return a.first_name?.localeCompare(b.first_name || '') || 0
-          default:
-            return 0
-        }
-      })
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            'Unable to load customers'
+        )
+      }
+
+      const customersWithStats =
+        await Promise.all(
+          (result.customers || []).map(
+            async customer => {
+              const { data: orders } =
+                await supabase
+                  .from('orders')
+                  .select(
+                    'id, price, amount_paid, created_at, current_status'
+                  )
+                  .eq(
+                    'customer_id',
+                    customer.id
+                  )
+
+              const orderList = orders || []
+
+              const orderCount =
+                orderList.length
+
+              const totalSpent =
+                orderList.reduce(
+                  (sum, order) =>
+                    sum +
+                    Number(
+                      order.amount_paid || 0
+                    ),
+                  0
+                )
+
+              const balance =
+                orderList.reduce(
+                  (sum, order) =>
+                    sum +
+                    Number(
+                      order.price || 0
+                    ) -
+                    Number(
+                      order.amount_paid || 0
+                    ),
+                  0
+                )
+
+              const lastOrder =
+                [...orderList].sort(
+                  (a, b) =>
+                    new Date(b.created_at) -
+                    new Date(a.created_at)
+                )[0] || null
+
+              return {
+                ...customer,
+                orderCount,
+                totalSpent,
+                balance,
+                lastOrder
+              }
+            }
+          )
+        )
+
+      const sorted =
+        [...customersWithStats].sort(
+          (a, b) => {
+            if (sortBy === 'most_orders') {
+              return (
+                b.orderCount -
+                a.orderCount
+              )
+            }
+
+            if (sortBy === 'most_spent') {
+              return (
+                b.totalSpent -
+                a.totalSpent
+              )
+            }
+
+            if (sortBy === 'name_asc') {
+              return `${a.first_name} ${a.last_name}`
+                .localeCompare(
+                  `${b.first_name} ${b.last_name}`
+                )
+            }
+
+            return (
+              new Date(b.created_at) -
+              new Date(a.created_at)
+            )
+          }
+        )
 
       setCustomers(sorted)
     } catch (err) {
-      console.error('Error loading customers:', err)
-      setError('Failed to load customers: ' + err.message)
+      console.error(
+        'Customers page error:',
+        err
+      )
+
+      setError(
+        err?.message ||
+          'Something went wrong while loading customers.'
+      )
     } finally {
       setLoading(false)
     }
@@ -150,177 +246,1021 @@ export default function CustomersPage() {
 
   useEffect(() => {
     loadCustomers()
-  }, [router, searchParams, sortBy])
+  }, [searchParams, sortBy])
 
-  const filteredCustomers = customers.filter(c => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    const fullName = `${c.first_name || ''} ${c.last_name || ''}`.toLowerCase()
-    return fullName.includes(q) || c.phone?.includes(q)
-  })
+  const filteredCustomers = useMemo(() => {
+    const query = search
+      .trim()
+      .toLowerCase()
 
-  // ─── Call handler ───
-  const handleCall = (phone) => {
-    if (!phone) return
-    const cleanPhone = phone.replace(/\D/g, '')
-    window.location.href = `tel:${cleanPhone}`
-  }
+    if (!query) return customers
 
-  // ─── Skeleton ───
+    return customers.filter(customer => {
+      const name =
+        `${customer.first_name || ''} ${customer.last_name || ''}`
+          .toLowerCase()
+
+      const phone =
+        customer.phone || ''
+
+      return (
+        name.includes(query) ||
+        phone.includes(query)
+      )
+    })
+  }, [customers, search])
+
+  const totalOutstanding = customers.reduce(
+    (sum, customer) =>
+      sum +
+      Math.max(Number(customer.balance || 0), 0),
+    0
+  )
+
+  const activeCustomers =
+    customers.filter(
+      customer =>
+        customer.orderCount > 0
+    ).length
+
   if (loading) {
     return (
-      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ width: '140px', height: '24px', background: 'var(--color-border)', borderRadius: '6px' }} />
-          <div style={{ width: '80px', height: '20px', background: 'var(--color-border)', borderRadius: '6px' }} />
+      <main className="customers-page">
+        <div className="customers-shell">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-search" />
+          <div className="skeleton-list">
+            {[1, 2, 3, 4].map(item => (
+              <div
+                className="customer-skeleton"
+                key={item}
+              >
+                <div className="skeleton avatar" />
+                <div className="skeleton-lines">
+                  <div className="skeleton line wide" />
+                  <div className="skeleton line" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
-          {[1,2,3,4,5,6].map(i => (
-            <div key={i} style={{ background: 'var(--color-card)', padding: '1rem', borderRadius: '8px', boxShadow: 'var(--shadow-sm)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '60%', height: '16px', background: 'var(--color-border)', borderRadius: '6px' }} />
-              <div style={{ width: '40%', height: '12px', background: 'var(--color-border)', borderRadius: '6px', marginTop: '0.5rem' }} />
-              <div style={{ width: '50%', height: '10px', background: 'var(--color-border)', borderRadius: '6px', marginTop: '0.5rem' }} />
-            </div>
-          ))}
-        </div>
-        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
-      </div>
+      </main>
     )
   }
 
   if (error) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
-        {error}
-        <button onClick={loadCustomers} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
-      </div>
+      <main className="customers-page">
+        <div className="customers-error">
+          <Icon
+            name="alert-circle"
+            size={30}
+            stroke="var(--color-danger)"
+          />
+          <h2>
+            We couldn't load your customers
+          </h2>
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={loadCustomers}
+          >
+            Try again
+          </button>
+        </div>
+      </main>
     )
   }
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', color: 'var(--color-text)' }}>
-      {/* ─── Header ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0, color: 'var(--color-text)' }}>Customers</h1>
-          <p style={{ color: 'var(--color-text-muted)', margin: '0.1rem 0 0', fontSize: '0.85rem' }}>
-            {customers.length} customers · {businessName || 'Your business'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{ padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.85rem' }}
+    <main className="customers-page">
+      <div className="customers-shell">
+            <header className="customers-header">
+          <div className="customers-heading">
+            <button
+              type="button"
+              className="back-button"
+              onClick={() => router.push('/dashboard')}
+              aria-label="Back to dashboard"
+            >
+              <Icon
+                name="arrow-left"
+                size={19}
+                stroke="currentColor"
+              />
+            </button>
+
+            <div>
+              <span className="eyebrow">
+                {businessName || 'YOUR BUSINESS'}
+              </span>
+
+              <h1>Customers</h1>
+
+              <p>
+                {customers.length === 0
+                  ? 'Build your customer list'
+                  : `${customers.length} customer${customers.length === 1 ? '' : 's'} in your business`}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="add-customer-button"
+            onClick={() =>
+              router.push(
+                businessId
+                  ? `/dashboard/customers/new?business_id=${businessId}`
+                  : '/dashboard/customers/new'
+              )
+            }
           >
-            <option value="last_added">Last Added</option>
-            <option value="most_orders">Most Orders</option>
-            <option value="most_spent">Most Spent</option>
-            <option value="name_asc">Name (A–Z)</option>
-          </select>
-          <a
-            href={`/dashboard/customers/new?business_id=${currentBusinessId || ''}`}
-            style={{ padding: '0.4rem 1rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', fontWeight: '500', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-          >
-            <Icon name="plus" size={14} stroke="#fff" /> Add Customer
-          </a>
-        </div>
-      </div>
+            <Icon
+              name="plus"
+              size={18}
+              stroke="currentColor"
+            />
 
-      {/* ─── Search ─── */}
-      <input
-        type="text"
-        placeholder="Search by name or phone..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ width: '100%', maxWidth: '400px', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.85rem', marginBottom: '1.2rem' }}
-      />
+            <span>Add customer</span>
+          </button>
+        </header>
 
-      {/* ─── Customers Grid ─── */}
-      {filteredCustomers.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--color-card)', borderRadius: '12px', border: '1px dashed var(--color-border)' }}>
-          <span style={{ fontSize: '3rem', display: 'block', marginBottom: '0.5rem' }}>👤</span>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', margin: '0 0 0.3rem' }}>No customers found</h3>
-          <p style={{ color: 'var(--color-text-muted)', margin: '0 0 1rem' }}>Add your first customer to start tracking orders.</p>
-          <a href={`/dashboard/customers/new?business_id=${currentBusinessId || ''}`} style={{ display: 'inline-block', padding: '0.6rem 1.5rem', background: 'var(--color-accent)', color: '#fff', borderRadius: '6px', textDecoration: 'none', fontWeight: '600' }}>Add Customer →</a>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-          {filteredCustomers.map((c) => {
-            const fullName = `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Unnamed'
-            const initials = fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        <section className="customer-overview">
+          <div className="overview-card">
+            <div className="overview-icon navy">
+              <Icon
+                name="users"
+                size={19}
+                stroke="currentColor"
+              />
+            </div>
 
-            return (
-              <div key={c.id} style={{ background: 'var(--color-card)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', transition: 'box-shadow 0.2s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.5rem' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.9rem', flexShrink: 0 }}>
-                    {initials || '?'}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '600', color: 'var(--color-text)' }}>{fullName}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                      {c.gender ? c.gender.charAt(0).toUpperCase() + c.gender.slice(1) : ''}
-                      {c.age_category ? ` · ${c.age_category}` : ''}
-                    </div>
-                  </div>
-                  {c.phone && (
-                    <button
-                      onClick={() => handleCall(c.phone)}
-                      style={{ background: 'var(--color-success)', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Icon name="phone" size={14} stroke="#fff" />
-                    </button>
-                  )}
-                </div>
+            <div>
+              <span>Customers</span>
+              <strong>{customers.length}</strong>
+            </div>
+          </div>
 
-                {c.phone && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text)', marginBottom: '0.2rem' }}>
-                    📞 {c.phone}
-                  </div>
-                )}
-                {c.email && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.2rem' }}>
-                    ✉️ {c.email}
-                  </div>
-                )}
-                {c.address && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-                    📍 {c.address}
-                  </div>
-                )}
+          <div className="overview-card">
+            <div className="overview-icon green">
+              <Icon
+                name="user-check"
+                size={19}
+                stroke="currentColor"
+              />
+            </div>
 
-                <div style={{ display: 'flex', gap: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)', marginTop: '0.5rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Orders</div>
-                    <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{c.orderCount || 0}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Spent</div>
-                    <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>₦{c.totalSpent?.toLocaleString() || 0}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Balance</div>
-                    <div style={{ fontWeight: '600', fontSize: '0.95rem', color: c.balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                      {c.balance > 0 ? `₦${c.balance.toLocaleString()}` : '✓'}
-                    </div>
-                  </div>
-                </div>
+            <div>
+              <span>With orders</span>
+              <strong>{activeCustomers}</strong>
+            </div>
+          </div>
 
-                {c.lastOrder && (
-                  <div style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
-                    Last order: {new Date(c.lastOrder).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </div>
-                )}
+          <div className="overview-card">
+            <div className="overview-icon gold">
+              <Icon
+                name="wallet"
+                size={19}
+                stroke="currentColor"
+              />
+            </div>
 
-                <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                  <a href={`/dashboard/customers/${c.id}?business_id=${currentBusinessId || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.6rem', borderRadius: '4px' }}>View</a>
-                  <a href={`/dashboard/customers/${c.id}/edit?business_id=${currentBusinessId || ''}`} style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textDecoration: 'none', border: '1px solid var(--color-border)', padding: '0.1rem 0.6rem', borderRadius: '4px' }}>Edit</a>
-                </div>
+            <div>
+              <span>Outstanding</span>
+              <strong>
+                {formatMoney(totalOutstanding)}
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        <section className="customer-toolbar">
+          <div className="search-box">
+            <Icon
+              name="search"
+              size={18}
+              stroke="var(--color-text-muted)"
+            />
+
+            <input
+              type="search"
+              value={search}
+              onChange={event =>
+                setSearch(event.target.value)
+              }
+              placeholder="Search name or phone..."
+              aria-label="Search customers"
+            />
+
+            {search && (
+              <button
+                type="button"
+                className="clear-search"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+              >
+                <Icon
+                  name="x"
+                  size={16}
+                  stroke="currentColor"
+                />
+              </button>
+            )}
+          </div>
+
+          <label className="sort-control">
+            <span>Sort</span>
+
+            <select
+              value={sortBy}
+              onChange={event =>
+                setSortBy(event.target.value)
+              }
+            >
+              <option value="last_added">
+                Recently added
+              </option>
+
+              <option value="most_orders">
+                Most orders
+              </option>
+
+              <option value="most_spent">
+                Highest payments
+              </option>
+
+              <option value="name_asc">
+                Name A–Z
+              </option>
+            </select>
+          </label>
+        </section>
+
+        <section className="customer-list-section">
+          <div className="list-heading">
+            <div>
+              <span className="section-label">
+                CUSTOMER LIST
+              </span>
+
+              <h2>
+                {search
+                  ? `Results for “${search}”`
+                  : 'Your customers'}
+              </h2>
+            </div>
+
+            {search && (
+              <span className="result-count">
+                {filteredCustomers.length} result
+                {filteredCustomers.length === 1
+                  ? ''
+                  : 's'}
+              </span>
+            )}
+          </div>
+
+          {filteredCustomers.length === 0 ? (
+            <div className="empty-customers">
+              <div className="empty-icon">
+                <Icon
+                  name={
+                    search
+                      ? 'search-x'
+                      : 'users'
+                  }
+                  size={26}
+                  stroke="var(--color-primary)"
+                />
               </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
+
+              <h3>
+                {search
+                  ? 'No customer found'
+                  : 'No customers yet'}
+              </h3>
+
+              <p>
+                {search
+                  ? 'Try another name or phone number.'
+                  : 'Add your first customer so you can keep their orders, payments, and measurements together.'}
+              </p>
+
+              {!search && (
+                <button
+                  type="button"
+                  className="empty-action"
+                  onClick={() =>
+                    router.push(
+                      businessId
+                        ? `/dashboard/customers/new?business_id=${businessId}`
+                        : '/dashboard/customers/new'
+                    )
+                  }
+                >
+                  <Icon
+                    name="plus"
+                    size={17}
+                    stroke="currentColor"
+                  />
+                  Add your first customer
+                </button>
+              )}
+
+              {search && (
+                <button
+                  type="button"
+                  className="empty-action secondary"
+                  onClick={() => setSearch('')}
+                >
+                  Clear search
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="customer-list">
+              {filteredCustomers.map(customer => {
+                const fullName =
+                  `${customer.first_name || ''} ${customer.last_name || ''}`
+                    .trim() ||
+                  'Unnamed customer'
+
+                const initials =
+                  `${customer.first_name?.charAt(0) || ''}${customer.last_name?.charAt(0) || ''}`
+                    .toUpperCase() ||
+                  '?'
+
+                const hasBalance =
+                  Number(customer.balance || 0) > 0
+
+                return (
+                  <button
+                    type="button"
+                    className="customer-row"
+                    key={customer.id}
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/customers/${customer.id}`
+                      )
+                    }
+                  >
+                    <div className="customer-avatar">
+                      {initials}
+                    </div>
+
+                    <div className="customer-main">
+                      <div className="customer-name-line">
+                        <h3>{fullName}</h3>
+
+                        {customer.orderCount > 0 && (
+                          <span className="orders-badge">
+                            {customer.orderCount}
+                            {customer.orderCount === 1
+                              ? ' order'
+                              : ' orders'}
+                          </span>
+                        )}
+                      </div>
+
+                      <p>
+                        {customer.phone ||
+                          customer.email ||
+                          'No contact information'}
+                      </p>
+
+                      <div className="customer-meta">
+                        <span>
+                          {customer.lastOrder
+                            ? `Last order ${formatDate(customer.lastOrder.created_at)}`
+                            : 'No orders yet'}
+                        </span>
+
+                        {hasBalance && (
+                          <strong>
+                            {formatMoney(
+                              customer.balance
+                            )}{' '}
+                            due
+                          </strong>
+                        )}
+
+                        {!hasBalance &&
+                          customer.orderCount > 0 && (
+                            <span className="paid-label">
+                              Paid
+                            </span>
+                          )}
+                      </div>
+                    </div>
+
+                    <Icon
+                      name="chevron-right"
+                      size={18}
+                      stroke="var(--color-text-muted)"
+                    />
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+                    </div>
+
+      <style jsx>{`
+        .customers-page {
+          min-height: 100vh;
+          background: var(--color-bg);
+          color: var(--color-text);
+          padding: 0 16px 90px;
+        }
+
+        .customers-shell {
+          width: 100%;
+          max-width: 760px;
+          margin: 0 auto;
+        }
+
+        .customers-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 20px 0;
+        }
+
+        .customers-heading {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .back-button {
+          width: 42px;
+          height: 42px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border: 1px solid var(--color-border);
+          border-radius: 13px;
+          background: var(--color-card);
+          color: var(--color-primary);
+          cursor: pointer;
+        }
+
+        .eyebrow {
+          color: var(--color-text-muted);
+          font-size: 10px;
+          letter-spacing: .08em;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        .customers-heading h1 {
+          margin: 4px 0;
+          font-size: 26px;
+          line-height: 1.15;
+          font-weight: 900;
+          color: var(--color-primary);
+        }
+
+        .customers-heading p {
+          margin: 0;
+          color: var(--color-text-muted);
+          font-size: 13px;
+        }
+
+        .add-customer-button {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 12px 14px;
+          border: 0;
+          border-radius: 13px;
+          background: var(--color-accent);
+          color: var(--color-primary);
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .customer-overview {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+
+        .overview-card {
+          min-height: 92px;
+          padding: 13px;
+          border-radius: 18px;
+          background: var(--color-card);
+          border: 1px solid var(--color-border);
+          box-shadow: var(--shadow);
+        }
+
+        .overview-icon {
+          width: 34px;
+          height: 34px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          margin-bottom: 10px;
+        }
+
+        .overview-icon.navy {
+          background: rgba(15,43,74,.1);
+          color: var(--color-primary);
+        }
+
+        .overview-icon.green {
+          background: rgba(46,125,94,.12);
+          color: var(--color-secondary);
+        }
+
+        .overview-icon.gold {
+          background: rgba(212,165,42,.14);
+          color: var(--color-accent);
+        }
+
+        .overview-card span {
+          display: block;
+          color: var(--color-text-muted);
+          font-size: 10px;
+          margin-bottom: 4px;
+        }
+
+        .overview-card strong {
+          display: block;
+          color: var(--color-primary);
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .customer-toolbar {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 22px;
+        }
+
+        .search-box {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          height: 48px;
+          padding: 0 14px;
+          border-radius: 14px;
+          border: 1px solid var(--color-border);
+          background: var(--color-card);
+        }
+
+        .search-box input {
+          flex: 1;
+          border: 0;
+          outline: none;
+          background: transparent;
+          color: var(--color-text);
+          font-size: 14px;
+        }
+
+        .search-box input::placeholder {
+          color: var(--color-text-muted);
+        }
+
+        .clear-search {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          border: 0;
+          border-radius: 50%;
+          background: var(--color-bg);
+          color: var(--color-text-muted);
+        }
+
+        .sort-control {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          height: 46px;
+          padding: 0 14px;
+          border-radius: 14px;
+          background: var(--color-card);
+          border: 1px solid var(--color-border);
+        }
+
+        .sort-control span {
+          color: var(--color-text-muted);
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .sort-control select {
+          border: 0;
+          outline: none;
+          background: transparent;
+          color: var(--color-primary);
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .list-heading {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-bottom: 12px;
+        }
+
+        .section-label {
+          color: var(--color-text-muted);
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: .1em;
+        }
+
+        .list-heading h2 {
+          margin: 4px 0 0;
+          color: var(--color-primary);
+          font-size: 19px;
+        }
+
+        .result-count {
+          color: var(--color-text-muted);
+          font-size: 12px;
+        }
+
+        .customer-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .customer-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 14px;
+          text-align: left;
+          border-radius: 18px;
+          border: 1px solid var(--color-border);
+          background: var(--color-card);
+          box-shadow: var(--shadow-sm);
+          cursor: pointer;
+        }
+
+        .customer-avatar {
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: var(--color-primary);
+          color: white;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .customer-main {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .customer-name-line {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+
+        .customer-name-line h3 {
+          margin: 0;
+          color: var(--color-primary);
+          font-size: 15px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .orders-badge {
+          flex-shrink: 0;
+          padding: 3px 7px;
+          border-radius: 20px;
+          background: rgba(212,165,42,.14);
+          color: var(--color-primary);
+          font-size: 9px;
+          font-weight: 800;
+        }
+
+        .customer-main p {
+          margin: 5px 0;
+          color: var(--color-text-muted);
+          font-size: 12px;
+        }
+
+        .customer-meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          font-size: 11px;
+          color: var(--color-text-muted);
+        }
+
+        .customer-meta strong {
+          color: var(--color-danger);
+        }
+
+        .paid-label {
+          color: var(--color-secondary);
+          font-weight: 800;
+}
+        .empty-customers {
+          padding: 42px 20px;
+          text-align: center;
+          border: 1px dashed var(--color-border);
+          border-radius: 20px;
+          background: var(--color-card);
+        }
+
+        .empty-icon {
+          width: 58px;
+          height: 58px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 15px;
+          border-radius: 18px;
+          background: rgba(15,43,74,.08);
+        }
+
+        .empty-customers h3 {
+          margin: 0;
+          color: var(--color-primary);
+          font-size: 17px;
+        }
+
+        .empty-customers p {
+          max-width: 330px;
+          margin: 8px auto 18px;
+          color: var(--color-text-muted);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .empty-action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 12px 15px;
+          border: 0;
+          border-radius: 12px;
+          background: var(--color-accent);
+          color: var(--color-primary);
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .empty-action.secondary {
+          background: var(--color-primary);
+          color: white;
+        }
+
+        .customers-error {
+          min-height: 70vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          text-align: center;
+        }
+
+        .customers-error h2 {
+          margin: 14px 0 7px;
+          color: var(--color-primary);
+          font-size: 19px;
+        }
+
+        .customers-error p {
+          max-width: 360px;
+          margin: 0 0 18px;
+          color: var(--color-text-muted);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .customers-error button {
+          padding: 12px 18px;
+          border: 0;
+          border-radius: 12px;
+          background: var(--color-accent);
+          color: var(--color-primary);
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .skeleton {
+          position: relative;
+          overflow: hidden;
+          background: var(--color-border);
+          border-radius: 10px;
+        }
+
+        .skeleton::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          transform: translateX(-100%);
+          background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255,255,255,.5),
+            transparent
+          );
+          animation: shimmer 1.4s infinite;
+        }
+
+        .skeleton-title {
+          width: 190px;
+          height: 30px;
+          margin: 28px 0 18px;
+        }
+
+        .skeleton-search {
+          width: 100%;
+          height: 48px;
+          margin-bottom: 20px;
+        }
+
+        .skeleton-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .customer-skeleton {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 15px;
+          border: 1px solid var(--color-border);
+          border-radius: 18px;
+          background: var(--color-card);
+        }
+
+        .skeleton.avatar {
+          width: 48px;
+          height: 48px;
+          flex-shrink: 0;
+          border-radius: 50%;
+        }
+
+        .skeleton-lines {
+          flex: 1;
+        }
+
+        .skeleton.line {
+          width: 55%;
+          height: 10px;
+          margin-top: 8px;
+        }
+
+        .skeleton.line.wide {
+          width: 75%;
+          margin-top: 0;
+        }
+
+        .customer-row:hover {
+          border-color: rgba(15,43,74,.2);
+          box-shadow: var(--shadow-md);
+        }
+
+        .customer-row:focus-visible,
+        .back-button:focus-visible,
+        .add-customer-button:focus-visible,
+        .empty-action:focus-visible,
+        .customers-error button:focus-visible {
+          outline: 3px solid rgba(212,165,42,.35);
+          outline-offset: 2px;
+        }
+
+        .add-customer-button:active,
+        .empty-action:active,
+        .back-button:active {
+          transform: translateY(1px);
+        }
+
+        @keyframes shimmer {
+          100% {
+            transform: translateX(100%);
           }
+        }
+
+        @media (min-width: 640px) {
+          .customers-page {
+            padding: 0 24px 70px;
+          }
+
+          .customers-header {
+            padding-top: 30px;
+          }
+
+          .customer-toolbar {
+            flex-direction: row;
+          }
+
+          .search-box {
+            flex: 1;
+          }
+
+          .sort-control {
+            width: 210px;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .customers-page {
+            padding-left: 12px;
+            padding-right: 12px;
+          }
+
+          .customers-header {
+            align-items: center;
+          }
+
+          .customers-heading {
+            gap: 9px;
+          }
+
+          .customers-heading h1 {
+            font-size: 23px;
+          }
+
+          .customers-heading p {
+            font-size: 11px;
+          }
+
+          .add-customer-button {
+            width: 42px;
+            height: 42px;
+            padding: 0;
+            justify-content: center;
+          }
+
+          .add-customer-button span {
+            display: none;
+          }
+
+          .customer-overview {
+            gap: 7px;
+          }
+
+          .overview-card {
+            min-height: 86px;
+            padding: 10px;
+          }
+
+          .overview-icon {
+            width: 30px;
+            height: 30px;
+            margin-bottom: 8px;
+          }
+
+          .overview-card span {
+            font-size: 9px;
+          }
+
+          .overview-card strong {
+            font-size: 13px;
+          }
+
+          .customer-row {
+            padding: 12px;
+          }
+
+          .customer-avatar {
+            width: 43px;
+            height: 43px;
+            font-size: 13px;
+          }
+
+          .customer-name-line h3 {
+            max-width: 150px;
+          }
+        }
+      `}</style>
+    </main>
+  )
+}
