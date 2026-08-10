@@ -1226,15 +1226,40 @@ const styles = `
   @media (max-width: 760px) {
     .group-page { padding: 16px; }
     .group-header { align-items: flex-start; }
-    .group-header, .group-header-left { flex-direction: column; }
-    .group-header-left { flex-direction: row; width: 100%; }
-    .group-header-actions { width: 100%; }
-    .group-header-actions .group-button { flex: 1; }
-    .group-summary { grid-template-columns: 1fr; }
-    .group-metrics { grid-template-columns: 1fr 1fr; }
-    <style>{`
-    .form-grid { grid-template-columns: 1fr; }
-    .field.full { grid-column: auto; }
+    .group-header,
+    .group-header-left {
+      flex-direction: column;
+    }
+
+    .group-header-left {
+      flex-direction: row;
+      width: 100%;
+    }
+
+    .group-header-actions {
+      width: 100%;
+    }
+
+    .group-header-actions .group-button {
+      flex: 1;
+    }
+
+    .group-summary {
+      grid-template-columns: 1fr;
+    }
+
+    .group-metrics {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .field.full {
+      grid-column: auto;
+    }
+  }
 `}</style>
     </div>
   )
