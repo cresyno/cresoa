@@ -152,8 +152,6 @@ export default function GroupDetailPage() {
 
       if (memberError) throw memberError
       if (customerError) {
-        // Some older customer schemas may not have all display columns.
-        // The member list is still usable, so do not fail the entire page.
         console.warn('Customer list warning:', customerError)
       }
 
@@ -248,10 +246,10 @@ export default function GroupDetailPage() {
       if (byPhone) return byPhone.id
     }
 
-    // Then try first/last name. This avoids the old `name`-only insert
-    // that caused `first_name` NOT NULL errors.
+    // Split name into first_name and last_name
     const { first_name, last_name } = splitName(name)
 
+    // Check if customer already exists by name
     let existingQuery = supabase
       .from('customers')
       .select('id')
@@ -267,20 +265,20 @@ export default function GroupDetailPage() {
     if (existingError) throw existingError
     if (existing) return existing.id
 
+    // Create new customer with first_name and last_name
     const customerPayload = {
       business_id: businessId,
-      first_name,
-      last_name,
+      first_name: first_name,
+      last_name: last_name || null,
       phone: phone || null,
     }
 
-    // Keep `name` only when the column exists in this project.
-    // If it does not, the fallback below creates the customer without it.
+    // Also include name if the column exists (it's a fallback)
     let { data: created, error: createError } = await supabase
       .from('customers')
       .insert({
         ...customerPayload,
-        name,
+        name: name,
       })
       .select('id')
       .single()
@@ -292,6 +290,7 @@ export default function GroupDetailPage() {
 
       if (!unknownNameColumn) throw createError
 
+      // Fallback: insert without the 'name' column
       const fallback = await supabase
         .from('customers')
         .insert(customerPayload)
@@ -447,7 +446,7 @@ export default function GroupDetailPage() {
           <div />
         </div>
         <div className="group-skeleton-table" />
-        <style jsx>{styles}</style>
+        <style dangerouslySetInnerHTML={{ __html: styles }} />
       </div>
     )
   }
@@ -462,7 +461,7 @@ export default function GroupDetailPage() {
             Try again
           </button>
         </div>
-        <style jsx>{styles}</style>
+        <style dangerouslySetInnerHTML={{ __html: styles }} />
       </div>
     )
   }
@@ -633,7 +632,7 @@ export default function GroupDetailPage() {
                           <span className={`status-pill ${status.className}`}>{status.label}</span>
                         )}
                       </td>
-                            {canManage && (
+                         {canManage && (
                         <td>
                           <div className="row-actions">
                             <button
@@ -799,7 +798,8 @@ export default function GroupDetailPage() {
           </div>
         </div>
       )}
-            <style jsx>{styles}</style>
+
+      <style dangerouslySetInnerHTML={{ __html: styles }} />
     </div>
   )
 }
@@ -854,9 +854,9 @@ const styles = `
     place-items: center;
     color: var(--ink);
     flex: 0 0 auto;
-  }
+          }
 
-  .group-eyebrow {
+.group-eyebrow {
     font-size: 10px;
     letter-spacing: .12em;
     font-weight: 800;
@@ -1093,7 +1093,7 @@ const styles = `
   }
   .icon-button.danger { color: #b44b45; }
 
-  .group-empty {
+    .group-empty {
     padding: 58px 20px;
     text-align: center;
   }
@@ -1110,7 +1110,7 @@ const styles = `
     font-size: 22px;
   }
 
-    .group-empty h3 { margin: 0; font-size: 15px; }
+  .group-empty h3 { margin: 0; font-size: 15px; }
   .group-empty p { color: var(--muted); font-size: 12px; margin: 5px 0 15px; }
 
   .group-footer {
@@ -1235,4 +1235,3 @@ const styles = `
     .form-grid { grid-template-columns: 1fr; }
     .field.full { grid-column: auto; }
   }
-}
