@@ -1387,7 +1387,7 @@ const handleDelete = async () => {
             padding: 1rem;
           }
         }
-      `}</style>
+      }</style>
     </div>
   )
               }
