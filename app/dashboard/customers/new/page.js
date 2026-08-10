@@ -521,57 +521,63 @@ export default function NewCustomerPage() {
                 <span>OPTIONAL</span>
               </div>
 
-              <select
-  value={form.gender}
-  onChange={event =>
-    updateField(
-      'gender',
-      event.target.value
-    )
-  }
->
-  <option value="">
-    Not specified
-  </option>
-
-  <option value="female">
-    Female
-  </option>
-
-  <option value="male">
-    Male
-  </option>
-
-  <option value="other">
-    Other
-  </option>
-</select>
-</label>
-<label className="field">
-  <span>Age category</span>
+              <div className="field-grid">
+  <label className="field">
+    <span>Gender</span>
 
     <select
-  value={form.age_category}
-  onChange={event =>
-    updateField(
-      'age_category',
-      event.target.value
-    )
-  }
->
-  <option value="">
-    Not specified
-  </option>
+      value={form.gender}
+      onChange={event =>
+        updateField(
+          'gender',
+          event.target.value
+        )
+      }
+    >
+      <option value="">
+        Not specified
+      </option>
 
-  <option value="child">
-    Child
-  </option>
+      <option value="female">
+        Female
+      </option>
 
-  <option value="adult">
-    Adult
-  </option>
-  </select>
+      <option value="male">
+        Male
+      </option>
+
+      <option value="other">
+        Other
+      </option>
+    </select>
   </label>
+
+  <label className="field">
+    <span>Age category</span>
+
+    <select
+      value={form.age_category}
+      onChange={event =>
+        updateField(
+          'age_category',
+          event.target.value
+        )
+      }
+    >
+      <option value="">
+        Not specified
+      </option>
+
+      <option value="child">
+        Child
+      </option>
+
+      <option value="adult">
+        Adult
+      </option>
+    </select>
+  </label>
+</div>
               </div>
             </section>
           )}
