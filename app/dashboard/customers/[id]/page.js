@@ -141,8 +141,6 @@ export default function CustomerDetailPage({ params }) {
           })
         }
 
-              }
-
       } catch (err) {
         console.error('Error loading customer:', err)
 
