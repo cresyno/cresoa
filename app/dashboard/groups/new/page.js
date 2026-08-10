@@ -504,28 +504,33 @@ export default function NewGroupPage() {
             }
           }
 
-          // If no phone match, don't silently attach
-          // somebody with the same name.
-          if (!customerId) {
-            const { data: newCustomer, error: customerError } =
-              await supabase
-                .from('customers')
-                .insert({
-                  business_id: businessId,
-                  name: normalizedName,
-                  phone: normalizedPhone || null
-                })
-                .select('id')
-                .single()
+         // If no phone match, create a new customer
+if (!customerId) {
+  // Split the full name into first and last name
+  const nameParts = normalizedName.trim().split(/\s+/);
+  const firstName = nameParts[0] || normalizedName;
+  const lastName = nameParts.slice(1).join(' ') || firstName;
 
-            if (customerError) {
-              throw customerError
-            }
+  const { data: newCustomer, error: customerError } =
+    await supabase
+      .from('customers')
+      .insert({
+        business_id: businessId,
+        name: normalizedName,
+        first_name: firstName,
+        last_name: lastName,
+        phone: normalizedPhone || null
+      })
+      .select('id')
+      .single()
 
-            customerId = newCustomer.id
-          }
-        }
+  if (customerError) {
+    throw customerError
+  }
 
+  customerId = newCustomer.id
+}
+          
         // ─────────────────────────────────────────────
         // 3. CREATE MEMBER ORDER
         // ─────────────────────────────────────────────
