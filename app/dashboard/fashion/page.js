@@ -2068,7 +2068,7 @@ export default function FashionDashboardPage() {
               )}
             </div>
 
-            {selectedAnalyticsDay && (
+{selectedAnalyticsDay && (
   <div className="selected-day">
     <div>
       <span>
@@ -2087,27 +2087,21 @@ export default function FashionDashboardPage() {
       </strong>
     </div>
 
-                <div>
-                  <span>
-                    Collected
-                  </span>
+    <div>
+      <span>Collected</span>
+      <strong>
+        {formatMoney(selectedDayCollected)}
+      </strong>
+    </div>
 
-                  <strong>
-                    {formatMoney(
-                      selectedDayCollected
-                    )}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Outstanding
-                  </span>
-
-                  <strong>
-                    {formatMoney(
-                      selectedDayOutstanding
-                    )}
+    <div>
+      <span>Outstanding</span>
+      <strong>
+        {formatMoney(selectedDayOutstanding)}
+      </strong>
+    </div>
+  </div>
+)}
                   </strong>
                 </div>
               </div>
