@@ -631,11 +631,9 @@ function ThemeStyle({ theme }) {
     margin-inline:auto;
   }
 }
-
     `}</style>
   )
 }
-
 
 function ThemeToggle({ theme, onToggle }) {
   const isDark = theme === 'dark'
