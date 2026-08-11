@@ -636,7 +636,6 @@ function ThemeStyle({ theme }) {
   )
 }
 
-<style>{cresoaAnimationStyles}</style>
 
 function ThemeToggle({ theme, onToggle }) {
   const isDark = theme === 'dark'
