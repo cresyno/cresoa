@@ -1,14 +1,12 @@
 'use client'
 
-import {
-  useEffect,
-  useMemo,
-  useState
-} from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { getCurrentBusinessId } from '@/lib/business'
-import Icon from '@/components/Icon'
+import Link from 'next/link'
+import { supabase } from '../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
+import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'
+import { Icon } from '../../../components/Icon'
 
 /* =========================================================
    CRESOA FASHION DASHBOARD
