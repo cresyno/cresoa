@@ -1575,7 +1575,7 @@ function TodayOverview({
           textAlign: 'right'
         }}
       >
-        {meta ? (
+        {meta && (
           <span
             style={{
               display: 'block',
