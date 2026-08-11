@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
-import { isFeatureAvailable } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'
 
+// ─── Helpers (unchanged) ──────────────────────────────
 const safeAmount = (value) => {
   const amount = Number(value)
   return Number.isFinite(amount) ? amount : 0
@@ -76,20 +76,17 @@ export default function FashionDashboardPage() {
   const loadDashboard = async () => {
     setLoading(true)
     setError('')
-
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
         return
       }
-
       const resolvedBusinessId = getCurrentBusinessId() || searchParams.get('business_id')
       if (!resolvedBusinessId) {
         router.push('/dashboard')
         return
       }
-
       setBusinessId(resolvedBusinessId)
 
       const { data: businessData, error: businessError } = await supabase
@@ -192,7 +189,6 @@ export default function FashionDashboardPage() {
       (customers.length > 0 ? Math.min(100, (customers.length / 10) * 10) : 0) * 0.2
     )
 
-    // Count orders due soon (next 3 days)
     const now = new Date()
     const threeDaysLater = new Date()
     threeDaysLater.setDate(threeDaysLater.getDate() + 3)
@@ -202,15 +198,11 @@ export default function FashionDashboardPage() {
       return due >= now && due <= threeDaysLater
     }).length
 
-    // Count fittings (we don't have fittings data, so we'll use orders with due_date soon as proxy for "fittings today"?)
-    // Instead we'll use orders due today.
     const todayStr = new Date().toISOString().split('T')[0]
     const ordersDueToday = orders.filter(o => o.due_date?.startsWith(todayStr) && !isOrderDelivered(o)).length
 
-    // Expected payments (outstanding balance)
     const expectedPayments = totalOutstanding
 
-    // Needs attention: overdue orders + orders with high outstanding balance > 0
     const attentionItems = orders.filter(o => {
       if (isOrderDelivered(o)) return false
       const balance = calculateBalance(o)
@@ -237,7 +229,6 @@ export default function FashionDashboardPage() {
       ordersDueToday,
       expectedPayments,
       attentionItems,
-      // Production pipeline counts by status
       production: {
         'Order placed': orders.filter(o => o.current_status === 'Order placed' && !isOrderDelivered(o)).length,
         'Cutting': orders.filter(o => o.current_status === 'Cutting' && !isOrderDelivered(o)).length,
@@ -252,12 +243,10 @@ export default function FashionDashboardPage() {
     return analytics.daily.find(d => d.key === selectedDay) || null
   }, [analytics.daily, selectedDay])
 
-  // ─── Recent data ────────────────────────────────────
   const recentOrders = useMemo(() => orders.slice(0, 6), [orders])
   const recentCustomers = useMemo(() => customers.slice(0, 6), [customers])
   const recentGroups = useMemo(() => groups.slice(0, 4), [groups])
 
-  // ─── Attention items ──────────────────────────────
   const attentionList = useMemo(() => {
     return orders
       .filter(o => {
@@ -282,7 +271,7 @@ export default function FashionDashboardPage() {
       })
   }, [orders, customers])
 
-  // ─── Loading state ──────────────────────────────────
+  // ─── Loading & error states (unchanged) ──────────────
   if (loading) {
     return (
       <div className="dashboard-loading">
@@ -296,7 +285,7 @@ export default function FashionDashboardPage() {
             <div className="skeleton-panel" />
           </div>
         </div>
-        <style jsx>{`
+        <style jsx global>{`
           .dashboard-loading { min-height: 100vh; padding: 16px; background: var(--color-bg); }
           .loading-skeleton { max-width: 1200px; margin: 0 auto; }
           .skeleton-header { height: 60px; background: var(--color-border); border-radius: 12px; margin-bottom: 16px; opacity: .5; animation: pulse 1.4s infinite; }
@@ -322,7 +311,7 @@ export default function FashionDashboardPage() {
           <h2>Business unavailable</h2>
           <p>This business is currently inactive. Contact the account owner.</p>
         </div>
-        <style jsx>{`
+        <style jsx global>{`
           .dashboard-error { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--color-bg); }
           .error-card { max-width: 420px; padding: 32px; text-align: center; background: var(--color-card); border-radius: 16px; border: 1px solid var(--color-border); }
           .error-card h2 { margin: 16px 0 8px; }
@@ -341,7 +330,7 @@ export default function FashionDashboardPage() {
           <p>{error}</p>
           <button onClick={loadDashboard} className="retry-btn">Try again</button>
         </div>
-        <style jsx>{`
+        <style jsx global>{`
           .dashboard-error { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--color-bg); }
           .error-card { max-width: 420px; padding: 32px; text-align: center; background: var(--color-card); border-radius: 16px; border: 1px solid var(--color-border); }
           .error-card h2 { margin: 16px 0 8px; }
@@ -381,7 +370,6 @@ export default function FashionDashboardPage() {
       return new Date(c.created_at) >= startDate
     }).length
 
-    // Build greeting
     const hour = new Date().getHours()
     let greeting = 'Good evening'
     if (hour < 12) greeting = 'Good morning'
@@ -389,462 +377,78 @@ export default function FashionDashboardPage() {
     const userName = business?.name || 'there'
 
     return (
-      <div className="dashboard-page">
-        <div className="dashboard-shell">
-          {/* ─── HEADER ─── */}
-          <header className="dashboard-header">
-            <div className="greeting">
-              <span className="greeting-text">{greeting}, {userName} 👋</span>
-              <span className="date-text">{formatDate(new Date())}</span>
-            </div>
-            <div className="header-actions">
-              <button className="btn-quick" onClick={() => setShowQuickOrder(true)}>
-                <Icon name="plus" size={16} stroke="currentColor" />
-                Quick order
-              </button>
-              <Link href={`/dashboard/orders/new?business_id=${businessId || ''}`} className="btn-primary">
-                <Icon name="plus" size={16} stroke="#fff" />
-                New order
-              </Link>
-            </div>
-          </header>
-
-          {/* ─── TODAY SUMMARY ─── */}
-          <section className="today-summary">
-            <div className="section-label">TODAY</div>
-            <div className="today-grid">
-              <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=due_soon`} className="today-tile">
-                <span className="today-number">{ordersDueSoon}</span>
-                <span className="today-label">Orders due soon</span>
-              </Link>
-              <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=due_today`} className="today-tile">
-                <span className="today-number">{ordersDueToday}</span>
-                <span className="today-label">Fittings today</span>
-              </Link>
-              <Link href={`/dashboard/payments?business_id=${businessId || ''}&filter=outstanding`} className="today-tile">
-                <span className="today-number">{formatMoney(expectedPayments)}</span>
-                <span className="today-label">Expected payments</span>
-              </Link>
-              <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=attention`} className="today-tile">
-                <span className="today-number">{attentionItems}</span>
-                <span className="today-label">Need attention</span>
-              </Link>
-            </div>
-          </section>
-
-          {/* ─── NEEDS YOUR ATTENTION ─── */}
-          {attentionList.length > 0 && (
-            <section className="attention-section">
-              <div className="section-label">NEEDS YOUR ATTENTION</div>
-              <div className="attention-list">
-                {attentionList.map((item) => {
-                  const isCritical = item.overdue
-                  const isWarning = item.balance > 0 && !item.overdue
-                  return (
-                    <div key={item.id} className={`attention-item ${isCritical ? 'critical' : isWarning ? 'warning' : ''}`}>
-                      <div className="attention-content">
-                        <div className="attention-main">
-                          <span className="attention-icon">{isCritical ? '🔴' : isWarning ? '🟠' : '🟡'}</span>
-                          <div>
-                            <strong>{item.customerName}</strong>
-                            <span className="attention-title">— {item.title}</span>
-                          </div>
-                        </div>
-                        <div className="attention-detail">
-                          {isCritical && <span className="attention-badge danger">Due {formatDate(item.due_date)}</span>}
-                          {isWarning && <span className="attention-badge warning">₦{item.balance.toLocaleString()} outstanding</span>}
-                          {!isCritical && !isWarning && <span className="attention-badge info">Payment overdue</span>}
-                        </div>
-                      </div>
-                      <div className="attention-actions">
-                        <Link href={`/dashboard/orders/${item.id}?business_id=${businessId || ''}`} className="attention-btn">View order</Link>
-                        {isWarning && (
-                          <button className="attention-btn secondary" onClick={() => alert(`Send reminder to ${item.customerName}`)}>
-                            Send reminder
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          )}
-
-               {/* ─── BUSINESS HEALTH ─── */}
-          <section className="health-section">
-            <div className="section-label">BUSINESS HEALTH</div>
-            <div className="health-card">
-              <div className="health-score-big">
-                <span className={`health-score-number ${healthTone}`}>{healthScore}</span>
-                <span className="health-score-label">/ 100</span>
-              </div>
-              <div className="health-metrics">
-                <div><span>Payment collection</span><span className={collectionRate >= 80 ? 'good' : 'watch'}>{collectionRate}%</span></div>
-                <div><span>Production</span><span className={deliveryRate >= 70 ? 'good' : 'watch'}>{deliveryRate}%</span></div>
-                <div><span>Overdue orders</span><span className={overdue === 0 ? 'good' : 'danger'}>{overdue}</span></div>
-                <div><span>Customer growth</span><span className="good">+{newCustomersThisPeriod}</span></div>
-              </div>
-              <div className="health-message">
-                {healthTone === 'healthy' && '👍 Everything is on track. Keep up the great work!'}
-                {healthTone === 'watch' && '⚠️ Some areas need attention. Review your overdue and collection.'}
-                {healthTone === 'risk' && '🚨 Critical issues detected. Address overdue orders and payments immediately.'}
-              </div>
-            </div>
-          </section>
-            
-
-          {/* ─── PRODUCTION PIPELINE ─── */}
-          <section className="production-section">
-            <div className="section-label">PRODUCTION</div>
-            <div className="production-pipeline">
-              {Object.entries(production).map(([stage, count]) => (
-                <Link
-                  key={stage}
-                  href={`/dashboard/orders?business_id=${businessId || ''}&status=${stage}`}
-                  className="production-stage"
-                >
-                  <span className="stage-count">{count}</span>
-                  <span className="stage-name">{stage}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          {/* ─── CHART (moved lower) ─── */}
-          <section className="chart-section">
-            <div className="panel-header">
-              <div>
-                <div className="section-label">PERFORMANCE</div>
-                <h2>Revenue & orders</h2>
-              </div>
-              <div className="period-control">
-                {['7d','30d','90d'].map(v => (
-                  <button key={v} className={period === v ? 'active' : ''} onClick={() => setPeriod(v)}>
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="chart-summary">
-              <div><span>Revenue</span><strong>{formatMoney(periodRevenue)}</strong></div>
-              <div><span>Orders</span><strong>{periodOrders.length}</strong></div>
-            </div>
-            <div className="chart-container">
-              {daily.length === 0 ? (
-                <div className="chart-empty">No data</div>
-              ) : (
-                daily.map((day) => {
-                  const maxRevenue = Math.max(...daily.map(d => Number(d.revenue || 0)), 1)
-                  const height = Math.max(4, Math.round((Number(day.revenue || 0) / maxRevenue) * 100))
-                  const selected = day.key === selectedAnalyticsDay?.key
-                  return (
-                    <button key={day.key} className={`chart-bar-wrap ${selected ? 'selected' : ''}`} onClick={() => setSelectedDay(day.key)}>
-                      <div className="chart-bar" style={{ height: `${height}%` }} />
-                      <span className="chart-label">{day.label}</span>
-                    </button>
-                  )
-                })
-              )}
-            </div>
-            {selectedAnalyticsDay && (
-              <div className="selected-day">
-                <div><span>Date</span><strong>{formatDate(selectedAnalyticsDay.key)}</strong></div>
-                <div><span>Orders</span><strong>{selectedAnalyticsDay.orders}</strong></div>
-                <div><span>Revenue</span><strong>{formatMoney(selectedAnalyticsDay.revenue)}</strong></div>
-              </div>
-            )}
-          </section>
-
-          {/* ─── RECENT ORDERS ─── */}
-          <section className="recent-section">
-            <div className="section-header">
-              <div className="section-label">RECENT ORDERS</div>
-              <Link href={`/dashboard/orders?business_id=${businessId || ''}`} className="view-all">View all →</Link>
-            </div>
-            {recentOrders.length === 0 ? (
-              <div className="empty-state">No orders yet</div>
-            ) : (
-              <div className="order-list">
-                {recentOrders.map((order) => {
-                  const customer = customers.find(c => c.id === order.customer_id)
-                  const status = getStatusBadge(order.current_status)
-                  const balance = calculateBalance(order)
-                  return (
-                    <Link key={order.id} href={`/dashboard/orders/${order.id}?business_id=${businessId || ''}`} className="order-item">
-                      <div>
-                        <strong className="order-title">{order.title || 'Untitled'}</strong>
-                        <span className="order-customer">{customer?.name || 'Unknown'}</span>
-                      </div>
-                      <div className="order-meta">
-                        <span className={`status-badge ${status.class}`}>{status.label}</span>
-                        <strong className="order-price">{formatMoney(order.price)}</strong>
-                        {balance > 0 && <span className="order-balance">₦{balance.toLocaleString()} due</span>}
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* ─── RECENT CUSTOMERS ─── */}
-          <section className="recent-section">
-            <div className="section-header">
-              <div className="section-label">RECENT CUSTOMERS</div>
-              <Link href={`/dashboard/customers?business_id=${businessId || ''}`} className="view-all">View all →</Link>
-            </div>
-            {recentCustomers.length === 0 ? (
-              <div className="empty-state">No customers yet</div>
-            ) : (
-              <div className="customer-list">
-                {recentCustomers.map((customer) => {
-                  const customerOrders = orders.filter(o => o.customer_id === customer.id)
-                  return (
-                    <Link key={customer.id} href={`/dashboard/customers/${customer.id}?business_id=${businessId || ''}`} className="customer-item">
-                      <div className="customer-avatar">
-                        {(customer.name || customer.first_name || 'C').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <strong className="customer-name">{customer.name || customer.first_name || 'Unknown'}</strong>
-                        <span className="customer-phone">{customer.phone || 'No phone'}</span>
-                      </div>
-                      <span className="customer-orders">{customerOrders.length} orders</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* ─── RECENT GROUPS ─── */}
-          <section className="recent-section">
-            <div className="section-header">
-              <div className="section-label">ASO-EBI GROUPS</div>
-              <Link href={`/dashboard/groups?business_id=${businessId || ''}`} className="view-all">View all →</Link>
-            </div>
-            {recentGroups.length === 0 ? (
-              <div className="empty-state">No group orders yet</div>
-            ) : (
-              <div className="group-list">
-                {recentGroups.map((group) => {
-                  const groupOrders = orders.filter(o => o.group_order_id === group.id)
-                  const delivered = groupOrders.filter(o => isOrderDelivered(o)).length
-                  const progress = groupOrders.length > 0 ? Math.round((delivered / groupOrders.length) * 100) : 0
-                  return (
-                    <Link key={group.id} href={`/dashboard/groups/${group.id}?business_id=${businessId || ''}`} className="group-item">
-                      <div>
-                        <strong className="group-name">{group.group_name}</strong>
-                        <span className="group-meta">{groupOrders.length} members · {progress}% delivered</span>
-                      </div>
-                      <div className="group-progress">
-                        <div className="progress-track"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
-                        <span>{progress}%</span>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* ─── BOTTOM NAVIGATION ─── */}
-          <nav className="bottom-nav">
-            <Link href={`/dashboard?business_id=${businessId || ''}`} className="nav-item active">
-              <Icon name="bar-chart-2" size={20} stroke="currentColor" />
-              <span>Home</span>
-            </Link>
-            <Link href={`/dashboard/orders?business_id=${businessId || ''}`} className="nav-item">
-              <Icon name="file-text" size={20} stroke="currentColor" />
-              <span>Orders</span>
-            </Link>
-            <Link href={`/dashboard/customers?business_id=${businessId || ''}`} className="nav-item">
-              <Icon name="users" size={20} stroke="currentColor" />
-              <span>Customers</span>
-            </Link>
-            <Link href={`/dashboard/orders?business_id=${businessId || ''}&status=Cutting,Sewing`} className="nav-item">
-              <Icon name="scissors" size={20} stroke="currentColor" />
-              <span>Production</span>
-            </Link>
-            <Link href={`/dashboard/settings?business_id=${businessId || ''}`} className="nav-item">
-              <Icon name="settings" size={20} stroke="currentColor" />
-              <span>More</span>
-            </Link>
-          </nav>
-
-          {/* ─── FLOATING ACTION BUTTON ─── */}
-          <button className="fab-btn" onClick={() => setShowQuickOrder(true)}>
-            <Icon name="plus" size={24} stroke="#fff" />
-          </button>
-
-          {/* ─── QUICK ORDER MODAL ─── */}
-          {showQuickOrder && (
-            <div className="modal-backdrop" onClick={() => setShowQuickOrder(false)}>
-              <div className="modal" onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                  <div>
-                    <h2>Quick order</h2>
-                    <p>Create an order in seconds</p>
-                  </div>
-                  <button className="modal-close" onClick={() => setShowQuickOrder(false)}>
-                    <Icon name="x" size={20} stroke="currentColor" />
-                  </button>
-                </div>
-                <form onSubmit={async (e) => {
-                  e.preventDefault()
-                  setQuickOrderLoading(true)
-                  try {
-                    const price = safeAmount(quickOrderPrice)
-                    const deposit = Math.min(Math.max(safeAmount(quickOrderDeposit), 0), price)
-                    const { error: insertError } = await supabase.from('orders').insert({
-                      business_id: businessId,
-                      customer_id: quickOrderCustomer,
-                      title: quickOrderItem,
-                      price,
-                      amount_paid: deposit,
-                      due_date: quickOrderDue || null,
-                      current_status: 'Order placed'
-                    })
-                    if (insertError) throw insertError
-                    setShowQuickOrder(false)
-                    await loadDashboard()
-                  } catch (err) {
-                    setQuickOrderMessage(err.message)
-                  } finally {
-                    setQuickOrderLoading(false)
-                  }
-                }}>
-                  <div className="modal-body">
-                    {quickOrderMessage && <div className="modal-error">{quickOrderMessage}</div>}
-                    <div className="modal-field">
-                      <label>Customer</label>
-                      <select value={quickOrderCustomer} onChange={e => setQuickOrderCustomer(e.target.value)} required>
-                        <option value="">Select customer</option>
-                        {customers.map(c => (
-                          <option key={c.id} value={c.id}>{c.name || c.first_name || 'Unknown'}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="modal-field">
-                      <label>Item</label>
-                      <input type="text" value={quickOrderItem} onChange={e => setQuickOrderItem(e.target.value)} placeholder="e.g. Senator outfit" required />
-                    </div>
-                    <div className="modal-field">
-                      <label>Price</label>
-                      <input type="number" value={quickOrderPrice} onChange={e => setQuickOrderPrice(e.target.value)} placeholder="0" min="0" required />
-                    </div>
-                    <div className="modal-field">
-                      <label>Deposit (optional)</label>
-                      <input type="number" value={quickOrderDeposit} onChange={e => setQuickOrderDeposit(e.target.value)} placeholder="0" min="0" />
-                    </div>
-                    <div className="modal-field">
-                      <label>Due date (optional)</label>
-                      <input type="date" value={quickOrderDue} onChange={e => setQuickOrderDue(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn-secondary" onClick={() => setShowQuickOrder(false)}>Cancel</button>
-                    <button type="submit" className="btn-primary" disabled={quickOrderLoading}>
-                      {quickOrderLoading ? 'Creating...' : 'Create order'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
-
-{/* ─── GLOBAL STYLES ─── */}
-        <style jsx>{`
-          /* ── CSS Variables (Cresoa Palette) ── */
+      <>
+        {/* ─── GLOBAL STYLES (CRESOA THEME) ─── */}
+        <style jsx global>{`
           :root {
             --color-primary: #0F2B4A;
+            --color-primary-dark: #0A1628;
             --color-accent: #D4A52A;
+            --color-accent-dark: #C79A2B;
             --color-secondary: #2E7D5E;
+            --color-secondary-dark: #1E5A44;
             --color-danger: #D9534F;
+            --color-danger-dark: #C0392B;
             --color-bg: #F8F6F2;
             --color-card: #FFFFFF;
             --color-text: #1A1A1A;
             --color-text-muted: #8A8A8A;
             --color-border: #E5E0D8;
             --shadow: 0 4px 16px rgba(15,43,74,0.06);
+            --shadow-lg: 0 8px 32px rgba(15,43,74,0.08);
           }
 
-          .dashboard-page {
-            min-height: 100vh;
-            padding: 12px 12px 100px; /* bottom padding for nav */
-            background: var(--color-bg);
-            color: var(--color-text);
-            font-family: 'Inter', sans-serif;
-          }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--color-bg); color: var(--color-text); -webkit-font-smoothing: antialiased; }
 
-          .dashboard-shell {
+          .dashboard-container {
             max-width: 800px;
             margin: 0 auto;
+            padding: 16px 16px 100px;
+          }
+
+          /* ── Cards ── */
+          .card {
+            background: var(--color-card);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow);
+            transition: box-shadow 0.15s;
           }
 
           /* ── Header ── */
-          .dashboard-header {
+          .header-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
             gap: 8px;
           }
+          .greeting-block { display: flex; flex-direction: column; }
+          .greeting-text { font-size: 20px; font-weight: 700; color: var(--color-primary); }
+          .date-text { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; }
 
-          .greeting {
-            display: flex;
-            flex-direction: column;
-          }
-
-          .greeting-text {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--color-primary);
-          }
-
-          .date-text {
-            font-size: 12px;
-            color: var(--color-text-muted);
-            margin-top: 2px;
-          }
-
-          .header-actions {
-            display: flex;
-            gap: 8px;
-          }
-
-          .btn-quick, .btn-primary {
+          .btn-group { display: flex; gap: 8px; }
+          .btn {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
             gap: 6px;
-            padding: 8px 14px;
-            border: 0;
-            border-radius: 8px;
-            font-size: 12px;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 13px;
             font-weight: 600;
+            border: none;
             cursor: pointer;
-            text-decoration: none;
             transition: all 0.15s;
+            text-decoration: none;
           }
+          .btn:active { transform: scale(0.96); }
+          .btn-primary { background: var(--color-accent); color: #fff; }
+          .btn-secondary { background: var(--color-primary); color: #fff; }
 
-          .btn-quick {
-            background: var(--color-primary);
-            color: #fff;
-          }
-
-          .btn-quick:active { transform: scale(0.96); }
-
-          .btn-primary {
-            background: var(--color-accent);
-            color: #fff;
-          }
-
-          .btn-primary:active { transform: scale(0.96); }
-
-          /* ── Section labels ── */
+          /* ── Section label ── */
           .section-label {
             font-size: 10px;
             font-weight: 700;
@@ -854,248 +458,172 @@ export default function FashionDashboardPage() {
             margin-bottom: 8px;
           }
 
-          /* ── Today Summary ── */
+          /* ── Today tiles ── */
           .today-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
+            margin-bottom: 16px;
           }
-
           .today-tile {
             display: flex;
             flex-direction: column;
-            padding: 14px 12px;
             background: var(--color-card);
-            border-radius: 12px;
+            padding: 14px 12px;
+            border-radius: 14px;
             border: 1px solid var(--color-border);
+            box-shadow: var(--shadow);
             text-decoration: none;
             color: var(--color-text);
             transition: all 0.15s;
-            box-shadow: var(--shadow);
           }
-
           .today-tile:active { transform: scale(0.97); }
-
-          .today-number {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--color-primary);
-          }
-
-          .today-label {
-            font-size: 11px;
-            color: var(--color-text-muted);
-            margin-top: 2px;
-          }
+          .today-number { font-size: 24px; font-weight: 700; color: var(--color-primary); }
+          .today-label { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
 
           /* ── Attention ── */
-          .attention-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-          }
-
+          .attention-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
           .attention-item {
             background: var(--color-card);
-            border-radius: 12px;
+            border-radius: 14px;
             padding: 14px 16px;
             border-left: 4px solid var(--color-border);
             box-shadow: var(--shadow);
             border: 1px solid var(--color-border);
             border-left-width: 4px;
-            transition: all 0.15s;
           }
-
           .attention-item.critical { border-left-color: var(--color-danger); }
           .attention-item.warning { border-left-color: var(--color-accent); }
           .attention-item.info { border-left-color: var(--color-primary); }
 
-          .attention-content {
+          .attention-row {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
           }
-
           .attention-main {
             display: flex;
             align-items: center;
             gap: 8px;
-          }
-
-          .attention-icon { font-size: 18px; }
-
-          .attention-title {
-            font-size: 13px;
-            color: var(--color-text-muted);
-            margin-left: 4px;
-          }
-
-          .attention-detail {
-            display: flex;
             flex-wrap: wrap;
-            gap: 6px;
           }
-
-          .attention-badge {
+          .attention-icon { font-size: 18px; }
+          .attention-title { font-size: 13px; color: var(--color-text-muted); }
+          .attention-detail { display: flex; flex-wrap: wrap; gap: 6px; }
+          .badge {
             font-size: 10px;
             font-weight: 600;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 12px;
             background: var(--color-bg);
           }
-
-          .attention-badge.danger { background: #fde8e8; color: var(--color-danger); }
-          .attention-badge.warning { background: #fcf2e1; color: var(--color-accent); }
-          .attention-badge.info { background: #e6f0f5; color: var(--color-primary); }
+          .badge.danger { background: #fde8e8; color: var(--color-danger); }
+          .badge.warning { background: #fcf2e1; color: var(--color-accent); }
+          .badge.info { background: #e6f0f5; color: var(--color-primary); }
 
           .attention-actions {
             display: flex;
             gap: 8px;
             margin-top: 8px;
           }
-
-          .attention-btn {
+              .attention-btn {
             padding: 4px 14px;
             border: 0;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 11px;
             font-weight: 600;
             background: var(--color-primary);
             color: #fff;
             cursor: pointer;
             text-decoration: none;
-            display: inline-flex;
-            align-items: center;
             transition: all 0.15s;
           }
-
           .attention-btn:active { transform: scale(0.95); }
-          .attention-btn.secondary {
+          .attention-btn.outline {
             background: var(--color-bg);
             color: var(--color-text);
             border: 1px solid var(--color-border);
           }
 
           /* ── Health ── */
-          .health-card {
-            background: var(--color-card);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid var(--color-border);
-            box-shadow: var(--shadow);
-          }
-
-          .health-score-big {
+          .health-card { margin-bottom: 16px; }
+          .health-score-row {
             display: flex;
             align-items: baseline;
-            gap: 4px;
+            gap: 6px;
             margin-bottom: 12px;
           }
-
-          .health-score-number {
-            font-size: 32px;
+          .health-number {
+            font-size: 34px;
             font-weight: 800;
           }
-
-          .health-score-number.healthy { color: var(--color-secondary); }
-          .health-score-number.watch { color: var(--color-accent); }
-          .health-score-number.risk { color: var(--color-danger); }
-
-          .health-score-label {
-            font-size: 14px;
-            color: var(--color-text-muted);
-          }
+          .health-number.healthy { color: var(--color-secondary); }
+          .health-number.watch { color: var(--color-accent); }
+          .health-number.risk { color: var(--color-danger); }
+          .health-label { font-size: 14px; color: var(--color-text-muted); }
 
           .health-metrics {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px 12px;
+            gap: 6px 12px;
             margin-bottom: 12px;
           }
-
           .health-metrics > div {
             display: flex;
             justify-content: space-between;
             font-size: 13px;
           }
-
-          .health-metrics span:first-child { color: var(--color-text-muted); }
+          .health-metrics .muted { color: var(--color-text-muted); }
           .health-metrics .good { color: var(--color-secondary); font-weight: 600; }
-          .health-metrics .watch { color: var(--color-accent); font-weight: 600; }
-          .health-metrics .danger { color: var(--color-danger); font-weight: 600; }
+          .health-metrics .warn { color: var(--color-accent); font-weight: 600; }
+          .health-metrics .bad { color: var(--color-danger); font-weight: 600; }
 
           .health-message {
             font-size: 13px;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
             background: var(--color-bg);
             color: var(--color-text-muted);
             line-height: 1.4;
           }
 
-          /* ── Production Pipeline ── */
-          .production-pipeline {
+          /* ── Production ── */
+          .production-grid {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
+            margin-bottom: 16px;
           }
-
-          .production-stage {
+          .stage-tile {
             display: flex;
             flex-direction: column;
             align-items: center;
             background: var(--color-card);
             padding: 10px 14px;
-            border-radius: 10px;
+            border-radius: 12px;
             border: 1px solid var(--color-border);
+            box-shadow: var(--shadow);
             text-decoration: none;
             color: var(--color-text);
-            min-width: 60px;
             flex: 1 0 auto;
+            min-width: 60px;
             transition: all 0.15s;
-            box-shadow: var(--shadow);
           }
-
-          .production-stage:active { transform: scale(0.96); }
-
-          .stage-count {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--color-primary);
-          }
-
-          .stage-name {
-            font-size: 9px;
-            text-transform: uppercase;
-            color: var(--color-text-muted);
-            margin-top: 2px;
-            letter-spacing: 0.04em;
-          }
+          .stage-tile:active { transform: scale(0.96); }
+          .stage-count { font-size: 20px; font-weight: 700; color: var(--color-primary); }
+          .stage-name { font-size: 9px; text-transform: uppercase; color: var(--color-text-muted); margin-top: 2px; letter-spacing: 0.04em; }
 
           /* ── Chart ── */
-          .chart-section {
-            background: var(--color-card);
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid var(--color-border);
-            box-shadow: var(--shadow);
-            margin-bottom: 16px;
-          }
-
-          .panel-header {
+          .chart-card { margin-bottom: 16px; }
+          .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
           }
+          .chart-header h3 { font-size: 16px; font-weight: 700; margin: 0; }
 
-          .panel-header h2 {
-            font-size: 16px;
-            font-weight: 700;
-            margin: 0;
-          }
-
-          .period-control {
+          .period-group {
             display: flex;
             gap: 4px;
             background: var(--color-bg);
@@ -1103,8 +631,7 @@ export default function FashionDashboardPage() {
             border-radius: 8px;
             border: 1px solid var(--color-border);
           }
-
-          .period-control button {
+          .period-btn {
             padding: 4px 10px;
             border: 0;
             border-radius: 6px;
@@ -1115,8 +642,7 @@ export default function FashionDashboardPage() {
             cursor: pointer;
             transition: all 0.15s;
           }
-
-          .period-control button.active {
+          .period-btn.active {
             background: var(--color-card);
             color: var(--color-text);
             box-shadow: 0 2px 4px rgba(0,0,0,0.04);
@@ -1128,28 +654,16 @@ export default function FashionDashboardPage() {
             gap: 8px;
             margin-bottom: 12px;
           }
-
           .chart-summary > div {
             padding: 8px 10px;
             border: 1px solid var(--color-border);
             border-radius: 8px;
             background: var(--color-bg);
           }
+          .chart-summary span { display: block; font-size: 10px; color: var(--color-text-muted); }
+          .chart-summary strong { display: block; font-size: 15px; font-weight: 700; margin-top: 2px; }
 
-          .chart-summary span {
-            display: block;
-            font-size: 10px;
-            color: var(--color-text-muted);
-          }
-
-          .chart-summary strong {
-            display: block;
-            font-size: 14px;
-            font-weight: 700;
-            margin-top: 2px;
-          }
-
-          .chart-container {
+          .chart-bars {
             display: flex;
             align-items: flex-end;
             gap: 3px;
@@ -1157,8 +671,7 @@ export default function FashionDashboardPage() {
             padding: 4px 0;
             border-bottom: 1px solid var(--color-border);
           }
-
-          .chart-bar-wrap {
+          .bar-wrap {
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -1169,8 +682,7 @@ export default function FashionDashboardPage() {
             cursor: pointer;
             min-width: 0;
           }
-
-          .chart-bar {
+          .bar {
             width: min(16px, 60%);
             min-height: 3px;
             border-radius: 3px 3px 0 0;
@@ -1178,27 +690,10 @@ export default function FashionDashboardPage() {
             opacity: 0.6;
             transition: all 0.2s;
           }
+          .bar-wrap.selected .bar { opacity: 1; transform: scaleX(1.15); box-shadow: 0 0 0 2px rgba(212,165,42,0.2); }
+          .bar-label { font-size: 7px; color: var(--color-text-muted); }
 
-          .chart-bar-wrap.selected .chart-bar {
-            opacity: 1;
-            transform: scaleX(1.15);
-            box-shadow: 0 0 0 2px rgba(212,165,42,0.2);
-          }
-
-          .chart-label {
-            font-size: 7px;
-            color: var(--color-text-muted);
-          }
-
-          .chart-empty {
-            width: 100%;
-            text-align: center;
-            color: var(--color-text-muted);
-            font-size: 13px;
-            padding: 20px 0;
-          }
-
-          .selected-day {
+          .day-detail {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             gap: 8px;
@@ -1208,109 +703,55 @@ export default function FashionDashboardPage() {
             border-radius: 8px;
             background: var(--color-bg);
           }
+          .day-detail > div { display: flex; flex-direction: column; gap: 1px; }
+          .day-detail span { font-size: 8px; color: var(--color-text-muted); text-transform: uppercase; }
+          .day-detail strong { font-size: 12px; font-weight: 700; }
 
-          .selected-day > div {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-          }
-
-          .selected-day span {
-            font-size: 8px;
-            color: var(--color-text-muted);
-            text-transform: uppercase;
-          }
-
-          .selected-day strong {
-            font-size: 12px;
-            font-weight: 700;
-          }
-
-          /* ── Recent Sections ── */
-          .recent-section {
-            margin-bottom: 16px;
-          }
-
+          /* ── Recent lists ── */
+          .recent-section { margin-bottom: 16px; }
           .section-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
           }
+          .view-all { font-size: 12px; font-weight: 600; color: var(--color-accent); text-decoration: none; }
 
-          .view-all {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--color-accent);
-            text-decoration: none;
-          }
-
-          .order-list, .customer-list, .group-list {
-            display: grid;
-            gap: 8px;
-          }
-
-          .order-item, .customer-item, .group-item {
+          .list { display: grid; gap: 8px; }
+          .list-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px;
+            padding: 12px 14px;
             background: var(--color-card);
-            border-radius: 10px;
+            border-radius: 12px;
             border: 1px solid var(--color-border);
+            box-shadow: var(--shadow);
             text-decoration: none;
             color: var(--color-text);
             transition: border-color 0.15s;
-            box-shadow: var(--shadow);
           }
-
-          .order-item:active, .customer-item:active, .group-item:active {
-            border-color: var(--color-accent);
-          }
-
-          .order-title, .customer-name, .group-name {
-            font-weight: 700;
-            font-size: 13px;
-          }
-
-          .order-customer, .customer-phone, .group-meta {
-            font-size: 11px;
-            color: var(--color-text-muted);
-            display: block;
-          }
-
-          .order-meta {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
-          }
-
-          .order-price {
-            font-weight: 700;
-            font-size: 13px;
-          }
-
-          .order-balance {
-            font-size: 10px;
-            color: var(--color-danger);
-          }
+          .list-item:active { border-color: var(--color-accent); }
+          .item-title { font-weight: 700; font-size: 13px; }
+          .item-sub { font-size: 11px; color: var(--color-text-muted); display: block; }
+          .item-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+          .item-price { font-weight: 700; font-size: 13px; }
+          .item-due { font-size: 10px; color: var(--color-danger); }
 
           .status-badge {
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 12px;
             font-size: 9px;
             font-weight: 700;
             text-transform: capitalize;
           }
-
           .status-placed { background: #e5e7eb; color: #374151; }
           .status-cutting { background: #fef3c7; color: #92400e; }
           .status-sewing { background: #dbeafe; color: #1e40af; }
           .status-ready { background: #d1fae5; color: #065f46; }
           .status-delivered { background: #d1fae5; color: #065f46; }
 
-          .customer-avatar {
+          .avatar {
             width: 36px;
             height: 36px;
             display: grid;
@@ -1322,12 +763,7 @@ export default function FashionDashboardPage() {
             font-weight: 700;
             flex-shrink: 0;
           }
-
-          .customer-orders {
-            font-size: 11px;
-            color: var(--color-text-muted);
-            flex-shrink: 0;
-          }
+          .customer-orders { font-size: 11px; color: var(--color-text-muted); flex-shrink: 0; }
 
           .group-progress {
             display: flex;
@@ -1335,7 +771,6 @@ export default function FashionDashboardPage() {
             gap: 6px;
             flex-shrink: 0;
           }
-
           .progress-track {
             width: 50px;
             height: 4px;
@@ -1343,27 +778,19 @@ export default function FashionDashboardPage() {
             background: var(--color-border);
             overflow: hidden;
           }
-
-          .progress-fill {
-            height: 100%;
-            background: var(--color-secondary);
-          }
-
-          .group-progress span {
-            font-size: 11px;
-            font-weight: 600;
-          }
+          .progress-fill { height: 100%; background: var(--color-secondary); }
+          .group-progress span { font-size: 11px; font-weight: 600; }
 
           .empty-state {
             text-align: center;
             padding: 24px;
             color: var(--color-text-muted);
             background: var(--color-card);
-            border-radius: 10px;
+            border-radius: 12px;
             border: 1px dashed var(--color-border);
           }
 
-          /* ── Bottom Navigation ── */
+          /* ── Bottom Nav ── */
           .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -1372,7 +799,7 @@ export default function FashionDashboardPage() {
             display: flex;
             justify-content: space-around;
             align-items: center;
-            background: rgba(255,255,255,0.92);
+            background: rgba(255,255,255,0.94);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-top: 1px solid var(--color-border);
@@ -1380,7 +807,6 @@ export default function FashionDashboardPage() {
             z-index: 100;
             box-shadow: 0 -4px 12px rgba(0,0,0,0.04);
           }
-
           .nav-item {
             display: flex;
             flex-direction: column;
@@ -1390,19 +816,14 @@ export default function FashionDashboardPage() {
             font-size: 10px;
             font-weight: 500;
             gap: 2px;
-            transition: color 0.15s;
             padding: 4px 12px;
-            -webkit-tap-highlight-color: transparent;
+            transition: color 0.15s;
           }
-
-          .nav-item.active {
-            color: var(--color-accent);
-          }
-
+          .nav-item.active { color: var(--color-accent); }
           .nav-item:active { opacity: 0.6; }
 
-                                                                                                      /* ── FAB ── */
-          .fab-btn {
+          /* ── FAB ── */
+          .fab {
             position: fixed;
             bottom: 80px;
             right: 20px;
@@ -1420,8 +841,7 @@ export default function FashionDashboardPage() {
             z-index: 99;
             transition: transform 0.15s;
           }
-
-          .fab-btn:active { transform: scale(0.92); }
+          .fab:active { transform: scale(0.92); }
 
           /* ── Modal ── */
           .modal-backdrop {
@@ -1434,7 +854,6 @@ export default function FashionDashboardPage() {
             background: rgba(0,0,0,0.4);
             backdrop-filter: blur(4px);
           }
-
           .modal {
             width: 100%;
             max-width: 440px;
@@ -1445,7 +864,6 @@ export default function FashionDashboardPage() {
             border: 1px solid var(--color-border);
             box-shadow: 0 24px 64px rgba(0,0,0,0.15);
           }
-
           .modal-header {
             display: flex;
             justify-content: space-between;
@@ -1453,10 +871,8 @@ export default function FashionDashboardPage() {
             padding: 16px;
             border-bottom: 1px solid var(--color-border);
           }
-
           .modal-header h2 { margin: 0; font-size: 18px; }
           .modal-header p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 13px; }
-
           .modal-close {
             display: grid;
             place-items: center;
@@ -1467,7 +883,6 @@ export default function FashionDashboardPage() {
             background: var(--color-bg);
             cursor: pointer;
           }
-
           .modal-body { padding: 16px; display: grid; gap: 12px; }
           .modal-field label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; }
           .modal-field input, .modal-field select {
@@ -1480,9 +895,7 @@ export default function FashionDashboardPage() {
             color: var(--color-text);
             outline: none;
           }
-          .modal-field input:focus, .modal-field select:focus {
-            border-color: var(--color-accent);
-          }
+          .modal-field input:focus, .modal-field select:focus { border-color: var(--color-accent); }
           .modal-error {
             padding: 8px 12px;
             border: 1px solid var(--color-danger);
@@ -1497,7 +910,7 @@ export default function FashionDashboardPage() {
             padding: 16px;
             border-top: 1px solid var(--color-border);
           }
-          .btn-secondary, .btn-primary {
+          .modal-footer .btn {
             flex: 1;
             padding: 10px;
             border: 0;
@@ -1506,36 +919,28 @@ export default function FashionDashboardPage() {
             font-weight: 600;
             cursor: pointer;
           }
-          .btn-secondary {
+          .modal-footer .btn-outline {
             border: 1px solid var(--color-border);
             background: transparent;
           }
-          .btn-primary {
-            background: var(--color-accent);
-            color: #fff;
-          }
-          .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+          .modal-footer .btn-primary { background: var(--color-accent); color: #fff; }
+          .modal-footer .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-          /* ── Responsive adjustments ── */
+             /* ── Responsive ── */
           @media (min-width: 640px) {
-            .dashboard-page { padding: 20px 20px 100px; }
+            .dashboard-container { padding: 20px 20px 100px; }
             .today-grid { grid-template-columns: repeat(4, 1fr); }
             .health-metrics { grid-template-columns: 1fr 1fr; }
-            .production-stage { flex: 1 0 auto; }
           }
-
           @media (min-width: 768px) {
-            .dashboard-shell { max-width: 960px; }
-            .today-grid { gap: 12px; }
+            .dashboard-container { max-width: 960px; }
           }
-
           @media (min-width: 1024px) {
-            .dashboard-shell { max-width: 1200px; }
-            .today-grid { gap: 16px; }
+            .dashboard-container { max-width: 1200px; }
             .health-metrics { grid-template-columns: 1fr 1fr 1fr 1fr; }
           }
 
-          /* ── Dark mode support ── */
+          /* ── Dark mode ── */
           [data-theme="dark"] {
             --color-bg: #12121A;
             --color-card: #1E1E2A;
@@ -1545,14 +950,372 @@ export default function FashionDashboardPage() {
             --shadow: 0 4px 16px rgba(0,0,0,0.3);
           }
           [data-theme="dark"] .bottom-nav {
-            background: rgba(30,30,42,0.92);
+            background: rgba(30,30,42,0.94);
             border-top-color: var(--color-border);
           }
-          [data-theme="dark"] .modal {
-            background: var(--color-card);
-          }
+          [data-theme="dark"] .modal { background: var(--color-card); }
         `}</style>
-      </div>
+
+        {/* ─── MAIN CONTENT ─── */}
+        <div className="dashboard-container">
+          {/* HEADER */}
+          <div className="header-row">
+            <div className="greeting-block">
+              <span className="greeting-text">{greeting}, {userName} 👋</span>
+              <span className="date-text">{formatDate(new Date())}</span>
+            </div>
+            <div className="btn-group">
+              <button className="btn btn-secondary" onClick={() => setShowQuickOrder(true)}>
+                <Icon name="plus" size={16} stroke="currentColor" />
+                Quick
+              </button>
+              <Link href={`/dashboard/orders/new?business_id=${businessId || ''}`} className="btn btn-primary">
+                <Icon name="plus" size={16} stroke="#fff" />
+                New order
+              </Link>
+            </div>
+          </div>
+
+          {/* TODAY */}
+          <div className="section-label">Today</div>
+          <div className="today-grid">
+            <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=due_soon`} className="today-tile">
+              <span className="today-number">{ordersDueSoon}</span>
+              <span className="today-label">Orders due soon</span>
+            </Link>
+            <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=due_today`} className="today-tile">
+              <span className="today-number">{ordersDueToday}</span>
+              <span className="today-label">Fittings today</span>
+            </Link>
+            <Link href={`/dashboard/payments?business_id=${businessId || ''}&filter=outstanding`} className="today-tile">
+              <span className="today-number">{formatMoney(expectedPayments)}</span>
+              <span className="today-label">Expected payments</span>
+            </Link>
+            <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=attention`} className="today-tile">
+              <span className="today-number">{attentionItems}</span>
+              <span className="today-label">Need attention</span>
+            </Link>
+          </div>
+
+          {/* ATTENTION */}
+          {attentionList.length > 0 && (
+            <>
+              <div className="section-label">Needs your attention</div>
+              <div className="attention-list">
+                {attentionList.map(item => {
+                  const isCritical = item.overdue
+                  const isWarning = item.balance > 0 && !item.overdue
+                  return (
+                    <div key={item.id} className={`attention-item ${isCritical ? 'critical' : isWarning ? 'warning' : 'info'}`}>
+                      <div className="attention-row">
+                        <div className="attention-main">
+                          <span className="attention-icon">{isCritical ? '🔴' : isWarning ? '🟠' : '🟡'}</span>
+                          <strong>{item.customerName}</strong>
+                          <span className="attention-title">— {item.title}</span>
+                        </div>
+                        <div className="attention-detail">
+                          {isCritical && <span className="badge danger">Due {formatDate(item.due_date)}</span>}
+                          {isWarning && <span className="badge warning">₦{item.balance.toLocaleString()} outstanding</span>}
+                          {!isCritical && !isWarning && <span className="badge info">Payment overdue</span>}
+                        </div>
+                      </div>
+                      <div className="attention-actions">
+                        <Link href={`/dashboard/orders/${item.id}?business_id=${businessId || ''}`} className="attention-btn">
+                          View order
+                        </Link>
+                        {isWarning && (
+                          <button className="attention-btn outline" onClick={() => alert(`Send reminder to ${item.customerName}`)}>
+                            Send reminder
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* BUSINESS HEALTH */}
+          <div className="section-label">Business health</div>
+          <div className="card health-card">
+            <div className="health-score-row">
+              <span className={`health-number ${healthTone}`}>{healthScore}</span>
+              <span className="health-label">/ 100</span>
+            </div>
+            <div className="health-metrics">
+              <div><span className="muted">Payment collection</span><span className={collectionRate >= 80 ? 'good' : 'warn'}>{collectionRate}%</span></div>
+              <div><span className="muted">Production</span><span className={deliveryRate >= 70 ? 'good' : 'warn'}>{deliveryRate}%</span></div>
+              <div><span className="muted">Overdue orders</span><span className={overdue === 0 ? 'good' : 'bad'}>{overdue}</span></div>
+              <div><span className="muted">Customer growth</span><span className="good">+{newCustomersThisPeriod}</span></div>
+            </div>
+            <div className="health-message">
+              {healthTone === 'healthy' && '👍 Everything is on track. Keep up the great work!'}
+              {healthTone === 'watch' && '⚠️ Some areas need attention. Review your overdue and collection.'}
+              {healthTone === 'risk' && '🚨 Critical issues detected. Address overdue orders and payments immediately.'}
+            </div>
+          </div>
+
+          {/* PRODUCTION */}
+          <div className="section-label">Production</div>
+          <div className="production-grid">
+            {Object.entries(production).map(([stage, count]) => (
+              <Link
+                key={stage}
+                href={`/dashboard/orders?business_id=${businessId || ''}&status=${stage}`}
+                className="stage-tile"
+              >
+                <span className="stage-count">{count}</span>
+                <span className="stage-name">{stage}</span>
+              </Link>
+            ))}
+          </div>
+
+          {/* CHART (now lower) */}
+          <div className="card chart-card">
+            <div className="chart-header">
+              <div>
+                <div className="section-label" style={{ marginBottom: 0 }}>Performance</div>
+                <h3>Revenue & orders</h3>
+              </div>
+              <div className="period-group">
+                {['7d','30d','90d'].map(v => (
+                  <button key={v} className={`period-btn ${period === v ? 'active' : ''}`} onClick={() => setPeriod(v)}>
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="chart-summary">
+              <div><span>Revenue</span><strong>{formatMoney(periodRevenue)}</strong></div>
+              <div><span>Orders</span><strong>{periodOrders.length}</strong></div>
+            </div>
+            <div className="chart-bars">
+              {daily.length === 0 ? (
+                <div style={{ width: '100%', textAlign: 'center', color: 'var(--color-text-muted)', padding: '12px 0' }}>No data</div>
+              ) : (
+                daily.map(day => {
+                  const maxRevenue = Math.max(...daily.map(d => Number(d.revenue || 0)), 1)
+                  const height = Math.max(4, Math.round((Number(day.revenue || 0) / maxRevenue) * 100))
+                  const selected = day.key === selectedAnalyticsDay?.key
+                  return (
+                    <button key={day.key} className={`bar-wrap ${selected ? 'selected' : ''}`} onClick={() => setSelectedDay(day.key)}>
+                      <div className="bar" style={{ height: `${height}%` }} />
+                      <span className="bar-label">{day.label}</span>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            {selectedAnalyticsDay && (
+              <div className="day-detail">
+                <div><span>Date</span><strong>{formatDate(selectedAnalyticsDay.key)}</strong></div>
+                <div><span>Orders</span><strong>{selectedAnalyticsDay.orders}</strong></div>
+                <div><span>Revenue</span><strong>{formatMoney(selectedAnalyticsDay.revenue)}</strong></div>
+              </div>
+            )}
+          </div>
+
+          {/* RECENT ORDERS */}
+          <div className="recent-section">
+            <div className="section-header">
+              <div className="section-label">Recent orders</div>
+              <Link href={`/dashboard/orders?business_id=${businessId || ''}`} className="view-all">View all →</Link>
+            </div>
+            {recentOrders.length === 0 ? (
+              <div className="empty-state">No orders yet</div>
+            ) : (
+              <div className="list">
+                {recentOrders.map(order => {
+                  const customer = customers.find(c => c.id === order.customer_id)
+                  const status = getStatusBadge(order.current_status)
+                  const balance = calculateBalance(order)
+                  return (
+                    <Link key={order.id} href={`/dashboard/orders/${order.id}?business_id=${businessId || ''}`} className="list-item">
+                      <div>
+                        <strong className="item-title">{order.title || 'Untitled'}</strong>
+                        <span className="item-sub">{customer?.name || 'Unknown'}</span>
+                      </div>
+                      <div className="item-meta">
+                        <span className={`status-badge ${status.class}`}>{status.label}</span>
+                        <strong className="item-price">{formatMoney(order.price)}</strong>
+                        {balance > 0 && <span className="item-due">₦{balance.toLocaleString()} due</span>}
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+{/* RECENT CUSTOMERS */}
+          <div className="recent-section">
+            <div className="section-header">
+              <div className="section-label">Recent customers</div>
+              <Link href={`/dashboard/customers?business_id=${businessId || ''}`} className="view-all">View all →</Link>
+            </div>
+            {recentCustomers.length === 0 ? (
+              <div className="empty-state">No customers yet</div>
+            ) : (
+              <div className="list">
+                {recentCustomers.map(customer => {
+                  const customerOrders = orders.filter(o => o.customer_id === customer.id)
+                  return (
+                    <Link key={customer.id} href={`/dashboard/customers/${customer.id}?business_id=${businessId || ''}`} className="list-item">
+                      <div className="avatar">{(customer.name || customer.first_name || 'C').charAt(0).toUpperCase()}</div>
+                      <div style={{ flex: 1 }}>
+                        <strong className="item-title">{customer.name || customer.first_name || 'Unknown'}</strong>
+                        <span className="item-sub">{customer.phone || 'No phone'}</span>
+                      </div>
+                      <span className="customer-orders">{customerOrders.length} orders</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* RECENT GROUPS */}
+          <div className="recent-section">
+            <div className="section-header">
+              <div className="section-label">Aso-Ebi groups</div>
+              <Link href={`/dashboard/groups?business_id=${businessId || ''}`} className="view-all">View all →</Link>
+            </div>
+            {recentGroups.length === 0 ? (
+              <div className="empty-state">No group orders yet</div>
+            ) : (
+              <div className="list">
+                {recentGroups.map(group => {
+                  const groupOrders = orders.filter(o => o.group_order_id === group.id)
+                  const delivered = groupOrders.filter(o => isOrderDelivered(o)).length
+                  const progress = groupOrders.length > 0 ? Math.round((delivered / groupOrders.length) * 100) : 0
+                  return (
+                    <Link key={group.id} href={`/dashboard/groups/${group.id}?business_id=${businessId || ''}`} className="list-item">
+                      <div>
+                        <strong className="item-title">{group.group_name}</strong>
+                        <span className="item-sub">{groupOrders.length} members · {progress}% delivered</span>
+                      </div>
+                      <div className="group-progress">
+                        <div className="progress-track"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
+                        <span>{progress}%</span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ─── BOTTOM NAV ─── */}
+        <nav className="bottom-nav">
+          <Link href={`/dashboard?business_id=${businessId || ''}`} className="nav-item active">
+            <Icon name="bar-chart-2" size={20} stroke="currentColor" />
+            <span>Home</span>
+          </Link>
+          <Link href={`/dashboard/orders?business_id=${businessId || ''}`} className="nav-item">
+            <Icon name="file-text" size={20} stroke="currentColor" />
+            <span>Orders</span>
+          </Link>
+          <Link href={`/dashboard/customers?business_id=${businessId || ''}`} className="nav-item">
+            <Icon name="users" size={20} stroke="currentColor" />
+            <span>Customers</span>
+          </Link>
+          <Link href={`/dashboard/orders?business_id=${businessId || ''}&status=Cutting,Sewing`} className="nav-item">
+            <Icon name="scissors" size={20} stroke="currentColor" />
+            <span>Production</span>
+          </Link>
+          <Link href={`/dashboard/support?business_id=${businessId || ''}`} className="nav-item">
+            <Icon name="life-buoy" size={20} stroke="currentColor" />
+            <span>Support</span>
+          </Link>
+          <Link href={`/dashboard/settings?business_id=${businessId || ''}`} className="nav-item">
+            <Icon name="settings" size={20} stroke="currentColor" />
+            <span>More</span>
+          </Link>
+        </nav>
+
+        {/* ─── FAB ─── */}
+        <button className="fab" onClick={() => setShowQuickOrder(true)}>
+          <Icon name="plus" size={24} stroke="#fff" />
+        </button>
+
+        {/* ─── QUICK ORDER MODAL ─── */}
+        {showQuickOrder && (
+          <div className="modal-backdrop" onClick={() => setShowQuickOrder(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <h2>Quick order</h2>
+                  <p>Create an order in seconds</p>
+                </div>
+                <button className="modal-close" onClick={() => setShowQuickOrder(false)}>
+                  <Icon name="x" size={20} stroke="currentColor" />
+                </button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                setQuickOrderLoading(true)
+                try {
+                  const price = safeAmount(quickOrderPrice)
+                  const deposit = Math.min(Math.max(safeAmount(quickOrderDeposit), 0), price)
+                  const { error: insertError } = await supabase.from('orders').insert({
+                    business_id: businessId,
+                    customer_id: quickOrderCustomer,
+                    title: quickOrderItem,
+                    price,
+                    amount_paid: deposit,
+                    due_date: quickOrderDue || null,
+                    current_status: 'Order placed'
+                  })
+                  if (insertError) throw insertError
+                  setShowQuickOrder(false)
+                  await loadDashboard()
+                } catch (err) {
+                  setQuickOrderMessage(err.message)
+                } finally {
+                  setQuickOrderLoading(false)
+                }
+              }}>
+                <div className="modal-body">
+                  {quickOrderMessage && <div className="modal-error">{quickOrderMessage}</div>}
+                  <div className="modal-field">
+                    <label>Customer</label>
+                    <select value={quickOrderCustomer} onChange={e => setQuickOrderCustomer(e.target.value)} required>
+                      <option value="">Select customer</option>
+                      {customers.map(c => (
+                        <option key={c.id} value={c.id}>{c.name || c.first_name || 'Unknown'}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-field">
+                    <label>Item</label>
+                    <input type="text" value={quickOrderItem} onChange={e => setQuickOrderItem(e.target.value)} placeholder="e.g. Senator outfit" required />
+                  </div>
+                  <div className="modal-field">
+                    <label>Price</label>
+                    <input type="number" value={quickOrderPrice} onChange={e => setQuickOrderPrice(e.target.value)} placeholder="0" min="0" required />
+                  </div>
+                  <div className="modal-field">
+                    <label>Deposit (optional)</label>
+                    <input type="number" value={quickOrderDeposit} onChange={e => setQuickOrderDeposit(e.target.value)} placeholder="0" min="0" />
+                  </div>
+                  <div className="modal-field">
+                    <label>Due date (optional)</label>
+                    <input type="date" value={quickOrderDue} onChange={e => setQuickOrderDue(e.target.value)} />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowQuickOrder(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={quickOrderLoading}>
+                    {quickOrderLoading ? 'Creating...' : 'Create order'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </>
     )
   } catch (err) {
     console.error('Dashboard render error:', err)
@@ -1564,7 +1327,7 @@ export default function FashionDashboardPage() {
           <p>{err.message}</p>
           <button onClick={() => window.location.reload()}>Reload page</button>
         </div>
-        <style jsx>{`
+        <style jsx global>{`
           .dashboard-error { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--color-bg); }
           .error-card { max-width: 420px; padding: 32px; text-align: center; background: var(--color-card); border-radius: 16px; border: 1px solid var(--color-border); }
           .error-card h2 { margin: 16px 0 8px; }
@@ -1574,4 +1337,4 @@ export default function FashionDashboardPage() {
       </div>
     )
   }
-      }
+}
