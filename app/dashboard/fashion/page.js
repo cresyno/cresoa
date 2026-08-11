@@ -4593,7 +4593,7 @@ function DashboardPageContent({
         border-radius: 15px;
       }
     }
-  `
+  
 return (
   <>
     <style>{dashboardStyles}</style>
