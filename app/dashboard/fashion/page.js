@@ -2394,6 +2394,15 @@ function DashboardStyles() {
   )
 }
 
+useEffect(() => {
+  if (typeof document !== 'undefined') {
+    const styleEl = document.createElement('style')
+    styleEl.textContent = dashboardStyles
+    document.head.appendChild(styleEl)
+    return () => styleEl.remove()
+  }
+}, [])
+
 function FashionDashboardPage({
   businessId
 }) {
