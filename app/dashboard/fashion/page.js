@@ -471,7 +471,15 @@ export default function FashionDashboardPage() {
             </section>
           )}
 
-          <div className="health-metrics">
+               {/* ─── BUSINESS HEALTH ─── */}
+          <section className="health-section">
+            <div className="section-label">BUSINESS HEALTH</div>
+            <div className="health-card">
+              <div className="health-score-big">
+                <span className={`health-score-number ${healthTone}`}>{healthScore}</span>
+                <span className="health-score-label">/ 100</span>
+              </div>
+              <div className="health-metrics">
                 <div><span>Payment collection</span><span className={collectionRate >= 80 ? 'good' : 'watch'}>{collectionRate}%</span></div>
                 <div><span>Production</span><span className={deliveryRate >= 70 ? 'good' : 'watch'}>{deliveryRate}%</span></div>
                 <div><span>Overdue orders</span><span className={overdue === 0 ? 'good' : 'danger'}>{overdue}</span></div>
@@ -484,6 +492,7 @@ export default function FashionDashboardPage() {
               </div>
             </div>
           </section>
+            
 
           {/* ─── PRODUCTION PIPELINE ─── */}
           <section className="production-section">
