@@ -1317,7 +1317,7 @@ function EmptyState({
       </span>
     </div>
   )
-         }
+          }
 
 function RecentCustomers({
   customers,
@@ -1843,7 +1843,7 @@ function FashionDashboard({
           onOrders={handleOrders}
         />
 
-        <RecentCustomers
+            <RecentCustomers
           customers={customers}
           onCustomer={handleCustomer}
           onCustomers={handleCustomers}
@@ -2408,449 +2408,11 @@ function FashionDashboardPage({
       />
     </>
   )
-         }
-
-function safeAmount(value) {
-  const number =
-    Number(value)
-
-  return Number.isFinite(number)
-    ? number
-    : 0
 }
 
-
-function formatMoney(value) {
-  const amount =
-    safeAmount(value)
-
-  return new Intl.NumberFormat(
-    'en-NG',
-    {
-      style: 'currency',
-      currency: 'NGN',
-      maximumFractionDigits: 0
-    }
-  ).format(amount)
-}
-
-
-function formatShortDate(value) {
-  if (!value) {
-    return '—'
-  }
-
-  try {
-    return new Intl.DateTimeFormat(
-      'en-NG',
-      {
-        day: 'numeric',
-        month: 'short'
-      }
-    ).format(
-      new Date(value)
-    )
-  } catch {
-    return '—'
-  }
-}
-
-
-function getInitials(name = '') {
-  return String(name)
-    .trim()
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(
-      part =>
-        part[0]?.toUpperCase()
-    )
-    .join('') || 'C'
-}
-
-
-function getCustomerName(customer) {
-  return (
-    customer?.name ||
-    customer?.full_name ||
-    customer?.customer_name ||
-    'Customer'
-  )
-}
-
-
-function getOrderCustomerName(
-  order,
-  customers = []
-) {
-  if (
-    order?.customer_name
-  ) {
-    return order.customer_name
-  }
-
-  const customer =
-    customers.find(
-      item =>
-        item.id ===
-        order?.customer_id
-    )
-
-  return getCustomerName(customer)
-}
-
-         function normalizeOrder(order = {}) {
-  const price = safeAmount(
-    order.price ??
-      order.total_amount ??
-      order.total ??
-      order.amount
-  )
-
-  const paid = safeAmount(
-    order.paid ??
-      order.amount_paid ??
-      order.paid_amount
-  )
-
-  const balance = Math.max(
-    price - paid,
-    0
-  )
-
-  return {
-    ...order,
-
-    id:
-      order.id ||
-      order.order_id ||
-      null,
-
-    price,
-
-    paid,
-
-    balance,
-
-    current_status:
-      order.current_status ||
-      order.status ||
-      order.order_status ||
-      'Order placed',
-
-    customer_id:
-      order.customer_id ||
-      order.customerId ||
-      null,
-
-    customer_name:
-      order.customer_name ||
-      order.customerName ||
-      '',
-
-    created_at:
-      order.created_at ||
-      order.createdAt ||
-      null
-  }
-}
-
-
-function normalizeCustomer(
-  customer = {}
-) {
-  return {
-    ...customer,
-
-    id:
-      customer.id ||
-      customer.customer_id ||
-      null,
-
-    name:
-      customer.name ||
-      customer.full_name ||
-      customer.customer_name ||
-      'Customer',
-
-    created_at:
-      customer.created_at ||
-      customer.createdAt ||
-      null
-  }
-}
-
-
-function normalizeGroup(group = {}) {
-  return {
-    ...group,
-
-    id:
-      group.id ||
-      group.group_id ||
-      null,
-
-    name:
-      group.name ||
-      group.group_name ||
-      'Aso Ebi group',
-
-    created_at:
-      group.created_at ||
-      group.createdAt ||
-      null
-  }
-}
-
-
-function getRecentOrders(
-  orders = []
-) {
-  return [...orders]
-    .filter(item => item?.id)
-    .sort(
-      (a, b) =>
-        new Date(
-          b.created_at || 0
-        ) -
-        new Date(
-          a.created_at || 0
-        )
-    )
-    .slice(0, 5)
-}
-
-
-function getRecentCustomers(
-  customers = []
-) {
-  return [...customers]
-    .filter(item => item?.id)
-    .sort(
-      (a, b) =>
-        new Date(
-          b.created_at || 0
-        ) -
-        new Date(
-          a.created_at || 0
-        )
-    )
-    .slice(0, 5)
-            }
-
-const PRODUCTION_STAGES = [
-  'Order placed',
-  'Cutting',
-  'Sewing',
-  'Fitting',
-  'Ready'
-]
-
-
-function getProductionCounts(
-  orders = []
-) {
-  const counts = {}
-
-  PRODUCTION_STAGES.forEach(
-    stage => {
-      counts[stage] = 0
-    }
-  )
-
-  orders.forEach(order => {
-    const status =
-      String(
-        order?.current_status || ''
-      ).trim()
-
-    const stage =
-      PRODUCTION_STAGES.find(
-        item =>
-          item.toLowerCase() ===
-          status.toLowerCase()
-      )
-
-    if (stage) {
-      counts[stage] += 1
-    }
-  })
-
-  return counts
-}
-
-
-function getAttentionOrders(
-  orders = []
-) {
-  return [...orders]
-    .filter(order => {
-      const status =
-        String(
-          order?.current_status || ''
-        ).toLowerCase()
-
-      return (
-        safeAmount(
-          order?.balance
-        ) > 0 ||
-        status.includes(
-          'fitting'
-        ) ||
-        status.includes(
-          'overdue'
-        ) ||
-        status.includes(
-          'pending'
-        )
-      )
-    })
-    .sort(
-      (a, b) =>
-        new Date(
-          b.created_at || 0
-        ) -
-        new Date(
-          a.created_at || 0
-        )
-    )
-    .slice(0, 5)
-}
-
-
-function getDayKey(date) {
-  const year =
-    date.getFullYear()
-
-  const month =
-    String(
-      date.getMonth() + 1
-    ).padStart(2, '0')
-
-  const day =
-    String(
-      date.getDate()
-    ).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
-
-function getDaySeries(
-  orders = [],
-  days = 7
-) {
-  const totalDays =
-    Math.max(
-      Number(days) || 7,
-      1
-    )
-
-  const result = []
-
-  for (
-    let index = totalDays - 1;
-    index >= 0;
-    index -= 1
-  ) {
-    const date =
-      new Date()
-
-    date.setHours(
-      0,
-      0,
-      0,
-      0
-    )
-
-    date.setDate(
-      date.getDate() - index
-    )
-
-    const key =
-      getDayKey(date)
-
-    const dayOrders =
-      orders.filter(order => {
-        if (!order?.created_at) {
-          return false
-        }
-
-        const orderDate =
-          new Date(
-            order.created_at
-          )
-
-        return (
-          getDayKey(orderDate) ===
-          key
-        )
-      })
-
-    const revenue =
-      dayOrders.reduce(
-        (sum, order) =>
-          sum +
-          safeAmount(
-            order?.price
-          ),
-        0
-      )
-
-    result.push({
-      key,
-      label:
-        new Intl.DateTimeFormat(
-          'en-NG',
-          {
-            weekday: 'short'
-          }
-        ).format(date),
-      revenue,
-      orders:
-        dayOrders.length
-    })
-  }
-
-  return result
-}
-
-function getAnalyticsSummary(
-  orders = []
-) {
-  const revenue = orders.reduce(
-    (sum, order) =>
-      sum +
-      safeAmount(order?.price),
-    0
-  )
-
-  const paid = orders.reduce(
-    (sum, order) =>
-      sum +
-      safeAmount(order?.paid),
-    0
-  )
-
-  const outstanding =
-    orders.reduce(
-      (sum, order) =>
-        sum +
-        safeAmount(
-          order?.balance
-        ),
-      0
-    )
-
-  return {
-    revenue,
-    paid,
-    outstanding,
-    orders: orders.length
-  }
-}
-
+/* =========================================================
+   ADDITIONAL HELPERS & ENTRY POINT (unique definitions)
+   ========================================================= */
 
 function getAnalyticsPeriodSummary(
   orders = [],
@@ -2885,7 +2447,6 @@ function getAnalyticsPeriodSummary(
   }
 }
 
-
 function getMaxRevenue(
   series = []
 ) {
@@ -2899,7 +2460,7 @@ function getMaxRevenue(
       ),
     0
   )
-     }
+}
 
 function getPeriodSeries(
   orders = [],
@@ -2914,7 +2475,6 @@ function getPeriodSeries(
   )
 }
 
-
 function getPeriodRevenue(
   series = []
 ) {
@@ -2925,7 +2485,6 @@ function getPeriodRevenue(
     0
   )
 }
-
 
 function getPeriodOrders(
   series = []
@@ -2938,7 +2497,6 @@ function getPeriodOrders(
   )
 }
 
-
 function getPeriodMaxRevenue(
   series = []
 ) {
@@ -2946,10 +2504,6 @@ function getPeriodMaxRevenue(
     series
   )
 }
-
-const THEME_STORAGE_KEY =
-  'cresoa-dashboard-theme'
-
 
 function getBusinessIdFromUrl() {
   if (
@@ -2974,7 +2528,6 @@ function getBusinessIdFromUrl() {
   )
 }
 
-
 function resolveBusinessId(
   explicitBusinessId
 ) {
@@ -2984,7 +2537,6 @@ function resolveBusinessId(
 
   return getBusinessIdFromUrl()
 }
-
 
 function useResolvedBusinessId(
   explicitBusinessId
@@ -3065,7 +2617,7 @@ function FashionDashboardEntry({
       }
     />
   )
-               }
+}
 
 export default function Page({
   searchParams
@@ -3082,4 +2634,4 @@ export default function Page({
       }
     />
   )
-                 }
+}
