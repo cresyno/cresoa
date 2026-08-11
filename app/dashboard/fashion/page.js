@@ -192,6 +192,31 @@ export default function FashionDashboardPage() {
       (customers.length > 0 ? Math.min(100, (customers.length / 10) * 10) : 0) * 0.2
     )
 
+    // Count orders due soon (next 3 days)
+    const now = new Date()
+    const threeDaysLater = new Date()
+    threeDaysLater.setDate(threeDaysLater.getDate() + 3)
+    const ordersDueSoon = orders.filter(o => {
+      if (!o.due_date || isOrderDelivered(o)) return false
+      const due = new Date(o.due_date)
+      return due >= now && due <= threeDaysLater
+    }).length
+
+    // Count fittings (we don't have fittings data, so we'll use orders with due_date soon as proxy for "fittings today"?)
+    // Instead we'll use orders due today.
+    const todayStr = new Date().toISOString().split('T')[0]
+    const ordersDueToday = orders.filter(o => o.due_date?.startsWith(todayStr) && !isOrderDelivered(o)).length
+
+    // Expected payments (outstanding balance)
+    const expectedPayments = totalOutstanding
+
+    // Needs attention: overdue orders + orders with high outstanding balance > 0
+    const attentionItems = orders.filter(o => {
+      if (isOrderDelivered(o)) return false
+      const balance = calculateBalance(o)
+      return isOrderOverdue(o) || balance > 0
+    }).length
+
     return {
       totalRevenue,
       totalOrderValue,
@@ -207,7 +232,18 @@ export default function FashionDashboardPage() {
       overdueRate,
       healthScore,
       healthLabel: healthScore >= 80 ? 'Healthy' : healthScore >= 60 ? 'Watch closely' : 'Needs attention',
-      healthTone: healthScore >= 80 ? 'healthy' : healthScore >= 60 ? 'watch' : 'risk'
+      healthTone: healthScore >= 80 ? 'healthy' : healthScore >= 60 ? 'watch' : 'risk',
+      ordersDueSoon,
+      ordersDueToday,
+      expectedPayments,
+      attentionItems,
+      // Production pipeline counts by status
+      production: {
+        'Order placed': orders.filter(o => o.current_status === 'Order placed' && !isOrderDelivered(o)).length,
+        'Cutting': orders.filter(o => o.current_status === 'Cutting' && !isOrderDelivered(o)).length,
+        'Sewing': orders.filter(o => o.current_status === 'Sewing' && !isOrderDelivered(o)).length,
+        'Ready': orders.filter(o => o.current_status === 'Ready' && !isOrderDelivered(o)).length,
+      }
     }
   }, [orders, customers, period])
 
@@ -220,6 +256,31 @@ export default function FashionDashboardPage() {
   const recentOrders = useMemo(() => orders.slice(0, 6), [orders])
   const recentCustomers = useMemo(() => customers.slice(0, 6), [customers])
   const recentGroups = useMemo(() => groups.slice(0, 4), [groups])
+
+  // ─── Attention items ──────────────────────────────
+  const attentionList = useMemo(() => {
+    return orders
+      .filter(o => {
+        if (isOrderDelivered(o)) return false
+        const balance = calculateBalance(o)
+        return isOrderOverdue(o) || balance > 0
+      })
+      .slice(0, 3)
+      .map(o => {
+        const customer = customers.find(c => c.id === o.customer_id)
+        const balance = calculateBalance(o)
+        const overdue = isOrderOverdue(o)
+        return {
+          id: o.id,
+          customerName: customer?.name || customer?.first_name || 'Unknown',
+          title: o.title || 'Untitled',
+          balance,
+          overdue,
+          due_date: o.due_date,
+          status: o.current_status,
+        }
+      })
+  }, [orders, customers])
 
   // ─── Loading state ──────────────────────────────────
   if (loading) {
@@ -291,15 +352,26 @@ export default function FashionDashboardPage() {
     )
   }
 
-  // ─── Main render with try-catch ─────────────────────
+  // ─── Main render ──────────────────────────────────────
   try {
-    const totalRevenue = analytics.totalRevenue
-    const totalOutstanding = analytics.totalOutstanding
-    const activeOrders = analytics.active
-    const deliveredOrders = analytics.delivered
-    const overdueOrders = analytics.overdue
-    const collectionRate = analytics.collectionRate
-    const deliveryRate = analytics.deliveryRate
+    const {
+      ordersDueSoon,
+      ordersDueToday,
+      expectedPayments,
+      attentionItems,
+      production,
+      totalRevenue,
+      totalOutstanding,
+      collectionRate,
+      deliveryRate,
+      overdue,
+      healthScore,
+      healthLabel,
+      healthTone,
+      periodRevenue,
+      periodOrders,
+      daily
+    } = analytics
 
     const newCustomersThisPeriod = customers.filter(c => {
       if (!c.created_at) return false
@@ -309,15 +381,21 @@ export default function FashionDashboardPage() {
       return new Date(c.created_at) >= startDate
     }).length
 
+    // Build greeting
+    const hour = new Date().getHours()
+    let greeting = 'Good evening'
+    if (hour < 12) greeting = 'Good morning'
+    else if (hour < 17) greeting = 'Good afternoon'
+    const userName = business?.name || 'there'
+
     return (
       <div className="dashboard-page">
         <div className="dashboard-shell">
           {/* ─── HEADER ─── */}
           <header className="dashboard-header">
-            <div>
-              <div className="section-eyebrow">Business overview</div>
-              <h1>{business?.name || 'Your business'}</h1>
-              <p className="header-sub">A live view of orders, customers, collections and business health.</p>
+            <div className="greeting">
+              <span className="greeting-text">{greeting}, {userName} 👋</span>
+              <span className="date-text">{formatDate(new Date())}</span>
             </div>
             <div className="header-actions">
               <button className="btn-quick" onClick={() => setShowQuickOrder(true)}>
@@ -331,144 +409,152 @@ export default function FashionDashboardPage() {
             </div>
           </header>
 
-          {/* ─── METRICS ─── */}
-          <section className="metrics-grid">
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Collected</span>
-                <span className="metric-icon">₦</span>
-              </div>
-              <strong className="metric-value">{formatMoney(totalRevenue)}</strong>
-              <span className="metric-note">{collectionRate}% collected</span>
-            </div>
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Outstanding</span>
-                <span className="metric-icon danger">₦</span>
-              </div>
-              <strong className="metric-value">{formatMoney(totalOutstanding)}</strong>
-              <span className="metric-note">{overdueOrders} overdue orders</span>
-            </div>
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Orders</span>
-                <span className="metric-icon"><Icon name="shopping-bag" size={15} stroke="currentColor" /></span>
-              </div>
-              <strong className="metric-value">{orders.length}</strong>
-              <span className="metric-note">{activeOrders} currently active</span>
-            </div>
-            <div className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Customers</span>
-                <span className="metric-icon"><Icon name="users" size={15} stroke="currentColor" /></span>
-              </div>
-              <strong className="metric-value">{customers.length}</strong>
-              <span className="metric-note">+{newCustomersThisPeriod} this period</span>
+          {/* ─── TODAY SUMMARY ─── */}
+          <section className="today-summary">
+            <div className="section-label">TODAY</div>
+            <div className="today-grid">
+              <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=due_soon`} className="today-tile">
+                <span className="today-number">{ordersDueSoon}</span>
+                <span className="today-label">Orders due soon</span>
+              </Link>
+              <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=due_today`} className="today-tile">
+                <span className="today-number">{ordersDueToday}</span>
+                <span className="today-label">Fittings today</span>
+              </Link>
+              <Link href={`/dashboard/payments?business_id=${businessId || ''}&filter=outstanding`} className="today-tile">
+                <span className="today-number">{formatMoney(expectedPayments)}</span>
+                <span className="today-label">Expected payments</span>
+              </Link>
+              <Link href={`/dashboard/orders?business_id=${businessId || ''}&filter=attention`} className="today-tile">
+                <span className="today-number">{attentionItems}</span>
+                <span className="today-label">Need attention</span>
+              </Link>
             </div>
           </section>
 
-          {/* ─── MAIN GRID ─── */}
-          <section className="main-grid">
-            {/* ─── CHART ─── */}
-            <div className="chart-panel">
-              <div className="panel-header">
-                <div>
-                  <div className="section-eyebrow">Performance</div>
-                  <h2>Business activity</h2>
-                  <p>Daily order and collection movement from your real records.</p>
-                </div>
-                <div className="period-control">
-                  {['7d','30d','90d'].map(v => (
-                    <button key={v} className={period === v ? 'active' : ''} onClick={() => setPeriod(v)}>
-                      {v === '7d' ? '7D' : v === '30d' ? '30D' : '90D'}
+          {/* ─── NEEDS YOUR ATTENTION ─── */}
+          {attentionList.length > 0 && (
+            <section className="attention-section">
+              <div className="section-label">NEEDS YOUR ATTENTION</div>
+              <div className="attention-list">
+                {attentionList.map((item) => {
+                  const isCritical = item.overdue
+                  const isWarning = item.balance > 0 && !item.overdue
+                  return (
+                    <div key={item.id} className={`attention-item ${isCritical ? 'critical' : isWarning ? 'warning' : ''}`}>
+                      <div className="attention-content">
+                        <div className="attention-main">
+                          <span className="attention-icon">{isCritical ? '🔴' : isWarning ? '🟠' : '🟡'}</span>
+                          <div>
+                            <strong>{item.customerName}</strong>
+                            <span className="attention-title">— {item.title}</span>
+                          </div>
+                        </div>
+                        <div className="attention-detail">
+                          {isCritical && <span className="attention-badge danger">Due {formatDate(item.due_date)}</span>}
+                          {isWarning && <span className="attention-badge warning">₦{item.balance.toLocaleString()} outstanding</span>}
+                          {!isCritical && !isWarning && <span className="attention-badge info">Payment overdue</span>}
+                        </div>
+                      </div>
+                      <div className="attention-actions">
+                        <Link href={`/dashboard/orders/${item.id}?business_id=${businessId || ''}`} className="attention-btn">View order</Link>
+                        {isWarning && (
+                          <button className="attention-btn secondary" onClick={() => alert(`Send reminder to ${item.customerName}`)}>
+                            Send reminder
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
+          <div className="health-metrics">
+                <div><span>Payment collection</span><span className={collectionRate >= 80 ? 'good' : 'watch'}>{collectionRate}%</span></div>
+                <div><span>Production</span><span className={deliveryRate >= 70 ? 'good' : 'watch'}>{deliveryRate}%</span></div>
+                <div><span>Overdue orders</span><span className={overdue === 0 ? 'good' : 'danger'}>{overdue}</span></div>
+                <div><span>Customer growth</span><span className="good">+{newCustomersThisPeriod}</span></div>
+              </div>
+              <div className="health-message">
+                {healthTone === 'healthy' && '👍 Everything is on track. Keep up the great work!'}
+                {healthTone === 'watch' && '⚠️ Some areas need attention. Review your overdue and collection.'}
+                {healthTone === 'risk' && '🚨 Critical issues detected. Address overdue orders and payments immediately.'}
+              </div>
+            </div>
+          </section>
+
+          {/* ─── PRODUCTION PIPELINE ─── */}
+          <section className="production-section">
+            <div className="section-label">PRODUCTION</div>
+            <div className="production-pipeline">
+              {Object.entries(production).map(([stage, count]) => (
+                <Link
+                  key={stage}
+                  href={`/dashboard/orders?business_id=${businessId || ''}&status=${stage}`}
+                  className="production-stage"
+                >
+                  <span className="stage-count">{count}</span>
+                  <span className="stage-name">{stage}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {/* ─── CHART (moved lower) ─── */}
+          <section className="chart-section">
+            <div className="panel-header">
+              <div>
+                <div className="section-label">PERFORMANCE</div>
+                <h2>Revenue & orders</h2>
+              </div>
+              <div className="period-control">
+                {['7d','30d','90d'].map(v => (
+                  <button key={v} className={period === v ? 'active' : ''} onClick={() => setPeriod(v)}>
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="chart-summary">
+              <div><span>Revenue</span><strong>{formatMoney(periodRevenue)}</strong></div>
+              <div><span>Orders</span><strong>{periodOrders.length}</strong></div>
+            </div>
+            <div className="chart-container">
+              {daily.length === 0 ? (
+                <div className="chart-empty">No data</div>
+              ) : (
+                daily.map((day) => {
+                  const maxRevenue = Math.max(...daily.map(d => Number(d.revenue || 0)), 1)
+                  const height = Math.max(4, Math.round((Number(day.revenue || 0) / maxRevenue) * 100))
+                  const selected = day.key === selectedAnalyticsDay?.key
+                  return (
+                    <button key={day.key} className={`chart-bar-wrap ${selected ? 'selected' : ''}`} onClick={() => setSelectedDay(day.key)}>
+                      <div className="chart-bar" style={{ height: `${height}%` }} />
+                      <span className="chart-label">{day.label}</span>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="chart-summary">
-                <div>
-                  <span>{period === '7d' ? 'Last 7 days' : period === '30d' ? 'Last 30 days' : 'Last 90 days'}</span>
-                  <strong>{formatMoney(analytics.periodRevenue)}</strong>
-                </div>
-                <div>
-                  <span>Orders</span>
-                  <strong>{analytics.periodOrders.length}</strong>
-                </div>
-              </div>
-
-              <div className="chart-container">
-                {analytics.daily.length === 0 ? (
-                  <div className="chart-empty">
-                    <Icon name="bar-chart" size={24} stroke="var(--color-text-muted)" />
-                    <span>No activity recorded</span>
-                  </div>
-                ) : (
-                  analytics.daily.map((day) => {
-                    const maxRevenue = Math.max(...analytics.daily.map(d => Number(d.revenue || 0)), 1)
-                    const height = Math.max(4, Math.round((Number(day.revenue || 0) / maxRevenue) * 100))
-                    const selected = day.key === selectedAnalyticsDay?.key
-                    return (
-                      <button key={day.key} className={`chart-bar-wrap ${selected ? 'selected' : ''}`} onClick={() => setSelectedDay(day.key)}>
-                        <div className="chart-bar" style={{ height: `${height}%` }} />
-                        <span className="chart-label">{day.label}</span>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-
-              {selectedAnalyticsDay && (
-                <div className="selected-day">
-                  <div><span>Date</span><strong>{formatDate(selectedAnalyticsDay.key)}</strong></div>
-                  <div><span>Orders</span><strong>{selectedAnalyticsDay.orders}</strong></div>
-                  <div><span>Revenue</span><strong>{formatMoney(selectedAnalyticsDay.revenue)}</strong></div>
-                </div>
+                  )
+                })
               )}
             </div>
-
-            {/* ─── HEALTH ─── */}
-            <div className="health-panel">
-              <div className="panel-header compact">
-                <div>
-                  <div className="section-eyebrow">Business health</div>
-                  <h2>{analytics.healthLabel}</h2>
-                </div>
-                <span className={`health-score ${analytics.healthTone}`}>{analytics.healthScore}</span>
+            {selectedAnalyticsDay && (
+              <div className="selected-day">
+                <div><span>Date</span><strong>{formatDate(selectedAnalyticsDay.key)}</strong></div>
+                <div><span>Orders</span><strong>{selectedAnalyticsDay.orders}</strong></div>
+                <div><span>Revenue</span><strong>{formatMoney(selectedAnalyticsDay.revenue)}</strong></div>
               </div>
-
-              <div className="health-items">
-                <div><span>Payment collection</span><strong>{collectionRate}%</strong></div>
-                <div><span>Delivery completion</span><strong>{deliveryRate}%</strong></div>
-                <div><span>Overdue orders</span><strong className={overdueOrders > 0 ? 'text-danger' : 'text-success'}>{overdueOrders}</strong></div>
-                <div><span>New customers</span><strong>+{newCustomersThisPeriod}</strong></div>
-              </div>
-
-              <div className="health-message">
-                {analytics.healthTone === 'healthy'
-                  ? 'Your payment, delivery and customer activity are tracking well.'
-                  : analytics.healthTone === 'watch'
-                  ? 'A few areas deserve attention before they become bigger issues.'
-                  : 'There are overdue or collection issues worth addressing today.'}
-              </div>
-            </div>
+            )}
           </section>
 
           {/* ─── RECENT ORDERS ─── */}
           <section className="recent-section">
             <div className="section-header">
-              <div>
-                <div className="section-eyebrow">Activity</div>
-                <h2>Recent orders</h2>
-              </div>
+              <div className="section-label">RECENT ORDERS</div>
               <Link href={`/dashboard/orders?business_id=${businessId || ''}`} className="view-all">View all →</Link>
             </div>
-
-     {recentOrders.length === 0 ? (
-              <div className="empty-state">
-                <Icon name="clipboard" size={24} stroke="var(--color-text-muted)" />
-                <p>No orders yet</p>
-              </div>
+            {recentOrders.length === 0 ? (
+              <div className="empty-state">No orders yet</div>
             ) : (
               <div className="order-list">
                 {recentOrders.map((order) => {
@@ -496,18 +582,11 @@ export default function FashionDashboardPage() {
           {/* ─── RECENT CUSTOMERS ─── */}
           <section className="recent-section">
             <div className="section-header">
-              <div>
-                <div className="section-eyebrow">People</div>
-                <h2>Recent customers</h2>
-              </div>
+              <div className="section-label">RECENT CUSTOMERS</div>
               <Link href={`/dashboard/customers?business_id=${businessId || ''}`} className="view-all">View all →</Link>
             </div>
-
             {recentCustomers.length === 0 ? (
-              <div className="empty-state">
-                <Icon name="users" size={24} stroke="var(--color-text-muted)" />
-                <p>No customers yet</p>
-              </div>
+              <div className="empty-state">No customers yet</div>
             ) : (
               <div className="customer-list">
                 {recentCustomers.map((customer) => {
@@ -532,18 +611,11 @@ export default function FashionDashboardPage() {
           {/* ─── RECENT GROUPS ─── */}
           <section className="recent-section">
             <div className="section-header">
-              <div>
-                <div className="section-eyebrow">Groups</div>
-                <h2>Recent group orders</h2>
-              </div>
+              <div className="section-label">ASO-EBI GROUPS</div>
               <Link href={`/dashboard/groups?business_id=${businessId || ''}`} className="view-all">View all →</Link>
             </div>
-
             {recentGroups.length === 0 ? (
-              <div className="empty-state">
-                <Icon name="users" size={24} stroke="var(--color-text-muted)" />
-                <p>No group orders yet</p>
-              </div>
+              <div className="empty-state">No group orders yet</div>
             ) : (
               <div className="group-list">
                 {recentGroups.map((group) => {
@@ -566,6 +638,35 @@ export default function FashionDashboardPage() {
               </div>
             )}
           </section>
+
+          {/* ─── BOTTOM NAVIGATION ─── */}
+          <nav className="bottom-nav">
+            <Link href={`/dashboard?business_id=${businessId || ''}`} className="nav-item active">
+              <Icon name="bar-chart-2" size={20} stroke="currentColor" />
+              <span>Home</span>
+            </Link>
+            <Link href={`/dashboard/orders?business_id=${businessId || ''}`} className="nav-item">
+              <Icon name="file-text" size={20} stroke="currentColor" />
+              <span>Orders</span>
+            </Link>
+            <Link href={`/dashboard/customers?business_id=${businessId || ''}`} className="nav-item">
+              <Icon name="users" size={20} stroke="currentColor" />
+              <span>Customers</span>
+            </Link>
+            <Link href={`/dashboard/orders?business_id=${businessId || ''}&status=Cutting,Sewing`} className="nav-item">
+              <Icon name="scissors" size={20} stroke="currentColor" />
+              <span>Production</span>
+            </Link>
+            <Link href={`/dashboard/settings?business_id=${businessId || ''}`} className="nav-item">
+              <Icon name="settings" size={20} stroke="currentColor" />
+              <span>More</span>
+            </Link>
+          </nav>
+
+          {/* ─── FLOATING ACTION BUTTON ─── */}
+          <button className="fab-btn" onClick={() => setShowQuickOrder(true)}>
+            <Icon name="plus" size={24} stroke="#fff" />
+          </button>
 
           {/* ─── QUICK ORDER MODAL ─── */}
           {showQuickOrder && (
@@ -644,46 +745,60 @@ export default function FashionDashboardPage() {
           )}
         </div>
 
-        {/* ─── STYLES ─── */}
+{/* ─── GLOBAL STYLES ─── */}
         <style jsx>{`
+          /* ── CSS Variables (Cresoa Palette) ── */
+          :root {
+            --color-primary: #0F2B4A;
+            --color-accent: #D4A52A;
+            --color-secondary: #2E7D5E;
+            --color-danger: #D9534F;
+            --color-bg: #F8F6F2;
+            --color-card: #FFFFFF;
+            --color-text: #1A1A1A;
+            --color-text-muted: #8A8A8A;
+            --color-border: #E5E0D8;
+            --shadow: 0 4px 16px rgba(15,43,74,0.06);
+          }
+
           .dashboard-page {
             min-height: 100vh;
-            padding: 12px;
+            padding: 12px 12px 100px; /* bottom padding for nav */
             background: var(--color-bg);
             color: var(--color-text);
+            font-family: 'Inter', sans-serif;
           }
 
           .dashboard-shell {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
           }
 
-          /* ─── HEADER ─── */
+          /* ── Header ── */
           .dashboard-header {
             display: flex;
-            flex-direction: column;
-            gap: 12px;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 8px;
           }
 
-          .section-eyebrow {
+          .greeting {
+            display: flex;
+            flex-direction: column;
+          }
+
+          .greeting-text {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-primary);
+          }
+
+          .date-text {
+            font-size: 12px;
             color: var(--color-text-muted);
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: .12em;
-            text-transform: uppercase;
-          }
-
-          .dashboard-header h1 {
-            margin: 4px 0 0;
-            font-size: 22px;
-            font-weight: 750;
-          }
-
-          .header-sub {
-            margin: 4px 0 0;
-            color: var(--color-text-muted);
-            font-size: 13px;
+            margin-top: 2px;
           }
 
           .header-actions {
@@ -696,14 +811,14 @@ export default function FashionDashboardPage() {
             align-items: center;
             justify-content: center;
             gap: 6px;
-            padding: 10px 14px;
+            padding: 8px 14px;
             border: 0;
             border-radius: 8px;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
             text-decoration: none;
-            flex: 1;
+            transition: all 0.15s;
           }
 
           .btn-quick {
@@ -711,122 +826,291 @@ export default function FashionDashboardPage() {
             color: #fff;
           }
 
+          .btn-quick:active { transform: scale(0.96); }
+
           .btn-primary {
             background: var(--color-accent);
             color: #fff;
-       }
-
-        /* ─── METRICS ─── */
-          .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
           }
 
-          .metric-card {
-            padding: 14px;
-            border: 1px solid var(--color-border);
-            border-radius: 12px;
-            background: var(--color-card);
-          }
+          .btn-primary:active { transform: scale(0.96); }
 
-          .metric-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-
-          .metric-label {
-            color: var(--color-text-muted);
+          /* ── Section labels ── */
+          .section-label {
             font-size: 10px;
             font-weight: 700;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            letter-spacing: .06em;
-          }
-
-          .metric-icon {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--color-accent);
-          }
-
-          .metric-icon.danger {
-            color: var(--color-danger);
-          }
-
-          .metric-value {
-            display: block;
-            margin-top: 6px;
-            font-size: 20px;
-            font-weight: 750;
-          }
-
-          .metric-note {
-            display: block;
-            margin-top: 4px;
             color: var(--color-text-muted);
-            font-size: 10px;
+            margin-bottom: 8px;
           }
 
-          /* ─── MAIN GRID ─── */
-          .main-grid {
+          /* ── Today Summary ── */
+          .today-grid {
             display: grid;
-            gap: 14px;
-            margin-bottom: 16px;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
           }
 
-          .chart-panel, .health-panel {
+          .today-tile {
+            display: flex;
+            flex-direction: column;
+            padding: 14px 12px;
+            background: var(--color-card);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            text-decoration: none;
+            color: var(--color-text);
+            transition: all 0.15s;
+            box-shadow: var(--shadow);
+          }
+
+          .today-tile:active { transform: scale(0.97); }
+
+          .today-number {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-primary);
+          }
+
+          .today-label {
+            font-size: 11px;
+            color: var(--color-text-muted);
+            margin-top: 2px;
+          }
+
+          /* ── Attention ── */
+          .attention-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .attention-item {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 14px 16px;
+            border-left: 4px solid var(--color-border);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--color-border);
+            border-left-width: 4px;
+            transition: all 0.15s;
+          }
+
+          .attention-item.critical { border-left-color: var(--color-danger); }
+          .attention-item.warning { border-left-color: var(--color-accent); }
+          .attention-item.info { border-left-color: var(--color-primary); }
+
+          .attention-content {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+
+          .attention-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .attention-icon { font-size: 18px; }
+
+          .attention-title {
+            font-size: 13px;
+            color: var(--color-text-muted);
+            margin-left: 4px;
+          }
+
+          .attention-detail {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+          }
+
+          .attention-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: var(--color-bg);
+          }
+
+          .attention-badge.danger { background: #fde8e8; color: var(--color-danger); }
+          .attention-badge.warning { background: #fcf2e1; color: var(--color-accent); }
+          .attention-badge.info { background: #e6f0f5; color: var(--color-primary); }
+
+          .attention-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+          }
+
+          .attention-btn {
+            padding: 4px 14px;
+            border: 0;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: var(--color-primary);
+            color: #fff;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.15s;
+          }
+
+          .attention-btn:active { transform: scale(0.95); }
+          .attention-btn.secondary {
+            background: var(--color-bg);
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
+          }
+
+          /* ── Health ── */
+          .health-card {
+            background: var(--color-card);
+            border-radius: 12px;
             padding: 16px;
             border: 1px solid var(--color-border);
-            border-radius: 12px;
+            box-shadow: var(--shadow);
+          }
+
+          .health-score-big {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            margin-bottom: 12px;
+          }
+
+          .health-score-number {
+            font-size: 32px;
+            font-weight: 800;
+          }
+
+          .health-score-number.healthy { color: var(--color-secondary); }
+          .health-score-number.watch { color: var(--color-accent); }
+          .health-score-number.risk { color: var(--color-danger); }
+
+          .health-score-label {
+            font-size: 14px;
+            color: var(--color-text-muted);
+          }
+
+          .health-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 12px;
+            margin-bottom: 12px;
+          }
+
+          .health-metrics > div {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+          }
+
+          .health-metrics span:first-child { color: var(--color-text-muted); }
+          .health-metrics .good { color: var(--color-secondary); font-weight: 600; }
+          .health-metrics .watch { color: var(--color-accent); font-weight: 600; }
+          .health-metrics .danger { color: var(--color-danger); font-weight: 600; }
+
+          .health-message {
+            font-size: 13px;
+            padding: 10px;
+            border-radius: 8px;
+            background: var(--color-bg);
+            color: var(--color-text-muted);
+            line-height: 1.4;
+          }
+
+          /* ── Production Pipeline ── */
+          .production-pipeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+          }
+
+          .production-stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             background: var(--color-card);
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--color-border);
+            text-decoration: none;
+            color: var(--color-text);
+            min-width: 60px;
+            flex: 1 0 auto;
+            transition: all 0.15s;
+            box-shadow: var(--shadow);
+          }
+
+          .production-stage:active { transform: scale(0.96); }
+
+          .stage-count {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-primary);
+          }
+
+          .stage-name {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: var(--color-text-muted);
+            margin-top: 2px;
+            letter-spacing: 0.04em;
+          }
+
+          /* ── Chart ── */
+          .chart-section {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
           }
 
           .panel-header {
             display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 14px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
           }
 
           .panel-header h2 {
-            margin: 4px 0 0;
             font-size: 16px;
             font-weight: 700;
-          }
-
-          .panel-header p {
-            margin: 4px 0 0;
-            color: var(--color-text-muted);
-            font-size: 12px;
+            margin: 0;
           }
 
           .period-control {
             display: flex;
-            gap: 3px;
-            padding: 3px;
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
+            gap: 4px;
             background: var(--color-bg);
-            align-self: flex-start;
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
           }
 
           .period-control button {
             padding: 4px 10px;
             border: 0;
-            border-radius: 5px;
+            border-radius: 6px;
             background: transparent;
+            font-size: 11px;
+            font-weight: 600;
             color: var(--color-text-muted);
-            font-size: 10px;
-            font-weight: 700;
             cursor: pointer;
+            transition: all 0.15s;
           }
 
           .period-control button.active {
             background: var(--color-card);
             color: var(--color-text);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
           }
 
           .chart-summary {
@@ -845,23 +1129,23 @@ export default function FashionDashboardPage() {
 
           .chart-summary span {
             display: block;
+            font-size: 10px;
             color: var(--color-text-muted);
-            font-size: 9px;
           }
 
           .chart-summary strong {
             display: block;
-            margin-top: 2px;
             font-size: 14px;
             font-weight: 700;
+            margin-top: 2px;
           }
 
           .chart-container {
             display: flex;
             align-items: flex-end;
             gap: 3px;
-            height: 100px;
-            padding: 8px 0;
+            height: 80px;
+            padding: 4px 0;
             border-bottom: 1px solid var(--color-border);
           }
 
@@ -870,7 +1154,7 @@ export default function FashionDashboardPage() {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
             background: transparent;
             border: 0;
             cursor: pointer;
@@ -882,8 +1166,8 @@ export default function FashionDashboardPage() {
             min-height: 3px;
             border-radius: 3px 3px 0 0;
             background: var(--color-accent);
-            opacity: .6;
-            transition: all .2s;
+            opacity: 0.6;
+            transition: all 0.2s;
           }
 
           .chart-bar-wrap.selected .chart-bar {
@@ -898,14 +1182,11 @@ export default function FashionDashboardPage() {
           }
 
           .chart-empty {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100px;
             width: 100%;
+            text-align: center;
             color: var(--color-text-muted);
-            gap: 6px;
+            font-size: 13px;
+            padding: 20px 0;
           }
 
           .selected-day {
@@ -936,64 +1217,7 @@ export default function FashionDashboardPage() {
             font-weight: 700;
           }
 
-          /* ─── HEALTH ─── */
-          .health-items {
-            display: grid;
-            gap: 8px;
-            margin: 12px 0;
-          }
-
-          .health-items > div {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0;
-            border-bottom: 1px solid var(--color-border);
-          }
-
-          .health-items > div:last-child {
-            border-bottom: 0;
-          }
-
-          .health-items span {
-            color: var(--color-text-muted);
-            font-size: 12px;
-          }
-
-          .health-items strong {
-            font-size: 13px;
-            font-weight: 700;
-          }
-
-          .text-success { color: var(--color-success); }
-          .text-danger { color: var(--color-danger); }
-
-          .health-score {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4px 12px;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: 750;
-            background: var(--color-bg);
-          }
-
-          .health-score.healthy { color: var(--color-success); }
-          .health-score.watch { color: var(--color-accent); }
-          .health-score.risk { color: var(--color-danger); }
-
-          .health-message {
-            padding: 10px;
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            background: var(--color-bg);
-            font-size: 12px;
-            color: var(--color-text-muted);
-            line-height: 1.5;
-          }
-
-          /* ─── RECENT SECTIONS ─── */
+          /* ── Recent Sections ── */
           .recent-section {
             margin-bottom: 16px;
           }
@@ -1002,19 +1226,13 @@ export default function FashionDashboardPage() {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-          }
-
-          .section-header h2 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: 700;
+            margin-bottom: 8px;
           }
 
           .view-all {
-            color: var(--color-accent);
             font-size: 12px;
             font-weight: 600;
+            color: var(--color-accent);
             text-decoration: none;
           }
 
@@ -1028,34 +1246,34 @@ export default function FashionDashboardPage() {
             justify-content: space-between;
             align-items: center;
             padding: 12px;
-            border: 1px solid var(--color-border);
-            border-radius: 10px;
             background: var(--color-card);
+            border-radius: 10px;
+            border: 1px solid var(--color-border);
             text-decoration: none;
             color: var(--color-text);
-            transition: border-color .2s;
+            transition: border-color 0.15s;
+            box-shadow: var(--shadow);
           }
 
-          .order-item:hover, .customer-item:hover, .group-item:hover {
+          .order-item:active, .customer-item:active, .group-item:active {
             border-color: var(--color-accent);
           }
 
           .order-title, .customer-name, .group-name {
-            display: block;
             font-weight: 700;
             font-size: 13px;
           }
 
           .order-customer, .customer-phone, .group-meta {
-            display: block;
             font-size: 11px;
             color: var(--color-text-muted);
+            display: block;
           }
 
           .order-meta {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex-shrink: 0;
           }
 
@@ -1105,13 +1323,13 @@ export default function FashionDashboardPage() {
           .group-progress {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             flex-shrink: 0;
           }
 
           .progress-track {
-            width: 60px;
-            height: 5px;
+            width: 50px;
+            height: 4px;
             border-radius: 99px;
             background: var(--color-border);
             overflow: hidden;
@@ -1119,52 +1337,104 @@ export default function FashionDashboardPage() {
 
           .progress-fill {
             height: 100%;
-            border-radius: inherit;
-            background: var(--color-success);
+            background: var(--color-secondary);
           }
 
           .group-progress span {
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 600;
           }
 
           .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: var(--color-text-muted);
+            background: var(--color-card);
+            border-radius: 10px;
+            border: 1px dashed var(--color-border);
+          }
+
+          /* ── Bottom Navigation ── */
+          .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid var(--color-border);
+            padding: 8px 0 env(safe-area-inset-bottom, 8px);
+            z-index: 100;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.04);
+          }
+
+          .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 32px 16px;
-            border: 1px dashed var(--color-border);
-            border-radius: 10px;
+            text-decoration: none;
             color: var(--color-text-muted);
-            gap: 6px;
+            font-size: 10px;
+            font-weight: 500;
+            gap: 2px;
+            transition: color 0.15s;
+            padding: 4px 12px;
+            -webkit-tap-highlight-color: transparent;
           }
 
-          .empty-state p {
-            margin: 0;
-            font-size: 13px;
+          .nav-item.active {
+            color: var(--color-accent);
           }
 
-                 /* ─── MODAL ─── */
+          .nav-item:active { opacity: 0.6; }
+
+                                                                                                      /* ── FAB ── */
+          .fab-btn {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 0;
+            background: var(--color-accent);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(212,165,42,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 99;
+            transition: transform 0.15s;
+          }
+
+          .fab-btn:active { transform: scale(0.92); }
+
+          /* ── Modal ── */
           .modal-backdrop {
             position: fixed;
-            z-index: 1000;
             inset: 0;
+            z-index: 200;
             display: grid;
             place-items: center;
             padding: 16px;
-            background: rgba(0,0,0,0.48);
+            background: rgba(0,0,0,0.4);
             backdrop-filter: blur(4px);
           }
 
           .modal {
-            width: min(100%, 440px);
+            width: 100%;
+            max-width: 440px;
             max-height: calc(100vh - 32px);
             overflow-y: auto;
-            border: 1px solid var(--color-border);
-            border-radius: 16px;
             background: var(--color-card);
-            box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+            border-radius: 16px;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.15);
           }
 
           .modal-header {
@@ -1189,34 +1459,21 @@ export default function FashionDashboardPage() {
             cursor: pointer;
           }
 
-          .modal-body {
-            padding: 16px;
-            display: grid;
-            gap: 12px;
-          }
-
-          .modal-field label {
-            display: block;
-            margin-bottom: 4px;
-            font-size: 12px;
-            font-weight: 700;
-          }
-
+          .modal-body { padding: 16px; display: grid; gap: 12px; }
+          .modal-field label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; }
           .modal-field input, .modal-field select {
             width: 100%;
             padding: 10px 12px;
             border: 1px solid var(--color-border);
             border-radius: 8px;
             background: var(--color-bg);
-            color: var(--color-text);
             font-size: 14px;
+            color: var(--color-text);
             outline: none;
           }
-
           .modal-field input:focus, .modal-field select:focus {
             border-color: var(--color-accent);
           }
-
           .modal-error {
             padding: 8px 12px;
             border: 1px solid var(--color-danger);
@@ -1225,60 +1482,65 @@ export default function FashionDashboardPage() {
             color: var(--color-danger);
             font-size: 12px;
           }
-
           .modal-footer {
             display: flex;
             gap: 8px;
             padding: 16px;
             border-top: 1px solid var(--color-border);
           }
-
           .btn-secondary, .btn-primary {
             flex: 1;
             padding: 10px;
             border: 0;
             border-radius: 8px;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
           }
-
           .btn-secondary {
             border: 1px solid var(--color-border);
             background: transparent;
-            color: var(--color-text);
           }
-
           .btn-primary {
             background: var(--color-accent);
             color: #fff;
           }
+          .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-          .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-          /* ─── RESPONSIVE ─── */
-          @media (min-width: 480px) {
-            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-          }
-
+          /* ── Responsive adjustments ── */
           @media (min-width: 640px) {
-            .dashboard-page { padding: 20px; }
-            .dashboard-header { flex-direction: row; align-items: center; }
-            .header-actions { flex: 0 0 auto; }
-            .btn-quick, .btn-primary { flex: 0 0 auto; }
-            .chart-container { height: 130px; }
+            .dashboard-page { padding: 20px 20px 100px; }
+            .today-grid { grid-template-columns: repeat(4, 1fr); }
+            .health-metrics { grid-template-columns: 1fr 1fr; }
+            .production-stage { flex: 1 0 auto; }
           }
 
           @media (min-width: 768px) {
-            .metrics-grid { grid-template-columns: repeat(4, 1fr); }
-            .main-grid { grid-template-columns: 2fr 1fr; }
-            .selected-day { grid-template-columns: 1fr 1fr 1fr; }
-            .order-item, .customer-item, .group-item { padding: 14px 16px; }
+            .dashboard-shell { max-width: 960px; }
+            .today-grid { gap: 12px; }
           }
 
           @media (min-width: 1024px) {
-            .dashboard-page { padding: 28px; }
-            .chart-container { height: 160px; }
+            .dashboard-shell { max-width: 1200px; }
+            .today-grid { gap: 16px; }
+            .health-metrics { grid-template-columns: 1fr 1fr 1fr 1fr; }
+          }
+
+          /* ── Dark mode support ── */
+          [data-theme="dark"] {
+            --color-bg: #12121A;
+            --color-card: #1E1E2A;
+            --color-text: #E8E8E8;
+            --color-text-muted: #AAAAAA;
+            --color-border: #2A2A3A;
+            --shadow: 0 4px 16px rgba(0,0,0,0.3);
+          }
+          [data-theme="dark"] .bottom-nav {
+            background: rgba(30,30,42,0.92);
+            border-top-color: var(--color-border);
+          }
+          [data-theme="dark"] .modal {
+            background: var(--color-card);
           }
         `}</style>
       </div>
@@ -1303,4 +1565,4 @@ export default function FashionDashboardPage() {
       </div>
     )
   }
-}
+      }
