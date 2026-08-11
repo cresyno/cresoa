@@ -7618,3 +7618,6 @@ function getDashboardGreeting() {
 
   return 'Good evening'
     }
+     }
+export default DashboardContent;
+     }
