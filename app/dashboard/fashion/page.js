@@ -631,7 +631,6 @@ function ThemeStyle({ theme }) {
     margin-inline:auto;
   }
 }
-    `}</style>
   )
 }
 
