@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
-import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../lib/utils'
+import { formatMoney, formatShortDate, safeAmount } from '../../../lib/utils'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
+import { Icon } from '../../../components/Icon'
 
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
@@ -19,6 +20,14 @@ const THEME_STORAGE_KEY = 'cresoa-theme'
 // ============================================================
 // HELPERS
 // ============================================================
+function getInitials(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+  return name.charAt(0).toUpperCase()
+}
+
 function getDaySeries(orders, days = 7) {
   const result = []
   const today = new Date()
@@ -67,12 +76,10 @@ function resolveCustomerName(order, customers) {
   return 'Unknown Customer'
 }
 
-function getOrderDisplay(order) {
-  // Try to get order title or fallback to ID
+function getOrderTitle(order) {
   if (order.title) return order.title
   if (order.order_title) return order.order_title
-  if (order.id) return `Order #${order.id.slice(0, 6)}`
-  return 'Order'
+  return `Order #${order.id?.slice(0,6) || '?'}`
 }
 
 // ---- Action items ----
@@ -91,8 +98,7 @@ function getActionItems(orders, customers) {
       .slice(0, 5)
       .map(o => {
         const customerName = resolveCustomerName(o, customers)
-        const orderRef = getOrderDisplay(o)
-        // Combine order reference and customer name for display
+        const orderRef = getOrderTitle(o)
         const displayName = `${orderRef} – ${customerName}`
         return {
           id: o.id || 'unknown',
@@ -144,6 +150,7 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
+  const [chartMetric, setChartMetric] = useState('revenue') // 'revenue' | 'orders' | 'collected'
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -184,12 +191,12 @@ function FashionDashboard({ businessId }) {
     }
     return ordersList.slice(0, 4).map(order => {
       const customerName = resolveCustomerName(order, customers)
-      const orderRef = getOrderDisplay(order)
+      const orderRef = getOrderTitle(order)
       const displayName = `${orderRef} – ${customerName}`
-      const orderId = order.id || `temp-${Math.random()}`
+      const initials = getInitials(customerName)
       return (
-        <button key={orderId} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
-          <span className="cresoa-avatar">{getInitials(customerName)}</span>
+        <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
+          <span className="cresoa-avatar">{initials}</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
             <span className="cresoa-row-title">{displayName}</span>
             <span className="cresoa-row-meta">
@@ -211,9 +218,10 @@ function FashionDashboard({ businessId }) {
       const customerOrders = orders ? orders.filter(o => o.customer_id === customer.id) : []
       const totalSpent = customerOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
       const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
+      const initials = getInitials(name)
       return (
         <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
-          <span className="cresoa-avatar">{getInitials(name)}</span>
+          <span className="cresoa-avatar">{initials}</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
             <span className="cresoa-row-title">{name}</span>
             <span className="cresoa-row-meta">
@@ -236,7 +244,7 @@ function FashionDashboard({ businessId }) {
       const progress = group.progress
       return (
         <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)}>
-          <span className="cresoa-group-icon">✦</span>
+          <span className="cresoa-group-icon"><Icon name="users" size={16} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <strong className="cresoa-row-title">{group.name}</strong>
             <div className="cresoa-row-meta">
@@ -260,20 +268,31 @@ function FashionDashboard({ businessId }) {
     })
   }
 
-  // ---- Chart ----
-  const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
-  const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
-  const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
+  // ---- Chart data based on selected metric ----
+  const chartData = useMemo(() => {
+    if (chartMetric === 'revenue') return series.map(d => ({ ...d, value: d.revenue, label: 'Revenue' }))
+    if (chartMetric === 'orders') return series.map(d => ({ ...d, value: d.orders, label: 'Orders' }))
+    // collected: daily collected from orders
+    const dailyCollected = orders.reduce((acc, o) => {
+      const day = new Date(o.created_at).toISOString().split('T')[0]
+      acc[day] = (acc[day] || 0) + safeAmount(o.amount_paid)
+      return acc
+    }, {})
+    return series.map(d => ({ ...d, value: dailyCollected[d.key] || 0, label: 'Collected' }))
+  }, [series, chartMetric, orders])
 
-  // ---- Inline KPI (2×2) ----
+  const maxValue = Math.max(...chartData.map(d => safeAmount(d.value)), 1)
+  const totalValue = chartData.reduce((s, d) => s + safeAmount(d.value), 0)
+
+  // ---- KPI Cards (2×2) ----
   const kpiCards = [
-    { label: 'Revenue', value: formatMoney(summary.revenue), trend: '↑ 14.2%', meta: 'Total order value', icon: '₦', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Orders', value: String(summary.orders), trend: '↑ 3 today', meta: 'Orders in period', icon: '◫', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Collected', value: formatMoney(summary.paid), trend: `${summary.orders ? Math.round((summary.paid / summary.revenue) * 100) : 0}% collected`, meta: 'Payments received', icon: '✓', onClick: () => navigate('/dashboard/orders?filter=payments') },
-    { label: 'Outstanding', value: formatMoney(summary.outstanding), trend: `${summary.outstanding > 0 ? '3 need action' : 'All clear'}`, meta: 'Balance to collect', icon: '!', onClick: () => navigate('/dashboard/orders?filter=attention') },
+    { label: 'Revenue', value: formatMoney(summary.revenue), trend: '↑ 14.2%', meta: 'Total order value', icon: 'dollar-sign', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Orders', value: String(summary.orders), trend: '↑ 3 today', meta: 'Orders in period', icon: 'package', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Collected', value: formatMoney(summary.paid), trend: `${summary.orders ? Math.round((summary.paid / summary.revenue) * 100) : 0}% collected`, meta: 'Payments received', icon: 'check-circle', onClick: () => navigate('/dashboard/orders?filter=payments') },
+    { label: 'Outstanding', value: formatMoney(summary.outstanding), trend: `${summary.outstanding > 0 ? '3 need action' : 'All clear'}`, meta: 'Balance to collect', icon: 'alert-circle', onClick: () => navigate('/dashboard/orders?filter=attention') },
   ]
 
-  // ---- Inline Financial Health ----
+  // ---- Financial Health ----
   const collectedPercent = summary.revenue ? Math.min((summary.paid / summary.revenue) * 100, 100) : 0
   const outstandingPercent = summary.revenue ? Math.min((summary.outstanding / summary.revenue) * 100, 100) : 0
 
@@ -293,9 +312,15 @@ function FashionDashboard({ businessId }) {
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>{new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button">{theme === 'dark' ? '☀' : '☾'}</button>
-            <button onClick={refresh} className="cresoa-icon-button">↻</button>
-            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button">+ New Order</button>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button">
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+            </button>
+            <button onClick={refresh} className="cresoa-icon-button">
+              <Icon name="refresh-cw" size={18} />
+            </button>
+            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button">
+              <Icon name="plus" size={14} /> New Order
+            </button>
           </div>
         </header>
 
@@ -303,7 +328,7 @@ function FashionDashboard({ businessId }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {kpiCards.map(card => (
             <button key={card.label} type="button" onClick={card.onClick} className="cresoa-metric-card">
-              <span className="cresoa-metric-icon">{card.icon}</span>
+              <span className="cresoa-metric-icon"><Icon name={card.icon} size={18} /></span>
               <span style={{ minWidth: 0 }}>
                 <span className="cresoa-metric-label">{card.label}</span>
                 <strong className="cresoa-metric-value">{card.value}</strong>
@@ -347,29 +372,40 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance Chart */}
+        {/* Performance with metric selector */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <div>
-                <strong style={{ fontSize: 22 }}>{formatMoney(totalRevenue)}</strong>
-                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
+                <strong style={{ fontSize: 22 }}>
+                  {chartMetric === 'revenue' ? formatMoney(totalValue) : totalValue}
+                </strong>
+                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>
+                  {chartData.reduce((s,d) => s + safeAmount(d.orders), 0)} orders
+                </span>
                 <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span>
               </div>
-              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
-                <option value="7">7 days</option>
-                <option value="30">30 days</option>
-                <option value="90">90 days</option>
-              </select>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <select className="cresoa-select" value={chartMetric} onChange={e => setChartMetric(e.target.value)} style={{ minWidth: 100 }}>
+                  <option value="revenue">Revenue</option>
+                  <option value="orders">Orders</option>
+                  <option value="collected">Collected</option>
+                </select>
+                <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
+                  <option value="7">7d</option>
+                  <option value="30">30d</option>
+                  <option value="90">90d</option>
+                </select>
+              </div>
             </div>
             <div className="cresoa-chart" style={{ minHeight: 120 }}>
-              {series.map(day => {
-                const height = Math.max((safeAmount(day.revenue) / maxRevenue) * 100, day.revenue ? 4 : 1)
+              {chartData.map(day => {
+                const height = Math.max((safeAmount(day.value) / maxValue) * 100, day.value ? 4 : 1)
                 return (
                   <div key={day.key} className="cresoa-chart-day">
                     <div className="cresoa-chart-bar-wrap">
-                      <div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div>
+                      <div className="cresoa-chart-value">{day.value > 0 ? (chartMetric === 'revenue' ? formatMoney(day.value) : day.value) : ''}</div>
                       <div className="cresoa-chart-bar" style={{ height: height+'%' }} />
                     </div>
                     <span>{day.label}</span>
@@ -380,7 +416,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Inline Financial Health */}
+        {/* Financial Health */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -418,16 +454,17 @@ function FashionDashboard({ businessId }) {
                   <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99 }} />
                 </div>
               </div>
-    {summary.outstanding > 0 && (
+              {summary.outstanding > 0 && (
                 <div style={{ padding: '8px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)' }}>
-                  ⚠ {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
+                  <Icon name="alert-triangle" size={14} style={{ marginRight: 6 }} />
+                  {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
                 </div>
               )}
             </div>
           </Card>
         </div>
 
-        {/* Recent Orders & Recent Customers – 2-col */}
+        {/* Recent Orders & Customers – 2-col */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -444,6 +481,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Group Orders */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
@@ -478,4 +516,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-          }
+}
