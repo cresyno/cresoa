@@ -7,14 +7,13 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components
+// ✅ Shared components (only those confirmed working)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
-import { ActionCenter } from '../../../components/ActionCenter'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -53,31 +52,6 @@ function getProductionCounts(orders) {
   return counts
 }
 
-// Build action items
-function getActionItems(orders, customers) {
-  return orders
-    .filter(o => {
-      const status = String(o.current_status || '').toLowerCase()
-      return safeAmount(o.balance) > 0 ||
-        status === 'order placed' ||
-        status === 'fitting' ||
-        status === 'alteration'
-    })
-    .slice(0, 5)
-    .map(o => {
-      const name = getOrderCustomerName(o, customers)
-      return {
-        id: o.id,
-        customerName: name,
-        amount: o.balance,
-        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
-        status: o.current_status,
-        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
-        order: o
-      }
-    })
-}
-
 // ============================================================
 // DASHBOARD SHELL
 // ============================================================
@@ -113,15 +87,10 @@ function FashionDashboard({ businessId }) {
   const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
   const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
   const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
-  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
 
   const navigate = (path) => {
     const sep = path.includes('?') ? '&' : '?'
     router.push(`${path}${sep}business_id=${businessId}`)
-  }
-
-  const handleOrderClick = (item) => {
-    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
   }
 
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
@@ -155,22 +124,7 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* ActionCenter - temporarily disabled */}
-<div style={{ marginTop: 16 }}>
-  <Card>
-    <SectionHeader
-      title="Action Required"
-      subtitle={`${actionItems.length} item${actionItems.length > 1 ? 's' : ''} need your attention`}
-      action="View all"
-      onAction={() => navigate('/dashboard/orders')}
-    />
-    <div style={{ padding: '12px', color: 'var(--cresoa-text-muted)' }}>
-      ActionCenter coming soon – {actionItems.length} items
-    </div>
-  </Card>
-</div>
-
-        {/* Production Pipeline (inline) */}
+        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -204,7 +158,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ Keep EmptyState test for now */}
+        {/* EmptyState Test (confirmed working) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
