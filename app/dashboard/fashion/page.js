@@ -760,18 +760,30 @@ function FashionDashboard({ businessId }) {
   const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
 
   const navigateWithBusiness = (path) => {
-    const separator = path.includes('?') ? '&' : '?'
-    router.push(`${path}${separator}business_id=${businessId}`)
+  if (!businessId) {
+    console.error('No businessId available for navigation')
+    return
   }
+  const separator = path.includes('?') ? '&' : '?'
+  const url = `${path}${separator}business_id=${businessId}`
+  console.log('Navigating to:', url)
+  // Try router.push first, fallback to window.location if fails
+  try {
+    router.push(url)
+  } catch (e) {
+    console.warn('router.push failed, using window.location', e)
+    window.location.href = url
+  }
+}
 
-  const handleNewOrder = () => navigateWithBusiness('/dashboard/fashion/orders/new')
-  const handleOrder = (order) => order?.id && navigateWithBusiness(`/dashboard/fashion/orders/${order.id}`)
-  const handleCustomer = (customer) => customer?.id && navigateWithBusiness(`/dashboard/fashion/customers/${customer.id}`)
-  const handleGroup = (group) => group?.id && navigateWithBusiness(`/dashboard/fashion/groups/${group.id}`)
-  const handleOrders = () => navigateWithBusiness('/dashboard/fashion/orders')
-  const handleCustomers = () => navigateWithBusiness('/dashboard/fashion/customers')
-  const handleGroups = () => navigateWithBusiness('/dashboard/fashion/groups')
-  const handleStage = (stage) => navigateWithBusiness(`/dashboard/fashion/orders?status=${encodeURIComponent(stage)}`)
+const handleNewOrder = () => navigateWithBusiness('/dashboard/orders/new')
+const handleOrder = (order) => order?.id && navigateWithBusiness(`/dashboard/orders/${order.id}`)
+const handleCustomer = (customer) => customer?.id && navigateWithBusiness(`/dashboard/customers/${customer.id}`)
+const handleGroup = (group) => group?.id && navigateWithBusiness(`/dashboard/groups/${group.id}`)
+const handleOrders = () => navigateWithBusiness('/dashboard/orders')
+const handleCustomers = () => navigateWithBusiness('/dashboard/customers')
+const handleGroups = () => navigateWithBusiness('/dashboard/groups')
+const handleStage = (stage) => navigateWithBusiness(`/dashboard/orders?status=${encodeURIComponent(stage)}`)
 
   if (loading) {
     return (
