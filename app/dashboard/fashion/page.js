@@ -15,6 +15,7 @@ import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
 import { ActionCenter } from '../../../components/ActionCenter'
+import { FinancialHealth } from '../../../components/FinancialHealth'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -53,7 +54,7 @@ function getProductionCounts(orders) {
   return counts
 }
 
-// ✅ Safe getActionItems – catches all errors and returns empty array
+// Safe getActionItems
 function getActionItems(orders, customers) {
   if (!Array.isArray(orders) || !Array.isArray(customers)) return []
   try {
@@ -165,7 +166,7 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* ✅ ActionCenter with safe data */}
+        {/* ActionCenter */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -182,7 +183,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Production Pipeline */}
+        {/* Production Pipeline (inline) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -216,7 +217,19 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* EmptyState test (optional – keep or remove) */}
+        {/* ✅ Financial Health (new) */}
+        <div style={{ marginTop: 16 }}>
+          <Card>
+            <SectionHeader title="Financial Health" />
+            <FinancialHealth
+              revenue={summary.revenue}
+              collected={summary.paid}
+              outstanding={summary.outstanding}
+            />
+          </Card>
+        </div>
+
+        {/* Optional: keep a small EmptyState test for now (we can remove later) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
@@ -244,4 +257,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-        }
+    }
