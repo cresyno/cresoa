@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Icon } from './Icon'   // adjust path if needed
 
 export function Navigation({ businessId }) {
   const pathname = usePathname()
@@ -16,10 +17,10 @@ export function Navigation({ businessId }) {
   }, [])
 
   const navItems = [
-    { icon: '🏠', label: 'Home', path: '/dashboard/fashion' },
-    { icon: '📦', label: 'Orders', path: '/dashboard/orders' },
-    { icon: '🧵', label: 'Production', path: '/dashboard/production' },
-    { icon: '👥', label: 'Customers', path: '/dashboard/customers' },
+    { icon: 'home', label: 'Home', path: '/dashboard/fashion' },
+    { icon: 'file-text', label: 'Orders', path: '/dashboard/orders' },
+    { icon: 'layers', label: 'Production', path: '/dashboard/production' },
+    { icon: 'users', label: 'Customers', path: '/dashboard/customers' },
   ]
 
   const navigate = (path) => {
@@ -54,7 +55,7 @@ export function Navigation({ businessId }) {
                 fontSize: 14,
               }}
             >
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <Icon name={item.icon} size={20} />
               <span>{item.label}</span>
             </button>
           )
@@ -85,7 +86,7 @@ export function Navigation({ businessId }) {
               fontWeight: isActive ? 700 : 400,
             }}
           >
-            <span style={{ fontSize: 24 }}>{item.icon}</span>
+            <Icon name={item.icon} size={24} />
             <span>{item.label}</span>
           </button>
         )
