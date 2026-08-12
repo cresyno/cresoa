@@ -2,16 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import './styles.css'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'
 
 /* =========================================================
-   CRESOA FASHION DASHBOARD
-   Single-file dashboard
+   CRESOA FASHION DASHBOARD – v2.0 (Branded & Fixed)
    ========================================================= */
 
 const PRODUCTION_STAGES = [
@@ -78,167 +75,77 @@ const THEME = {
 
 function safeAmount(value) {
   const number = Number(value)
-
-  return Number.isFinite(number)
-    ? number
-    : 0
+  return Number.isFinite(number) ? number : 0
 }
 
 function calculateBalance(order) {
-  return Math.max(
-    safeAmount(order?.price) -
-      safeAmount(order?.amount_paid),
-    0
-  )
+  return Math.max(safeAmount(order?.price) - safeAmount(order?.amount_paid), 0)
 }
 
 function formatMoney(value) {
-  return `₦${safeAmount(value).toLocaleString(
-    'en-NG'
-  )}`
+  return `₦${safeAmount(value).toLocaleString('en-NG')}`
 }
 
 function formatDate(value) {
   if (!value) return '—'
-
-  const date =
-    value instanceof Date
-      ? value
-      : new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return '—'
-  }
-
-  return date.toLocaleDateString(
-    'en-NG',
-    {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    }
-  )
+  const date = value instanceof Date ? value : new Date(value)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function formatShortDate(value) {
   if (!value) return '—'
-
-  const date =
-    value instanceof Date
-      ? value
-      : new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return '—'
-  }
-
-  return date.toLocaleDateString(
-    'en-NG',
-    {
-      day: 'numeric',
-      month: 'short'
-    }
-  )
+  const date = value instanceof Date ? value : new Date(value)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
 }
 
 function getDateKey(value) {
   const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return ''
-  }
-
+  if (isNaN(date.getTime())) return ''
   const year = date.getFullYear()
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, '0')
-  const day = String(
-    date.getDate()
-  ).padStart(2, '0')
-
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
 function getInitials(name) {
-  const value =
-    String(name || 'C').trim()
-
+  const value = String(name || 'C').trim()
   if (!value) return 'C'
-
   return value
     .split(/\s+/)
     .slice(0, 2)
-    .map(part =>
-      part.charAt(0).toUpperCase()
-    )
+    .map(part => part.charAt(0).toUpperCase())
     .join('')
 }
 
 function getCustomerName(customer) {
-  if (!customer) {
-    return 'Unnamed customer'
-  }
-
+  if (!customer) return 'Unnamed customer'
   return (
     customer.full_name ||
     customer.name ||
-    `${customer.first_name || ''} ${
-      customer.last_name || ''
-    }`.trim() ||
+    `${customer.first_name || ''} ${customer.last_name || ''}`.trim() ||
     'Unnamed customer'
   )
 }
 
-function getOrderCustomerName(
-  order,
-  customers
-) {
-  if (!order) {
-    return 'Unknown customer'
-  }
+function getOrderCustomerName(order, customers) {
+  if (!order) return 'Unknown customer'
+  if (order.customer_name) return order.customer_name
+  const customer = customers.find(item => item?.id === order?.customer_id)
+  if (customer) return getCustomerName(customer)
+  return order.customer_id ? `Customer (${order.customer_id.slice(0, 8)})` : 'Unknown customer'
+}
 
-  if (order.customer_name) {
-    return order.customer_name
-  }
-
-  const customer =
-    customers.find(
-      item =>
-        item?.id ===
-        order?.customer_id
-    )
-
-  return getCustomerName(customer)
-     }
-
-     /* =========================================================
+/* =========================================================
    NORMALIZATION
    ========================================================= */
 
 function normalizeOrder(order) {
-  const status =
-    order?.current_status ||
-    order?.status ||
-    order?.order_status ||
-    'Order placed'
-
-  const createdAt =
-    order?.created_at ||
-    order?.createdAt ||
-    order?.date ||
-    new Date().toISOString()
-
-  const price = safeAmount(
-    order?.price ??
-    order?.total_amount ??
-    order?.amount
-  )
-
-  const amountPaid = safeAmount(
-    order?.amount_paid ??
-    order?.paid_amount ??
-    order?.amountPaid
-  )
+  const status = order?.current_status || order?.status || order?.order_status || 'Order placed'
+  const createdAt = order?.created_at || order?.createdAt || order?.date || new Date().toISOString()
+  const price = safeAmount(order?.price ?? order?.total_amount ?? order?.amount)
+  const amountPaid = safeAmount(order?.amount_paid ?? order?.paid_amount ?? order?.amountPaid)
 
   return {
     ...order,
@@ -248,14 +155,8 @@ function normalizeOrder(order) {
     created_at: createdAt,
     price,
     amount_paid: amountPaid,
-    balance: calculateBalance({
-      price,
-      amount_paid: amountPaid
-    }),
-    customer_name:
-      order?.customer_name ||
-      order?.customer?.name ||
-      'Unknown customer'
+    balance: calculateBalance({ price, amount_paid: amountPaid }),
+    customer_name: order?.customer_name || order?.customer?.name || ''
   }
 }
 
@@ -264,9 +165,7 @@ function normalizeCustomer(customer) {
     ...customer,
     id: customer?.id,
     name: getCustomerName(customer),
-    created_at:
-      customer?.created_at ||
-      new Date().toISOString()
+    created_at: customer?.created_at || new Date().toISOString()
   }
 }
 
@@ -274,13 +173,11 @@ function normalizeGroup(group) {
   return {
     ...group,
     id: group?.id,
-    name:
-      group?.name ||
-      group?.group_name ||
-      'Aso Ebi group',
-    created_at:
-      group?.created_at ||
-      new Date().toISOString()
+    name: group?.group_name || group?.name || 'Group',
+    created_at: group?.created_at || new Date().toISOString(),
+    coordinator_customer_id: group?.coordinator_customer_id || null,
+    due_date: group?.due_date || null,
+    status: group?.status || 'pending'
   }
 }
 
@@ -291,102 +188,45 @@ function normalizeGroup(group) {
 function getDaySeries(orders, days = 7) {
   const result = []
   const today = new Date()
-
   for (let index = days - 1; index >= 0; index -= 1) {
     const date = new Date(today)
-
     date.setHours(0, 0, 0, 0)
-    date.setDate(
-      today.getDate() - index
-    )
-
+    date.setDate(today.getDate() - index)
     const key = getDateKey(date)
-
-    const dayOrders = orders.filter(
-      order =>
-        getDateKey(order.created_at) === key
-    )
-
-    const revenue = dayOrders.reduce(
-      (sum, order) =>
-        sum + safeAmount(order.price),
-      0
-    )
-
+    const dayOrders = orders.filter(order => getDateKey(order.created_at) === key)
+    const revenue = dayOrders.reduce((sum, order) => sum + safeAmount(order.price), 0)
     result.push({
       key,
       date,
-      label: date.toLocaleDateString(
-        'en-NG',
-        { weekday: 'short' }
-      ),
-      shortDate: date.toLocaleDateString(
-        'en-NG',
-        {
-          day: 'numeric',
-          month: 'short'
-        }
-      ),
+      label: date.toLocaleDateString('en-NG', { weekday: 'short' }),
+      shortDate: formatShortDate(date),
       orders: dayOrders.length,
       revenue
     })
   }
-
   return result
 }
 
 function getAnalyticsSummary(orders) {
-  const revenue = orders.reduce(
-    (sum, order) =>
-      sum + safeAmount(order.price),
-    0
-  )
-
-  const paid = orders.reduce(
-    (sum, order) =>
-      sum + safeAmount(order.amount_paid),
-    0
-  )
-
-  const outstanding = orders.reduce(
-    (sum, order) =>
-      sum + safeAmount(order.balance),
-    0
-  )
-
-  return {
-    revenue,
-    paid,
-    outstanding,
-    orders: orders.length
-  }
+  const revenue = orders.reduce((sum, order) => sum + safeAmount(order.price), 0)
+  const paid = orders.reduce((sum, order) => sum + safeAmount(order.amount_paid), 0)
+  const outstanding = orders.reduce((sum, order) => sum + safeAmount(order.balance), 0)
+  return { revenue, paid, outstanding, orders: orders.length }
 }
 
 function getProductionCounts(orders) {
-  return PRODUCTION_STAGES.reduce(
-    (result, stage) => {
-      result[stage] = orders.filter(
-        order =>
-          String(
-            order.current_status || ''
-          ).toLowerCase() ===
-          stage.toLowerCase()
-      ).length
-
-      return result
-    },
-    {}
-  )
+  return PRODUCTION_STAGES.reduce((result, stage) => {
+    result[stage] = orders.filter(
+      order => String(order.current_status || '').toLowerCase() === stage.toLowerCase()
+    ).length
+    return result
+  }, {})
 }
 
 function getAttentionOrders(orders) {
   return orders
     .filter(order => {
-      const status =
-        String(
-          order.current_status || ''
-        ).toLowerCase()
-
+      const status = String(order.current_status || '').toLowerCase()
       return (
         status.includes('fitting') ||
         status.includes('alteration') ||
@@ -399,39 +239,30 @@ function getAttentionOrders(orders) {
 
 function getRecentOrders(orders) {
   return [...orders]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at) -
-        new Date(a.created_at)
-    )
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 6)
 }
 
 function getRecentCustomers(customers) {
   return [...customers]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at) -
-        new Date(a.created_at)
-    )
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 5)
-     }
+}
 
-function useFashionDashboardData(
-  businessId
-) {
+/* =========================================================
+   DATA FETCHING HOOK
+   ========================================================= */
+
+function useFashionDashboardData(businessId) {
   const [orders, setOrders] = useState([])
   const [customers, setCustomers] = useState([])
   const [groups, setGroups] = useState([])
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] =
-    useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
-  const load = async (
-    silent = false
-  ) => {
+  const load = async (silent = false) => {
     if (!businessId) {
       setLoading(false)
       return
@@ -443,102 +274,27 @@ function useFashionDashboardData(
       } else {
         setLoading(true)
       }
-
       setError('')
 
-      const [
-        businessResult,
-        ordersResult,
-        customersResult,
-        groupsResult
-      ] = await Promise.all([
-        supabase
-          .from('businesses')
-          .select('*')
-          .eq('id', businessId)
-          .maybeSingle(),
-
-        supabase
-          .from('orders')
-          .select('*')
-          .eq(
-            'business_id',
-            businessId
-          )
-          .order(
-            'created_at',
-            { ascending: false }
-          ),
-
-        supabase
-          .from('customers')
-          .select('*')
-          .eq(
-            'business_id',
-            businessId
-          )
-          .order(
-            'created_at',
-            { ascending: false }
-          ),
-
-        supabase
-          .from('aso_ebi_groups')
-          .select('*')
-          .eq(
-            'business_id',
-            businessId
-          )
-          .order(
-            'created_at',
-            { ascending: false }
-          )
+      const [businessResult, ordersResult, customersResult, groupsResult] = await Promise.all([
+        supabase.from('businesses').select('*').eq('id', businessId).maybeSingle(),
+        supabase.from('orders').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
+        supabase.from('customers').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
+        supabase.from('group_orders').select('*').eq('business_id', businessId).order('created_at', { ascending: false })
       ])
 
-      if (businessResult.error) {
-        throw businessResult.error
-      }
+      if (businessResult.error) throw businessResult.error
+      if (ordersResult.error) throw ordersResult.error
+      if (customersResult.error) throw customersResult.error
+      if (groupsResult.error) throw groupsResult.error
 
-      if (ordersResult.error) {
-        throw ordersResult.error
-      }
-
-      if (customersResult.error) {
-        throw customersResult.error
-      }
-
-      if (groupsResult.error) {
-        throw groupsResult.error
-      }
-
-      setBusiness(
-        businessResult.data || null
-      )
-
-      setOrders(
-        (ordersResult.data || [])
-          .map(normalizeOrder)
-      )
-
-      setCustomers(
-        (customersResult.data || [])
-          .map(normalizeCustomer)
-      )
-
-      setGroups(
-        (groupsResult.data || [])
-          .map(normalizeGroup)
-      )
+      setBusiness(businessResult.data || null)
+      setOrders((ordersResult.data || []).map(normalizeOrder))
+      setCustomers((customersResult.data || []).map(normalizeCustomer))
+      setGroups((groupsResult.data || []).map(normalizeGroup))
     } catch (loadError) {
-      console.error(
-        'Cresoa dashboard:',
-        loadError
-      )
-
-      setError(
-        loadError?.message ||
-        'Unable to load dashboard data.'
-      )
+      console.error('Cresoa dashboard:', loadError)
+      setError(loadError?.message || 'Unable to load dashboard data.')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -549,184 +305,67 @@ function useFashionDashboardData(
     load()
   }, [businessId])
 
-  return {
-    orders,
-    customers,
-    groups,
-    business,
-    loading,
-    refreshing,
-    error,
-    refresh: () => load(true)
-  }
+  return { orders, customers, groups, business, loading, refreshing, error, refresh: () => load(true) }
 }
 
-function DashboardCard({
-  children,
-  style = {},
-  className = ''
-}) {
+/* =========================================================
+   COMPONENTS
+   ========================================================= */
+
+function DashboardCard({ children, style = {}, className = '' }) {
   return (
-    <section
-      className={`cresoa-card ${className}`}
-      style={{
-        background:
-          'var(--cresoa-surface)',
-        border:
-          '1px solid var(--cresoa-border)',
-        borderRadius: 18,
-        boxShadow:
-          '0 4px 18px rgba(15,45,70,.045)',
-        minWidth: 0,
-        ...style
-      }}
-    >
+    <section className={`cresoa-card ${className}`} style={style}>
       {children}
     </section>
   )
 }
 
-function SectionHeader({
-  title,
-  subtitle,
-  action,
-  onAction
-}) {
+function SectionHeader({ title, subtitle, action, onAction }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 12,
-        marginBottom: 16
-      }}
-    >
+    <div className="cresoa-section-header">
       <div style={{ minWidth: 0 }}>
-        <h2
-          style={{
-            margin: 0,
-            color: 'var(--cresoa-text)',
-            fontSize: 15,
-            fontWeight: 800,
-            letterSpacing: '-.01em'
-          }}
-        >
-          {title}
-        </h2>
-
-        {subtitle && (
-          <p
-            style={{
-              margin: '4px 0 0',
-              color: 'var(--cresoa-text-muted)',
-              fontSize: 11,
-              lineHeight: 1.45
-            }}
-          >
-            {subtitle}
-          </p>
-        )}
+        <h2 className="cresoa-section-header-title">{title}</h2>
+        {subtitle && <p className="cresoa-section-header-subtitle">{subtitle}</p>}
       </div>
-
       {action && (
-        <button
-          type="button"
-          onClick={onAction}
-          style={{
-            border: 0,
-            background: 'transparent',
-            color: 'var(--cresoa-accent)',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 800,
-            padding: 4
-          }}
-        >
-          {action}
+        <button type="button" onClick={onAction} className="cresoa-section-header-action">
+          {action} →
         </button>
       )}
     </div>
   )
 }
 
-function StatusPill({
-  status
-}) {
-  const value =
-    String(status || 'Order placed')
+function StatusPill({ status }) {
+  const value = String(status || 'Order placed')
+  const lower = value.toLowerCase()
+  const tone = lower.includes('deliver') || lower.includes('ready')
+    ? 'success'
+    : lower.includes('fitting') || lower.includes('alter')
+    ? 'warning'
+    : lower.includes('cancel')
+    ? 'danger'
+    : 'info'
 
-  const lower =
-    value.toLowerCase()
-
-  const tone =
-    lower.includes('deliver') ||
-    lower.includes('ready')
-      ? 'success'
-      : lower.includes('fitting') ||
-        lower.includes('alter')
-      ? 'warning'
-      : lower.includes('cancel')
-      ? 'danger'
-      : 'info'
-
-  return (
-    <span
-      className={`cresoa-status cresoa-status-${tone}`}
-    >
-      {value}
-    </span>
-  )
+  return <span className={`cresoa-status cresoa-status-${tone}`}>{value}</span>
 }
 
-       function DashboardHeader({
-  business,
-  onRefresh,
-  refreshing,
-  onNewOrder,
-  theme,
-  onToggleTheme
-}) {
-  const businessName =
-    business?.name ||
-    business?.business_name ||
-    'Your fashion business'
+function DashboardHeader({ business, onRefresh, refreshing, onNewOrder, theme, onToggleTheme }) {
+  const businessName = business?.name || business?.business_name || 'Your fashion business'
 
   return (
-    <header
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        marginBottom: 18
-      }}
-    >
-      <div
-        style={{
-          minWidth: 0,
-          flex: 1
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--cresoa-text-muted)',
-            fontSize: 11,
-            fontWeight: 600
-          }}
-        >
+    <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p style={{ margin: 0, color: 'var(--cresoa-text-muted)', fontSize: 12, fontWeight: 600 }}>
           Cresoa Fashion
         </p>
-
         <h1
           style={{
-            margin: '3px 0 0',
+            margin: '2px 0 0',
             color: 'var(--cresoa-text)',
-            fontSize: 'clamp(20px, 5vw, 27px)',
-            lineHeight: 1.15,
+            fontSize: 'clamp(22px, 5vw, 30px)',
             fontWeight: 850,
-            letterSpacing: '-.035em',
+            letterSpacing: '-0.03em',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
@@ -735,253 +374,76 @@ function StatusPill({
           {businessName}
         </h1>
       </div>
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 7,
-          flexShrink: 0
-        }}
-      >
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          aria-label="Toggle theme"
-          className="cresoa-icon-button"
-        >
-          {theme === 'dark' ? '☀' : '☾'}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button type="button" onClick={onToggleTheme} aria-label="Toggle theme" className="cresoa-icon-button">
+          {theme === 'dark' ? <Icon name="sun" size={18} /> : <Icon name="moon" size={18} />}
         </button>
-
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          aria-label="Refresh dashboard"
-          className="cresoa-icon-button"
-        >
-          <span
-            style={{
-              display: 'inline-block',
-              transform: refreshing
-                ? 'rotate(180deg)'
-                : 'none',
-              transition:
-                'transform .3s ease'
-            }}
-          >
-            ↻
-          </span>
+        <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh dashboard" className="cresoa-icon-button">
+          <Icon name="refresh" size={18} style={{ transform: refreshing ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
         </button>
-
-        <button
-          type="button"
-          onClick={onNewOrder}
-          className="cresoa-primary-button"
-        >
-          <span>+</span>
-          <span className="cresoa-new-order-text">
-            New order
-          </span>
+        <button type="button" onClick={onNewOrder} className="cresoa-primary-button">
+          <Icon name="plus" size={14} />
+          <span className="cresoa-new-order-text">New order</span>
         </button>
       </div>
     </header>
   )
 }
 
-function TodayOverview({
-  metrics,
-  onOrders,
-  onPayments,
-  onAttention
-}) {
+function TodayOverview({ metrics, onOrders, onPayments, onAttention }) {
   const cards = [
-    {
-      label: 'Revenue',
-      value: formatMoney(
-        metrics?.revenue
-      ),
-      meta: 'Total order value',
-      icon: '₦',
-      onClick: onOrders
-    },
-    {
-      label: 'Orders',
-      value: String(
-        metrics?.orders || 0
-      ),
-      meta: 'Orders in period',
-      icon: '◫',
-      onClick: onOrders
-    },
-    {
-      label: 'Paid',
-      value: formatMoney(
-        metrics?.paid
-      ),
-      meta: 'Payments received',
-      icon: '✓',
-      onClick: onPayments
-    },
-    {
-      label: 'Outstanding',
-      value: formatMoney(
-        metrics?.outstanding
-      ),
-      meta: 'Balance to collect',
-      icon: '!',
-      onClick: onAttention
-    }
+    { label: 'Revenue', value: formatMoney(metrics?.revenue), meta: 'Total order value', icon: 'revenue', onClick: onOrders },
+    { label: 'Orders', value: String(metrics?.orders || 0), meta: 'Orders in period', icon: 'orders', onClick: onOrders },
+    { label: 'Paid', value: formatMoney(metrics?.paid), meta: 'Payments received', icon: 'paid', onClick: onPayments },
+    { label: 'Outstanding', value: formatMoney(metrics?.outstanding), meta: 'Balance to collect', icon: 'outstanding', onClick: onAttention }
   ]
 
   return (
-    <div
-      className="cresoa-overview-grid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns:
-          'repeat(2, minmax(0, 1fr))',
-        gap: 10
-      }}
-    >
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
       {cards.map(card => (
-        <button
-          key={card.label}
-          type="button"
-          onClick={card.onClick}
-          className="cresoa-metric-card"
-        >
-          <span
-            className="cresoa-metric-icon"
-          >
-            {card.icon}
-          </span>
-
-          <span
-            style={{
-              minWidth: 0
-            }}
-          >
-            <span className="cresoa-metric-label">
-              {card.label}
-            </span>
-
-            <strong className="cresoa-metric-value">
-              {card.value}
-            </strong>
-
-            <span className="cresoa-metric-meta">
-              {card.meta}
-            </span>
+        <button key={card.label} type="button" onClick={card.onClick} className="cresoa-metric-card">
+          <span className="cresoa-metric-icon"><Icon name={card.icon} size={18} /></span>
+          <span style={{ minWidth: 0 }}>
+            <span className="cresoa-metric-label">{card.label}</span>
+            <strong className="cresoa-metric-value">{card.value}</strong>
+            <span className="cresoa-metric-meta">{card.meta}</span>
           </span>
         </button>
       ))}
     </div>
   )
-               }
+}
 
-           function AttentionPanel({
-  orders,
-  customers,
-  onOrder,
-  onOrders
-}) {
-  const items =
-    getAttentionOrders(orders)
+function AttentionPanel({ orders, customers, onOrder, onOrders }) {
+  const items = getAttentionOrders(orders)
 
   return (
-    <DashboardCard
-      style={{
-        padding: 16
-      }}
-    >
+    <DashboardCard>
       <SectionHeader
         title="Needs your attention"
-        subtitle={
-          items.length
-            ? `${items.length} item${
-                items.length === 1
-                  ? ''
-                  : 's'
-              } need action`
-            : 'Everything looks clear'
-        }
+        subtitle={items.length ? `${items.length} item${items.length > 1 ? 's' : ''} need action` : 'Everything looks clear'}
         action="View all"
         onAction={onOrders}
       />
-
       {items.length === 0 ? (
-        <div
-          style={{
-            padding: '20px 4px',
-            textAlign: 'center',
-            color:
-              'var(--cresoa-text-muted)',
-            fontSize: 12
-          }}
-        >
-          ✓ Nothing urgent right now
+        <div className="cresoa-empty-state">
+          <span className="cresoa-empty-state-message">✓ Nothing urgent right now</span>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gap: 8
-          }}
-        >
+        <div style={{ display: 'grid', gap: 6 }}>
           {items.map(order => {
-            const name =
-              getOrderCustomerName(
-                order,
-                customers
-              )
-
+            const name = getOrderCustomerName(order, customers)
             return (
-              <button
-                key={order.id}
-                type="button"
-                onClick={() =>
-                  onOrder?.(order)
-                }
-                className="cresoa-list-row"
-              >
-                <span
-                  className="cresoa-avatar"
-                >
-                  {getInitials(name)}
-                </span>
-
-                <span
-                  style={{
-                    minWidth: 0,
-                    flex: 1,
-                    textAlign: 'left'
-                  }}
-                >
-                  <strong className="cresoa-row-title">
-                    {name}
-                  </strong>
-
+              <button key={order.id} type="button" onClick={() => onOrder?.(order)} className="cresoa-list-row">
+                <span className="cresoa-avatar">{getInitials(name)}</span>
+                <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
+                  <strong className="cresoa-row-title">{name}</strong>
                   <span className="cresoa-row-meta">
-                    {order.balance > 0
-                      ? `${formatMoney(
-                          order.balance
-                        )} outstanding`
-                      : order.current_status}
+                    {order.balance > 0 ? `${formatMoney(order.balance)} outstanding` : order.current_status}
                   </span>
                 </span>
-
-                <StatusPill
-                  status={
-                    order.current_status
-                  }
-                />
-
-                <span
-                  className="cresoa-row-arrow"
-                >
-                  ›
-                </span>
+                <StatusPill status={order.current_status} />
+                <span className="cresoa-row-arrow">›</span>
               </button>
             )
           })}
@@ -989,201 +451,63 @@ function TodayOverview({
       )}
     </DashboardCard>
   )
-                     }
+}
 
-function ProductionPipeline({
-  orders,
-  onStage
-}) {
-  const counts =
-    getProductionCounts(orders)
+function ProductionPipeline({ orders, onStage }) {
+  const counts = getProductionCounts(orders)
 
   return (
-    <DashboardCard
-      style={{ padding: 16 }}
-    >
-      <SectionHeader
-        title="Production pipeline"
-        subtitle="See what is moving through your workshop"
-      />
-
-      <div
-        className="cresoa-pipeline"
-      >
-        {PRODUCTION_STAGES.map(
-          (stage, index) => {
-            const count =
-              counts[stage] || 0
-
-            return (
-              <button
-                key={stage}
-                type="button"
-                onClick={() =>
-                  onStage?.(stage)
-                }
-                className="cresoa-pipeline-item"
-              >
-                <span
-                  className="cresoa-pipeline-number"
-                >
-                  {count}
-                </span>
-
-                <span
-                  className="cresoa-pipeline-label"
-                >
-                  {stage}
-                </span>
-
-                {index <
-                  PRODUCTION_STAGES.length -
-                    1 && (
-                  <span
-                    className="cresoa-pipeline-line"
-                  />
-                )}
-              </button>
-            )
-          }
-        )}
+    <DashboardCard>
+      <SectionHeader title="Production pipeline" subtitle="See what is moving through your workshop" />
+      <div className="cresoa-pipeline">
+        {PRODUCTION_STAGES.map((stage, index) => {
+          const count = counts[stage] || 0
+          return (
+            <button key={stage} type="button" onClick={() => onStage?.(stage)} className="cresoa-pipeline-item">
+              <span className="cresoa-pipeline-number">{count}</span>
+              <span className="cresoa-pipeline-label">{stage}</span>
+              {index < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
+            </button>
+          )
+        })}
       </div>
     </DashboardCard>
   )
 }
 
-function AnalyticsCard({
-  series,
-  period,
-  onPeriodChange
-}) {
-  const maxRevenue = Math.max(
-    ...series.map(day =>
-      safeAmount(day.revenue)
-    ),
-    1
-  )
-
-  const totalRevenue = series.reduce(
-    (sum, day) =>
-      sum + safeAmount(day.revenue),
-    0
-  )
-
-  const totalOrders = series.reduce(
-    (sum, day) =>
-      sum + safeAmount(day.orders),
-    0
-  )
+function AnalyticsCard({ series, period, onPeriodChange }) {
+  const maxRevenue = Math.max(...series.map(day => safeAmount(day.revenue)), 1)
+  const totalRevenue = series.reduce((sum, day) => sum + safeAmount(day.revenue), 0)
+  const totalOrders = series.reduce((sum, day) => sum + safeAmount(day.orders), 0)
 
   return (
-    <DashboardCard
-      style={{ padding: 16 }}
-    >
-      <SectionHeader
-        title="Analytics"
-        subtitle="Daily performance"
-      />
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginBottom: 18
-        }}
-      >
+    <DashboardCard>
+      <SectionHeader title="Analytics" subtitle="Daily performance" />
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
         <div>
-          <strong
-            style={{
-              display: 'block',
-              color: 'var(--cresoa-text)',
-              fontSize: 22,
-              letterSpacing: '-.03em'
-            }}
-          >
+          <strong style={{ display: 'block', color: 'var(--cresoa-text)', fontSize: 24, letterSpacing: '-0.03em' }}>
             {formatMoney(totalRevenue)}
           </strong>
-
-          <span
-            style={{
-              color:
-                'var(--cresoa-text-muted)',
-              fontSize: 11
-            }}
-          >
-            {totalOrders} orders
-          </span>
+          <span style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>{totalOrders} orders</span>
         </div>
-
-        <select
-          value={period}
-          onChange={event =>
-            onPeriodChange(
-              event.target.value
-            )
-          }
-          className="cresoa-select"
-          aria-label="Analytics period"
-        >
-          <option value="7">
-            7 days
-          </option>
-          <option value="14">
-            14 days
-          </option>
-          <option value="30">
-            30 days
-          </option>
+        <select value={period} onChange={e => onPeriodChange(e.target.value)} className="cresoa-select">
+          <option value="7">7 days</option>
+          <option value="14">14 days</option>
+          <option value="30">30 days</option>
         </select>
       </div>
-
-      <div
-        className="cresoa-chart"
-        aria-label="Daily revenue chart"
-      >
+      <div className="cresoa-chart">
         {series.map(day => {
-          const height =
-            Math.max(
-              (safeAmount(day.revenue) /
-                maxRevenue) *
-                100,
-              day.revenue ? 4 : 1
-            )
-
+          const height = Math.max((safeAmount(day.revenue) / maxRevenue) * 100, day.revenue ? 4 : 1)
           return (
-            <div
-              key={day.key}
-              className="cresoa-chart-day"
-            >
-              <div
-                className="cresoa-chart-bar-wrap"
-              >
-                <div
-                  className="cresoa-chart-value"
-                  title={formatMoney(
-                    day.revenue
-                  )}
-                >
-                  {day.revenue > 0
-                    ? formatMoney(
-                        day.revenue
-                      )
-                    : ''}
+            <div key={day.key} className="cresoa-chart-day">
+              <div className="cresoa-chart-bar-wrap">
+                <div className="cresoa-chart-value" title={formatMoney(day.revenue)}>
+                  {day.revenue > 0 ? formatMoney(day.revenue) : ''}
                 </div>
-
-                <div
-                  className="cresoa-chart-bar"
-                  style={{
-                    height: `${height}%`
-                  }}
-                />
+                <div className="cresoa-chart-bar" style={{ height: `${height}%` }} />
               </div>
-
-              <span>
-                {day.label}
-              </span>
+              <span>{day.label}</span>
             </div>
           )
         })}
@@ -1192,87 +516,29 @@ function AnalyticsCard({
   )
 }
 
-function RecentOrders({
-  orders,
-  customers,
-  onOrder,
-  onOrders
-}) {
-  const recent =
-    getRecentOrders(orders)
+function RecentOrders({ orders, customers, onOrder, onOrders }) {
+  const recent = getRecentOrders(orders)
 
   return (
-    <DashboardCard
-      style={{ padding: 16 }}
-    >
-      <SectionHeader
-        title="Recent orders"
-        subtitle="Your latest customer orders"
-        action="View all"
-        onAction={onOrders}
-      />
-
+    <DashboardCard>
+      <SectionHeader title="Recent orders" subtitle="Your latest customer orders" action="View all" onAction={onOrders} />
       {recent.length === 0 ? (
-        <EmptyState
-          title="No orders yet"
-          message="Your latest orders will appear here."
-        />
+        <div className="cresoa-empty-state">
+          <span className="cresoa-empty-state-title">No orders yet</span>
+          <span className="cresoa-empty-state-message">Your latest orders will appear here.</span>
+        </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gap: 4
-          }}
-        >
+        <div style={{ display: 'grid', gap: 4 }}>
           {recent.map(order => {
-            const customer =
-              getOrderCustomerName(
-                order,
-                customers
-              )
-
+            const customer = getOrderCustomerName(order, customers)
             return (
-              <button
-                key={order.id}
-                type="button"
-                onClick={() =>
-                  onOrder?.(order)
-                }
-                className="cresoa-list-row"
-              >
-                <span
-                  className="cresoa-avatar"
-                >
-                  {getInitials(customer)}
+              <button key={order.id} type="button" onClick={() => onOrder?.(order)} className="cresoa-list-row">
+                <span className="cresoa-avatar">{getInitials(customer)}</span>
+                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <strong className="cresoa-row-title">{customer}</strong>
+                  <span className="cresoa-row-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
                 </span>
-
-                <span
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    textAlign: 'left'
-                  }}
-                >
-                  <strong className="cresoa-row-title">
-                    {customer}
-                  </strong>
-
-                  <span className="cresoa-row-meta">
-                    {formatShortDate(
-                      order.created_at
-                    )}{' '}
-                    ·{' '}
-                    {formatMoney(
-                      order.price
-                    )}
-                  </span>
-                </span>
-
-                <StatusPill
-                  status={
-                    order.current_status
-                  }
-                />
+                <StatusPill status={order.current_status} />
               </button>
             )
           })}
@@ -1282,116 +548,29 @@ function RecentOrders({
   )
 }
 
-function EmptyState({
-  title,
-  message
-}) {
-  return (
-    <div
-      style={{
-        padding: '24px 10px',
-        textAlign: 'center'
-      }}
-    >
-      <strong
-        style={{
-          display: 'block',
-          color: 'var(--cresoa-text)',
-          fontSize: 13
-        }}
-      >
-        {title}
-      </strong>
-
-      <span
-        style={{
-          display: 'block',
-          marginTop: 5,
-          color: 'var(--cresoa-text-muted)',
-          fontSize: 11,
-          lineHeight: 1.5
-        }}
-      >
-        {message}
-      </span>
-    </div>
-  )
-          }
-
-function RecentCustomers({
-  customers,
-  onCustomer,
-  onCustomers
-}) {
-  const recent =
-    getRecentCustomers(customers)
+function RecentCustomers({ customers, onCustomer, onCustomers }) {
+  const recent = getRecentCustomers(customers)
 
   return (
-    <DashboardCard
-      style={{ padding: 16 }}
-    >
-      <SectionHeader
-        title="Recent customers"
-        subtitle="People who recently ordered"
-        action="View all"
-        onAction={onCustomers}
-      />
-
+    <DashboardCard>
+      <SectionHeader title="Recent customers" subtitle="People who recently ordered" action="View all" onAction={onCustomers} />
       {recent.length === 0 ? (
-        <EmptyState
-          title="No customers yet"
-          message="New customers will appear here."
-        />
+        <div className="cresoa-empty-state">
+          <span className="cresoa-empty-state-title">No customers yet</span>
+          <span className="cresoa-empty-state-message">New customers will appear here.</span>
+        </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gap: 4
-          }}
-        >
+        <div style={{ display: 'grid', gap: 4 }}>
           {recent.map(customer => {
-            const name =
-              getCustomerName(customer)
-
+            const name = getCustomerName(customer)
             return (
-              <button
-                key={customer.id}
-                type="button"
-                onClick={() =>
-                  onCustomer?.(customer)
-                }
-                className="cresoa-list-row"
-              >
-                <span
-                  className="cresoa-avatar"
-                >
-                  {getInitials(name)}
+              <button key={customer.id} type="button" onClick={() => onCustomer?.(customer)} className="cresoa-list-row">
+                <span className="cresoa-avatar">{getInitials(name)}</span>
+                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <strong className="cresoa-row-title">{name}</strong>
+                  <span className="cresoa-row-meta">Joined {formatShortDate(customer.created_at)}</span>
                 </span>
-
-                <span
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    textAlign: 'left'
-                  }}
-                >
-                  <strong className="cresoa-row-title">
-                    {name}
-                  </strong>
-
-                  <span className="cresoa-row-meta">
-                    Joined{' '}
-                    {formatShortDate(
-                      customer.created_at
-                    )}
-                  </span>
-                </span>
-
-                <span
-                  className="cresoa-row-arrow"
-                >
-                  ›
-                </span>
+                <span className="cresoa-row-arrow">›</span>
               </button>
             )
           })}
@@ -1401,93 +580,114 @@ function RecentCustomers({
   )
 }
 
-function AsoEbiGroups({
-  groups,
-  onGroup,
-  onGroups
-}) {
-  const recent =
-    groups.slice(0, 4)
+function GroupOrders({ groups, orders, onGroup, onGroups }) {
+  const [expandedId, setExpandedId] = useState(null)
+
+  const toggleExpand = (id) => {
+    setExpandedId(expandedId === id ? null : id)
+  }
+
+  // Compute progress for each group
+  const groupsWithProgress = groups.map(group => {
+    const groupOrders = orders.filter(o => o.group_order_id === group.id)
+    const total = groupOrders.length
+    const delivered = groupOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
+    const progress = total === 0 ? null : Math.round((delivered / total) * 100)
+    return { ...group, totalOrders: total, deliveredOrders: delivered, progress }
+  })
 
   return (
-    <DashboardCard
-      style={{ padding: 16 }}
-    >
-      <SectionHeader
-        title="Aso Ebi groups"
-        subtitle="Keep group orders organised"
-        action="View all"
-        onAction={onGroups}
-      />
-
-      {recent.length === 0 ? (
-        <EmptyState
-          title="No Aso Ebi groups"
-          message="Create a group to manage coordinated outfits."
-        />
+    <DashboardCard>
+      <SectionHeader title="Group Orders" subtitle="Keep group orders organised" action="View all" onAction={onGroups} />
+      {groupsWithProgress.length === 0 ? (
+        <div className="cresoa-empty-state">
+          <span className="cresoa-empty-state-title">No group orders</span>
+          <span className="cresoa-empty-state-message">Create a group to manage coordinated outfits.</span>
+        </div>
       ) : (
-        <div
-          className="cresoa-groups-grid"
-        >
-          {recent.map(group => (
-            <button
-              key={group.id}
-              type="button"
-              onClick={() =>
-                onGroup?.(group)
-              }
-              className="cresoa-group-card"
-            >
-              <span
-                className="cresoa-group-icon"
-              >
-                ✦
-              </span>
+        <div className="cresoa-groups-grid">
+          {groupsWithProgress.map(group => {
+            const isExpanded = expandedId === group.id
+            const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
 
-              <span
-                style={{
-                  minWidth: 0,
-                  flex: 1,
-                  textAlign: 'left'
-                }}
-              >
-                <strong
-                  className="cresoa-row-title"
-                >
-                  {group.name}
-                </strong>
+            return (
+              <div key={group.id} className="cresoa-group-card" onClick={() => toggleExpand(group.id)}>
+                <span className="cresoa-group-icon"><Icon name="group" size={16} /></span>
+                <div style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
+                  <strong className="cresoa-row-title">{group.name}</strong>
+                  <span className="cresoa-row-meta">
+                    {group.progress !== null ? (
+                      <span className="cresoa-group-progress">
+                        <span className="cresoa-group-progress-bar">
+                          <span className="cresoa-group-progress-bar-fill" style={{ width: `${group.progress}%` }} />
+                        </span>
+                        {group.progress}% complete
+                      </span>
+                    ) : (
+                      'N/A'
+                    )}
+                    {coordinator && ` · ${coordinator.name}`}
+                    {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
+                  </span>
+                </div>
+                <span className={`cresoa-row-arrow ${isExpanded ? 'open' : ''}`}>›</span>
 
-                <span
-                  className="cresoa-row-meta"
-                >
-                  Created{' '}
-                  {formatShortDate(
-                    group.created_at
-                  )}
-                </span>
-              </span>
-
-              <span
-                className="cresoa-row-arrow"
-              >
-                ›
-              </span>
-            </button>
-          ))}
+                {isExpanded && (
+                  <div className="cresoa-group-detail">
+                    <div className="cresoa-group-detail-row">
+                      <span>Total orders</span>
+                      <strong>{group.totalOrders}</strong>
+                    </div>
+                    <div className="cresoa-group-detail-row">
+                      <span>Delivered</span>
+                      <strong>{group.deliveredOrders}</strong>
+                    </div>
+                    {coordinator && (
+                      <>
+                        <div className="cresoa-group-detail-row">
+                          <span>Coordinator</span>
+                          <strong>{coordinator.name}</strong>
+                        </div>
+                        {coordinator.phone && (
+                          <div className="cresoa-group-detail-row">
+                            <span>Phone</span>
+                            <strong>{coordinator.phone}</strong>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {group.due_date && (
+                      <div className="cresoa-group-detail-row">
+                        <span>Due date</span>
+                        <strong>{formatDate(group.due_date)}</strong>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="cresoa-group-detail-button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onGroup?.(group)
+                      }}
+                    >
+                      View Group →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </DashboardCard>
   )
-           }
+}
 
 function DashboardLoading() {
   return (
     <div className="cresoa-loading-grid">
       {[1, 2, 3, 4].map(item => (
-        <div
-          key={item}
-          className="cresoa-skeleton-card"
-        >
+        <div key={item} className="cresoa-skeleton-card">
           <div className="cresoa-skeleton short" />
           <div className="cresoa-skeleton long" />
           <div className="cresoa-skeleton medium" />
@@ -1497,123 +697,35 @@ function DashboardLoading() {
   )
 }
 
-function DashboardError({
-  message,
-  onRetry
-}) {
+function DashboardError({ message, onRetry }) {
   return (
-    <DashboardCard
-      style={{
-        padding: 24,
-        textAlign: 'center'
-      }}
-    >
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          margin: '0 auto 12px',
-          display: 'grid',
-          placeItems: 'center',
-          borderRadius: 14,
-          background:
-            'var(--cresoa-danger-soft)',
-          color:
-            'var(--cresoa-danger)',
-          fontSize: 18,
-          fontWeight: 800
-        }}
-      >
-        !
+    <DashboardCard style={{ padding: '40px 24px', textAlign: 'center' }}>
+      <div style={{ width: 48, height: 48, margin: '0 auto 16px', display: 'grid', placeItems: 'center', borderRadius: '50%', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', fontSize: 24, fontWeight: 900 }}>
+        <Icon name="alert" size={24} />
       </div>
-
-      <h2
-        style={{
-          margin: 0,
-          color: 'var(--cresoa-text)',
-          fontSize: 16
-        }}
-      >
-        We couldn't load your dashboard
-      </h2>
-
-      <p
-        style={{
-          margin: '7px auto 16px',
-          maxWidth: 420,
-          color:
-            'var(--cresoa-text-muted)',
-          fontSize: 12,
-          lineHeight: 1.5
-        }}
-      >
-        {message ||
-          'Please try again.'}
-      </p>
-
-      <button
-        type="button"
-        onClick={onRetry}
-        className="cresoa-primary-button"
-      >
-        Try again
-      </button>
+      <h2 style={{ margin: 0, color: 'var(--cresoa-text)', fontSize: 18 }}>Couldn't load dashboard</h2>
+      <p style={{ margin: '8px auto 20px', maxWidth: 400, color: 'var(--cresoa-text-muted)', fontSize: 13 }}>{message || 'Please try again.'}</p>
+      <button type="button" onClick={onRetry} className="cresoa-primary-button">Try again</button>
     </DashboardCard>
   )
-                 }
+}
 
-function BusinessSnapshot({
-  metrics
-}) {
+function BusinessSnapshot({ metrics }) {
   const items = [
-    {
-      label: 'Orders',
-      value: metrics?.orders || 0
-    },
-    {
-      label: 'Revenue',
-      value: formatMoney(
-        metrics?.revenue
-      )
-    },
-    {
-      label: 'Collected',
-      value: formatMoney(
-        metrics?.paid
-      )
-    },
-    {
-      label: 'Outstanding',
-      value: formatMoney(
-        metrics?.outstanding
-      )
-    }
+    { label: 'Orders', value: metrics?.orders || 0 },
+    { label: 'Revenue', value: formatMoney(metrics?.revenue) },
+    { label: 'Collected', value: formatMoney(metrics?.paid) },
+    { label: 'Outstanding', value: formatMoney(metrics?.outstanding) }
   ]
 
   return (
-    <DashboardCard
-      style={{ padding: 16 }}
-    >
-      <SectionHeader
-        title="Business snapshot"
-        subtitle="A quick view of your numbers"
-      />
-
-      <div
-        className="cresoa-snapshot-grid"
-      >
+    <DashboardCard>
+      <SectionHeader title="Business snapshot" subtitle="A quick view of your numbers" />
+      <div className="cresoa-snapshot-grid">
         {items.map(item => (
-          <div
-            key={item.label}
-            className="cresoa-snapshot-item"
-          >
-            <span>
-              {item.label}
-            </span>
-
-            <strong>
-              {item.value}
-            </strong>
+          <div key={item.label} className="cresoa-snapshot-item">
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
           </div>
         ))}
       </div>
@@ -1621,128 +733,45 @@ function BusinessSnapshot({
   )
 }
 
-function FashionDashboard({
-  businessId
-}) {
+/* =========================================================
+   MAIN DASHBOARD
+   ========================================================= */
+
+function FashionDashboard({ businessId }) {
   const router = useRouter()
-  const searchParams =
-    useSearchParams()
+  const { orders, customers, groups, business, loading, refreshing, error, refresh } = useFashionDashboardData(businessId)
 
-  const {
-    orders,
-    customers,
-    groups,
-    business,
-    loading,
-    refreshing,
-    error,
-    refresh
-  } = useFashionDashboardData(
-    businessId
-  )
-
-  const [theme, setTheme] =
-    useState('light')
-
-  const [period, setPeriod] =
-    useState('7')
+  const [theme, setTheme] = useState('light')
+  const [period, setPeriod] = useState('7')
 
   useEffect(() => {
-    const saved =
-      window.localStorage.getItem(
-        THEME_STORAGE_KEY
-      )
-
-    const initial =
-      saved === 'dark'
-        ? 'dark'
-        : 'light'
-
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY)
+    const initial = saved === 'dark' ? 'dark' : 'light'
     setTheme(initial)
-    document.documentElement.dataset.theme =
-      initial
+    document.documentElement.dataset.theme = initial
   }, [])
 
   useEffect(() => {
-    document.documentElement.dataset.theme =
-      theme
-
-    window.localStorage.setItem(
-      THEME_STORAGE_KEY,
-      theme
-    )
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  const series = useMemo(
-    () =>
-      getDaySeries(
-        orders,
-        Number(period)
-      ),
-    [orders, period]
-  )
+  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
+  const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
 
-  const summary = useMemo(
-    () =>
-      getAnalyticsSummary(orders),
-    [orders]
-  )
-
-  const handleNewOrder = () => {
-    router.push(
-      '/dashboard/fashion/orders/new'
-    )
+  const navigateWithBusiness = (path) => {
+    const separator = path.includes('?') ? '&' : '?'
+    router.push(`${path}${separator}business_id=${businessId}`)
   }
 
-  const handleOrder = order => {
-    if (!order?.id) return
-
-    router.push(
-      `/dashboard/fashion/orders/${order.id}`
-    )
-  }
-
-  const handleCustomer = customer => {
-    if (!customer?.id) return
-
-    router.push(
-      `/dashboard/fashion/customers/${customer.id}`
-    )
-  }
-
-  const handleGroup = group => {
-    if (!group?.id) return
-
-    router.push(
-      `/dashboard/fashion/aso-ebi/${group.id}`
-    )
-  }
-
-  const handleOrders = () => {
-    router.push(
-      '/dashboard/fashion/orders'
-    )
-  }
-
-  const handleCustomers = () => {
-    router.push(
-      '/dashboard/fashion/customers'
-    )
-  }
-
-  const handleGroups = () => {
-    router.push(
-      '/dashboard/fashion/aso-ebi'
-    )
-  }
-
-  const handleStage = stage => {
-    router.push(
-      `/dashboard/fashion/orders?status=${encodeURIComponent(
-        stage
-      )}`
-    )
-  }
+  const handleNewOrder = () => navigateWithBusiness('/dashboard/fashion/orders/new')
+  const handleOrder = (order) => order?.id && navigateWithBusiness(`/dashboard/fashion/orders/${order.id}`)
+  const handleCustomer = (customer) => customer?.id && navigateWithBusiness(`/dashboard/fashion/customers/${customer.id}`)
+  const handleGroup = (group) => group?.id && navigateWithBusiness(`/dashboard/fashion/groups/${group.id}`)
+  const handleOrders = () => navigateWithBusiness('/dashboard/fashion/orders')
+  const handleCustomers = () => navigateWithBusiness('/dashboard/fashion/customers')
+  const handleGroups = () => navigateWithBusiness('/dashboard/fashion/groups')
+  const handleStage = (stage) => navigateWithBusiness(`/dashboard/fashion/orders?status=${encodeURIComponent(stage)}`)
 
   if (loading) {
     return (
@@ -1755,10 +784,7 @@ function FashionDashboard({
   if (error) {
     return (
       <DashboardShell theme={theme}>
-        <DashboardError
-          message={error}
-          onRetry={refresh}
-        />
+        <DashboardError message={error} onRetry={refresh} />
       </DashboardShell>
     )
   }
@@ -1771,866 +797,91 @@ function FashionDashboard({
         onRefresh={refresh}
         onNewOrder={handleNewOrder}
         theme={theme}
-        onToggleTheme={() =>
-          setTheme(
-            current =>
-              current === 'dark'
-                ? 'light'
-                : 'dark'
-          )
-        }
+        onToggleTheme={() => setTheme(current => (current === 'dark' ? 'light' : 'dark'))}
       />
 
-      <TodayOverview
-        metrics={summary}
-        onOrders={handleOrders}
-        onPayments={handleOrders}
-        onAttention={handleOrders}
-      />
+      <TodayOverview metrics={summary} onOrders={handleOrders} onPayments={handleOrders} onAttention={handleOrders} />
 
-      <div
-        style={{
-          marginTop: 14
-        }}
-      >
-        <AttentionPanel
-          orders={orders}
-          customers={customers}
-          onOrder={handleOrder}
-          onOrders={handleOrders}
-        />
+      <div style={{ marginTop: 16 }}>
+        <AttentionPanel orders={orders} customers={customers} onOrder={handleOrder} onOrders={handleOrders} />
       </div>
 
-      <div
-        style={{
-          marginTop: 14
-        }}
-      >
-        <ProductionPipeline
-          orders={orders}
-          onStage={handleStage}
-        />
+      <div style={{ marginTop: 16 }}>
+        <ProductionPipeline orders={orders} onStage={handleStage} />
       </div>
 
-      <div
-        className="cresoa-main-grid"
-        style={{
-          marginTop: 14
-        }}
-      >
-        <AnalyticsCard
-          series={series}
-          period={period}
-          onPeriodChange={setPeriod}
-        />
-
-        <BusinessSnapshot
-          metrics={summary}
-        />
+      <div className="cresoa-main-grid" style={{ marginTop: 16 }}>
+        <AnalyticsCard series={series} period={period} onPeriodChange={setPeriod} />
+        <BusinessSnapshot metrics={summary} />
       </div>
 
-      <div
-        className="cresoa-two-column"
-        style={{
-          marginTop: 14
-        }}
-      >
-        <RecentOrders
-          orders={orders}
-          customers={customers}
-          onOrder={handleOrder}
-          onOrders={handleOrders}
-        />
-
-            <RecentCustomers
-          customers={customers}
-          onCustomer={handleCustomer}
-          onCustomers={handleCustomers}
-        />
+      <div className="cresoa-two-column" style={{ marginTop: 16 }}>
+        <RecentOrders orders={orders} customers={customers} onOrder={handleOrder} onOrders={handleOrders} />
+        <RecentCustomers customers={customers} onCustomer={handleCustomer} onCustomers={handleCustomers} />
       </div>
 
-      <div
-        style={{
-          marginTop: 14
-        }}
-      >
-        <AsoEbiGroups
-          groups={groups}
-          onGroup={handleGroup}
-          onGroups={handleGroups}
-        />
+      <div style={{ marginTop: 16 }}>
+        <GroupOrders groups={groups} orders={orders} onGroup={handleGroup} onGroups={handleGroups} />
       </div>
     </DashboardShell>
   )
-       }
+}
 
-function DashboardShell({
-  children,
-  theme
-}) {
+/* =========================================================
+   SHELL & ENTRY
+   ========================================================= */
+
+function DashboardShell({ children, theme }) {
   return (
-    <main
-      className="cresoa-dashboard"
-      data-theme={theme}
-    >
-      <div
-        className="cresoa-dashboard-shell"
-      >
-        <div
-          className="cresoa-dashboard-content"
-        >
-          {children}
-        </div>
+    <main className="cresoa-dashboard" data-theme={theme}>
+      <div className="cresoa-dashboard-shell">
+        <div className="cresoa-dashboard-content">{children}</div>
       </div>
     </main>
   )
 }
 
-const dashboardStyles = `
-  :root {
-    --cresoa-bg: #f7f8f6;
-    --cresoa-surface: #ffffff;
-    --cresoa-surface-soft: #f1f4f1;
-    --cresoa-text: #17221c;
-    --cresoa-text-muted: #718078;
-    --cresoa-text-soft: #9aa69f;
-    --cresoa-border: #e4e9e5;
-    --cresoa-accent: #174f3a;
-    --cresoa-accent-soft: #e8f1ed;
-    --cresoa-success: #237a52;
-    --cresoa-success-soft: #e8f5ee;
-    --cresoa-warning: #a66b18;
-    --cresoa-warning-soft: #fbf1df;
-    --cresoa-danger: #b84a4a;
-    --cresoa-danger-soft: #fbeaea;
-    --cresoa-info: #3d6f96;
-    --cresoa-info-soft: #eaf2f8;
-  }
-
-  [data-theme="dark"] {
-    --cresoa-bg: #101513;
-    --cresoa-surface: #171d1a;
-    --cresoa-surface-soft: #202823;
-    --cresoa-text: #edf3ef;
-    --cresoa-text-muted: #9aa8a0;
-    --cresoa-text-soft: #68756e;
-    --cresoa-border: #29332e;
-    --cresoa-accent: #8fc6ad;
-    --cresoa-accent-soft: #1d352b;
-    --cresoa-success: #72c49c;
-    --cresoa-success-soft: #193428;
-    --cresoa-warning: #e0ad60;
-    --cresoa-warning-soft: #382b18;
-    --cresoa-danger: #e27b7b;
-    --cresoa-danger-soft: #3b2020;
-    --cresoa-info: #80afd0;
-    --cresoa-info-soft: #1d2e3a;
-  }
-
-  .cresoa-dashboard {
-    width: 100%;
-    min-height: 100vh;
-    background: var(--cresoa-bg);
-    color: var(--cresoa-text);
-    transition:
-      background-color .2s ease,
-      color .2s ease;
-  }
-
-  .cresoa-dashboard-shell {
-    width: 100%;
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 20px;
-    box-sizing: border-box;
-  }
-
-  .cresoa-dashboard-content {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .cresoa-icon-button,
-  .cresoa-primary-button,
-  .cresoa-metric-card,
-  .cresoa-list-row,
-  .cresoa-pipeline-item,
-  .cresoa-group-card {
-    font: inherit;
-  }
-
-  .cresoa-icon-button {
-    width: 38px;
-    height: 38px;
-    border: 1px solid var(--cresoa-border);
-    border-radius: 12px;
-    background: var(--cresoa-surface);
-    color: var(--cresoa-text);
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-  }
-
-  .cresoa-primary-button {
-    min-height: 38px;
-    padding: 0 13px;
-    border: 0;
-    border-radius: 12px;
-    background: var(--cresoa-accent);
-    color: #fff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 800;
-  }
-
-  .cresoa-metric-card {
-    width: 100%;
-    min-width: 0;
-    padding: 14px;
-    border: 1px solid var(--cresoa-border);
-    border-radius: 16px;
-    background: var(--cresoa-surface);
-    color: var(--cresoa-text);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .cresoa-metric-icon {
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 11px;
-    background: var(--cresoa-accent-soft);
-    color: var(--cresoa-accent);
-    font-size: 14px;
-    font-weight: 900;
-  }
-
-  .cresoa-metric-label,
-  .cresoa-metric-value,
-  .cresoa-metric-meta {
-    display: block;
-  }
-
-  .cresoa-metric-label {
-    color: var(--cresoa-text-muted);
-    font-size: 10px;
-    font-weight: 700;
-  }
-
-  .cresoa-metric-value {
-    margin-top: 2px;
-    color: var(--cresoa-text);
-    font-size: 16px;
-    line-height: 1.2;
-  }
-
-  .cresoa-metric-meta {
-    margin-top: 2px;
-    color: var(--cresoa-text-soft);
-    font-size: 9px;
-  }
-
-  .cresoa-list-row {
-    width: 100%;
-    min-width: 0;
-    padding: 9px 4px;
-    border: 0;
-    border-bottom: 1px solid var(--cresoa-border);
-    background: transparent;
-    color: var(--cresoa-text);
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  .cresoa-list-row:last-child {
-    border-bottom: 0;
-  }
-
-  .cresoa-avatar {
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--cresoa-accent-soft);
-    color: var(--cresoa-accent);
-    font-size: 10px;
-    font-weight: 900;
-  }
-
-  .cresoa-row-title,
-  .cresoa-row-meta {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .cresoa-row-title {
-    color: var(--cresoa-text);
-    font-size: 11px;
-  }
-
-  .cresoa-row-meta {
-    margin-top: 3px;
-    color: var(--cresoa-text-muted);
-    font-size: 9px;
-  }
-
-  .cresoa-row-arrow {
-    color: var(--cresoa-text-soft);
-    font-size: 18px;
-    flex: 0 0 auto;
-  }
-
-  .cresoa-status {
-    display: inline-flex;
-    align-items: center;
-    min-height: 22px;
-    padding: 0 7px;
-    border-radius: 999px;
-    font-size: 8px;
-    font-weight: 800;
-    white-space: nowrap;
-  }
-
-  .cresoa-status-success {
-    background: var(--cresoa-success-soft);
-    color: var(--cresoa-success);
-  }
-
-  .cresoa-status-warning {
-    background: var(--cresoa-warning-soft);
-    color: var(--cresoa-warning);
-  }
-
-  .cresoa-status-danger {
-    background: var(--cresoa-danger-soft);
-    color: var(--cresoa-danger);
-  }
-
-  .cresoa-status-info {
-    background: var(--cresoa-info-soft);
-    color: var(--cresoa-info);
-  }
-
-  .cresoa-main-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(220px, .8fr);
-    gap: 14px;
-  }
-
-  .cresoa-two-column {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .cresoa-pipeline {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .cresoa-pipeline-item {
-    position: relative;
-    min-width: 0;
-    padding: 4px;
-    border: 0;
-    background: transparent;
-    color: var(--cresoa-text);
-    cursor: pointer;
-  }
-
-  .cresoa-pipeline-number {
-    width: 38px;
-    height: 38px;
-    margin: 0 auto 7px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--cresoa-accent-soft);
-    color: var(--cresoa-accent);
-    font-size: 12px;
-    font-weight: 900;
-  }
-
-  .cresoa-pipeline-label {
-    display: block;
-    color: var(--cresoa-text-muted);
-    font-size: 9px;
-    line-height: 1.3;
-  }
-
-  .cresoa-pipeline-line {
-    position: absolute;
-    top: 22px;
-    left: calc(50% + 23px);
-    right: calc(-50% + 23px);
-    height: 1px;
-    background: var(--cresoa-border);
-    pointer-events: none;
-  }
-
-  .cresoa-chart {
-    height: 190px;
-    display: flex;
-    align-items: stretch;
-    gap: 7px;
-    overflow-x: auto;
-    padding-top: 4px;
-  }
-
-  .cresoa-chart-day {
-    min-width: 30px;
-    flex: 1 0 30px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 6px;
-    color: var(--cresoa-text-muted);
-    font-size: 8px;
-  }
-
-  .cresoa-chart-bar-wrap {
-    width: 100%;
-    height: 155px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: center;
-  }
-
-  .cresoa-chart-value {
-    min-height: 12px;
-    margin-bottom: 3px;
-    color: var(--cresoa-text-soft);
-    font-size: 7px;
-    white-space: nowrap;
-  }
-
-  .cresoa-chart-bar {
-    width: min(18px, 70%);
-    min-height: 1px;
-    border-radius: 7px 7px 3px 3px;
-    background: var(--cresoa-accent);
-    transition: height .3s ease;
-  }
-
-  .cresoa-select {
-    min-height: 32px;
-    padding: 0 9px;
-    border: 1px solid var(--cresoa-border);
-    border-radius: 9px;
-    background: var(--cresoa-surface);
-    color: var(--cresoa-text);
-    font-size: 10px;
-    font-weight: 700;
-    outline: none;
-  }
-
-  .cresoa-snapshot-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .cresoa-snapshot-item {
-    padding: 11px;
-    border-radius: 12px;
-    background: var(--cresoa-surface-soft);
-  }
-
-  .cresoa-snapshot-item span,
-  .cresoa-snapshot-item strong {
-    display: block;
-  }
-
-  .cresoa-snapshot-item span {
-    color: var(--cresoa-text-muted);
-    font-size: 9px;
-  }
-
-  .cresoa-snapshot-item strong {
-    margin-top: 4px;
-    color: var(--cresoa-text);
-    font-size: 13px;
-  }
-
-  .cresoa-groups-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .cresoa-group-card {
-    min-width: 0;
-    padding: 11px;
-    border: 1px solid var(--cresoa-border);
-    border-radius: 13px;
-    background: var(--cresoa-surface-soft);
-    color: var(--cresoa-text);
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    cursor: pointer;
-  }
-
-  .cresoa-group-icon {
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    display: grid;
-    place-items: center;
-    border-radius: 10px;
-    background: var(--cresoa-accent);
-    color: #fff;
-    font-size: 12px;
-  }
-
-  .cresoa-loading-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .cresoa-skeleton-card {
-    min-height: 130px;
-    padding: 16px;
-    border-radius: 16px;
-    background: var(--cresoa-surface);
-    border: 1px solid var(--cresoa-border);
-  }
-
-  .cresoa-skeleton {
-    height: 10px;
-    margin-bottom: 12px;
-    border-radius: 6px;
-    background: var(--cresoa-surface-soft);
-    animation: cresoa-pulse 1.2s ease-in-out infinite;
-  }
-
-  .cresoa-skeleton.short {
-    width: 30%;
-  }
-
-  .cresoa-skeleton.medium {
-    width: 55%;
-  }
-
-  .cresoa-skeleton.long {
-    width: 80%;
-    height: 24px;
-  }
-
-  @keyframes cresoa-pulse {
-    50% {
-      opacity: .45;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .cresoa-dashboard-shell {
-      padding: 14px;
-    }
-
-    .cresoa-main-grid,
-    .cresoa-two-column {
-      grid-template-columns: 1fr;
-    }
-
-    .cresoa-pipeline {
-      overflow-x: auto;
-      grid-template-columns: repeat(5, minmax(72px, 1fr));
-    }
-  }
-
-  @media (max-width: 480px) {
-    .cresoa-dashboard-shell {
-      padding: 11px;
-    }
-
-    .cresoa-new-order-text {
-      display: none;
-    }
-
-    .cresoa-primary-button {
-      width: 38px;
-      padding: 0;
-    }
-
-    .cresoa-main-grid,
-    .cresoa-two-column {
-      gap: 10px;
-    }
-
-    .cresoa-chart {
-      height: 175px;
-    }
-  }
-`
-
-function DashboardStyles() {
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: dashboardStyles
-      }}
-    />
-  )
-}
-
-function FashionDashboardPage({
-  businessId
-}) {
-  return (
-    <>
-      <DashboardStyles />
-
-      <FashionDashboard
-        businessId={businessId}
-      />
-    </>
-  )
-}
-
-/* =========================================================
-   ADDITIONAL HELPERS & ENTRY POINT (unique definitions)
-   ========================================================= */
-
-function getAnalyticsPeriodSummary(
-  orders = [],
-  days = 7
-) {
-  const series =
-    getDaySeries(
-      orders,
-      days
-    )
-
-  return {
-    revenue: series.reduce(
-      (sum, day) =>
-        sum +
-        safeAmount(
-          day.revenue
-        ),
-      0
-    ),
-
-    orders: series.reduce(
-      (sum, day) =>
-        sum +
-        safeAmount(
-          day.orders
-        ),
-      0
-    ),
-
-    series
-  }
-}
-
-function getMaxRevenue(
-  series = []
-) {
-  return series.reduce(
-    (maximum, day) =>
-      Math.max(
-        maximum,
-        safeAmount(
-          day?.revenue
-        )
-      ),
-    0
-  )
-}
-
-function getPeriodSeries(
-  orders = [],
-  period = '7'
-) {
-  const days =
-    Number(period) || 7
-
-  return getDaySeries(
-    orders,
-    days
-  )
-}
-
-function getPeriodRevenue(
-  series = []
-) {
-  return series.reduce(
-    (total, day) =>
-      total +
-      safeAmount(day?.revenue),
-    0
-  )
-}
-
-function getPeriodOrders(
-  series = []
-) {
-  return series.reduce(
-    (total, day) =>
-      total +
-      safeAmount(day?.orders),
-    0
-  )
-}
-
-function getPeriodMaxRevenue(
-  series = []
-) {
-  return getMaxRevenue(
-    series
-  )
-}
-
+// Helper to get business_id from URL if not passed
 function getBusinessIdFromUrl() {
-  if (
-    typeof window ===
-    'undefined'
-  ) {
-    return null
-  }
-
-  const params =
-    new URLSearchParams(
-      window.location.search
-    )
-
-  return (
-    params.get(
-      'business_id'
-    ) ||
-    params.get(
-      'businessId'
-    )
-  )
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  return params.get('business_id') || params.get('businessId')
 }
 
-function resolveBusinessId(
-  explicitBusinessId
-) {
-  if (explicitBusinessId) {
-    return explicitBusinessId
-  }
-
-  return getBusinessIdFromUrl()
-}
-
-function useResolvedBusinessId(
-  explicitBusinessId
-) {
-  const [
-    resolvedBusinessId,
-    setResolvedBusinessId
-  ] = useState(
-    explicitBusinessId || null
-  )
+function useResolvedBusinessId(explicitBusinessId) {
+  const [resolved, setResolved] = useState(explicitBusinessId || null)
 
   useEffect(() => {
     if (explicitBusinessId) {
-      setResolvedBusinessId(
-        explicitBusinessId
-      )
+      setResolved(explicitBusinessId)
       return
     }
-
-    setResolvedBusinessId(
-      getBusinessIdFromUrl()
-    )
+    setResolved(getBusinessIdFromUrl())
   }, [explicitBusinessId])
 
-  return resolvedBusinessId
+  return resolved
 }
 
-function FashionDashboardEntry({
-  businessId
-}) {
-  const resolvedBusinessId =
-    useResolvedBusinessId(
-      businessId
-    )
+function FashionDashboardEntry({ businessId }) {
+  const resolvedBusinessId = useResolvedBusinessId(businessId)
 
   if (!resolvedBusinessId) {
     return (
       <DashboardShell theme="light">
-        <DashboardCard
-          style={{
-            padding: 24,
-            textAlign: 'center'
-          }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              color:
-                'var(--cresoa-text)',
-              fontSize: 16
-            }}
-          >
-            Business account required
-          </h2>
-
-          <p
-            style={{
-              margin:
-                '7px 0 0',
-              color:
-                'var(--cresoa-text-muted)',
-              fontSize: 12,
-              lineHeight: 1.5
-            }}
-          >
-            Select a business account
-            to view its dashboard.
+        <DashboardCard style={{ padding: '40px 24px', textAlign: 'center' }}>
+          <h2 style={{ margin: 0, color: 'var(--cresoa-text)', fontSize: 18 }}>Business account required</h2>
+          <p style={{ margin: '8px 0 0', color: 'var(--cresoa-text-muted)', fontSize: 13 }}>
+            Select a business account to view its dashboard.
           </p>
         </DashboardCard>
       </DashboardShell>
     )
   }
 
-  return (
-    <FashionDashboard
-      businessId={
-        resolvedBusinessId
-      }
-    />
-  )
+  return <FashionDashboard businessId={resolvedBusinessId} />
 }
 
-export default function Page({
-  searchParams
-}) {
-  const businessId =
-    searchParams?.business_id ||
-    searchParams?.businessId ||
-    null
-
-  return (
-    <FashionDashboardEntry
-      businessId={
-        businessId
-      }
-    />
-  )
-}
+export default function Page({ searchParams }) {
+  const businessId = searchParams?.business_id || searchParams?.businessId || null
+  return <FashionDashboardEntry businessId={businessId} />
+       }
