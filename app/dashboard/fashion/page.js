@@ -66,12 +66,14 @@ function getActionItems(orders, customers) {
       })
       .slice(0, 5)
       .map(o => {
-        let name = 'Customer unavailable'
+        // Get customer name properly
+        let name = 'Unknown Customer'
         try {
-          name = getOrderCustomerName(o, customers) || `Customer #${o.id?.slice(0,6) || '?'}`
-        } catch (_) {
-          name = `Customer #${o.id?.slice(0,6) || '?'}`
-        }
+          const customerName = getOrderCustomerName(o, customers)
+          if (customerName && customerName !== 'Unknown customer' && customerName !== 'Unnamed customer') {
+            name = customerName
+          }
+        } catch (_) { /* ignore */ }
         return {
           id: o.id || 'unknown',
           customerName: name,
@@ -161,13 +163,14 @@ function FashionDashboard({ businessId }) {
       return <EmptyState title="No orders" message="Create your first order to get started." />
     }
     return ordersList.slice(0, 4).map(order => {
-      // Safely get customer name
-      let name = 'Unnamed customer'
+      // Get customer name properly
+      let name = 'Unknown Customer'
       try {
-        name = getOrderCustomerName(order, customers) || `Customer #${order.id?.slice(0,6) || '?'}`
-      } catch (_) {
-        name = `Customer #${order.id?.slice(0,6) || '?'}`
-      }
+        const customerName = getOrderCustomerName(order, customers)
+        if (customerName && customerName !== 'Unknown customer' && customerName !== 'Unnamed customer') {
+          name = customerName
+        }
+      } catch (_) { /* ignore */ }
       const orderId = order.id || `temp-${Math.random()}`
       return (
         <button key={orderId} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
@@ -460,4 +463,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-            }
+              }
