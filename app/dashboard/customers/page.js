@@ -31,7 +31,7 @@ export default function CustomersPage() {
   const [businessId, setBusinessId] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('last_added')
-  const [filterType, setFilterType] = useState('all') // 'all' | 'withOrders' | 'outstanding'
+  const [filterType, setFilterType] = useState('all') // 'all' | 'withOrders' | 'outstanding' | 'paid'
 
   const loadCustomers = async () => {
     setLoading(true)
@@ -130,7 +130,12 @@ export default function CustomersPage() {
     loadCustomers()
   }, [searchParams, sortBy])
 
-  // Filter by search and filterType
+  // ─── Compute stats ───
+  const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
+  const activeCustomers = customers.filter(c => c.orderCount > 0).length
+  const customersWithBalance = customers.filter(c => Number(c.balance || 0) > 0).length
+
+  // ─── Filtering ───
   const filteredCustomers = useMemo(() => {
     let result = customers
     const query = search.trim().toLowerCase()
@@ -143,18 +148,22 @@ export default function CustomersPage() {
       })
     }
 
-    if (filterType === 'withOrders') {
-      result = result.filter(c => c.orderCount > 0)
-    } else if (filterType === 'outstanding') {
-      result = result.filter(c => Number(c.balance || 0) > 0)
+    switch (filterType) {
+      case 'withOrders':
+        result = result.filter(c => c.orderCount > 0)
+        break
+      case 'outstanding':
+        result = result.filter(c => Number(c.balance || 0) > 0)
+        break
+      case 'paid':
+        result = result.filter(c => Number(c.balance || 0) <= 0 && c.orderCount > 0)
+        break
+      default: // 'all'
+        break
     }
 
     return result
   }, [customers, search, filterType])
-
-  const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
-  const activeCustomers = customers.filter(c => c.orderCount > 0).length
-  const customersWithBalance = customers.filter(c => Number(c.balance || 0) > 0).length
 
   // ─── Skeleton ───
   if (loading) {
@@ -210,7 +219,7 @@ export default function CustomersPage() {
     <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-      {/* Header – single title */}
+      {/* Header – single authoritative */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
@@ -259,7 +268,7 @@ export default function CustomersPage() {
             transition: 'all 0.15s'
           }}
         >
-          <div style={{ fontSize: '0.65rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Active</div>
+          <div style={{ fontSize: '0.65rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>With orders</div>
           <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text)' }}>{activeCustomers}</div>
         </button>
         <button
@@ -279,7 +288,7 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* Outstanding Attention Card */}
+      {/* Outstanding Alert with filter action */}
       {customersWithBalance > 0 && (
         <Card style={{ marginBottom: '1rem', background: 'var(--cresoa-danger-soft)', borderColor: 'var(--cresoa-danger)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -295,13 +304,13 @@ export default function CustomersPage() {
               onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
               style={{ padding: '0.3rem 0.8rem', borderRadius: '20px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
             >
-              {filterType === 'outstanding' ? 'Show all' : 'View →'}
+              {filterType === 'outstanding' ? 'Show all' : `View ${customersWithBalance} customers →`}
             </button>
           </div>
         </Card>
       )}
 
-      {/* Search + Filters + Sort */}
+      {/* Search + Filter + Sort */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
           <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
@@ -319,6 +328,16 @@ export default function CustomersPage() {
           )}
         </div>
         <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+          style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
+        >
+          <option value="all">All</option>
+          <option value="withOrders">With orders</option>
+          <option value="outstanding">Outstanding</option>
+          <option value="paid">Paid</option>
+        </select>
+        <select
           value={sortBy}
           onChange={e => setSortBy(e.target.value)}
           style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
@@ -330,16 +349,24 @@ export default function CustomersPage() {
         </select>
       </div>
 
-      {/* Customer List */}
+          {/* Customer List */}
       {filteredCustomers.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
           <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--cresoa-primary)" />
-          <h3 style={{ margin: '0.5rem 0 0.3rem', fontSize: '1rem' }}>{search ? 'No customer found' : 'No customers yet'}</h3>
-          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>{search ? 'Try another search term.' : 'Add your first customer to get started.'}</p>
-          {!search ? (
+          <h3 style={{ margin: '0.5rem 0 0.3rem', fontSize: '1rem' }}>
+            {search ? 'No customer found' : filterType !== 'all' ? `No customers match this filter` : 'No customers yet'}
+          </h3>
+          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>
+            {search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}
+          </p>
+          {!search && filterType === 'all' && (
             <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} className="cresoa-primary-button">Add customer</button>
-          ) : (
+          )}
+          {search && (
             <button onClick={() => setSearch('')} className="cresoa-primary-button" style={{ background: 'var(--cresoa-primary)' }}>Clear search</button>
+          )}
+          {filterType !== 'all' && !search && (
+            <button onClick={() => setFilterType('all')} className="cresoa-primary-button" style={{ background: 'var(--cresoa-primary)' }}>Show all</button>
           )}
         </div>
       ) : (
@@ -394,4 +421,4 @@ export default function CustomersPage() {
       </div>
     </main>
   )
-                                   }
+                    }
