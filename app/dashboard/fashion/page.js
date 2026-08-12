@@ -7,10 +7,12 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (now with StatusPill)
+// ✅ Shared components
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
+import { DashboardLoading } from '../../../components/Loading'
+import { EmptyState } from '../../../components/EmptyState'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -90,8 +92,14 @@ function FashionDashboard({ businessId }) {
     router.push(`${path}${sep}business_id=${businessId}`)
   }
 
-  if (loading) return <DashboardShell theme={theme}><div className="cresoa-loading-grid">Loading...</div></DashboardShell>
-  if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
+  // ✅ Use shared loading component
+  if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
+
+  if (error) return (
+    <DashboardShell theme={theme}>
+      <Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card>
+    </DashboardShell>
+  )
 
   return (
     <DashboardShell theme={theme}>
@@ -113,7 +121,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* KPI Cards */}
+        {/* KPI Cards (still inline – will be replaced with KpiCards next) */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
           <div className="cresoa-metric-card"><span className="cresoa-metric-icon">₦</span><div><span className="cresoa-metric-label">Revenue</span><strong className="cresoa-metric-value">{formatMoney(summary.revenue)}</strong><span className="cresoa-metric-meta">↑ 14.2%</span></div></div>
           <div className="cresoa-metric-card"><span className="cresoa-metric-icon">◫</span><div><span className="cresoa-metric-label">Orders</span><strong className="cresoa-metric-value">{summary.orders}</strong><span className="cresoa-metric-meta">↑ 3 today</span></div></div>
@@ -137,7 +145,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Chart */}
+        {/* Performance Chart */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
@@ -155,19 +163,11 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ Test StatusPill - add a small demo section */}
+        {/* ✅ Test EmptyState - add a demo section */}
         <div style={{ marginTop: 16 }}>
           <Card>
-            <SectionHeader title="StatusPill Test" subtitle="Testing the shared component" />
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <StatusPill status="Order placed" />
-              <StatusPill status="Cutting" />
-              <StatusPill status="Sewing" />
-              <StatusPill status="Ready" />
-              <StatusPill status="Delivered" />
-              <StatusPill status="Fitting" />
-              <StatusPill status="Overdue" />
-            </div>
+            <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
+            <EmptyState title="No data" message="This is a placeholder message." />
           </Card>
         </div>
       </div>
@@ -191,4 +191,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-          }
+                       }
