@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (all confirmed working)
+// ✅ Shared components
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
@@ -157,7 +157,6 @@ function FashionDashboard({ businessId }) {
     if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
   }
 
-  // Retry function for sections – just triggers a global refresh
   const handleRetry = () => refresh()
 
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
@@ -169,18 +168,35 @@ function FashionDashboard({ businessId }) {
       if (!ordersList || ordersList.length === 0) {
         return <EmptyState title="No orders" message="Create your first order to get started." />
       }
-      return ordersList.slice(0, 4).map(order => {
-        const name = getOrderCustomerName(order, customers)
-        return (
-          <button key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
-            <span className="cresoa-avatar">{getInitials(name)}</span>
-            <span style={{ flex: 1, textAlign: 'left' }}>
-              <span className="cresoa-row-title">{name}</span>
-              <span className="cresoa-row-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
-            </span>
-            <StatusPill status={order.current_status} />
-          </button>
-        )
+      // Filter out orders without an id
+      const validOrders = ordersList.filter(o => o && o.id)
+      if (validOrders.length === 0) {
+        return <EmptyState title="No valid orders" message="All orders are missing required data." />
+      }
+      return validOrders.slice(0, 4).map(order => {
+        try {
+          const name = getOrderCustomerName(order, customers)
+          return (
+            <button key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
+              <span className="cresoa-avatar">{getInitials(name)}</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>
+                <span className="cresoa-row-title">{name}</span>
+                <span className="cresoa-row-meta">
+                  {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price)}
+                </span>
+              </span>
+              <StatusPill status={order.current_status} />
+            </button>
+          )
+        } catch (orderError) {
+          console.error('Error rendering single order:', orderError, order)
+          // return a fallback row for this order
+          return (
+            <div key={order.id || 'fallback'} className="cresoa-list-row compact" style={{ padding: '8px 0', color: 'var(--cresoa-text-muted)' }}>
+              <span>Order unavailable</span>
+            </div>
+          )
+        }
       })
     } catch (e) {
       console.error('Order row error:', e)
@@ -200,7 +216,7 @@ function FashionDashboard({ businessId }) {
       }
       return customersList.slice(0, 4).map(customer => {
         const name = customer.name || 'Unnamed'
-        // Determine active orders (we don't have a count, but we can estimate from orders)
+        // Count active orders for this customer
         const activeOrders = orders ? orders.filter(o => o.customer_id === customer.id && o.current_status !== 'Delivered').length : 0
         return (
           <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
@@ -271,10 +287,8 @@ function FashionDashboard({ businessId }) {
     <DashboardShell theme={theme}>
       <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80 }}>
 
-        {/* ✅ Navigation (top) */}
         <Navigation businessId={businessId} />
 
-        {/* Header – no duplicate "Dashboard / Welcome back" */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
@@ -291,7 +305,6 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* KPI Cards – already 2×2 on all screens */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
@@ -299,7 +312,6 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* Action Center */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -316,7 +328,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -332,7 +343,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance Chart */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
@@ -366,7 +376,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Financial Health – enhanced with progress bars and spacing */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -417,7 +426,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-           {/* Recent Orders + Recent Customers (responsive 2-col) */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -444,7 +452,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Group Orders */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
@@ -459,7 +466,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ Navigation (bottom) – with safe-area padding */}
         <div style={{ marginTop: 24, paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Navigation businessId={businessId} />
         </div>
@@ -485,4 +491,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+                            }
