@@ -695,6 +695,7 @@ export default function OrderDetailPage() {
           Choose where the order is now. Cresoa can prepare a customer update for you.
         </p>
       </Card>
+</div>
 
       {/* ─── Money Grid ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
