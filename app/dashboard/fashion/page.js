@@ -7,23 +7,12 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Import shared components (start with just these two)
+// ✅ Shared components (now with StatusPill)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
+import { StatusPill } from '../../../components/StatusPill'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
-
-// ============================================================
-// INLINE COMPONENTS (still here – we'll remove them gradually)
-// ============================================================
-function StatusPill({ status }) {
-  const value = String(status || 'Order placed')
-  const lower = value.toLowerCase()
-  const tone = lower.includes('deliver') || lower.includes('ready') ? 'success'
-    : lower.includes('fitting') || lower.includes('alter') ? 'warning'
-    : lower.includes('cancel') ? 'danger' : 'info'
-  return <span className={`cresoa-status cresoa-status-${tone}`}>{value}</span>
-}
 
 // ============================================================
 // HELPERS
@@ -132,7 +121,7 @@ function FashionDashboard({ businessId }) {
           <div className="cresoa-metric-card"><span className="cresoa-metric-icon">!</span><div><span className="cresoa-metric-label">Outstanding</span><strong className="cresoa-metric-value">{formatMoney(summary.outstanding)}</strong><span className="cresoa-metric-meta">{summary.outstanding > 0 ? '3 need action' : 'All clear'}</span></div></div>
         </div>
 
-        {/* Production Pipeline - now using Card and SectionHeader from components */}
+        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -165,6 +154,22 @@ function FashionDashboard({ businessId }) {
             </div>
           </Card>
         </div>
+
+        {/* ✅ Test StatusPill - add a small demo section */}
+        <div style={{ marginTop: 16 }}>
+          <Card>
+            <SectionHeader title="StatusPill Test" subtitle="Testing the shared component" />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <StatusPill status="Order placed" />
+              <StatusPill status="Cutting" />
+              <StatusPill status="Sewing" />
+              <StatusPill status="Ready" />
+              <StatusPill status="Delivered" />
+              <StatusPill status="Fitting" />
+              <StatusPill status="Overdue" />
+            </div>
+          </Card>
+        </div>
       </div>
     </DashboardShell>
   )
@@ -186,4 +191,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                       }
+          }
