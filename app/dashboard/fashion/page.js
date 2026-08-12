@@ -155,22 +155,20 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* ✅ ActionCenter */}
-        <div style={{ marginTop: 16 }}>
-          <Card>
-            <SectionHeader
-              title="Action Required"
-              subtitle={`${actionItems.length} item${actionItems.length > 1 ? 's' : ''} need your attention`}
-              action="View all"
-              onAction={() => navigate('/dashboard/orders')}
-            />
-            <ActionCenter
-              items={actionItems}
-              onActionClick={handleOrderClick}
-              onViewAll={() => navigate('/dashboard/orders')}
-            />
-          </Card>
-        </div>
+        {/* ActionCenter - temporarily disabled */}
+<div style={{ marginTop: 16 }}>
+  <Card>
+    <SectionHeader
+      title="Action Required"
+      subtitle={`${actionItems.length} item${actionItems.length > 1 ? 's' : ''} need your attention`}
+      action="View all"
+      onAction={() => navigate('/dashboard/orders')}
+    />
+    <div style={{ padding: '12px', color: 'var(--cresoa-text-muted)' }}>
+      ActionCenter coming soon – {actionItems.length} items
+    </div>
+  </Card>
+</div>
 
         {/* Production Pipeline (inline) */}
         <div style={{ marginTop: 16 }}>
