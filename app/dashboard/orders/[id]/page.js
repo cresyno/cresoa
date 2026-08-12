@@ -10,7 +10,7 @@ import { Card } from '../../../../components/Card'
 import { SectionHeader } from '../../../../components/SectionHeader'
 import { StatusPill } from '../../../../components/StatusPill'
 import { Navigation } from '../../../../components/Navigation'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 const STATUS_FLOW = [
   {
