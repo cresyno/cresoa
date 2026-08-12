@@ -43,12 +43,17 @@ const { role, permissions } = body;
     }
 
     // ─── Update role ───
-    const { data: updated, error: updateError } = await supabaseAdmin
-      .from('business_memberships')
-      .update({ role })
-      .eq('id', id)
-      .select()
-      .single();
+    const updateData = { role };
+if (permissions !== undefined) {
+  updateData.permissions = permissions;
+}
+
+const { data: updated, error: updateError } = await supabaseAdmin
+  .from('business_memberships')
+  .update(updateData)
+  .eq('id', id)
+  .select()
+  .single();
 
     if (updateError) throw updateError;
 
