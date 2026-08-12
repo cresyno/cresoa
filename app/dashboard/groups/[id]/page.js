@@ -10,7 +10,7 @@ import { SectionHeader } from '../../../../components/SectionHeader'
 import { StatusPill } from '../../../../components/StatusPill'
 import { Navigation } from '../../../../components/Navigation'
 import { isFeatureAvailable, getPlanLimits } from '../../../../lib/planLimits'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 const EMPTY_MEMBER = {
   customer_id: '',
