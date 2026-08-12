@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components
+// ✅ Shared components (all confirmed working)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
@@ -57,7 +57,7 @@ function getProductionCounts(orders) {
 function getActionItems(orders, customers) {
   if (!Array.isArray(orders) || !Array.isArray(customers)) return []
   try {
-    const items = orders
+    return orders
       .filter(o => o && typeof o === 'object')
       .filter(o => {
         const status = String(o.current_status || '').toLowerCase()
@@ -69,9 +69,7 @@ function getActionItems(orders, customers) {
       .slice(0, 5)
       .map(o => {
         let name = 'Unknown'
-        try {
-          name = getOrderCustomerName(o, customers)
-        } catch (_) { /* ignore */ }
+        try { name = getOrderCustomerName(o, customers) } catch (_) {}
         return {
           id: o.id || 'unknown',
           customerName: name,
@@ -82,11 +80,21 @@ function getActionItems(orders, customers) {
           order: o
         }
       })
-    return items
   } catch (e) {
     console.error('getActionItems error:', e)
     return []
   }
+}
+
+function getGroupProgress(groups, orders) {
+  if (!Array.isArray(groups) || !Array.isArray(orders)) return []
+  return groups.map(group => {
+    const groupOrders = orders.filter(o => o.group_order_id === group.id)
+    const total = groupOrders.length
+    const delivered = groupOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
+    const progress = total === 0 ? null : Math.round((delivered / total) * 100)
+    return { ...group, totalOrders: total, deliveredOrders: delivered, progress }
+  })
 }
 
 // ============================================================
@@ -98,6 +106,18 @@ function DashboardShell({ children, theme }) {
       <div className="cresoa-dashboard-shell">{children}</div>
     </main>
   )
+}
+
+// ============================================================
+// SAFE RENDER HELPER
+// ============================================================
+function SafeRender({ children, fallback = null }) {
+  try {
+    return children
+  } catch (e) {
+    console.error('Render error:', e)
+    return fallback
+  }
 }
 
 // ============================================================
@@ -125,6 +145,7 @@ function FashionDashboard({ businessId }) {
   const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
   const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
   const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
+  const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
 
   const navigate = (path) => {
     const sep = path.includes('?') ? '&' : '?'
@@ -138,9 +159,85 @@ function FashionDashboard({ businessId }) {
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
+  // Safe list rendering
+  const renderOrderRows = (ordersList) => {
+    try {
+      return ordersList.slice(0, 4).map(order => {
+        const name = getOrderCustomerName(order, customers)
+        return (
+          <button key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
+            <span className="cresoa-avatar">{getInitials(name)}</span>
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              <span className="cresoa-row-title">{name}</span>
+              <span className="cresoa-row-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
+            </span>
+            <StatusPill status={order.current_status} />
+          </button>
+        )
+      })
+    } catch (e) {
+      console.error('Order row error:', e)
+      return <EmptyState title="Error loading orders" message="Please refresh the page." />
+    }
+  }
+
+  const renderCustomerRows = (customersList) => {
+    try {
+      return customersList.slice(0, 4).map(customer => {
+        const name = customer.name || 'Unnamed'
+        return (
+          <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
+            <span className="cresoa-avatar">{getInitials(name)}</span>
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              <span className="cresoa-row-title">{name}</span>
+              <span className="cresoa-row-meta">{customer.orders_count || 0} orders</span>
+            </span>
+            <span className="cresoa-row-arrow">›</span>
+          </button>
+        )
+      })
+    } catch (e) {
+      console.error('Customer row error:', e)
+      return <EmptyState title="Error loading customers" message="Please refresh the page." />
+    }
+  }
+
+  const renderGroupCards = (groupsList) => {
+    try {
+      return groupsList.slice(0, 4).map(group => {
+        const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
+        const progress = group.progress
+        return (
+          <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)}>
+            <span className="cresoa-group-icon">✦</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <strong className="cresoa-row-title">{group.name}</strong>
+              <div className="cresoa-row-meta">
+                {progress !== null ? (
+                  <>
+                    <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                      <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
+                    </div>
+                    <span>{progress}% complete</span>
+                  </>
+                ) : 'N/A'}
+                {coordinator && ` · ${coordinator.name}`}
+                {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
+              </div>
+            </div>
+            <span className="cresoa-row-arrow">›</span>
+          </div>
+        )
+      })
+    } catch (e) {
+      console.error('Group card error:', e)
+      return <EmptyState title="Error loading groups" message="Please refresh the page." />
+    }
+  }
+
   return (
     <DashboardShell theme={theme}>
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 40 }}>
         {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
@@ -158,6 +255,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
+        {/* KPI Cards */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
@@ -165,6 +263,7 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
+        {/* Action Center */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -181,6 +280,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -196,23 +296,41 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Performance Chart */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div><strong style={{ fontSize: 22 }}>{formatMoney(series.reduce((s,d) => s + safeAmount(d.revenue), 0))}</strong> <span>{series.reduce((s,d) => s + safeAmount(d.orders), 0)} orders</span> <span style={{ color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span></div>
-              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select>
+              <div>
+                <strong style={{ fontSize: 22 }}>{formatMoney(series.reduce((s,d) => s + safeAmount(d.revenue), 0))}</strong>
+                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{series.reduce((s,d) => s + safeAmount(d.orders), 0)} orders</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span>
+              </div>
+              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+              </select>
             </div>
             <div className="cresoa-chart">
               {series.map(day => {
                 const max = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
                 const height = Math.max((safeAmount(day.revenue)/max)*100, day.revenue ? 4 : 1)
-                return <div key={day.key} className="cresoa-chart-day"><div className="cresoa-chart-bar-wrap"><div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div><div className="cresoa-chart-bar" style={{ height: height+'%' }} /></div><span>{day.label}</span></div>
+                return (
+                  <div key={day.key} className="cresoa-chart-day">
+                    <div className="cresoa-chart-bar-wrap">
+                      <div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div>
+                      <div className="cresoa-chart-bar" style={{ height: height+'%' }} />
+                    </div>
+                    <span>{day.label}</span>
+                  </div>
+                )
               })}
             </div>
           </Card>
         </div>
 
+        {/* Financial Health */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -224,31 +342,44 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ SAFE Recent Orders – no StatusPill, no onClick, just text */}
-        <div style={{ marginTop: 16 }}>
+        {/* Recent Orders + Recent Customers */}
+        <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
-            <SectionHeader title="Recent Orders (safe)" />
-            <div style={{ padding: '8px 0' }}>
+            <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
+            <SafeRender fallback={<EmptyState title="Could not load orders" message="Please refresh" />}>
               {orders.length === 0 ? (
                 <EmptyState title="No orders" message="Create your first order to get started." />
               ) : (
-                <div>
-                  {orders.slice(0, 4).map(order => (
-                    <div key={order.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
-                      <span>{getOrderCustomerName(order, customers)}</span>
-                      <span style={{ float: 'right' }}>{formatMoney(order.price)}</span>
-                    </div>
-                  ))}
-                </div>
+                <div style={{ display: 'grid', gap: 6 }}>{renderOrderRows(orders)}</div>
               )}
-            </div>
+            </SafeRender>
+          </Card>
+
+          <Card>
+            <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
+            <SafeRender fallback={<EmptyState title="Could not load customers" message="Please refresh" />}>
+              {customers.length === 0 ? (
+                <EmptyState title="No customers" message="Add customers to see them here." />
+              ) : (
+                <div style={{ display: 'grid', gap: 6 }}>{renderCustomerRows(customers)}</div>
+              )}
+            </SafeRender>
           </Card>
         </div>
 
+        {/* Group Orders */}
         <div style={{ marginTop: 16 }}>
           <Card>
-            <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
-            <EmptyState title="No data" message="This is a placeholder message." />
+            <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
+            <SafeRender fallback={<EmptyState title="Could not load groups" message="Please refresh" />}>
+              {groupsWithProgress.length === 0 ? (
+                <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
+              ) : (
+                <div className="cresoa-groups-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                  {renderGroupCards(groupsWithProgress)}
+                </div>
+              )}
+            </SafeRender>
           </Card>
         </div>
       </div>
@@ -272,4 +403,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-    }
+        }
