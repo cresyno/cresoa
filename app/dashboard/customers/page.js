@@ -450,14 +450,6 @@ export default function CustomersPage() {
             )}
           </div>
         ) : (
-        <button onClick={() => setSearch('')} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '12px 15px', border: 0, borderRadius: '12px', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>
-                Clear search
-              </button>
-            )}
-          </div>
-</section>
-
-        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredCustomers.map(customer => {
               const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
