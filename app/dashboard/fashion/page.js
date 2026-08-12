@@ -552,4 +552,3 @@ export default function Page() {
 
   return <FashionDashboard businessId={businessId} />
 }
-```
