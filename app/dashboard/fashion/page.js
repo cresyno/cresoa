@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (Step 6 working set)
+// ✅ Shared components
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
@@ -20,7 +20,7 @@ import { FinancialHealth } from '../../../components/FinancialHealth'
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// HELPERS (same as before)
+// HELPERS
 // ============================================================
 function getDaySeries(orders, days = 7) {
   const result = []
@@ -165,7 +165,6 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* ActionCenter */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -182,7 +181,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -198,7 +196,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance Chart */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
@@ -216,7 +213,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Financial Health */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -228,33 +224,27 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-{/* Recent Orders – inline */}
-<div style={{ marginTop: 16 }}>
-  <Card>
-    <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
-    {orders.length === 0 ? (
-      <EmptyState title="No orders" message="Create your first order to get started." />
-    ) : (
-      <div style={{ display: 'grid', gap: 6 }}>
-        {orders.slice(0, 4).map(order => {
-          const name = getOrderCustomerName(order, customers)
-          return (
-            <button key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
-              <span className="cresoa-avatar">{getInitials(name)}</span>
-              <span style={{ flex: 1, textAlign: 'left' }}>
-                <span className="cresoa-row-title">{name}</span>
-                <span className="cresoa-row-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
-              </span>
-              <StatusPill status={order.current_status} />
-            </button>
-          )
-        })}
-      </div>
-    )}
-  </Card>
-</div>
+        {/* ✅ SAFE Recent Orders – no StatusPill, no onClick, just text */}
+        <div style={{ marginTop: 16 }}>
+          <Card>
+            <SectionHeader title="Recent Orders (safe)" />
+            <div style={{ padding: '8px 0' }}>
+              {orders.length === 0 ? (
+                <EmptyState title="No orders" message="Create your first order to get started." />
+              ) : (
+                <div>
+                  {orders.slice(0, 4).map(order => (
+                    <div key={order.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+                      <span>{getOrderCustomerName(order, customers)}</span>
+                      <span style={{ float: 'right' }}>{formatMoney(order.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
 
-        {/* ✅ Keep the test EmptyState for now (we removed it earlier but it was working) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
