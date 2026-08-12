@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabaseClient'
 import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
-import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
@@ -39,33 +38,22 @@ export default function CustomersPage() {
     setError(null)
 
     try {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession()
-
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         router.push('/login')
         return
       }
 
-      const {
-        data: { user }
-      } = await supabase.auth.getUser()
-
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
         return
       }
 
-      const urlBusinessId =
-        searchParams.get('business_id')
-
+      const urlBusinessId = searchParams.get('business_id')
       let resolvedBusinessId = urlBusinessId
 
-      if (
-        !resolvedBusinessId ||
-        resolvedBusinessId.length < 20
-      ) {
+      if (!resolvedBusinessId || resolvedBusinessId.length < 20) {
         const { data: owned } = await supabase
           .from('businesses')
           .select('id, name')
@@ -76,43 +64,29 @@ export default function CustomersPage() {
           resolvedBusinessId = owned.id
           setBusinessName(owned.name)
         } else {
-          const { data: membership } =
-            await supabase
-              .from('business_memberships')
-              .select('business_id')
-              .eq('user_id', user.id)
-              .maybeSingle()
+          const { data: membership } = await supabase
+            .from('business_memberships')
+            .select('business_id')
+            .eq('user_id', user.id)
+            .maybeSingle()
 
           if (membership) {
-            resolvedBusinessId =
-              membership.business_id
-
-            const { data: business } =
-              await supabase
-                .from('businesses')
-                .select('name')
-                .eq(
-                  'id',
-                  resolvedBusinessId
-                )
-                .single()
-
-            if (business) {
-              setBusinessName(business.name)
-            }
+            resolvedBusinessId = membership.business_id
+            const { data: business } = await supabase
+              .from('businesses')
+              .select('name')
+              .eq('id', resolvedBusinessId)
+              .single()
+            if (business) setBusinessName(business.name)
           }
         }
       } else {
-        const { data: business } =
-          await supabase
-            .from('businesses')
-            .select('name')
-            .eq('id', resolvedBusinessId)
-            .single()
-
-        if (business) {
-          setBusinessName(business.name)
-        }
+        const { data: business } = await supabase
+          .from('businesses')
+          .select('name')
+          .eq('id', resolvedBusinessId)
+          .single()
+        if (business) setBusinessName(business.name)
       }
 
       if (!resolvedBusinessId) {
@@ -126,124 +100,44 @@ export default function CustomersPage() {
         `/api/customers?business_id=${resolvedBusinessId}`,
         {
           headers: {
-            Authorization:
-              `Bearer ${session.access_token}`
+            Authorization: `Bearer ${session.access_token}`
           }
         }
       )
 
       const result = await response.json()
-
       if (!response.ok) {
-        throw new Error(
-          result.error ||
-            'Unable to load customers'
-        )
+        throw new Error(result.error || 'Unable to load customers')
       }
 
-      const customersWithStats =
-        await Promise.all(
-          (result.customers || []).map(
-            async customer => {
-              const { data: orders } =
-                await supabase
-                  .from('orders')
-                  .select(
-                    'id, price, amount_paid, created_at, current_status'
-                  )
-                  .eq(
-                    'customer_id',
-                    customer.id
-                  )
+      const customersWithStats = await Promise.all(
+        (result.customers || []).map(async customer => {
+          const { data: orders } = await supabase
+            .from('orders')
+            .select('id, price, amount_paid, created_at, current_status')
+            .eq('customer_id', customer.id)
 
-              const orderList = orders || []
+          const orderList = orders || []
+          const orderCount = orderList.length
+          const totalSpent = orderList.reduce((sum, o) => sum + Number(o.amount_paid || 0), 0)
+          const balance = orderList.reduce((sum, o) => sum + Number(o.price || 0) - Number(o.amount_paid || 0), 0)
+          const lastOrder = [...orderList].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0] || null
 
-              const orderCount =
-                orderList.length
+          return { ...customer, orderCount, totalSpent, balance, lastOrder }
+        })
+      )
 
-              const totalSpent =
-                orderList.reduce(
-                  (sum, order) =>
-                    sum +
-                    Number(
-                      order.amount_paid || 0
-                    ),
-                  0
-                )
-
-              const balance =
-                orderList.reduce(
-                  (sum, order) =>
-                    sum +
-                    Number(
-                      order.price || 0
-                    ) -
-                    Number(
-                      order.amount_paid || 0
-                    ),
-                  0
-                )
-
-              const lastOrder =
-                [...orderList].sort(
-                  (a, b) =>
-                    new Date(b.created_at) -
-                    new Date(a.created_at)
-                )[0] || null
-
-              return {
-                ...customer,
-                orderCount,
-                totalSpent,
-                balance,
-                lastOrder
-              }
-            }
-          )
-        )
-
-      const sorted =
-        [...customersWithStats].sort(
-          (a, b) => {
-            if (sortBy === 'most_orders') {
-              return (
-                b.orderCount -
-                a.orderCount
-              )
-            }
-
-            if (sortBy === 'most_spent') {
-              return (
-                b.totalSpent -
-                a.totalSpent
-              )
-            }
-
-            if (sortBy === 'name_asc') {
-              return `${a.first_name} ${a.last_name}`
-                .localeCompare(
-                  `${b.first_name} ${b.last_name}`
-                )
-            }
-
-            return (
-              new Date(b.created_at) -
-              new Date(a.created_at)
-            )
-          }
-        )
+      const sorted = [...customersWithStats].sort((a, b) => {
+        if (sortBy === 'most_orders') return b.orderCount - a.orderCount
+        if (sortBy === 'most_spent') return b.totalSpent - a.totalSpent
+        if (sortBy === 'name_asc') return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+        return new Date(b.created_at) - new Date(a.created_at)
+      })
 
       setCustomers(sorted)
     } catch (err) {
-      console.error(
-        'Customers page error:',
-        err
-      )
-
-      setError(
-        err?.message ||
-          'Something went wrong while loading customers.'
-      )
+      console.error('Customers page error:', err)
+      setError(err?.message || 'Something went wrong while loading customers.')
     } finally {
       setLoading(false)
     }
@@ -254,40 +148,19 @@ export default function CustomersPage() {
   }, [searchParams, sortBy])
 
   const filteredCustomers = useMemo(() => {
-    const query = search
-      .trim()
-      .toLowerCase()
-
+    const query = search.trim().toLowerCase()
     if (!query) return customers
-
     return customers.filter(customer => {
-      const name =
-        `${customer.first_name || ''} ${customer.last_name || ''}`
-          .toLowerCase()
-
-      const phone =
-        customer.phone || ''
-
-      return (
-        name.includes(query) ||
-        phone.includes(query)
-      )
+      const name = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase()
+      const phone = customer.phone || ''
+      return name.includes(query) || phone.includes(query)
     })
   }, [customers, search])
 
-  const totalOutstanding = customers.reduce(
-    (sum, customer) =>
-      sum +
-      Math.max(Number(customer.balance || 0), 0),
-    0
-  )
+  const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
+  const activeCustomers = customers.filter(c => c.orderCount > 0).length
 
-  const activeCustomers =
-    customers.filter(
-      customer =>
-        customer.orderCount > 0
-    ).length
-
+  // ─── Skeleton ───
   if (loading) {
     return (
       <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
@@ -341,155 +214,119 @@ export default function CustomersPage() {
     <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '20px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard')}
-            style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--cresoa-border)', borderRadius: '13px', background: 'var(--cresoa-surface)', color: 'var(--cresoa-primary)', cursor: 'pointer' }}
-          >
-            <Icon name="arrow-left" size={19} stroke="currentColor" />
-          </button>
-          <div>
-            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '10px', letterSpacing: '.08em', fontWeight: 800, textTransform: 'uppercase' }}>
-              {businessName || 'YOUR BUSINESS'}
-            </span>
-            <h1 style={{ margin: '4px 0', fontSize: '26px', lineHeight: 1.15, fontWeight: 900, color: 'var(--cresoa-text)' }}>Customers</h1>
-            <p style={{ margin: 0, color: 'var(--cresoa-text-muted)', fontSize: '13px' }}>
-              {customers.length === 0 ? 'Build your customer list' : `${customers.length} customer${customers.length === 1 ? '' : 's'} in your business`}
-            </p>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0, color: 'var(--cresoa-text)' }}>Customers</h1>
+          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0.1rem 0 0', fontSize: '0.85rem' }}>
+            {customers.length} customer{customers.length === 1 ? '' : 's'} · {activeCustomers} with orders
+          </p>
         </div>
         <button
-          type="button"
           onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')}
-          style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 14px', border: 0, borderRadius: '13px', background: 'var(--cresoa-accent)', color: '#fff', fontSize: '12px', fontWeight: 800, cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}
+          className="cresoa-primary-button"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}
         >
-          <Icon name="plus" size={18} stroke="currentColor" />
-          <span>Add customer</span>
+          <Icon name="plus" size={14} stroke="#fff" /> Add customer
         </button>
-      </header>
+      </div>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '10px', marginBottom: '18px' }}>
-        <div style={{ minHeight: '92px', padding: '13px', borderRadius: '18px', background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', marginBottom: '10px', background: 'rgba(15,43,74,0.1)', color: 'var(--cresoa-primary)' }}>
-            <Icon name="users" size={19} stroke="currentColor" />
-          </div>
-          <span style={{ display: 'block', color: 'var(--cresoa-text-muted)', fontSize: '10px', marginBottom: '4px' }}>Customers</span>
-          <strong style={{ display: 'block', color: 'var(--cresoa-text)', fontSize: '15px', fontWeight: 900 }}>{customers.length}</strong>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ background: 'var(--cresoa-surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>{customers.length}</div>
         </div>
-        <div style={{ minHeight: '92px', padding: '13px', borderRadius: '18px', background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', marginBottom: '10px', background: 'rgba(46,125,94,0.12)', color: 'var(--cresoa-success)' }}>
-            <Icon name="user-check" size={19} stroke="currentColor" />
-          </div>
-          <span style={{ display: 'block', color: 'var(--cresoa-text-muted)', fontSize: '10px', marginBottom: '4px' }}>With orders</span>
-          <strong style={{ display: 'block', color: 'var(--cresoa-text)', fontSize: '15px', fontWeight: 900 }}>{activeCustomers}</strong>
+        <div style={{ background: 'var(--cresoa-surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Active</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>{activeCustomers}</div>
         </div>
-        <div style={{ minHeight: '92px', padding: '13px', borderRadius: '18px', background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', marginBottom: '10px', background: 'rgba(212,165,42,0.14)', color: 'var(--cresoa-accent)' }}>
-            <Icon name="wallet" size={19} stroke="currentColor" />
-          </div>
-          <span style={{ display: 'block', color: 'var(--cresoa-text-muted)', fontSize: '10px', marginBottom: '4px' }}>Outstanding</span>
-          <strong style={{ display: 'block', color: 'var(--cresoa-text)', fontSize: '15px', fontWeight: 900 }}>{formatMoney(totalOutstanding)}</strong>
+        <div style={{ background: 'var(--cresoa-surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Outstanding</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--cresoa-danger)' }}>{formatMoney(totalOutstanding)}</div>
         </div>
-      </section>
+      </div>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '48px', padding: '0 14px', borderRadius: '14px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }}>
-          <Icon name="search" size={18} stroke="var(--cresoa-text-muted)" />
+      {/* Search and Sort */}
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
+          <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
           <input
-            type="search"
+            type="text"
+            placeholder="Search name or phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name or phone..."
-            style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '14px' }}
+            style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
           />
           {search && (
-            <button onClick={() => setSearch('')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '26px', height: '26px', border: 0, borderRadius: '50%', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text-muted)', cursor: 'pointer' }}>
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
               <Icon name="x" size={16} stroke="currentColor" />
             </button>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '46px', padding: '0 14px', borderRadius: '14px', background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)' }}>
-          <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '12px', fontWeight: 700 }}>Sort</span>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ border: 0, outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '12px', fontWeight: 800 }}>
-            <option value="last_added">Recently added</option>
-            <option value="most_orders">Most orders</option>
-            <option value="most_spent">Highest payments</option>
-            <option value="name_asc">Name A–Z</option>
-          </select>
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+          style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
+        >
+          <option value="last_added">Recently added</option>
+          <option value="most_orders">Most orders</option>
+          <option value="most_spent">Highest payments</option>
+          <option value="name_asc">Name A–Z</option>
+        </select>
+      </div>
+
+      {/* Customer List */}
+      {filteredCustomers.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
+          <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--cresoa-primary)" />
+          <h3 style={{ margin: '0.5rem 0 0.3rem', fontSize: '1rem' }}>{search ? 'No customer found' : 'No customers yet'}</h3>
+          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>{search ? 'Try another name or phone number.' : 'Add your first customer to get started.'}</p>
+          {!search ? (
+            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} className="cresoa-primary-button">Add customer</button>
+          ) : (
+            <button onClick={() => setSearch('')} className="cresoa-primary-button" style={{ background: 'var(--cresoa-primary)' }}>Clear search</button>
+          )}
         </div>
-      </section>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {filteredCustomers.map(customer => {
+            const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
+            const initials = `${customer.first_name?.charAt(0) || ''}${customer.last_name?.charAt(0) || ''}`.toUpperCase() || '?'
+            const hasBalance = Number(customer.balance || 0) > 0
 
-      <section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
-          <div>
-            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '10px', fontWeight: 900, letterSpacing: '.1em', textTransform: 'uppercase' }}>CUSTOMER LIST</span>
-            <h2 style={{ margin: '4px 0 0', color: 'var(--cresoa-text)', fontSize: '19px' }}>{search ? `Results for “${search}”` : 'Your customers'}</h2>
-          </div>
-          {search && <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '12px' }}>{filteredCustomers.length} result{filteredCustomers.length === 1 ? '' : 's'}</span>}
-        </div>
-
-        {filteredCustomers.length === 0 ? (
-          <div style={{ padding: '42px 20px', textAlign: 'center', border: '1px dashed var(--cresoa-border)', borderRadius: '20px', background: 'var(--cresoa-surface)' }}>
-            <div style={{ width: '58px', height: '58px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px', borderRadius: '18px', background: 'rgba(15,43,74,0.08)' }}>
-              <Icon name={search ? 'search-x' : 'users'} size={26} stroke="var(--cresoa-primary)" />
-            </div>
-            <h3 style={{ margin: 0, color: 'var(--cresoa-text)', fontSize: '17px' }}>{search ? 'No customer found' : 'No customers yet'}</h3>
-            <p style={{ maxWidth: '330px', margin: '8px auto 18px', color: 'var(--cresoa-text-muted)', fontSize: '13px', lineHeight: 1.55 }}>
-              {search ? 'Try another name or phone number.' : 'Add your first customer so you can keep their orders, payments, and measurements together.'}
-            </p>
-            {!search ? (
-              <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '12px 15px', border: 0, borderRadius: '12px', background: 'var(--cresoa-accent)', color: '#fff', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>
-                <Icon name="plus" size={17} stroke="currentColor" /> Add your first customer
-              </button>
-            ) : (
-              <button onClick={() => setSearch('')} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '12px 15px', border: 0, borderRadius: '12px', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>
-                Clear search
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {filteredCustomers.map(customer => {
-              const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
-              const initials = `${customer.first_name?.charAt(0) || ''}${customer.last_name?.charAt(0) || ''}`.toUpperCase() || '?'
-              const hasBalance = Number(customer.balance || 0) > 0
-
-              return (
+            return (
+              <Card key={customer.id} style={{ padding: '1rem' }}>
                 <button
-                  key={customer.id}
                   onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px', textAlign: 'left', borderRadius: '18px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', boxShadow: 'var(--shadow-sm)', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(15,43,74,0.2)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--cresoa-border)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
                 >
                   <div style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '15px', fontWeight: 900 }}>{initials}</div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <h3 style={{ margin: 0, color: 'var(--cresoa-text)', fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fullName}</h3>
+                      <span style={{ fontWeight: '600', fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>{fullName}</span>
                       {customer.orderCount > 0 && (
-                        <span style={{ flexShrink: 0, padding: '3px 7px', borderRadius: '20px', background: 'rgba(212,165,42,0.14)', color: 'var(--cresoa-text)', fontSize: '9px', fontWeight: 800 }}>{customer.orderCount} {customer.orderCount === 1 ? 'order' : 'orders'}</span>
+                        <span style={{ padding: '3px 7px', borderRadius: '20px', background: 'rgba(212,165,42,0.14)', color: 'var(--cresoa-text)', fontSize: '9px', fontWeight: 800 }}>{customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}</span>
                       )}
                     </div>
-                    <p style={{ margin: '5px 0', color: 'var(--cresoa-text-muted)', fontSize: '12px' }}>{customer.phone || customer.email || 'No contact information'}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '11px', color: 'var(--cresoa-text-muted)' }}>
+                    <div style={{ marginTop: '0.2rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.8rem', fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>
+                      <span>{customer.phone || customer.email || 'No contact'}</span>
+                      <span>·</span>
                       <span>{customer.lastOrder ? `Last order ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
-                      {hasBalance && <strong style={{ color: 'var(--cresoa-danger)' }}>{formatMoney(customer.balance)} due</strong>}
-                      {!hasBalance && customer.orderCount > 0 && <span style={{ color: 'var(--cresoa-success)', fontWeight: 800 }}>Paid</span>}
+                      {hasBalance && <span style={{ color: 'var(--cresoa-danger)', fontWeight: '600' }}>{formatMoney(customer.balance)} due</span>}
+                      {!hasBalance && customer.orderCount > 0 && <span style={{ color: 'var(--cresoa-success)', fontWeight: '600' }}>Paid</span>}
                     </div>
                   </div>
                   <Icon name="chevron-right" size={18} stroke="var(--cresoa-text-muted)" />
                 </button>
-              )
-            })}
-          </div>
-        )}
-      </section>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={businessId} />
       </div>
     </main>
   )
-}
+                                }
