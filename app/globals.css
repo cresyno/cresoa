@@ -1,0 +1,951 @@
+/* ============================================================
+   CRESOA – Global Styles & Design System
+   Version: 1.0
+   ============================================================ */
+
+/* ===== CSS Variables ===== */
+:root {
+  /* Core Colours */
+  --color-primary: #0F2B4A;
+  --color-primary-dark: #0A1628;
+  --color-primary-light: #1A3F66;
+  --color-accent: #D4A52A;
+  --color-accent-dark: #C79A2B;
+  --color-secondary: #2E7D5E;
+  --color-secondary-dark: #1E5A44;
+  --color-danger: #D9534F;
+  --color-danger-dark: #C0392B;
+
+  /* Neutral Colours */
+  --color-bg: #F8F6F2;
+  --color-bg-dark: #12121A;
+  --color-card: #FFFFFF;
+  --color-card-dark: #1E1E2A;
+  --color-text: #1A1A1A;
+  --color-text-secondary: #8A8A8A;
+  --color-text-muted: #C8C0B5;
+  --color-border: #E5E0D8;
+  --color-border-dark: #2A2A3A;
+
+  /* Status Colours */
+  --color-success: #2E7D5E;
+  --color-warning: #D4A52A;
+  --color-error: #D9534F;
+  --color-info: #0F2B4A;
+  --color-neutral: #6B6255;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(15, 43, 74, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 43, 74, 0.06);
+  --shadow-lg: 0 8px 32px rgba(15, 43, 74, 0.08);
+  --shadow-xl: 0 12px 48px rgba(15, 43, 74, 0.12);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #0F2B4A, #1A3F66);
+  --gradient-accent: linear-gradient(135deg, #D4A52A, #C79A2B);
+  --gradient-success: linear-gradient(135deg, #2E7D5E, #1E5A44);
+  --gradient-danger: linear-gradient(135deg, #D9534F, #C0392B);
+
+  /* ===== Cresoa Dashboard Variables (mapped to official palette) ===== */
+  --cresoa-bg: var(--color-bg);
+  --cresoa-surface: var(--color-card);
+  --cresoa-surface-soft: #F1EFEA;
+  --cresoa-text: var(--color-text);
+  --cresoa-text-muted: var(--color-text-secondary);
+  --cresoa-text-soft: var(--color-text-muted);
+  --cresoa-border: var(--color-border);
+  --cresoa-accent: var(--color-accent);
+  --cresoa-accent-soft: #FBF3E0;
+  --cresoa-success: var(--color-success);
+  --cresoa-success-soft: #EAF5EF;
+  --cresoa-warning: var(--color-warning);
+  --cresoa-warning-soft: #FBF3E0;
+  --cresoa-danger: var(--color-danger);
+  --cresoa-danger-soft: #FCEAEA;
+  --cresoa-info: var(--color-info);
+  --cresoa-info-soft: #E8EEF5;
+}
+
+/* ============================================================
+   DARK THEME
+   ============================================================ */
+
+[data-theme="dark"] {
+  /* Core Colours (dark mode – accent stays gold, others adapt) */
+  --color-primary: #D4A52A;
+  --color-primary-dark: #0A1628;
+  --color-primary-light: #1A3F66;
+  --color-accent: #D4A52A;
+  --color-accent-dark: #C79A2B;
+  --color-secondary: #2E7D5E;
+  --color-secondary-dark: #1E5A44;
+  --color-danger: #D9534F;
+  --color-danger-dark: #C0392B;
+
+  /* Neutral Colours (dark) */
+  --color-bg: #12121A;
+  --color-bg-dark: #0A0A10;
+  --color-card: #1E1E2A;
+  --color-card-dark: #2A2A3A;
+  --color-text: #E8E8E8;
+  --color-text-secondary: #AAAAAA;
+  --color-text-muted: #6B6B7A;
+  --color-border: #2A2A3A;
+  --color-border-dark: #3A3A4A;
+
+  /* Shadows (dark) */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.6);
+
+  /* Gradients (dark) */
+  --gradient-primary: linear-gradient(135deg, #1A3F66, #0F2B4A);
+  --gradient-accent: linear-gradient(135deg, #D4A52A, #B8921F);
+  --gradient-success: linear-gradient(135deg, #2E7D5E, #1E5A44);
+  --gradient-danger: linear-gradient(135deg, #D9534F, #B53A37);
+
+  /* Cresoa Variables (dark) */
+  --cresoa-bg: var(--color-bg);
+  --cresoa-surface: var(--color-card);
+  --cresoa-surface-soft: #2A2A3A;
+  --cresoa-text: var(--color-text);
+  --cresoa-text-muted: var(--color-text-secondary);
+  --cresoa-text-soft: var(--color-text-muted);
+  --cresoa-border: var(--color-border);
+  --cresoa-accent: var(--color-accent);
+  --cresoa-accent-soft: #3A3020;
+  --cresoa-success: var(--color-success);
+  --cresoa-success-soft: #1A2D25;
+  --cresoa-warning: var(--color-warning);
+  --cresoa-warning-soft: #3A3020;
+  --cresoa-danger: var(--color-danger);
+  --cresoa-danger-soft: #3A2020;
+  --cresoa-info: #80B5D4;
+  --cresoa-info-soft: #1A2A3A;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--cresoa-bg);
+  color: var(--cresoa-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   DASHBOARD LAYOUT
+   ============================================================ */
+
+.cresoa-dashboard {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--cresoa-bg);
+  color: var(--cresoa-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.cresoa-dashboard-shell {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.cresoa-dashboard-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ============================================================
+   CARD
+   ============================================================ */
+
+.cresoa-card {
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  padding: 20px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.cresoa-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* ============================================================
+   SECTION HEADER
+   ============================================================ */
+
+.cresoa-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cresoa-section-header-title {
+  margin: 0;
+  color: var(--cresoa-text);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.cresoa-section-header-subtitle {
+  margin: 4px 0 0;
+  color: var(--cresoa-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cresoa-section-header-action {
+  border: 0;
+  background: transparent;
+  color: var(--cresoa-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 0;
+  transition: color 0.15s ease;
+}
+
+.cresoa-section-header-action:hover {
+  color: var(--cresoa-accent-dark);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.cresoa-icon-button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+.cresoa-icon-button:hover {
+  border-color: var(--cresoa-accent);
+  color: var(--cresoa-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.cresoa-icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cresoa-primary-button {
+  min-height: 38px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--gradient-accent);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.cresoa-primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.cresoa-primary-button:active {
+  transform: translateY(0);
+}
+
+.cresoa-primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ============================================================
+   METRIC CARDS
+   ============================================================ */
+
+.cresoa-metric-card {
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 16px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.cresoa-metric-card:hover {
+  border-color: var(--cresoa-accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.cresoa-metric-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--cresoa-accent-soft);
+  color: var(--cresoa-accent);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.cresoa-metric-label,
+.cresoa-metric-value,
+.cresoa-metric-meta {
+  display: block;
+}
+
+.cresoa-metric-label {
+  color: var(--cresoa-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cresoa-metric-value {
+  margin-top: 2px;
+  color: var(--cresoa-text);
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.cresoa-metric-meta {
+  margin-top: 2px;
+  color: var(--cresoa-text-soft);
+  font-size: 10px;
+}
+
+/* ============================================================
+   LIST ROWS
+   ============================================================ */
+
+.cresoa-list-row {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--cresoa-border);
+  background: transparent;
+  color: var(--cresoa-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+  border-radius: 8px;
+}
+
+.cresoa-list-row:hover {
+  background: var(--cresoa-accent-soft);
+}
+
+.cresoa-list-row:last-child {
+  border-bottom: 0;
+}
+
+.cresoa-avatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cresoa-row-title,
+.cresoa-row-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cresoa-row-title {
+  color: var(--cresoa-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cresoa-row-meta {
+  margin-top: 2px;
+  color: var(--cresoa-text-muted);
+  font-size: 10px;
+}
+
+.cresoa-row-arrow {
+  color: var(--cresoa-text-soft);
+  font-size: 18px;
+  flex: 0 0 auto;
+  transition: transform 0.2s ease;
+}
+
+.cresoa-row-arrow.open {
+  transform: rotate(90deg);
+}
+
+/* ============================================================
+   STATUS PILLS
+   ============================================================ */
+
+.cresoa-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.cresoa-status-success {
+  background: var(--cresoa-success-soft);
+  color: var(--cresoa-success);
+}
+
+.cresoa-status-warning {
+  background: var(--cresoa-warning-soft);
+  color: var(--cresoa-warning);
+}
+
+.cresoa-status-danger {
+  background: var(--cresoa-danger-soft);
+  color: var(--cresoa-danger);
+}
+
+.cresoa-status-info {
+  background: var(--cresoa-info-soft);
+  color: var(--cresoa-info);
+}
+
+/* ============================================================
+   PRODUCTION PIPELINE
+   ============================================================ */
+
+.cresoa-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cresoa-pipeline-item {
+  position: relative;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--cresoa-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 12px;
+}
+
+.cresoa-pipeline-item:hover {
+  background: var(--cresoa-accent-soft);
+}
+
+.cresoa-pipeline-number {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 900;
+  transition: all 0.2s ease;
+}
+
+.cresoa-pipeline-item:hover .cresoa-pipeline-number {
+  background: var(--gradient-accent);
+  transform: scale(1.05);
+}
+
+.cresoa-pipeline-label {
+  display: block;
+  color: var(--cresoa-text-muted);
+  font-size: 9px;
+  line-height: 1.3;
+  text-align: center;
+  font-weight: 600;
+}
+
+.cresoa-pipeline-line {
+  position: absolute;
+  top: 22px;
+  left: calc(50% + 22px);
+  right: calc(-50% + 22px);
+  height: 2px;
+  background: var(--cresoa-border);
+  pointer-events: none;
+}
+
+/* ============================================================
+   ANALYTICS CHART
+   ============================================================ */
+
+.cresoa-chart {
+  height: 190px;
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+  overflow-x: auto;
+  padding-top: 4px;
+}
+
+.cresoa-chart-day {
+  min-width: 32px;
+  flex: 1 0 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  color: var(--cresoa-text-muted);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.cresoa-chart-bar-wrap {
+  width: 100%;
+  height: 155px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.cresoa-chart-value {
+  min-height: 14px;
+  margin-bottom: 4px;
+  color: var(--cresoa-text-soft);
+  font-size: 8px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.cresoa-chart-bar {
+  width: min(20px, 70%);
+  min-height: 2px;
+  border-radius: 8px 8px 4px 4px;
+  background: var(--gradient-accent);
+  transition: height 0.4s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================
+   SELECT
+   ============================================================ */
+
+.cresoa-select {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 10px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 11px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cresoa-select:focus {
+  border-color: var(--cresoa-accent);
+  box-shadow: 0 0 0 3px var(--cresoa-accent-soft);
+}
+
+/* ============================================================
+   BUSINESS SNAPSHOT
+   ============================================================ */
+
+.cresoa-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cresoa-snapshot-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--cresoa-surface-soft);
+  border: 1px solid var(--cresoa-border);
+}
+
+.cresoa-snapshot-item span,
+.cresoa-snapshot-item strong {
+  display: block;
+}
+
+.cresoa-snapshot-item span {
+  color: var(--cresoa-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cresoa-snapshot-item strong {
+  margin-top: 4px;
+  color: var(--cresoa-text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* ============================================================
+   GROUP ORDERS
+   ============================================================ */
+
+.cresoa-groups-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cresoa-group-card {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 14px;
+  background: var(--cresoa-surface-soft);
+  color: var(--cresoa-text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.cresoa-group-card:hover {
+  border-color: var(--cresoa-accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.cresoa-group-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  font-size: 14px;
+}
+
+/* Group expandable detail */
+.cresoa-group-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cresoa-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: cresoa-fade-in 0.25s ease;
+}
+
+.cresoa-group-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--cresoa-text-muted);
+}
+
+.cresoa-group-detail-row strong {
+  color: var(--cresoa-text);
+  font-weight: 600;
+}
+
+.cresoa-group-detail-button {
+  margin-top: 4px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.cresoa-group-detail-button:hover {
+  opacity: 0.85;
+  transform: translateX(4px);
+}
+
+/* Completion percentage ring */
+.cresoa-group-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cresoa-text);
+}
+
+.cresoa-group-progress-bar {
+  width: 60px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--cresoa-border);
+  overflow: hidden;
+}
+
+.cresoa-group-progress-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--gradient-success);
+  transition: width 0.4s ease;
+}
+
+/* ============================================================
+   LOADING SKELETONS
+   ============================================================ */
+
+.cresoa-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cresoa-skeleton-card {
+  min-height: 140px;
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+}
+
+.cresoa-skeleton {
+  height: 11px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: var(--cresoa-surface-soft);
+  animation: cresoa-pulse 1.2s ease-in-out infinite;
+}
+
+.cresoa-skeleton.short {
+  width: 30%;
+}
+
+.cresoa-skeleton.medium {
+  width: 55%;
+}
+
+.cresoa-skeleton.long {
+  width: 80%;
+  height: 28px;
+}
+
+@keyframes cresoa-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes cresoa-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+
+.cresoa-empty-state {
+  padding: 30px 10px;
+  text-align: center;
+}
+
+.cresoa-empty-state-title {
+  display: block;
+  color: var(--cresoa-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cresoa-empty-state-message {
+  display: block;
+  margin-top: 6px;
+  color: var(--cresoa-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 760px) {
+  .cresoa-dashboard-shell {
+    padding: 14px;
+  }
+
+  .cresoa-card {
+    padding: 16px;
+  }
+
+  .cresoa-main-grid,
+  .cresoa-two-column {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cresoa-pipeline {
+    overflow-x: auto;
+    grid-template-columns: repeat(5, minmax(72px, 1fr));
+  }
+
+  .cresoa-groups-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cresoa-snapshot-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .cresoa-dashboard-shell {
+    padding: 11px;
+  }
+
+  .cresoa-new-order-text {
+    display: none;
+  }
+
+  .cresoa-primary-button {
+    width: 38px;
+    padding: 0;
+  }
+
+  .cresoa-metric-value {
+    font-size: 15px;
+  }
+
+  .cresoa-metric-card {
+    padding: 12px;
+  }
+
+  .cresoa-chart {
+    height: 175px;
+  }
+
+  .cresoa-snapshot-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ============================================================
+   UTILITY – GRID LAYOUTS (used in page.js)
+   ============================================================ */
+
+.cresoa-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
+  gap: 14px;
+}
+
+.cresoa-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* ============================================================
+   SCROLLBAR (optional polish)
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cresoa-surface-soft);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cresoa-border);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cresoa-text-muted);
+}
