@@ -89,6 +89,7 @@ export default function GroupDetailPage() {
 
   const requestedBusinessId = searchParams.get('business_id')
 
+  // ─── Load Data ────────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!groupId) return
     setLoading(true)
@@ -102,9 +103,24 @@ export default function GroupDetailPage() {
       if (!bizId) { router.push('/dashboard'); return }
       setBusinessId(bizId)
 
+      // ─── Fetch business, group with coordinator join ───
       const [{ data: bizData, error: bizError }, { data: groupData, error: groupError }] = await Promise.all([
         supabase.from('businesses').select('id, plan, sector, name').eq('id', bizId).single(),
-        supabase.from('group_orders').select('*').eq('id', groupId).eq('business_id', bizId).single(),
+        supabase
+          .from('group_orders')
+          .select(`
+            *,
+            coordinator:coordinator_customer_id (
+              id,
+              name,
+              first_name,
+              last_name,
+              phone
+            )
+          `)
+          .eq('id', groupId)
+          .eq('business_id', bizId)
+          .single(),
       ])
 
       if (bizError) throw bizError
@@ -118,6 +134,7 @@ export default function GroupDetailPage() {
       setMaxMembers(limits?.maxGroupMembers || 0)
       setGroup(groupData)
 
+      // ─── Fetch members and customers ─────────────────────
       const [{ data: memberData, error: memberError }, { data: customerData, error: customerError }] = await Promise.all([
         supabase
           .from('orders')
@@ -143,6 +160,7 @@ export default function GroupDetailPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // ─── Stats ────────────────────────────────────────────────
   const stats = useMemo(() => {
     const total = members.reduce((sum, m) => sum + Number(m.price || 0), 0)
     const paid = members.reduce((sum, m) => sum + Number(m.amount_paid || 0), 0)
@@ -164,42 +182,12 @@ export default function GroupDetailPage() {
     }
   }, [members])
 
-  const coordinatorName = group?.coordinator?.name || group?.coordinator_name || 'Coordinator'
-  const coordinatorPhone = group?.coordinator?.phone
+  // ─── Coordinator info (now correctly populated) ──────────
+  const coordinator = group?.coordinator
+  const coordinatorName = coordinator?.name || coordinator?.first_name || 'Coordinator'
+  const coordinatorPhone = coordinator?.phone
 
-  const getGroupSummaryMessage = () => {
-    const deliveredCount = stats.delivered
-    const totalCount = stats.count
-    const pendingCount = totalCount - deliveredCount
-    const balanceAmount = stats.balance
-    let message = `📋 *Group Order Update*\n\n`
-    message += `👥 *${group?.group_name}*\n`
-    message += `👤 Coordinator: ${coordinatorName}\n\n`
-    message += `📦 *${deliveredCount} of ${totalCount}* orders delivered\n`
-    if (pendingCount > 0) message += `⏳ ${pendingCount} orders still pending\n`
-    if (balanceAmount > 0) message += `💰 *${money(balanceAmount)}* outstanding balance\n\n`
-    message += `📊 *Member Status:*\n`
-    members.forEach(m => {
-      const name = customerLabel(m.customer) || 'Unknown'
-      const status = m.current_status || 'Order placed'
-      const price = Number(m.price || 0)
-      const paid = Number(m.amount_paid || 0)
-      const balance = price - paid
-      message += `- ${name}: ${status}${balance > 0 ? ` (${money(balance)} due)` : ''}\n`
-    })
-    return message
-  }
-
-  const sendCoordinatorUpdate = () => {
-    if (!coordinatorPhone) {
-      alert('Coordinator phone number not available.')
-      return
-    }
-    const message = getGroupSummaryMessage()
-    const url = `https://wa.me/${coordinatorPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
-    window.open(url, '_blank')
-  }
-
+  // ─── Member CRUD ──────────────────────────────────────────
   const closeMemberModal = () => {
     if (!saving) { setShowMemberModal(false); setEditingMemberId(null); setMemberForm(EMPTY_MEMBER) }
   }
@@ -336,6 +324,7 @@ export default function GroupDetailPage() {
     setMembers(prev => prev.map(m => m.id === orderId ? { ...m, current_status: status } : m))
   }
 
+  // ─── Payments ──────────────────────────────────────────────
   const fetchPayments = async (orderId) => {
     const { data, error } = await supabase.from('payment_records').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
     if (error) throw error
@@ -386,6 +375,7 @@ export default function GroupDetailPage() {
     }
   }
 
+  // ─── Member Detail ────────────────────────────────────────
   const openMemberDetail = async (member) => {
     setDetailMember(member)
     try {
@@ -411,6 +401,7 @@ export default function GroupDetailPage() {
     window.open(url, '_blank')
   }
 
+  // ─── Measurements ─────────────────────────────────────────
   const openMeasurementView = (member) => {
     setMeasurementMember(member)
     setShowMeasurementViewModal(true)
@@ -441,15 +432,83 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
-  if (loading) { /* loading skeleton */ return <div>Loading...</div> } // Simplified for brevity
-  if (error && !group) { /* error state */ return <div>Error</div> }
+  // ─── Coordinator WhatsApp ──────────────────────────────────
+  const getGroupSummaryMessage = () => {
+    const deliveredCount = stats.delivered
+    const totalCount = stats.count
+    const pendingCount = totalCount - deliveredCount
+    const balanceAmount = stats.balance
+    let message = `📋 *Group Order Update*\n\n`
+    message += `👥 *${group?.group_name}*\n`
+    message += `👤 Coordinator: ${coordinatorName}\n\n`
+    message += `📦 *${deliveredCount} of ${totalCount}* orders delivered\n`
+    if (pendingCount > 0) message += `⏳ ${pendingCount} orders still pending\n`
+    if (balanceAmount > 0) message += `💰 *${money(balanceAmount)}* outstanding balance\n\n`
+    message += `📊 *Member Status:*\n`
+    members.forEach(m => {
+      const name = customerLabel(m.customer) || 'Unknown'
+      const status = m.current_status || 'Order placed'
+      const price = Number(m.price || 0)
+      const paid = Number(m.amount_paid || 0)
+      const balance = price - paid
+      message += `- ${name}: ${status}${balance > 0 ? ` (${money(balance)} due)` : ''}\n`
+    })
+    return message
+  }
+
+  const sendCoordinatorUpdate = () => {
+    if (!coordinatorPhone) {
+      alert('Coordinator phone number not available.')
+      return
+    }
+    const message = getGroupSummaryMessage()
+    const url = `https://wa.me/${coordinatorPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank')
+  }
+
+   // ─── Loading / Error ──────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+          <div style={{ width: '100px', height: '32px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.8rem', marginBottom: '1rem' }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+              <div style={{ width: '60%', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ background: 'var(--cresoa-surface)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite', height: '200px' }} />
+        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
+        <Navigation businessId={businessId} />
+      </div>
+    )
+  }
+
+  if (error && !group) {
+    return (
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <Card style={{ padding: '2rem', textAlign: 'center' }}>
+          <Icon name="alert-circle" size={32} stroke="var(--cresoa-danger)" />
+          <h2 style={{ margin: '0.5rem 0' }}>Unable to load group</h2>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>{error}</p>
+          <button onClick={loadData} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Try again</button>
+        </Card>
+        <Navigation businessId={businessId} />
+      </div>
+    )
+  }
+
   if (!group) return null
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-           {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button onClick={() => router.back()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', background: 'var(--cresoa-surface)', cursor: 'pointer', color: 'var(--cresoa-text)' }}>
@@ -570,22 +629,27 @@ export default function GroupDetailPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button onClick={() => openMemberDetail(member)} title="View" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.7rem' }}>
-                      View
+                    <button onClick={() => openMemberDetail(member)} title="View member details" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--cresoa-text-muted)' }}>
+                      <Icon name="eye" size={16} stroke="currentColor" />
+                      <span>View</span>
                     </button>
-                    <button onClick={() => openPaymentModal(member.id)} title="Payment" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-success)' }}>
-                      <Icon name="dollar-sign" size={14} stroke="currentColor" />
+                    <button onClick={() => openPaymentModal(member.id)} title="Record payment" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--cresoa-success)' }}>
+                      <Icon name="dollar-sign" size={16} stroke="currentColor" />
+                      <span>Payment</span>
                     </button>
                     {canManage && (
                       <>
-                        <button onClick={() => openEditMember(member)} title="Edit" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
-                          <Icon name="edit-2" size={14} stroke="currentColor" />
+                        <button onClick={() => openEditMember(member)} title="Edit member" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--cresoa-text-muted)' }}>
+                          <Icon name="edit-2" size={16} stroke="currentColor" />
+                          <span>Edit</span>
                         </button>
-                        <button onClick={() => openMeasurementView(member)} title="Measurements" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-accent)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-accent)' }}>
-                          <Icon name="ruler" size={14} stroke="currentColor" />
+                        <button onClick={() => openMeasurementView(member)} title="View measurements" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-accent)', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--cresoa-accent)' }}>
+                          <Icon name="ruler" size={16} stroke="currentColor" />
+                          <span>Meas.</span>
                         </button>
-                        <button onClick={() => handleDeleteMember(member.id)} title="Remove" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-danger)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
-                          <Icon name="trash-2" size={14} stroke="currentColor" />
+                        <button onClick={() => handleDeleteMember(member.id)} title="Remove member" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-danger)', background: 'transparent', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--cresoa-danger)' }}>
+                          <Icon name="trash-2" size={16} stroke="currentColor" />
+                          <span>Remove</span>
                         </button>
                       </>
                     )}
@@ -601,7 +665,7 @@ export default function GroupDetailPage() {
         <Navigation businessId={businessId} />
       </div>
 
-      {/* ─── Add/Edit Member Modal ────────────────────────── */}
+    {/* ─── Add/Edit Member Modal ────────────────────────── */}
       {showMemberModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={closeMemberModal}>
           <div style={{ width: '100%', maxWidth: '600px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
@@ -696,7 +760,7 @@ export default function GroupDetailPage() {
               </div>
             )}
 
-    <form onSubmit={handleRecordPayment}>
+            <form onSubmit={handleRecordPayment}>
               <div style={{ marginBottom: '0.8rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Amount (₦)</label>
                 <input type="number" min="1" step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} placeholder="Enter amount" required autoFocus style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
@@ -799,7 +863,7 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {/* ─── Measurement Edit Modal ────────────────────────── */}
+    {/* ─── Measurement Edit Modal ────────────────────────── */}
       {showMeasurementEditModal && measurementMember && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => { if (!saving) setShowMeasurementEditModal(false) }}>
           <div style={{ width: '100%', maxWidth: '600px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
