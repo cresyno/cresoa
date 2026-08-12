@@ -8,7 +8,7 @@ import { Icon } from '../../../../components/Icon'
 import { Card } from '../../../../components/Card'
 import { SectionHeader } from '../../../../components/SectionHeader'
 import { Navigation } from '../../../../components/Navigation'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 // ─── Helpers (can be moved to lib/utils later) ───
 const formatMoney = value =>
