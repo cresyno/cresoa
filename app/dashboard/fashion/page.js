@@ -502,39 +502,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ Support button – positioned above bottom nav, no overlap */}
-        <div style={{ position: 'fixed', bottom: 70, right: 20, zIndex: 50 }}>
-          <button
-            onClick={() => navigate('/support')}
-            style={{
-              background: 'var(--gradient-primary)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 50,
-              padding: '12px 18px',
-              fontSize: 14,
-              fontWeight: 600,
-              boxShadow: 'var(--shadow-lg)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            💬 Support
-          </button>
-        </div>
-
-        {/* Navigation (bottom) – with safe-area padding */}
-        <div style={{ marginTop: 24, paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <Navigation businessId={businessId} />
-        </div>
-
-      </div>
-    </DashboardShell>
-  )
-}
-
+      
 // ============================================================
 // ENTRY
 // ============================================================
