@@ -228,6 +228,32 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+{/* Recent Orders – inline */}
+<div style={{ marginTop: 16 }}>
+  <Card>
+    <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
+    {orders.length === 0 ? (
+      <EmptyState title="No orders" message="Create your first order to get started." />
+    ) : (
+      <div style={{ display: 'grid', gap: 6 }}>
+        {orders.slice(0, 4).map(order => {
+          const name = getOrderCustomerName(order, customers)
+          return (
+            <button key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
+              <span className="cresoa-avatar">{getInitials(name)}</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>
+                <span className="cresoa-row-title">{name}</span>
+                <span className="cresoa-row-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
+              </span>
+              <StatusPill status={order.current_status} />
+            </button>
+          )
+        })}
+      </div>
+    )}
+  </Card>
+</div>
+
         {/* ✅ Keep the test EmptyState for now (we removed it earlier but it was working) */}
         <div style={{ marginTop: 16 }}>
           <Card>
