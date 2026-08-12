@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
-import { SectionHeader } from '../../../components/SectionHeader'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
@@ -32,6 +31,7 @@ export default function CustomersPage() {
   const [businessId, setBusinessId] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('last_added')
+  const [filterType, setFilterType] = useState('all') // 'all' | 'withOrders' | 'outstanding'
 
   const loadCustomers = async () => {
     setLoading(true)
@@ -39,16 +39,10 @@ export default function CustomersPage() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-        return
-      }
+      if (!session) { router.push('/login'); return }
 
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      if (!user) { router.push('/login'); return }
 
       const urlBusinessId = searchParams.get('business_id')
       let resolvedBusinessId = urlBusinessId
@@ -59,7 +53,6 @@ export default function CustomersPage() {
           .select('id, name')
           .eq('owner_id', user.id)
           .single()
-
         if (owned) {
           resolvedBusinessId = owned.id
           setBusinessName(owned.name)
@@ -69,46 +62,36 @@ export default function CustomersPage() {
             .select('business_id')
             .eq('user_id', user.id)
             .maybeSingle()
-
           if (membership) {
             resolvedBusinessId = membership.business_id
-            const { data: business } = await supabase
+            const { data: biz } = await supabase
               .from('businesses')
               .select('name')
               .eq('id', resolvedBusinessId)
               .single()
-            if (business) setBusinessName(business.name)
+            if (biz) setBusinessName(biz.name)
           }
         }
       } else {
-        const { data: business } = await supabase
+        const { data: biz } = await supabase
           .from('businesses')
           .select('name')
           .eq('id', resolvedBusinessId)
           .single()
-        if (business) setBusinessName(business.name)
+        if (biz) setBusinessName(biz.name)
       }
 
-      if (!resolvedBusinessId) {
-        router.push('/onboarding')
-        return
-      }
+      if (!resolvedBusinessId) { router.push('/onboarding'); return }
 
       setBusinessId(resolvedBusinessId)
 
       const response = await fetch(
         `/api/customers?business_id=${resolvedBusinessId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
-        }
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
       )
 
       const result = await response.json()
-      if (!response.ok) {
-        throw new Error(result.error || 'Unable to load customers')
-      }
+      if (!response.ok) throw new Error(result.error || 'Unable to load customers')
 
       const customersWithStats = await Promise.all(
         (result.customers || []).map(async customer => {
@@ -147,18 +130,31 @@ export default function CustomersPage() {
     loadCustomers()
   }, [searchParams, sortBy])
 
+  // Filter by search and filterType
   const filteredCustomers = useMemo(() => {
+    let result = customers
     const query = search.trim().toLowerCase()
-    if (!query) return customers
-    return customers.filter(customer => {
-      const name = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase()
-      const phone = customer.phone || ''
-      return name.includes(query) || phone.includes(query)
-    })
-  }, [customers, search])
+
+    if (query) {
+      result = result.filter(customer => {
+        const name = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase()
+        const phone = customer.phone || ''
+        return name.includes(query) || phone.includes(query)
+      })
+    }
+
+    if (filterType === 'withOrders') {
+      result = result.filter(c => c.orderCount > 0)
+    } else if (filterType === 'outstanding') {
+      result = result.filter(c => Number(c.balance || 0) > 0)
+    }
+
+    return result
+  }, [customers, search, filterType])
 
   const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
   const activeCustomers = customers.filter(c => c.orderCount > 0).length
+  const customersWithBalance = customers.filter(c => Number(c.balance || 0) > 0).length
 
   // ─── Skeleton ───
   if (loading) {
@@ -214,11 +210,15 @@ export default function CustomersPage() {
     <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+      {/* Header – single title */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0, color: 'var(--cresoa-text)' }}>Customers</h1>
-          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0.1rem 0 0', fontSize: '0.85rem' }}>
-            {customers.length} customer{customers.length === 1 ? '' : 's'} · {activeCustomers} with orders
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
+            {businessName || 'YOUR BUSINESS'}
+          </p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0 0', color: 'var(--cresoa-text)' }}>Customers</h1>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0.1rem 0 0' }}>
+            {customers.length} customer{customers.length === 1 ? '' : 's'}
           </p>
         </div>
         <button
@@ -230,29 +230,84 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Summary Cards – interactive */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-        <div style={{ background: 'var(--cresoa-surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>{customers.length}</div>
-        </div>
-        <div style={{ background: 'var(--cresoa-surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Active</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>{activeCustomers}</div>
-        </div>
-        <div style={{ background: 'var(--cresoa-surface)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Outstanding</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: 'var(--cresoa-danger)' }}>{formatMoney(totalOutstanding)}</div>
-        </div>
+        <button
+          onClick={() => setFilterType('all')}
+          style={{
+            background: filterType === 'all' ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
+            padding: '0.6rem 0.8rem',
+            borderRadius: '8px',
+            border: '1px solid var(--cresoa-border)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s'
+          }}
+        >
+          <div style={{ fontSize: '0.65rem', color: filterType === 'all' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'all' ? '#fff' : 'var(--cresoa-text)' }}>{customers.length}</div>
+        </button>
+        <button
+          onClick={() => setFilterType(filterType === 'withOrders' ? 'all' : 'withOrders')}
+          style={{
+            background: filterType === 'withOrders' ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
+            padding: '0.6rem 0.8rem',
+            borderRadius: '8px',
+            border: '1px solid var(--cresoa-border)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s'
+          }}
+        >
+          <div style={{ fontSize: '0.65rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Active</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text)' }}>{activeCustomers}</div>
+        </button>
+        <button
+          onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
+          style={{
+            background: filterType === 'outstanding' ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
+            padding: '0.6rem 0.8rem',
+            borderRadius: '8px',
+            border: '1px solid var(--cresoa-border)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s'
+          }}
+        >
+          <div style={{ fontSize: '0.65rem', color: filterType === 'outstanding' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Outstanding</div>
+          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'outstanding' ? '#fff' : 'var(--cresoa-danger)' }}>{formatMoney(totalOutstanding)}</div>
+        </button>
       </div>
 
-      {/* Search and Sort */}
+      {/* Outstanding Attention Card */}
+      {customersWithBalance > 0 && (
+        <Card style={{ marginBottom: '1rem', background: 'var(--cresoa-danger-soft)', borderColor: 'var(--cresoa-danger)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Icon name="alert-triangle" size={16} stroke="var(--cresoa-danger)" />
+                <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)', fontSize: '0.9rem' }}>Outstanding</span>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--cresoa-danger)' }}>{formatMoney(totalOutstanding)}</div>
+              <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>{customersWithBalance} customer{customersWithBalance > 1 ? 's' : ''} need payment</div>
+            </div>
+            <button
+              onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
+              style={{ padding: '0.3rem 0.8rem', borderRadius: '20px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+            >
+              {filterType === 'outstanding' ? 'Show all' : 'View →'}
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* Search + Filters + Sort */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
           <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
           <input
             type="text"
-            placeholder="Search name or phone..."
+            placeholder="Search name, phone or order..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
@@ -280,7 +335,7 @@ export default function CustomersPage() {
         <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
           <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--cresoa-primary)" />
           <h3 style={{ margin: '0.5rem 0 0.3rem', fontSize: '1rem' }}>{search ? 'No customer found' : 'No customers yet'}</h3>
-          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>{search ? 'Try another name or phone number.' : 'Add your first customer to get started.'}</p>
+          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>{search ? 'Try another search term.' : 'Add your first customer to get started.'}</p>
           {!search ? (
             <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} className="cresoa-primary-button">Add customer</button>
           ) : (
@@ -295,25 +350,35 @@ export default function CustomersPage() {
             const hasBalance = Number(customer.balance || 0) > 0
 
             return (
-              <Card key={customer.id} style={{ padding: '1rem' }}>
+              <Card key={customer.id} style={{ padding: '0.6rem 1rem' }}>
                 <button
-                  onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                  onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
                 >
-                  <div style={{ width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '15px', fontWeight: 900 }}>{initials}</div>
+                  <div style={{ width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '14px', fontWeight: 800 }}>{initials}</div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <span style={{ fontWeight: '600', fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>{fullName}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>{fullName}</span>
                       {customer.orderCount > 0 && (
-                        <span style={{ padding: '3px 7px', borderRadius: '20px', background: 'rgba(212,165,42,0.14)', color: 'var(--cresoa-text)', fontSize: '9px', fontWeight: 800 }}>{customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}</span>
+                        <span style={{ padding: '2px 8px', borderRadius: '20px', background: 'rgba(212,165,42,0.14)', color: 'var(--cresoa-text)', fontSize: '0.7rem', fontWeight: 700 }}>
+                          {customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}
+                        </span>
                       )}
                     </div>
-                    <div style={{ marginTop: '0.2rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.8rem', fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>
-                      <span>{customer.phone || customer.email || 'No contact'}</span>
-                      <span>·</span>
-                      <span>{customer.lastOrder ? `Last order ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
-                      {hasBalance && <span style={{ color: 'var(--cresoa-danger)', fontWeight: '600' }}>{formatMoney(customer.balance)} due</span>}
-                      {!hasBalance && customer.orderCount > 0 && <span style={{ color: 'var(--cresoa-success)', fontWeight: '600' }}>Paid</span>}
+                    <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '0.1rem' }}>
+                      {customer.phone || customer.email || 'No contact'}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.8rem', fontSize: '0.75rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>
+                      <span>{customer.lastOrder ? `Last order · ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
+                      {hasBalance && (
+                        <span style={{ color: 'var(--cresoa-danger)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <Icon name="alert-circle" size={12} stroke="var(--cresoa-danger)" />
+                          {formatMoney(customer.balance)} due
+                        </span>
+                      )}
+                      {!hasBalance && customer.orderCount > 0 && (
+                        <span style={{ color: 'var(--cresoa-success)', fontWeight: 600 }}>Paid</span>
+                      )}
                     </div>
                   </div>
                   <Icon name="chevron-right" size={18} stroke="var(--cresoa-text-muted)" />
@@ -329,4 +394,4 @@ export default function CustomersPage() {
       </div>
     </main>
   )
-                                }
+                                   }
