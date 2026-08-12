@@ -455,6 +455,8 @@ export default function CustomersPage() {
               </button>
             )}
           </div>
+</section>
+
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredCustomers.map(customer => {
