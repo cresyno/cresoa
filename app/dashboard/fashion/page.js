@@ -13,6 +13,7 @@ import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
+import { KpiCards } from '../../../components/KpiCards'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -92,14 +93,8 @@ function FashionDashboard({ businessId }) {
     router.push(`${path}${sep}business_id=${businessId}`)
   }
 
-  // ✅ Use shared loading component
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
-
-  if (error) return (
-    <DashboardShell theme={theme}>
-      <Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card>
-    </DashboardShell>
-  )
+  if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
   return (
     <DashboardShell theme={theme}>
@@ -121,13 +116,13 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* KPI Cards (still inline – will be replaced with KpiCards next) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
-          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">₦</span><div><span className="cresoa-metric-label">Revenue</span><strong className="cresoa-metric-value">{formatMoney(summary.revenue)}</strong><span className="cresoa-metric-meta">↑ 14.2%</span></div></div>
-          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">◫</span><div><span className="cresoa-metric-label">Orders</span><strong className="cresoa-metric-value">{summary.orders}</strong><span className="cresoa-metric-meta">↑ 3 today</span></div></div>
-          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">✓</span><div><span className="cresoa-metric-label">Collected</span><strong className="cresoa-metric-value">{formatMoney(summary.paid)}</strong><span className="cresoa-metric-meta">{summary.orders ? Math.round(summary.paid/summary.revenue*100) : 0}% collected</span></div></div>
-          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">!</span><div><span className="cresoa-metric-label">Outstanding</span><strong className="cresoa-metric-value">{formatMoney(summary.outstanding)}</strong><span className="cresoa-metric-meta">{summary.outstanding > 0 ? '3 need action' : 'All clear'}</span></div></div>
-        </div>
+        {/* ✅ KpiCards from shared components */}
+        <KpiCards
+          metrics={summary}
+          onOrders={() => navigate('/dashboard/orders')}
+          onPayments={() => navigate('/dashboard/orders?filter=payments')}
+          onAttention={() => navigate('/dashboard/orders?filter=attention')}
+        />
 
         {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
@@ -163,7 +158,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ Test EmptyState - add a demo section */}
+        {/* ✅ Test: EmptyState (still here for confirmation) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
@@ -191,4 +186,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                       }
+    }
