@@ -130,12 +130,10 @@ export default function CustomersPage() {
     loadCustomers()
   }, [searchParams, sortBy])
 
-  // ─── Computed stats ───
   const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
   const activeCustomers = customers.filter(c => c.orderCount > 0).length
   const customersWithBalance = customers.filter(c => Number(c.balance || 0) > 0).length
 
-  // ─── Filtering ───
   const filteredCustomers = useMemo(() => {
     let result = customers
     const query = search.trim().toLowerCase()
@@ -165,7 +163,6 @@ export default function CustomersPage() {
     return result
   }, [customers, search, filterType])
 
-  // ─── Loading ───
   if (loading) {
     return (
       <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
@@ -219,7 +216,6 @@ export default function CustomersPage() {
     <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-      {/* ─── Header ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
@@ -239,7 +235,6 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* ─── Summary Cards ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <button
           onClick={() => setFilterType('all')}
@@ -288,7 +283,6 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* ─── Outstanding Alert ─── */}
       {customersWithBalance > 0 && (
         <Card style={{ marginBottom: '1rem', background: 'var(--cresoa-danger-soft)', borderColor: 'var(--cresoa-danger)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -310,7 +304,6 @@ export default function CustomersPage() {
         </Card>
       )}
 
-      {/* ─── Search + Filter + Sort ─── */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
           <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
@@ -349,7 +342,6 @@ export default function CustomersPage() {
         </select>
       </div>
 
-            {/* ─── Customer List ─── */}
       {filteredCustomers.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
           <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--cresoa-primary)" />
@@ -382,7 +374,8 @@ export default function CustomersPage() {
                   onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
                 >
-                  <div style={{ width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '14px', fontWeight: 800 }}>{initials}</div>
+                    {/* ✅ Avatar using standard class */}
+                  <span className="cresoa-avatar">{initials}</span>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>{fullName}</span>
@@ -421,4 +414,4 @@ export default function CustomersPage() {
       </div>
     </main>
   )
-            }
+}
