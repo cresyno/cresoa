@@ -140,13 +140,14 @@ export async function POST(req) {
     });
 
     // ─── Send email (optional) ───
-    const acceptLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?code=${code}`;
-    try {
-      await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-    }
-
+if (send_email !== false) {
+  const acceptLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?code=${code}`;
+  try {
+    await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
+  } catch (emailError) {
+    console.error('Email sending failed:', emailError);
+  }
+}
     return NextResponse.json({ success: true, invite }, { status: 200 });
   } catch (error) {
     console.error('Generate invite error:', error);
