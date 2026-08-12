@@ -11,7 +11,8 @@ export async function PATCH(req, { params }) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { role } = await req.json();
+    const body = await req.json();
+const { role, permissions } = body;
     if (!role || !['Owner', 'Manager', 'Staff'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
