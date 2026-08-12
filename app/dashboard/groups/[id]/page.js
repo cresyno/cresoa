@@ -5,7 +5,12 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Icon } from '../../../../components/Icon'
+import { Card } from '../../../../components/Card'
+import { SectionHeader } from '../../../../components/SectionHeader'
+import { StatusPill } from '../../../../components/StatusPill'
+import { Navigation } from '../../../../components/Navigation'
 import { isFeatureAvailable, getPlanLimits } from '../../../../lib/planLimits'
+import '../../../../globals.css'
 
 const EMPTY_MEMBER = {
   customer_id: '',
@@ -18,21 +23,12 @@ const EMPTY_MEMBER = {
   due_date: '',
 }
 
-const STATUS_OPTIONS = [
-  'Order placed',
-  'Cutting',
-  'Sewing',
-  'Ready',
-  'Delivered',
-]
+const STATUS_OPTIONS = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
 function splitName(fullName) {
   const value = String(fullName || '').trim()
   const parts = value.split(/\s+/).filter(Boolean)
-  return {
-    first_name: parts[0] || '',
-    last_name: parts.slice(1).join(' ') || null,
-  }
+  return { first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || null }
 }
 
 function money(value) {
@@ -49,6 +45,12 @@ function getStatusInfo(status) {
     Delivered: { label: 'Delivered', className: 'delivered' },
   }
   return map[status] || { label: status || 'Placed', className: 'placed' }
+}
+
+function customerLabel(customer) {
+  if (!customer) return 'Unknown'
+  if (customer.name) return customer.name
+  return [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
 }
 
 export default function GroupDetailPage() {
@@ -72,47 +74,30 @@ export default function GroupDetailPage() {
   const [editingMemberId, setEditingMemberId] = useState(null)
   const [memberForm, setMemberForm] = useState(EMPTY_MEMBER)
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentMemberId, setPaymentMemberId] = useState(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+
   const requestedBusinessId = searchParams.get('business_id')
 
+  // ─── Load Data ────────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!groupId) return
-
     setLoading(true)
     setError('')
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
       const bizId = requestedBusinessId || getCurrentBusinessId()
-
-      if (!bizId) {
-        router.push('/dashboard')
-        return
-      }
-
+      if (!bizId) { router.push('/dashboard'); return }
       setBusinessId(bizId)
 
-      const [{ data: bizData, error: bizError }, { data: groupData, error: groupError }] =
-        await Promise.all([
-          supabase
-            .from('businesses')
-            .select('id, plan, sector')
-            .eq('id', bizId)
-            .single(),
-          supabase
-            .from('group_orders')
-            .select('*')
-            .eq('id', groupId)
-            .eq('business_id', bizId)
-            .single(),
-        ])
+      const [{ data: bizData, error: bizError }, { data: groupData, error: groupError }] = await Promise.all([
+        supabase.from('businesses').select('id, plan, sector').eq('id', bizId).single(),
+        supabase.from('group_orders').select('*').eq('id', groupId).eq('business_id', bizId).single(),
+      ])
 
       if (bizError) throw bizError
       if (groupError) throw groupError
@@ -123,37 +108,20 @@ export default function GroupDetailPage() {
 
       const limits = getPlanLimits(plan)
       setMaxMembers(limits?.maxGroupMembers || 0)
-
       setGroup(groupData)
 
-      const [{ data: memberData, error: memberError }, { data: customerData, error: customerError }] =
-        await Promise.all([
-          supabase
-            .from('orders')
-            .select(`
-              *,
-              customer:customer_id (
-                id,
-                name,
-                first_name,
-                last_name,
-                phone
-              )
-            `)
-            .eq('group_order_id', groupId)
-            .eq('business_id', bizId)
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('customers')
-            .select('id, name, first_name, last_name, phone')
-            .eq('business_id', bizId)
-            .order('first_name', { ascending: true }),
-        ])
+      const [{ data: memberData, error: memberError }, { data: customerData, error: customerError }] = await Promise.all([
+        supabase
+          .from('orders')
+          .select(`*, customer:customer_id (id, name, first_name, last_name, phone)`)
+          .eq('group_order_id', groupId)
+          .eq('business_id', bizId)
+          .order('created_at', { ascending: false }),
+        supabase.from('customers').select('id, name, first_name, last_name, phone').eq('business_id', bizId).order('first_name', { ascending: true }),
+      ])
 
       if (memberError) throw memberError
-      if (customerError) {
-        console.warn('Customer list warning:', customerError)
-      }
+      if (customerError) console.warn('Customer list warning:', customerError)
 
       setMembers(memberData || [])
       setCustomers(customerData || [])
@@ -165,34 +133,67 @@ export default function GroupDetailPage() {
     }
   }, [groupId, requestedBusinessId, router])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
 
-  const customerLabel = (customer) => {
-    if (!customer) return 'Unknown'
-    if (customer.name) return customer.name
-    return [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
+  // ─── Stats ────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const total = members.reduce((sum, m) => sum + Number(m.price || 0), 0)
+    const paid = members.reduce((sum, m) => sum + Number(m.amount_paid || 0), 0)
+    const delivered = members.filter(m => m.current_status === 'Delivered').length
+    const ready = members.filter(m => m.current_status === 'Ready').length
+    const notStarted = members.filter(m => m.current_status === 'Order placed').length
+    const balance = Math.max(total - paid, 0)
+    return { count: members.length, total, paid, balance, delivered, ready, notStarted, progress: members.length ? Math.round((delivered / members.length) * 100) : 0 }
+  }, [members])
+
+  // ─── Coordinator WhatsApp ──────────────────────────────────
+  const coordinatorName = group?.coordinator?.name || group?.coordinator_name || 'Coordinator'
+  const coordinatorPhone = group?.coordinator?.phone
+
+  const getGroupSummaryMessage = () => {
+    const deliveredCount = stats.delivered
+    const totalCount = stats.count
+    const pendingCount = totalCount - deliveredCount
+    const balanceAmount = stats.balance
+
+    let message = `📋 *Group Order Update*\n\n`
+    message += `👥 *${group?.group_name}*\n`
+    message += `👤 Coordinator: ${coordinatorName}\n\n`
+    message += `📦 *${deliveredCount} of ${totalCount}* orders delivered\n`
+    if (pendingCount > 0) message += `⏳ ${pendingCount} orders still pending\n`
+    if (balanceAmount > 0) message += `💰 *${money(balanceAmount)}* outstanding balance\n\n`
+    message += `📊 *Member Status:*\n`
+
+    members.forEach(m => {
+      const name = customerLabel(m.customer) || 'Unknown'
+      const status = m.current_status || 'Order placed'
+      const price = Number(m.price || 0)
+      const paid = Number(m.amount_paid || 0)
+      const balance = price - paid
+      message += `- ${name}: ${status}${balance > 0 ? ` (${money(balance)} due)` : ''}\n`
+    })
+
+    return message
   }
 
-  const closeModal = () => {
-    if (!saving) {
-      setShowMemberModal(false)
-      setEditingMemberId(null)
-      setMemberForm(EMPTY_MEMBER)
+  const sendCoordinatorUpdate = () => {
+    if (!coordinatorPhone) {
+      alert('Coordinator phone number not available.')
+      return
     }
+    const message = getGroupSummaryMessage()
+    const url = `https://wa.me/${coordinatorPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank')
   }
 
-  const openAddMember = () => {
-    setError('')
-    setEditingMemberId(null)
-    setMemberForm(EMPTY_MEMBER)
-    setShowMemberModal(true)
+  // ─── Member CRUD ──────────────────────────────────────────
+  const closeModal = () => {
+    if (!saving) { setShowMemberModal(false); setEditingMemberId(null); setMemberForm(EMPTY_MEMBER) }
   }
 
+  const openAddMember = () => { setError(''); setEditingMemberId(null); setMemberForm(EMPTY_MEMBER); setShowMemberModal(true) }
   const openEditMember = (member) => {
-    setError('')
-    setEditingMemberId(member.id)
+    setError(''); setEditingMemberId(member.id)
     setMemberForm({
       customer_id: member.customer_id || '',
       customer_name: customerLabel(member.customer),
@@ -206,130 +207,73 @@ export default function GroupDetailPage() {
     setShowMemberModal(true)
   }
 
+  const openPaymentModal = (memberId) => {
+    const member = members.find(m => m.id === memberId)
+    if (!member) return
+    const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
+    if (balance <= 0) { alert('This order is fully paid.'); return }
+    setPaymentMemberId(memberId)
+    setPaymentAmount('')
+    setShowPaymentModal(true)
+  }
+
   const handleMemberChange = (event) => {
     const { name, value } = event.target
-    setMemberForm((current) => ({ ...current, [name]: value }))
-
+    setMemberForm(prev => ({ ...prev, [name]: value }))
     if (name === 'customer_id' && value) {
-      const customer = customers.find((item) => item.id === value)
-      if (customer) {
-        setMemberForm((current) => ({
-          ...current,
-          customer_id: value,
-          customer_name: customerLabel(customer),
-          phone: customer.phone || '',
-        }))
-      }
+      const customer = customers.find(item => item.id === value)
+      if (customer) setMemberForm(prev => ({ ...prev, customer_id: value, customer_name: customerLabel(customer), phone: customer.phone || '' }))
     }
   }
 
   const findOrCreateCustomer = async () => {
     const name = memberForm.customer_name.trim()
     const phone = memberForm.phone.trim()
-
     if (!name) throw new Error('Customer name is required.')
+    if (memberForm.customer_id) return memberForm.customer_id
 
-    if (memberForm.customer_id) {
-      return memberForm.customer_id
-    }
-
-    // Prefer an exact phone match when available.
     if (phone) {
-      const { data: byPhone, error: phoneError } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('business_id', businessId)
-        .eq('phone', phone)
-        .maybeSingle()
-
+      const { data: byPhone, error: phoneError } = await supabase.from('customers').select('id').eq('business_id', businessId).eq('phone', phone).maybeSingle()
       if (phoneError) throw phoneError
       if (byPhone) return byPhone.id
     }
 
-    // Split name into first_name and last_name
     const { first_name, last_name } = splitName(name)
-
-    // Check if customer already exists by name
-    let existingQuery = supabase
-      .from('customers')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('first_name', first_name)
-
-    if (last_name) {
-      existingQuery = existingQuery.eq('last_name', last_name)
-    }
-
-    const { data: existing, error: existingError } = await existingQuery.maybeSingle()
-
+    let query = supabase.from('customers').select('id').eq('business_id', businessId).eq('first_name', first_name)
+    if (last_name) query = query.eq('last_name', last_name)
+    const { data: existing, error: existingError } = await query.maybeSingle()
     if (existingError) throw existingError
     if (existing) return existing.id
 
-    // Create new customer with first_name and last_name
-    const customerPayload = {
-      business_id: businessId,
-      first_name: first_name,
-      last_name: last_name || null,
-      phone: phone || null,
-    }
-
-    // Also include name if the column exists (it's a fallback)
-    let { data: created, error: createError } = await supabase
-      .from('customers')
-      .insert({
-        ...customerPayload,
-        name: name,
-      })
-      .select('id')
-      .single()
-
+    const payload = { business_id: businessId, first_name, last_name: last_name || null, phone: phone || null, name }
+    const { data: created, error: createError } = await supabase.from('customers').insert(payload).select('id').single()
     if (createError) {
-      const message = String(createError.message || '').toLowerCase()
-      const unknownNameColumn =
-        message.includes('column') && message.includes('name') && message.includes('does not exist')
-
-      if (!unknownNameColumn) throw createError
-
-      // Fallback: insert without the 'name' column
-      const fallback = await supabase
-        .from('customers')
-        .insert(customerPayload)
-        .select('id')
-        .single()
-
-      created = fallback.data
-      createError = fallback.error
+      const { data: fallback, error: fallbackError } = await supabase.from('customers').insert({ business_id: businessId, first_name, last_name: last_name || null, phone: phone || null }).select('id').single()
+      if (fallbackError) throw fallbackError
+      if (!fallback?.id) throw new Error('Customer was created but no ID returned.')
+      return fallback.id
     }
-
-    if (createError) throw createError
-    if (!created?.id) throw new Error('Customer was created but no customer ID was returned.')
-
+    if (!created?.id) throw new Error('Customer was created but no ID returned.')
     return created.id
   }
 
   const saveMember = async (event) => {
     event?.preventDefault()
     setError('')
-
     const name = memberForm.customer_name.trim()
     const item = memberForm.item.trim()
     const price = Number(memberForm.price)
-
     if (!name || !item || !Number.isFinite(price) || price < 0) {
       setError('Customer name, item, and a valid price are required.')
       return
     }
-
     if (!editingMemberId && maxMembers > 0 && members.length >= maxMembers) {
       setError(`Your current plan allows up to ${maxMembers} group members.`)
       return
     }
-
     setSaving(true)
-
     try {
       const customerId = await findOrCreateCustomer()
-
       const payload = {
         business_id: businessId,
         group_order_id: groupId,
@@ -339,54 +283,30 @@ export default function GroupDetailPage() {
         amount_paid: Number(memberForm.deposit) || 0,
         due_date: memberForm.due_date || null,
         current_status: editingMemberId ? undefined : 'Order placed',
-        measurements: memberForm.measurements.trim()
-          ? { notes: memberForm.measurements.trim() }
-          : null,
+        measurements: memberForm.measurements.trim() ? { notes: memberForm.measurements.trim() } : null,
       }
-
       if (editingMemberId) {
         delete payload.current_status
-
-        const { error: updateError } = await supabase
-          .from('orders')
-          .update(payload)
-          .eq('id', editingMemberId)
-          .eq('business_id', businessId)
-          .eq('group_order_id', groupId)
-
+        const { error: updateError } = await supabase.from('orders').update(payload).eq('id', editingMemberId).eq('business_id', businessId).eq('group_order_id', groupId)
         if (updateError) throw updateError
       } else {
-        const { error: insertError } = await supabase
-          .from('orders')
-          .insert(payload)
-
+        const { error: insertError } = await supabase.from('orders').insert(payload)
         if (insertError) throw insertError
       }
-
       closeModal()
       await loadData()
     } catch (err) {
       console.error('Save group member error:', err)
       setError(err?.message || 'Failed to save group member.')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   const handleDeleteMember = async (orderId) => {
     if (!canManage) return
-    if (!window.confirm('Remove this member from the group? The customer and order will not be deleted.')) return
-
+    if (!window.confirm('Remove this member from the group?')) return
     setError('')
-
     try {
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ group_order_id: null })
-        .eq('id', orderId)
-        .eq('business_id', businessId)
-        .eq('group_order_id', groupId)
-
+      const { error: updateError } = await supabase.from('orders').update({ group_order_id: null }).eq('id', orderId).eq('business_id', businessId).eq('group_order_id', groupId)
       if (updateError) throw updateError
       await loadData()
     } catch (err) {
@@ -397,192 +317,200 @@ export default function GroupDetailPage() {
 
   const handleStatusChange = async (orderId, status) => {
     if (!canManage) return
-
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({ current_status: status })
-      .eq('id', orderId)
-      .eq('business_id', businessId)
-      .eq('group_order_id', groupId)
-
-    if (updateError) {
-      setError(updateError.message || 'Failed to update status.')
-      return
-    }
-
-    setMembers((current) =>
-      current.map((member) =>
-        member.id === orderId ? { ...member, current_status: status } : member
-      )
-    )
+    const { error: updateError } = await supabase.from('orders').update({ current_status: status }).eq('id', orderId).eq('business_id', businessId).eq('group_order_id', groupId)
+    if (updateError) { setError(updateError.message || 'Failed to update status.'); return }
+    setMembers(prev => prev.map(m => m.id === orderId ? { ...m, current_status: status } : m))
   }
 
-  const stats = useMemo(() => {
-    const total = members.reduce((sum, member) => sum + Number(member.price || 0), 0)
-    const paid = members.reduce((sum, member) => sum + Number(member.amount_paid || 0), 0)
-    const delivered = members.filter((member) => member.current_status === 'Delivered').length
-    const ready = members.filter((member) => member.current_status === 'Ready').length
-    const balance = Math.max(total - paid, 0)
+  const handleRecordPayment = async (event) => {
+    event.preventDefault()
+    const amount = parseFloat(paymentAmount)
+    if (!amount || amount <= 0) { alert('Enter a valid amount.'); return }
+    const member = members.find(m => m.id === paymentMemberId)
+    if (!member) return
+    const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
+    if (amount > balance) { alert(`Amount exceeds balance of ${money(balance)}.`); return }
 
-    return {
-      count: members.length,
-      total,
-      paid,
-      balance,
-      delivered,
-      ready,
-      progress: members.length ? Math.round((delivered / members.length) * 100) : 0,
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      const response = await fetch(`/api/orders/${paymentMemberId}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ amount, note: 'Group member payment' }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to record payment')
+      setShowPaymentModal(false)
+      setPaymentMemberId(null)
+      setPaymentAmount('')
+      await loadData()
+    } catch (err) {
+      console.error('Payment error:', err)
+      alert(err.message || 'Could not record payment.')
     }
-  }, [members])
+  }
 
+  // ─── Loading / Error ──────────────────────────────────────
   if (loading) {
     return (
-      <div className="group-page">
-        <div className="group-skeleton-title" />
-        <div className="group-skeleton-grid">
-          <div />
-          <div />
-          <div />
-          <div />
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+          <div style={{ width: '100px', height: '32px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
         </div>
-        <div className="group-skeleton-table" />
-        <style dangerouslySetInnerHTML={{ __html: styles }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.8rem', marginBottom: '1rem' }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+              <div style={{ width: '60%', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ background: 'var(--cresoa-surface)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite', height: '200px' }} />
+        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
+        <Navigation businessId={businessId} />
       </div>
     )
   }
 
   if (error && !group) {
     return (
-      <div className="group-page group-error-page">
-        <div className="group-error-card">
-          <h2>Unable to load group</h2>
-          <p>{error}</p>
-          <button className="group-button accent" onClick={() => loadData()}>
-            Try again
-          </button>
-        </div>
-        <style dangerouslySetInnerHTML={{ __html: styles }} />
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <Card style={{ padding: '2rem', textAlign: 'center' }}>
+          <Icon name="alert-circle" size={32} stroke="var(--cresoa-danger)" />
+          <h2 style={{ margin: '0.5rem 0' }}>Unable to load group</h2>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>{error}</p>
+          <button onClick={loadData} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Try again</button>
+        </Card>
+        <Navigation businessId={businessId} />
       </div>
     )
   }
 
   if (!group) return null
 
+  // ─── Main Render ──────────────────────────────────────────
   return (
-    <div className="group-page">
-      <header className="group-header">
-        <div className="group-header-left">
-          <button className="group-back" onClick={() => router.back()} aria-label="Go back">
-            <Icon name="arrow-left" size={17} />
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+      <Navigation businessId={businessId} />
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={() => router.back()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', background: 'var(--cresoa-surface)', cursor: 'pointer', color: 'var(--cresoa-text)' }}>
+            <Icon name="arrow-left" size={17} stroke="currentColor" />
           </button>
           <div>
-            <div className="group-eyebrow">GROUP ORDER</div>
-            <h1>{group.group_name}</h1>
-            <p>
-              {group.coordinator?.name
-                ? `Coordinator: ${group.coordinator.name}`
-                : 'No coordinator assigned'}
-              {group.due_date
-                ? ` · Due ${new Date(group.due_date).toLocaleDateString('en-GB')}`
-                : ''}
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Group Order</p>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>{group.group_name}</h1>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>
+              Coordinator: <strong>{coordinatorName}</strong>
+              {group.due_date && ` · Due ${new Date(group.due_date).toLocaleDateString('en-GB')}`}
             </p>
           </div>
         </div>
-
-        <div className="group-header-actions">
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {canManage && (
-            <button className="group-button secondary" onClick={() => openAddMember()}>
-              <Icon name="plus" size={15} />
-              Add member
+            <button onClick={openAddMember} className="cresoa-primary-button">
+              <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Add member
             </button>
           )}
-          <button
-            className="group-button accent"
-            onClick={() =>
-              router.push(`/dashboard/groups/${groupId}/edit?business_id=${businessId}`)
-            }
-          >
-            <Icon name="edit-2" size={15} />
-            Edit group
+          <button onClick={() => router.push(`/dashboard/groups/${groupId}/edit?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+            <Icon name="edit-2" size={14} stroke="currentColor" /> Edit group
           </button>
         </div>
-      </header>
+      </div>
 
       {error && (
-        <div className="group-alert">
+        <div style={{ padding: '0.6rem 1rem', marginBottom: '0.8rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{error}</span>
-          <button onClick={() => setError('')} aria-label="Dismiss error">×</button>
+          <button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
         </div>
       )}
 
-      <section className="group-summary">
-        <div className="summary-main">
-          <div className="summary-label">GROUP COLLECTION</div>
-          <div className="summary-amount">{money(stats.total)}</div>
-          <div className="summary-sub">
-            {money(stats.paid)} collected · {money(stats.balance)} outstanding
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{money(stats.total)}</div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Paid</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-success)' }}>{money(stats.paid)}</div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: stats.balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Balance</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: stats.balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+            {stats.balance > 0 ? money(stats.balance) : '✓ Paid'}
           </div>
-        </div>
-
-        <div className="summary-progress">
-          <div className="progress-top">
-            <span>Delivery progress</span>
-            <strong>{stats.progress}%</strong>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Progress</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <div style={{ flex: 1, height: '6px', borderRadius: '99px', background: 'var(--cresoa-bg)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 'inherit', background: 'var(--cresoa-success)', width: `${stats.progress}%`, transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{stats.progress}%</span>
           </div>
-          <div className="progress-track">
-            <div style={{ width: `${stats.progress}%` }} />
-          </div>
-          <small>
-            {stats.delivered} of {stats.count} delivered
-            {stats.ready ? ` · ${stats.ready} ready` : ''}
-          </small>
-        </div>
-      </section>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>{stats.delivered} of {stats.count} delivered</div>
+        </Card>
+      </div>
 
-      <section className="group-metrics">
-        <Metric label="Members" value={stats.count} />
-        <Metric label="Paid" value={money(stats.paid)} />
-        <Metric label="Outstanding" value={money(stats.balance)} danger={stats.balance > 0} />
-        <Metric label="Delivered" value={`${stats.delivered}/${stats.count}`} />
-      </section>
-
-      <section className="group-card">
-        <div className="group-card-header">
+      {/* Pending Actions & Coordinator Update */}
+      <Card style={{ padding: '0.8rem 1rem', marginBottom: '1rem', background: 'rgba(212,165,42,0.06)', borderColor: 'var(--cresoa-accent)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            <h2>Members</h2>
-            <p>Each member is an individual order inside this group.</p>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>📋 Pending Actions</div>
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>
+              {stats.balance > 0 && <span>⚠ {stats.count - stats.delivered} members have outstanding balances</span>}
+              {stats.notStarted > 0 && <span>⏳ {stats.notStarted} members not yet started</span>}
+              {stats.balance === 0 && stats.notStarted === 0 && <span>✅ All members are on track!</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {coordinatorPhone && (
+              <button onClick={sendCoordinatorUpdate} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--cresoa-success)' }}>
+                <Icon name="send" size={14} stroke="currentColor" /> Send update to coordinator
+              </button>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Members Table */}
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '0.8rem 1rem', borderBottom: '1px solid var(--cresoa-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Members</h3>
+            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>{members.length} members</span>
           </div>
           {canManage && (
-            <button className="group-button accent small" onClick={openAddMember}>
-              <Icon name="plus" size={14} />
-              Add member
+            <button onClick={openAddMember} className="cresoa-primary-button" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}>
+              <Icon name="plus" size={12} stroke="#fff" style={{ marginRight: '0.2rem' }} /> Add member
             </button>
           )}
         </div>
 
         {members.length === 0 ? (
-          <div className="group-empty">
-            <div className="empty-icon">+</div>
-            <h3>No members yet</h3>
-            <p>Add the first person in this group to start tracking their order.</p>
-            {canManage && (
-              <button className="group-button accent" onClick={openAddMember}>
-                Add first member
-              </button>
-            )}
+          <div style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+            <Icon name="users" size={32} stroke="var(--cresoa-text-muted)" />
+            <h3 style={{ margin: '0.5rem 0' }}>No members yet</h3>
+            <p style={{ color: 'var(--cresoa-text-muted)' }}>Add the first person in this group to start tracking their order.</p>
+            {canManage && <button onClick={openAddMember} className="cresoa-primary-button" style={{ marginTop: '0.5rem' }}>Add first member</button>}
           </div>
         ) : (
-          <div className="group-table-wrap">
-            <table className="group-table">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '700px' }}>
               <thead>
-                <tr>
-                  <th>Member</th>
-                  <th>Order</th>
-                  <th>Due</th>
-                  <th>Total</th>
-                  <th>Balance</th>
-                  <th>Status</th>
-                  {canManage && <th aria-label="Actions" />}
+                <tr style={{ background: 'var(--cresoa-bg)' }}>
+                  <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Member</th>
+                  <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Order</th>
+                  <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Due</th>
+                  <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Total</th>
+                  <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Balance</th>
+                  <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Status</th>
+                  {canManage && <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -591,63 +519,51 @@ export default function GroupDetailPage() {
                   const paid = Number(member.amount_paid || 0)
                   const balance = Math.max(total - paid, 0)
                   const status = getStatusInfo(member.current_status)
+                  const name = customerLabel(member.customer)
 
                   return (
-                    <tr key={member.id}>
-                      <td>
-                        <div className="member-name">{customerLabel(member.customer)}</div>
-                        {member.customer?.phone && (
-                          <div className="member-phone">{member.customer.phone}</div>
-                        )}
+                    <tr key={member.id} style={{ borderTop: '1px solid var(--cresoa-border)' }}>
+                      <td style={{ padding: '0.6rem 0.8rem' }}>
+                        <div style={{ fontWeight: 600 }}>{name}</div>
+                        {member.customer?.phone && <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>{member.customer.phone}</div>}
                       </td>
-                      <td>
-                        <div className="order-title">{member.title || 'Untitled order'}</div>
-                        {member.measurements?.notes && (
-                          <div className="order-note">{member.measurements.notes}</div>
-                        )}
+                      <td style={{ padding: '0.6rem 0.8rem' }}>
+                        <div>{member.title || 'Untitled'}</div>
+                        {member.measurements?.notes && <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>{member.measurements.notes}</div>}
                       </td>
-                      <td>
-                        {member.due_date
-                          ? new Date(member.due_date).toLocaleDateString('en-GB')
-                          : '—'}
+                      <td style={{ padding: '0.6rem 0.8rem' }}>
+                        {member.due_date ? new Date(member.due_date).toLocaleDateString('en-GB') : '—'}
                       </td>
-                      <td>{money(total)}</td>
-                      <td className={balance > 0 ? 'balance-due' : 'balance-paid'}>
+                      <td style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>{money(total)}</td>
+                      <td style={{ padding: '0.6rem 0.8rem', color: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
                         {balance > 0 ? money(balance) : 'Paid'}
                       </td>
-                      <td>
+                      <td style={{ padding: '0.6rem 0.8rem' }}>
                         {canManage ? (
                           <select
-                            className={`status-select ${status.className}`}
                             value={member.current_status || 'Order placed'}
-                            onChange={(event) =>
-                              handleStatusChange(member.id, event.target.value)
-                            }
+                            onChange={(e) => handleStatusChange(member.id, e.target.value)}
+                            style={{ padding: '0.2rem 0.6rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', fontSize: '0.75rem', cursor: 'pointer' }}
                           >
-                            {STATUS_OPTIONS.map((option) => (
-                              <option key={option} value={option}>{option}</option>
+                            {STATUS_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
                             ))}
                           </select>
                         ) : (
-                          <span className={`status-pill ${status.className}`}>{status.label}</span>
+                          <StatusPill status={member.current_status || 'Order placed'} />
                         )}
                       </td>
-                         {canManage && (
-                        <td>
-                          <div className="row-actions">
-                            <button
-                              className="icon-button"
-                              onClick={() => openEditMember(member)}
-                              title="Edit member"
-                            >
-                              <Icon name="edit-2" size={14} />
+                      {canManage && (
+                        <td style={{ padding: '0.6rem 0.8rem' }}>
+                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <button onClick={() => openPaymentModal(member.id)} title="Record payment" style={{ padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-success)' }}>
+                              <Icon name="dollar-sign" size={14} stroke="currentColor" />
                             </button>
-                            <button
-                              className="icon-button danger"
-                              onClick={() => handleDeleteMember(member.id)}
-                              title="Remove member"
-                            >
-                              <Icon name="trash-2" size={14} />
+                            <button onClick={() => openEditMember(member)} title="Edit member" style={{ padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                              <Icon name="edit-2" size={14} stroke="currentColor" />
+                            </button>
+                            <button onClick={() => handleDeleteMember(member.id)} title="Remove member" style={{ padding: '0.2rem 0.4rem', borderRadius': '4px', border: '1px solid var(--cresoa-danger)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
+                              <Icon name="trash-2" size={14} stroke="currentColor" />
                             </button>
                           </div>
                         </td>
@@ -659,139 +575,73 @@ export default function GroupDetailPage() {
             </table>
           </div>
         )}
-      </section>
+      </Card>
 
-      <footer className="group-footer">
-        <span>Plan: {businessPlan}</span>
-        {maxMembers > 0 && <span> · Limit: {maxMembers} members</span>}
-      </footer>
+      <div style={{ marginTop: '2rem' }}>
+        <Navigation businessId={businessId} />
+      </div>
 
+      {/* ─── Add/Edit Member Modal ────────────────────────── */}
       {showMemberModal && (
-        <div className="modal-backdrop" onMouseDown={closeModal}>
-          <div className="member-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-header">
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={closeModal}>
+          <div style={{ width: '100%', maxWidth: '600px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div>
-                <div className="group-eyebrow">GROUP MEMBER</div>
-                <h2>{editingMemberId ? 'Edit member' : 'Add member'}</h2>
-                <p>Create or update the individual order.</p>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Group Member</span>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>{editingMemberId ? 'Edit member' : 'Add member'}</h2>
+                <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>Create or update the individual order.</p>
               </div>
-              <button className="modal-close" onClick={closeModal} disabled={saving}>×</button>
+              <button onClick={closeModal} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
             </div>
 
             <form onSubmit={saveMember}>
-              <div className="form-grid">
-                <div className="field full">
-                  <label>Existing customer</label>
-                  <select
-                    name="customer_id"
-                    value={memberForm.customer_id}
-                    onChange={handleMemberChange}
-                    disabled={saving}
-                  >
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Existing customer</label>
+                  <select name="customer_id" value={memberForm.customer_id} onChange={handleMemberChange} disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }}>
                     <option value="">New customer</option>
-                    {customers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customerLabel(customer)}
-                        {customer.phone ? ` · ${customer.phone}` : ''}
-                      </option>
-                    ))}
+                    {customers.map(c => <option key={c.id} value={c.id}>{customerLabel(c)}{c.phone ? ` · ${c.phone}` : ''}</option>)}
                   </select>
-                  <small>Select a customer to reuse their existing record, or leave as New customer.</small>
+                  <small style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>Select a customer to reuse their existing record, or leave as New customer.</small>
                 </div>
-
-                <div className="field">
-                  <label>Customer name *</label>
-                  <input
-                    name="customer_name"
-                    value={memberForm.customer_name}
-                    onChange={handleMemberChange}
-                    placeholder="e.g. Amaka Okafor"
-                    required
-                    disabled={saving || Boolean(memberForm.customer_id)}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Customer name *</label>
+                  <input name="customer_name" value={memberForm.customer_name} onChange={handleMemberChange} placeholder="e.g. Amaka Okafor" required disabled={saving || !!memberForm.customer_id} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
-
-                <div className="field">
-                  <label>Phone</label>
-                  <input
-                    name="phone"
-                    value={memberForm.phone}
-                    onChange={handleMemberChange}
-                    placeholder="080..."
-                    disabled={saving || Boolean(memberForm.customer_id)}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Phone</label>
+                  <input name="phone" value={memberForm.phone} onChange={handleMemberChange} placeholder="080..." disabled={saving || !!memberForm.customer_id} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
-
-                <div className="field full">
-                  <label>Item / garment *</label>
-                  <input
-                    name="item"
-                    value={memberForm.item}
-                    onChange={handleMemberChange}
-                    placeholder="e.g. Aso Ebi blouse and wrapper"
-                    required
-                    disabled={saving}
-                  />
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Item / garment *</label>
+                  <input name="item" value={memberForm.item} onChange={handleMemberChange} placeholder="e.g. Aso Ebi blouse and wrapper" required disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
-
-                <div className="field">
-                  <label>Price (₦) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    name="price"
-                    value={memberForm.price}
-                    onChange={handleMemberChange}
-                    placeholder="0"
-                    required
-                    disabled={saving}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Price (₦) *</label>
+                  <input type="number" min="0" step="0.01" name="price" value={memberForm.price} onChange={handleMemberChange} placeholder="0" required disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
-
-                <div className="field">
-                  <label>Deposit (₦)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    name="deposit"
-                    value={memberForm.deposit}
-                    onChange={handleMemberChange}
-                    placeholder="0"
-                    disabled={saving}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Deposit (₦)</label>
+                  <input type="number" min="0" step="0.01" name="deposit" value={memberForm.deposit} onChange={handleMemberChange} placeholder="0" disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
-
-                <div className="field">
-                  <label>Due date</label>
-                  <input
-                    type="date"
-                    name="due_date"
-                    value={memberForm.due_date}
-                    onChange={handleMemberChange}
-                    disabled={saving}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due date</label>
+                  <input type="date" name="due_date" value={memberForm.due_date} onChange={handleMemberChange} disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
-
-                <div className="field">
-                  <label>Measurements / fitting notes</label>
-                  <input
-                    name="measurements"
-                    value={memberForm.measurements}
-                    onChange={handleMemberChange}
-                    placeholder="Optional"
-                    disabled={saving}
-                  />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Measurements / fitting notes</label>
+                  <input name="measurements" value={memberForm.measurements} onChange={handleMemberChange} placeholder="Optional" disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
                 </div>
               </div>
 
-              <div className="modal-footer">
-                <button type="button" className="group-button secondary" onClick={closeModal} disabled={saving}>
-                  Cancel
-                </button>
-                <button type="submit" className="group-button accent" disabled={saving}>
-                  {saving ? 'Saving…' : editingMemberId ? 'Save changes' : 'Add member'}
+              {error && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.8rem', margin: '0.5rem 0 0' }}>{error}</p>}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+                <button type="button" onClick={closeModal} disabled={saving} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+                <button type="submit" disabled={saving} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}>
+                  {saving ? 'Saving...' : editingMemberId ? 'Save changes' : 'Add member'}
                 </button>
               </div>
             </form>
@@ -799,792 +649,27 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      <style dangerouslySetInnerHTML={{ __html: styles }} />
+{/* ─── Payment Modal ──────────────────────────────────── */}
+      {showPaymentModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => { if (!saving) setShowPaymentModal(false) }}>
+          <form style={{ width: '100%', maxWidth: '400px', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onSubmit={handleRecordPayment} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Record Payment</h2>
+              <button type="button" onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Amount (₦)</label>
+              <input type="number" min="1" step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} placeholder="Enter amount" required autoFocus style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+              <button type="submit" className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}>Record</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
-}
-
-function Metric({ label, value, danger = false }) {
-  return (
-    <div className="metric">
-      <span>{label}</span>
-      <strong className={danger ? 'metric-danger' : ''}>{value}</strong>
-    </div>
-  )
-}
-
-const styles = `
-  /* ─── Reset & Variables ────────────────────────────────── */
-  .group-page {
-    --ink: var(--color-text, #172033);
-    --muted: var(--color-text-muted, #697386);
-    --line: var(--color-border, #e5e7eb);
-    --card: var(--color-card, #fff);
-    --bg: var(--color-bg, #f7f7f5);
-    --accent: var(--color-accent, #d8b24c);
-    min-height: 100vh;
-    padding: 28px;
-    color: var(--ink);
-    background: var(--bg);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
-  /* ─── Header ──────────────────────────────────────────── */
-  .group-header {
-    max-width: 1180px;
-    margin: 0 auto 22px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-  }
-
-  .group-header-left {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    min-width: 0;
-  }
-
-  .group-back {
-    width: 38px;
-    height: 38px;
-    border: 1px solid var(--line);
-    background: var(--card);
-    border-radius: 10px;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    color: var(--ink);
-    flex: 0 0 auto;
-    transition: background 0.15s ease;
-  }
-
-  .group-back:hover {
-    background: var(--bg);
-  }
-
-  .group-eyebrow {
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    font-weight: 800;
-    color: var(--muted);
-    margin-bottom: 5px;
-    text-transform: uppercase;
-  }
-
-  .group-header h1 {
-    margin: 0;
-    font-size: 25px;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
-    color: var(--ink);
-  }
-
-  .group-header p {
-    margin: 7px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .group-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .row-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* ─── Buttons ──────────────────────────────────────────── */
-  .group-button {
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    padding: 9px 13px;
-    background: var(--card);
-    color: var(--ink);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    font-weight: 700;
-    font-size: 13px;
-    transition: transform 0.12s ease, opacity 0.12s ease, background 0.15s ease;
-  }
-
-  .group-button:hover {
-    transform: translateY(-1px);
-  }
-
-  .group-button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-    transform: none;
-  }
-
-  .group-button.accent {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #172033;
-  }
-
-  .group-button.accent:hover {
-    background: #c9a342;
-    border-color: #c9a342;
-  }
-
-  .group-button.small {
-    padding: 7px 10px;
-    font-size: 12px;
-  }
-
-  .group-button.secondary {
-    background: var(--card);
-  }
-
-  .group-button.secondary:hover {
-    background: var(--bg);
-  }
-
-  /* ─── Summary ──────────────────────────────────────────── */
-  .group-summary {
-    max-width: 1180px;
-    margin-left: auto;
-    margin-right: auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
-    gap: 24px;
-    padding: 24px;
-    background: #16283d;
-    color: white;
-    border-radius: 18px;
-    box-shadow: 0 12px 30px rgba(18, 35, 53, 0.12);
-  }
-
-  .summary-label {
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    opacity: 0.65;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .summary-amount {
-    margin-top: 6px;
-    font-size: 31px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-  }
-
-  .summary-sub {
-    margin-top: 4px;
-    color: rgba(255, 255, 255, 0.68);
-    font-size: 12px;
-  }
-
-  .summary-progress {
-    align-self: center;
-    padding: 4px 0;
-  }
-
-  .progress-top {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 12px;
-    margin-bottom: 8px;
-  }
-
-  .progress-track {
-    height: 8px;
-    border-radius: 99px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.16);
-  }
-
-  .progress-track div {
-    height: 100%;
-    border-radius: inherit;
-    background: var(--accent);
-    transition: width 0.25s ease;
-  }
-
-  .summary-progress small {
-    display: block;
-    margin-top: 7px;
-    color: rgba(255, 255, 255, 0.62);
-    font-size: 11px;
-  }
-
-  /* ─── Metrics ──────────────────────────────────────────── */
-  .group-metrics {
-    max-width: 1180px;
-    margin: 12px auto 18px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-  }
-
-  .metric {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 13px 15px;
-  }
-
-  .metric span {
-    display: block;
-    color: var(--muted);
-    font-size: 11px;
-    margin-bottom: 4px;
-  }
-
-  .metric strong {
-    font-size: 16px;
-    font-weight: 700;
-  }
-
-  .metric-danger {
-    color: #b44b45;
-  }
-
-  .balance-due {
-    color: #b44b45;
-  }
-
-  .balance-paid {
-    color: #2f7659;
-    font-weight: 700;
-  }
-
-  /* ─── Card ─────────────────────────────────────────────── */
-  .group-card {
-    max-width: 1180px;
-    margin-left: auto;
-    margin-right: auto;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
-  .group-card-header {
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .group-card-header h2 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 700;
-  }
-
-  .group-card-header p {
-    margin: 4px 0 0;
-    color: var(--muted);
-    font-size: 11px;
-  }
-
-  /* ─── Table ────────────────────────────────────────────── */
-  .group-table-wrap {
-    overflow-x: auto;
-  }
-
-  .group-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 760px;
-    font-size: 12px;
-  }
-
-  .group-table th {
-    padding: 11px 14px;
-    text-align: left;
-    background: var(--bg);
-    color: var(--muted);
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    font-weight: 800;
-    white-space: nowrap;
-  }
-
-  .group-table td {
-    padding: 13px 14px;
-    border-top: 1px solid var(--line);
-    vertical-align: middle;
-  }
-
-  .member-name {
-    font-weight: 700;
-  }
-
-  .order-title {
-    font-weight: 700;
-  }
-
-  .member-phone {
-    color: var(--muted);
-    font-size: 10px;
-    margin-top: 3px;
-  }
-
-  .order-note {
-    color: var(--muted);
-    font-size: 10px;
-    margin-top: 3px;
-    max-width: 220px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* ─── Status ───────────────────────────────────────────── */
-  .status-pill,
-  .status-select {
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .status-pill {
-    display: inline-block;
-    padding: 5px 9px;
-  }
-
-  .status-select {
-    padding: 5px 24px 5px 8px;
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: var(--ink);
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23697386' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-  }
-
-  .placed {
-    color: #655e55;
-    background: #eeeae3;
-  }
-
-  .cutting {
-    color: #8a6814;
-    background: #f7e9bd;
-  }
-
-  .sewing {
-    color: #315578;
-    background: #dce7f1;
-  }
-
-  .ready {
-    color: #2f7659;
-    background: #dcece3;
-  }
-
-  .delivered {
-    color: #625a50;
-    background: #e7e0d7;
-  }
-
-  /* ─── Icons ────────────────────────────────────────────── */
-  .icon-button {
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    border: 1px solid var(--line);
-    background: var(--card);
-    color: var(--muted);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
-  }
-
-  .icon-button:hover {
-    background: var(--bg);
-    border-color: var(--muted);
-  }
-
-  .icon-button.danger {
-    color: #b44b45;
-  }
-
-  .icon-button.danger:hover {
-    background: #fff5f4;
-    border-color: #b44b45;
-  }
-
-  /* ─── Empty State ──────────────────────────────────────── */
-  .group-empty {
-    padding: 58px 20px;
-    text-align: center;
-  }
-
-  .empty-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    margin: 0 auto 10px;
-    background: var(--bg);
-    color: var(--muted);
-    font-size: 22px;
-    font-weight: 300;
-  }
-
-  .group-empty h3 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 700;
-  }
-
-  .group-empty p {
-    color: var(--muted);
-    font-size: 12px;
-    margin: 5px 0 15px;
-  }
-
-  /* ─── Footer ───────────────────────────────────────────── */
-  .group-footer {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 12px 2px 30px;
-    color: var(--muted);
-    font-size: 10px;
-  }
-
-  /* ─── Alert ────────────────────────────────────────────── */
-  .group-alert {
-    max-width: 1180px;
-    margin: 0 auto 14px;
-    padding: 11px 13px;
-    border: 1px solid #efc4c1;
-    background: #fff5f4;
-    color: #9f403b;
-    border-radius: 10px;
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 12px;
-  }
-
-  .group-alert button {
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    color: inherit;
-    font-size: 18px;
-    padding: 0 4px;
-  }
-
-  /* ─── Modal ────────────────────────────────────────────── */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    padding: 20px;
-    display: grid;
-    place-items: center;
-    background: rgba(8, 17, 28, 0.52);
-    backdrop-filter: blur(5px);
-    animation: fadeIn 0.2s ease;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  .member-modal {
-    width: min(620px, 100%);
-    max-height: calc(100vh - 40px);
-    overflow-y: auto;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
-    animation: slideUp 0.25s ease;
-  }
-
-  @keyframes slideUp {
-    from {
-      transform: translateY(20px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  .modal-header {
-    padding: 20px 20px 16px;
-    display: flex;
-    justify-content: space-between;
-    gap: 15px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .modal-header h2 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-  }
-
-  .modal-header p {
-    margin: 5px 0 0;
-    color: var(--muted);
-    font-size: 11px;
-  }
-
-  .modal-close {
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: var(--bg);
-    cursor: pointer;
-    font-size: 20px;
-    color: var(--muted);
-    display: grid;
-    place-items: center;
-    transition: background 0.15s ease;
-    flex-shrink: 0;
-  }
-
-  .modal-close:hover {
-    background: var(--line);
-  }
-
-  .modal-close:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .member-modal form {
-    padding: 20px;
-  }
-
-  .form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 13px;
-  }
-
-  .field.full {
-    grid-column: 1 / -1;
-  }
-
-  .field label {
-    display: block;
-    font-size: 11px;
-    font-weight: 800;
-    margin-bottom: 5px;
-    color: var(--ink);
-  }
-
-  .field small {
-    display: block;
-    color: var(--muted);
-    font-size: 9px;
-    margin-top: 5px;
-  }
-
-  .field input,
-  .field select {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 10px 11px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: var(--bg);
-    color: var(--ink);
-    outline: none;
-    font: inherit;
-    font-size: 12px;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .field input:focus,
-  .field select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(216, 178, 76, 0.12);
-  }
-
-  .field input:disabled,
-  .field select:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding-top: 18px;
-    margin-top: 18px;
-    border-top: 1px solid var(--line);
-  }
-
-  /* ─── Error Page ───────────────────────────────────────── */
-  .group-error-page {
-    display: grid;
-    place-items: center;
-    min-height: 60vh;
-  }
-
-  .group-error-card {
-    max-width: 450px;
-    padding: 30px;
-    text-align: center;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-  }
-
-  .group-error-card h2 {
-    margin: 0 0 8px;
-    font-size: 20px;
-  }
-
-  .group-error-card p {
-    color: var(--muted);
-    font-size: 12px;
-    margin-bottom: 18px;
-  }
-
-  /* ─── Skeleton ─────────────────────────────────────────── */
-  .group-skeleton-title {
-    width: 280px;
-    height: 28px;
-    background: var(--line);
-    border-radius: 8px;
-    margin: 10px auto 20px;
-    opacity: 0.6;
-  }
-
-  .group-skeleton-grid {
-    max-width: 1180px;
-    margin: auto;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-  }
-
-  .group-skeleton-grid div,
-  .group-skeleton-table {
-    background: var(--line);
-    border-radius: 12px;
-    opacity: 0.45;
-    animation: pulse 1.2s ease-in-out infinite;
-  }
-
-  .group-skeleton-grid div {
-    height: 72px;
-  }
-
-  .group-skeleton-table {
-    max-width: 1180px;
-    height: 300px;
-    margin: 18px auto;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 0.3;
-    }
-    50% {
-      opacity: 0.6;
-    }
-  }
-
-  /* ─── Responsive ───────────────────────────────────────── */
-  @media (max-width: 760px) {
-    .group-page {
-      padding: 16px;
-    }
-
-    .group-header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 14px;
-    }
-
-    .group-header-left {
-      flex-direction: row;
-      width: 100%;
-    }
-
-    .group-header-actions {
-      width: 100%;
-    }
-
-    .group-header-actions .group-button {
-      flex: 1;
-    }
-
-    .group-summary {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    .group-metrics {
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .form-grid {
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-
-    .field.full {
-      grid-column: auto;
-    }
-
-    .member-modal {
-      max-height: calc(100vh - 20px);
-    }
-
-    .modal-header {
-      padding: 16px;
-    }
-
-    .member-modal form {
-      padding: 16px;
-    }
-
-    .group-table {
-      min-width: 600px;
-      font-size: 11px;
-    }
-
-    .group-table th,
-    .group-table td {
-      padding: 10px 12px;
-    }
-
-    .summary-amount {
-      font-size: 24px;
-    }
-  }
-`
+        }
