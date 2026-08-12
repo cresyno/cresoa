@@ -490,8 +490,10 @@ function DashboardShell({ children, theme }) {
    ENTRY
    ============================================================ */
 
-export default function Page({ searchParams }) {
-  const businessId = searchParams?.business_id || searchParams?.businessId || null
+export default function Page() {
+  const searchParams = useSearchParams()
+  const businessId = searchParams?.get('business_id') || searchParams?.get('businessId') || null
+
   if (!businessId) {
     return (
       <DashboardShell theme="light">
@@ -502,5 +504,6 @@ export default function Page({ searchParams }) {
       </DashboardShell>
     )
   }
+
   return <FashionDashboard businessId={businessId} />
-   }
+     }
