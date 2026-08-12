@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components
+// ✅ Shared components (excluding Navigation)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
@@ -16,12 +16,12 @@ import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { FinancialHealth } from '../../../components/FinancialHealth'
-import { Navigation } from '../../../components/Navigation'
+// import { Navigation } from '../../../components/Navigation'   // ❌ temporarily removed
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// HELPERS
+// HELPERS (same as before)
 // ============================================================
 function getDaySeries(orders, days = 7) {
   const result = []
@@ -90,7 +90,6 @@ function getActionItems(orders, customers) {
   }
 }
 
-// Helper to get group progress
 function getGroupProgress(groups, orders) {
   if (!Array.isArray(groups) || !Array.isArray(orders)) return []
   return groups.map(group => {
@@ -155,8 +154,10 @@ function FashionDashboard({ businessId }) {
   return (
     <DashboardShell theme={theme}>
       <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80 }}>
-        {/* Navigation (top) */}
-        <Navigation businessId={businessId} />
+        {/* Navigation placeholder – removed */}
+        <div style={{ marginBottom: 16, padding: '8px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+          <span style={{ color: 'var(--cresoa-text-muted)' }}>Navigation placeholder (removed for testing)</span>
+        </div>
 
         {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -182,7 +183,6 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* ActionCenter */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -199,7 +199,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -215,7 +214,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance Chart */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
@@ -233,7 +231,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Financial Health */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -245,9 +242,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Recent Orders + Recent Customers (two-column grid) */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          {/* Recent Orders */}
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
             {orders.length === 0 ? (
@@ -271,7 +266,6 @@ function FashionDashboard({ businessId }) {
             )}
           </Card>
 
-          {/* Recent Customers */}
           <Card>
             <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
             {customers.length === 0 ? (
@@ -296,14 +290,13 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Group Orders */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
             {groupsWithProgress.length === 0 ? (
               <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
             ) : (
-              <div className="cresoa-groups-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                 {groupsWithProgress.slice(0, 4).map(group => {
                   const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
                   const progress = group.progress
@@ -315,7 +308,7 @@ function FashionDashboard({ businessId }) {
                         <div className="cresoa-row-meta">
                           {progress !== null ? (
                             <>
-                              <div className="cresoa-group-progress-bar" style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                              <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
                                 <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
                               </div>
                               <span>{progress}% complete</span>
@@ -334,9 +327,9 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Navigation (bottom) */}
-        <div style={{ marginTop: 24 }}>
-          <Navigation businessId={businessId} />
+        {/* Bottom placeholder (no Navigation) */}
+        <div style={{ marginTop: 24, padding: '8px 0', borderTop: '1px solid var(--cresoa-border)' }}>
+          <span style={{ color: 'var(--cresoa-text-muted)' }}>Navigation placeholder (bottom)</span>
         </div>
       </div>
     </DashboardShell>
@@ -359,4 +352,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-          }
+      }
