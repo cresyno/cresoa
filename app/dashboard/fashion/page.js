@@ -8,7 +8,7 @@ import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'
 
 /* =========================================================
-   CRESOA FASHION DASHBOARD – v2.0 (Branded & Fixed)
+   CRESOA FASHION DASHBOARD – v2.1 (Stable)
    ========================================================= */
 
 const PRODUCTION_STAGES = [
@@ -376,13 +376,13 @@ function DashboardHeader({ business, onRefresh, refreshing, onNewOrder, theme, o
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <button type="button" onClick={onToggleTheme} aria-label="Toggle theme" className="cresoa-icon-button">
-          {theme === 'dark' ? <Icon name="sun" size={18} /> : <Icon name="moon" size={18} />}
+          {theme === 'dark' ? '☀' : '☾'}
         </button>
         <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh dashboard" className="cresoa-icon-button">
-          <Icon name="refresh" size={18} style={{ transform: refreshing ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
+          <span style={{ display: 'inline-block', transform: refreshing ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>↻</span>
         </button>
         <button type="button" onClick={onNewOrder} className="cresoa-primary-button">
-          <Icon name="plus" size={14} />
+          <span>+</span>
           <span className="cresoa-new-order-text">New order</span>
         </button>
       </div>
@@ -392,17 +392,17 @@ function DashboardHeader({ business, onRefresh, refreshing, onNewOrder, theme, o
 
 function TodayOverview({ metrics, onOrders, onPayments, onAttention }) {
   const cards = [
-    { label: 'Revenue', value: formatMoney(metrics?.revenue), meta: 'Total order value', icon: 'revenue', onClick: onOrders },
-    { label: 'Orders', value: String(metrics?.orders || 0), meta: 'Orders in period', icon: 'orders', onClick: onOrders },
-    { label: 'Paid', value: formatMoney(metrics?.paid), meta: 'Payments received', icon: 'paid', onClick: onPayments },
-    { label: 'Outstanding', value: formatMoney(metrics?.outstanding), meta: 'Balance to collect', icon: 'outstanding', onClick: onAttention }
+    { label: 'Revenue', value: formatMoney(metrics?.revenue), meta: 'Total order value', icon: '₦', onClick: onOrders },
+    { label: 'Orders', value: String(metrics?.orders || 0), meta: 'Orders in period', icon: '◫', onClick: onOrders },
+    { label: 'Paid', value: formatMoney(metrics?.paid), meta: 'Payments received', icon: '✓', onClick: onPayments },
+    { label: 'Outstanding', value: formatMoney(metrics?.outstanding), meta: 'Balance to collect', icon: '!', onClick: onAttention }
   ]
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
       {cards.map(card => (
         <button key={card.label} type="button" onClick={card.onClick} className="cresoa-metric-card">
-          <span className="cresoa-metric-icon"><Icon name={card.icon} size={18} /></span>
+          <span className="cresoa-metric-icon">{card.icon}</span>
           <span style={{ minWidth: 0 }}>
             <span className="cresoa-metric-label">{card.label}</span>
             <strong className="cresoa-metric-value">{card.value}</strong>
@@ -548,6 +548,7 @@ function RecentOrders({ orders, customers, onOrder, onOrders }) {
   )
 }
 
+
 function RecentCustomers({ customers, onCustomer, onCustomers }) {
   const recent = getRecentCustomers(customers)
 
@@ -580,14 +581,13 @@ function RecentCustomers({ customers, onCustomer, onCustomers }) {
   )
 }
 
-function GroupOrders({ groups, orders, onGroup, onGroups }) {
+function GroupOrders({ groups, orders, customers, onGroup, onGroups }) {
   const [expandedId, setExpandedId] = useState(null)
 
   const toggleExpand = (id) => {
     setExpandedId(expandedId === id ? null : id)
   }
 
-  // Compute progress for each group
   const groupsWithProgress = groups.map(group => {
     const groupOrders = orders.filter(o => o.group_order_id === group.id)
     const total = groupOrders.length
@@ -612,7 +612,7 @@ function GroupOrders({ groups, orders, onGroup, onGroups }) {
 
             return (
               <div key={group.id} className="cresoa-group-card" onClick={() => toggleExpand(group.id)}>
-                <span className="cresoa-group-icon"><Icon name="group" size={16} /></span>
+                <span className="cresoa-group-icon">✦</span>
                 <div style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
                   <strong className="cresoa-row-title">{group.name}</strong>
                   <span className="cresoa-row-meta">
@@ -701,7 +701,7 @@ function DashboardError({ message, onRetry }) {
   return (
     <DashboardCard style={{ padding: '40px 24px', textAlign: 'center' }}>
       <div style={{ width: 48, height: 48, margin: '0 auto 16px', display: 'grid', placeItems: 'center', borderRadius: '50%', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', fontSize: 24, fontWeight: 900 }}>
-        <Icon name="alert" size={24} />
+        !
       </div>
       <h2 style={{ margin: 0, color: 'var(--cresoa-text)', fontSize: 18 }}>Couldn't load dashboard</h2>
       <p style={{ margin: '8px auto 20px', maxWidth: 400, color: 'var(--cresoa-text-muted)', fontSize: 13 }}>{message || 'Please try again.'}</p>
@@ -821,7 +821,7 @@ function FashionDashboard({ businessId }) {
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <GroupOrders groups={groups} orders={orders} onGroup={handleGroup} onGroups={handleGroups} />
+        <GroupOrders groups={groups} orders={orders} customers={customers} onGroup={handleGroup} onGroups={handleGroups} />
       </div>
     </DashboardShell>
   )
@@ -841,7 +841,6 @@ function DashboardShell({ children, theme }) {
   )
 }
 
-// Helper to get business_id from URL if not passed
 function getBusinessIdFromUrl() {
   if (typeof window === 'undefined') return null
   const params = new URLSearchParams(window.location.search)
@@ -884,4 +883,4 @@ function FashionDashboardEntry({ businessId }) {
 export default function Page({ searchParams }) {
   const businessId = searchParams?.business_id || searchParams?.businessId || null
   return <FashionDashboardEntry businessId={businessId} />
-       }
+         }
