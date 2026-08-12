@@ -16,6 +16,7 @@ import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { FinancialHealth } from '../../../components/FinancialHealth'
+import { Navigation } from '../../../components/Navigation'   // ✅ Added
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -237,7 +238,11 @@ function FashionDashboard({ businessId }) {
 
   return (
     <DashboardShell theme={theme}>
-      <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 40 }}>
+      <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80 }}>
+
+        {/* ✅ Navigation (top) */}
+        <Navigation businessId={businessId} />
+
         {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
@@ -382,6 +387,12 @@ function FashionDashboard({ businessId }) {
             </SafeRender>
           </Card>
         </div>
+
+        {/* ✅ Navigation (bottom) */}
+        <div style={{ marginTop: 24 }}>
+          <Navigation businessId={businessId} />
+        </div>
+
       </div>
     </DashboardShell>
   )
@@ -403,4 +414,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-        }
+}
