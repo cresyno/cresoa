@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
-import { formatMoney, formatShortDate, getInitials, safeAmount, getCustomerName } from '../../../lib/utils'
-import { getOrderCustomerName } from '../../../lib/order-helpers'
+import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../lib/utils'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
 import { Card } from '../../../components/Card'
@@ -18,7 +17,7 @@ import { Navigation } from '../../../components/Navigation'
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// HELPERS
+// HELPERS (self-contained)
 // ============================================================
 function getDaySeries(orders, days = 7) {
   const result = []
@@ -52,24 +51,24 @@ function getProductionCounts(orders) {
   return counts
 }
 
-// ---- Robust customer name resolver ----
+// ---- Safe customer name resolver ----
 function resolveCustomerName(order, customers) {
   if (!order) return 'Unknown Customer'
-  // First, check if order has a customer_name directly
+  // 1. Check if order has customer_name directly
   if (order.customer_name && order.customer_name !== 'Unknown customer' && order.customer_name !== 'Unnamed customer') {
     return order.customer_name
   }
-  // Try to find by customer_id with string conversion
+  // 2. Try to find by customer_id
   if (order.customer_id) {
     const customer = customers.find(c => String(c.id) === String(order.customer_id))
     if (customer) {
-      const name = getCustomerName(customer)
+      const name = customer.full_name || customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
       if (name && name !== 'Unknown customer' && name !== 'Unnamed customer') {
         return name
       }
     }
   }
-  // Fallback
+  // 3. Fallback
   return 'Unknown Customer'
 }
 
@@ -86,18 +85,15 @@ function getActionItems(orders, customers) {
           status === 'alteration'
       })
       .slice(0, 5)
-      .map(o => {
-        const name = resolveCustomerName(o, customers)
-        return {
-          id: o.id || 'unknown',
-          customerName: name,
-          amount: o.balance || 0,
-          reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
-          status: o.current_status || 'Unknown',
-          actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
-          order: o
-        }
-      })
+      .map(o => ({
+        id: o.id || 'unknown',
+        customerName: resolveCustomerName(o, customers),
+        amount: o.balance || 0,
+        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+        status: o.current_status || 'Unknown',
+        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+        order: o
+      }))
   } catch (e) {
     console.error('getActionItems error:', e)
     return []
@@ -171,7 +167,7 @@ function FashionDashboard({ businessId }) {
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
-  // ---- Render functions (using robust name resolver) ----
+  // ---- Render functions ----
   const renderOrderRows = (ordersList) => {
     if (!ordersList || ordersList.length === 0) {
       return <EmptyState title="No orders" message="Create your first order to get started." />
@@ -419,7 +415,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-           {/* Recent Orders & Customers – 2-col */}
+            {/* Recent Orders & Customers – 2-col */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -470,4 +466,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+              }
