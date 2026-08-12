@@ -12,63 +12,73 @@ export async function PATCH(req, { params }) {
     if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-const { role, permissions } = body;
-    if (!role || !['Owner', 'Manager', 'Staff'].includes(role)) {
-      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
-    }
+    const { role, permissions } = body;
 
-    // ─── Get current user's membership (to check permission and business_id) ───
-    const { data: myMembership } = await supabaseAdmin
+    // ─── Get the target membership to know which business it belongs to ───
+    const { data: target, error: targetError } = await supabaseAdmin
       .from('business_memberships')
-      .select('business_id, role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!myMembership || (myMembership.role !== 'Owner' && myMembership.role !== 'Manager')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    // ─── Fetch target membership to verify they belong to the same business ───
-    const { data: target } = await supabaseAdmin
-      .from('business_memberships')
-      .select('role, user_id')
+      .select('business_id, role, user_id')
       .eq('id', id)
       .single();
 
-    if (!target) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    if (targetError || !target) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    }
 
-    // Cannot change role of Owner unless you are Owner
+    // ─── Get current user's membership in the same business ───
+    const { data: myMembership, error: myError } = await supabaseAdmin
+      .from('business_memberships')
+      .select('role')
+      .eq('business_id', target.business_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (myError || !myMembership) {
+      return NextResponse.json({ error: 'You are not a member of this business' }, { status: 403 });
+    }
+
+    // ─── Permission checks ───
+    const canManage = myMembership.role === 'Owner' || myMembership.role === 'Manager';
+    if (!canManage) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    // Cannot change Owner unless you are Owner
     if (target.role === 'Owner' && myMembership.role !== 'Owner') {
       return NextResponse.json({ error: 'Only the Owner can change the Owner role' }, { status: 403 });
     }
 
-    // ─── Update role ───
-    const updateData = { role };
-if (permissions !== undefined) {
-  updateData.permissions = permissions;
-}
+    // ─── Build update data ───
+    const updateData = {};
+    if (role !== undefined) updateData.role = role;
+    if (permissions !== undefined) updateData.permissions = permissions;
 
-const { data: updated, error: updateError } = await supabaseAdmin
-  .from('business_memberships')
-  .update(updateData)
-  .eq('id', id)
-  .select()
-  .single();
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
+    // ─── Update membership ───
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('business_memberships')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
 
     if (updateError) throw updateError;
 
     // ─── Log activity ───
     await supabaseAdmin.from('business_activity_logs').insert({
-      business_id: myMembership.business_id,
+      business_id: target.business_id,
       performed_by: user.id,
       action: 'role_changed',
-      details: { member_id: id, new_role: role }
+      details: { member_id: id, new_role: role, new_permissions: permissions }
     });
 
     return NextResponse.json({ success: true, member: updated });
   } catch (err) {
-    console.error('Error updating role:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Error updating member:', err);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -81,24 +91,33 @@ export async function DELETE(req, { params }) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: myMembership } = await supabaseAdmin
+    // ─── Get target membership to get business_id ───
+    const { data: target, error: targetError } = await supabaseAdmin
       .from('business_memberships')
       .select('business_id, role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!myMembership || (myMembership.role !== 'Owner' && myMembership.role !== 'Manager')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    // ─── Fetch target membership ───
-    const { data: target } = await supabaseAdmin
-      .from('business_memberships')
-      .select('role')
       .eq('id', id)
       .single();
 
-    if (!target) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    if (targetError || !target) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+    }
+
+    // ─── Get current user's membership in the same business ───
+    const { data: myMembership, error: myError } = await supabaseAdmin
+      .from('business_memberships')
+      .select('role')
+      .eq('business_id', target.business_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (myError || !myMembership) {
+      return NextResponse.json({ error: 'You are not a member of this business' }, { status: 403 });
+    }
+
+    const canManage = myMembership.role === 'Owner' || myMembership.role === 'Manager';
+    if (!canManage) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
 
     // Cannot remove Owner unless you are Owner
     if (target.role === 'Owner' && myMembership.role !== 'Owner') {
@@ -115,7 +134,7 @@ export async function DELETE(req, { params }) {
 
     // ─── Log activity ───
     await supabaseAdmin.from('business_activity_logs').insert({
-      business_id: myMembership.business_id,
+      business_id: target.business_id,
       performed_by: user.id,
       action: 'member_removed',
       details: { member_id: id }
@@ -124,6 +143,6 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Error removing member:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
-        }
+  }
