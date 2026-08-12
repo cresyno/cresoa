@@ -761,6 +761,226 @@ body {
   transition: width 0.4s ease;
 }
 
+/* ─── Measurement Form ──────────────────────────────────── */
+.measurement-form {
+  background: var(--cresoa-surface);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--cresoa-border);
+}
+
+.measurement-form-title {
+  margin: 0 0 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cresoa-text);
+}
+
+.measurement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.8rem;
+}
+
+.measurement-field label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--cresoa-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.measurement-field .unit {
+  font-weight: 400;
+  color: var(--cresoa-text-soft);
+}
+
+.measurement-field input {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 6px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.measurement-field input:focus {
+  border-color: var(--cresoa-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(212,165,42,0.1);
+}
+
+.measurement-field input.read-only {
+  background: var(--cresoa-bg);
+  color: var(--cresoa-text-muted);
+  cursor: default;
+}
+
+/* ─── Custom Measurements ──────────────────────────────── */
+.measurement-custom-section {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--cresoa-border);
+}
+
+.measurement-custom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.measurement-custom-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--cresoa-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.measurement-add-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 6px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.measurement-add-custom:hover {
+  border-color: var(--cresoa-accent);
+  color: var(--cresoa-accent);
+}
+
+.measurement-custom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.measurement-custom-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.measurement-custom-key {
+  min-width: 80px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--cresoa-text);
+  text-transform: capitalize;
+}
+
+.measurement-custom-item input {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 6px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.8rem;
+  width: 80px;
+}
+
+.measurement-custom-item input:focus {
+  border-color: var(--cresoa-accent);
+  outline: none;
+}
+
+.measurement-custom-value {
+  font-size: 0.8rem;
+  color: var(--cresoa-text);
+}
+
+.measurement-remove-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1rem 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--cresoa-danger);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.measurement-remove-custom:hover {
+  background: var(--cresoa-danger-soft);
+}
+
+.measurement-custom-empty {
+  color: var(--cresoa-text-muted);
+  font-size: 0.8rem;
+  padding: 0.2rem 0;
+}
+
+/* ─── Notes ────────────────────────────────────────────── */
+.measurement-notes {
+  margin-top: 0.8rem;
+}
+
+.measurement-notes label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--cresoa-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.measurement-notes textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 6px;
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 60px;
+  box-sizing: border-box;
+}
+
+.measurement-notes textarea:focus {
+  border-color: var(--cresoa-accent);
+  outline: none;
+}
+
+.measurement-notes textarea.read-only {
+  background: var(--cresoa-bg);
+  color: var(--cresoa-text-muted);
+  cursor: default;
+}
+
+/* ─── Responsive ────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .measurement-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+
+  .measurement-field input {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .measurement-custom-item {
+    flex-wrap: wrap;
+  }
+
+  .measurement-custom-item input {
+    flex: 1 1 60px;
+    min-width: 50px;
+  }
+   }
 /* ============================================================
    LOADING SKELETONS
    ============================================================ */
