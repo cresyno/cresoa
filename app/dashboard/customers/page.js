@@ -31,7 +31,7 @@ export default function CustomersPage() {
   const [businessId, setBusinessId] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('last_added')
-  const [filterType, setFilterType] = useState('all') // 'all' | 'withOrders' | 'outstanding' | 'paid'
+  const [filterType, setFilterType] = useState('all')
 
   const loadCustomers = async () => {
     setLoading(true)
@@ -130,7 +130,7 @@ export default function CustomersPage() {
     loadCustomers()
   }, [searchParams, sortBy])
 
-  // ─── Compute stats ───
+  // ─── Computed stats ───
   const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
   const activeCustomers = customers.filter(c => c.orderCount > 0).length
   const customersWithBalance = customers.filter(c => Number(c.balance || 0) > 0).length
@@ -158,14 +158,14 @@ export default function CustomersPage() {
       case 'paid':
         result = result.filter(c => Number(c.balance || 0) <= 0 && c.orderCount > 0)
         break
-      default: // 'all'
+      default:
         break
     }
 
     return result
   }, [customers, search, filterType])
 
-  // ─── Skeleton ───
+  // ─── Loading ───
   if (loading) {
     return (
       <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
@@ -219,7 +219,7 @@ export default function CustomersPage() {
     <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-      {/* Header – single authoritative */}
+      {/* ─── Header ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
@@ -239,7 +239,7 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* Summary Cards – interactive */}
+      {/* ─── Summary Cards ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <button
           onClick={() => setFilterType('all')}
@@ -288,7 +288,7 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {/* Outstanding Alert with filter action */}
+      {/* ─── Outstanding Alert ─── */}
       {customersWithBalance > 0 && (
         <Card style={{ marginBottom: '1rem', background: 'var(--cresoa-danger-soft)', borderColor: 'var(--cresoa-danger)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -310,7 +310,7 @@ export default function CustomersPage() {
         </Card>
       )}
 
-      {/* Search + Filter + Sort */}
+      {/* ─── Search + Filter + Sort ─── */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
           <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
@@ -349,12 +349,12 @@ export default function CustomersPage() {
         </select>
       </div>
 
-          {/* Customer List */}
+            {/* ─── Customer List ─── */}
       {filteredCustomers.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
           <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--cresoa-primary)" />
           <h3 style={{ margin: '0.5rem 0 0.3rem', fontSize: '1rem' }}>
-            {search ? 'No customer found' : filterType !== 'all' ? `No customers match this filter` : 'No customers yet'}
+            {search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}
           </h3>
           <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>
             {search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}
@@ -421,4 +421,4 @@ export default function CustomersPage() {
       </div>
     </main>
   )
-                    }
+            }
