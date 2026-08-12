@@ -53,29 +53,40 @@ function getProductionCounts(orders) {
   return counts
 }
 
-// ✅ Real action items generator
+// ✅ Safe getActionItems – catches all errors and returns empty array
 function getActionItems(orders, customers) {
-  return orders
-    .filter(o => {
-      const status = String(o.current_status || '').toLowerCase()
-      return safeAmount(o.balance) > 0 ||
-        status === 'order placed' ||
-        status === 'fitting' ||
-        status === 'alteration'
-    })
-    .slice(0, 5)
-    .map(o => {
-      const name = getOrderCustomerName(o, customers)
-      return {
-        id: o.id,
-        customerName: name,
-        amount: o.balance,
-        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
-        status: o.current_status,
-        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
-        order: o
-      }
-    })
+  if (!Array.isArray(orders) || !Array.isArray(customers)) return []
+  try {
+    const items = orders
+      .filter(o => o && typeof o === 'object')
+      .filter(o => {
+        const status = String(o.current_status || '').toLowerCase()
+        return safeAmount(o.balance) > 0 ||
+          status === 'order placed' ||
+          status === 'fitting' ||
+          status === 'alteration'
+      })
+      .slice(0, 5)
+      .map(o => {
+        let name = 'Unknown'
+        try {
+          name = getOrderCustomerName(o, customers)
+        } catch (_) { /* ignore */ }
+        return {
+          id: o.id || 'unknown',
+          customerName: name,
+          amount: o.balance || 0,
+          reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+          status: o.current_status || 'Unknown',
+          actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+          order: o
+        }
+      })
+    return items
+  } catch (e) {
+    console.error('getActionItems error:', e)
+    return []
+  }
 }
 
 // ============================================================
@@ -154,7 +165,7 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* ✅ Real ActionCenter */}
+        {/* ✅ ActionCenter with safe data */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -205,7 +216,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Keep EmptyState test */}
+        {/* EmptyState test (optional – keep or remove) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
@@ -233,4 +244,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+        }
