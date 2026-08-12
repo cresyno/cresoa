@@ -17,7 +17,7 @@ import { Navigation } from '../../../components/Navigation'
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// HELPERS (self-contained)
+// HELPERS
 // ============================================================
 function getDaySeries(orders, days = 7) {
   const result = []
@@ -54,24 +54,28 @@ function getProductionCounts(orders) {
 // ---- Safe customer name resolver ----
 function resolveCustomerName(order, customers) {
   if (!order) return 'Unknown Customer'
-  // 1. Check if order has customer_name directly
   if (order.customer_name && order.customer_name !== 'Unknown customer' && order.customer_name !== 'Unnamed customer') {
     return order.customer_name
   }
-  // 2. Try to find by customer_id
   if (order.customer_id) {
     const customer = customers.find(c => String(c.id) === String(order.customer_id))
     if (customer) {
       const name = customer.full_name || customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
-      if (name && name !== 'Unknown customer' && name !== 'Unnamed customer') {
-        return name
-      }
+      if (name && name !== 'Unknown customer' && name !== 'Unnamed customer') return name
     }
   }
-  // 3. Fallback
   return 'Unknown Customer'
 }
 
+function getOrderDisplay(order) {
+  // Try to get order title or fallback to ID
+  if (order.title) return order.title
+  if (order.order_title) return order.order_title
+  if (order.id) return `Order #${order.id.slice(0, 6)}`
+  return 'Order'
+}
+
+// ---- Action items ----
 function getActionItems(orders, customers) {
   if (!Array.isArray(orders) || !Array.isArray(customers)) return []
   try {
@@ -85,15 +89,21 @@ function getActionItems(orders, customers) {
           status === 'alteration'
       })
       .slice(0, 5)
-      .map(o => ({
-        id: o.id || 'unknown',
-        customerName: resolveCustomerName(o, customers),
-        amount: o.balance || 0,
-        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
-        status: o.current_status || 'Unknown',
-        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
-        order: o
-      }))
+      .map(o => {
+        const customerName = resolveCustomerName(o, customers)
+        const orderRef = getOrderDisplay(o)
+        // Combine order reference and customer name for display
+        const displayName = `${orderRef} – ${customerName}`
+        return {
+          id: o.id || 'unknown',
+          customerName: displayName,
+          amount: o.balance || 0,
+          reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+          status: o.current_status || 'Unknown',
+          actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+          order: o
+        }
+      })
   } catch (e) {
     console.error('getActionItems error:', e)
     return []
@@ -173,13 +183,15 @@ function FashionDashboard({ businessId }) {
       return <EmptyState title="No orders" message="Create your first order to get started." />
     }
     return ordersList.slice(0, 4).map(order => {
-      const name = resolveCustomerName(order, customers)
+      const customerName = resolveCustomerName(order, customers)
+      const orderRef = getOrderDisplay(order)
+      const displayName = `${orderRef} – ${customerName}`
       const orderId = order.id || `temp-${Math.random()}`
       return (
         <button key={orderId} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
-          <span className="cresoa-avatar">{getInitials(name)}</span>
+          <span className="cresoa-avatar">{getInitials(customerName)}</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
-            <span className="cresoa-row-title">{name}</span>
+            <span className="cresoa-row-title">{displayName}</span>
             <span className="cresoa-row-meta">
               {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
             </span>
@@ -406,7 +418,7 @@ function FashionDashboard({ businessId }) {
                   <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99 }} />
                 </div>
               </div>
-              {summary.outstanding > 0 && (
+    {summary.outstanding > 0 && (
                 <div style={{ padding: '8px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)' }}>
                   ⚠ {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
                 </div>
@@ -415,7 +427,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-            {/* Recent Orders & Customers – 2-col */}
+        {/* Recent Orders & Recent Customers – 2-col */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -466,4 +478,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-              }
+          }
