@@ -7,14 +7,12 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (only those confirmed working)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
 import { ActionCenter } from '../../../components/ActionCenter'
-import { FinancialHealth } from '../../../components/FinancialHealth'
 import { Navigation } from '../../../components/Navigation'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
@@ -69,7 +67,11 @@ function getActionItems(orders, customers) {
       .slice(0, 5)
       .map(o => {
         let name = 'Customer unavailable'
-        try { name = getOrderCustomerName(o, customers) } catch (_) {}
+        try {
+          name = getOrderCustomerName(o, customers) || `Customer #${o.id?.slice(0,6) || '?'}`
+        } catch (_) {
+          name = `Customer #${o.id?.slice(0,6) || '?'}`
+        }
         return {
           id: o.id || 'unknown',
           customerName: name,
@@ -108,16 +110,8 @@ function DashboardShell({ children, theme }) {
   )
 }
 
-// ============================================================
-// SAFE RENDER HELPER
-// ============================================================
 function SafeRender({ children, fallback = null }) {
-  try {
-    return children
-  } catch (e) {
-    console.error('Render error:', e)
-    return fallback
-  }
+  try { return children } catch (e) { console.error('Render error:', e); return fallback }
 }
 
 // ============================================================
@@ -161,136 +155,99 @@ function FashionDashboard({ businessId }) {
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
-  // ---- Safe renderers ----
+  // ---- Render functions ----
   const renderOrderRows = (ordersList) => {
-    try {
-      if (!ordersList || ordersList.length === 0) {
-        return <EmptyState title="No orders" message="Create your first order to get started." />
-      }
-      // Take up to 4, but don't filter out orders without id – just provide a fallback key.
-      const displayOrders = ordersList.slice(0, 4)
-      return displayOrders.map((order, index) => {
-        try {
-          const name = getOrderCustomerName(order, customers) || 'Unnamed customer'
-          const orderId = order.id || `temp-${index}`
-          return (
-            <button key={orderId} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
-              <span className="cresoa-avatar">{getInitials(name)}</span>
-              <span style={{ flex: 1, textAlign: 'left' }}>
-                <span className="cresoa-row-title">{name}</span>
-                <span className="cresoa-row-meta">
-                  {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
-                </span>
-              </span>
-              <StatusPill status={order.current_status || 'Order placed'} />
-            </button>
-          )
-        } catch (orderError) {
-          console.error('Error rendering single order:', orderError, order)
-          // fallback row – show some info if available
-          return (
-            <div key={order?.id || `fallback-${index}`} className="cresoa-list-row compact" style={{ padding: '8px 0', color: 'var(--cresoa-text-muted)' }}>
-              <span>Order #{order?.id?.slice(0,6) || '?'}</span>
-              <span style={{ marginLeft: 8 }}>{order?.price ? formatMoney(order.price) : ''}</span>
-            </div>
-          )
-        }
-      })
-    } catch (e) {
-      console.error('Order row error:', e)
-      return (
-        <div style={{ padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p>
-          <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
-        </div>
-      )
+    if (!ordersList || ordersList.length === 0) {
+      return <EmptyState title="No orders" message="Create your first order to get started." />
     }
+    return ordersList.slice(0, 4).map(order => {
+      // Safely get customer name
+      let name = 'Unnamed customer'
+      try {
+        name = getOrderCustomerName(order, customers) || `Customer #${order.id?.slice(0,6) || '?'}`
+      } catch (_) {
+        name = `Customer #${order.id?.slice(0,6) || '?'}`
+      }
+      const orderId = order.id || `temp-${Math.random()}`
+      return (
+        <button key={orderId} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
+          <span className="cresoa-avatar">{getInitials(name)}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            <span className="cresoa-row-title">{name}</span>
+            <span className="cresoa-row-meta">
+              {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
+            </span>
+          </span>
+          <StatusPill status={order.current_status || 'Order placed'} />
+        </button>
+      )
+    })
   }
 
   const renderCustomerRows = (customersList) => {
-    try {
-      if (!customersList || customersList.length === 0) {
-        return <EmptyState title="No customers" message="Add customers to see them here." />
-      }
-      return customersList.slice(0, 4).map(customer => {
-        const name = customer.name || 'Unnamed'
-        const customerOrders = orders ? orders.filter(o => o.customer_id === customer.id) : []
-        const totalSpent = customerOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
-        const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
-        return (
-          <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
-            <span className="cresoa-avatar">{getInitials(name)}</span>
-            <span style={{ flex: 1, textAlign: 'left' }}>
-              <span className="cresoa-row-title">{name}</span>
-              <span className="cresoa-row-meta">
-                {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
-                {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
-              </span>
-            </span>
-            <span className="cresoa-row-arrow">›</span>
-          </button>
-        )
-      })
-    } catch (e) {
-      console.error('Customer row error:', e)
-      return (
-        <div style={{ padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load customers</p>
-          <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
-        </div>
-      )
+    if (!customersList || customersList.length === 0) {
+      return <EmptyState title="No customers" message="Add customers to see them here." />
     }
+    return customersList.slice(0, 4).map(customer => {
+      const name = customer.name || 'Unnamed'
+      const customerOrders = orders ? orders.filter(o => o.customer_id === customer.id) : []
+      const totalSpent = customerOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
+      const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
+      return (
+        <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
+          <span className="cresoa-avatar">{getInitials(name)}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            <span className="cresoa-row-title">{name}</span>
+            <span className="cresoa-row-meta">
+              {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
+              {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
+            </span>
+          </span>
+          <span className="cresoa-row-arrow">›</span>
+        </button>
+      )
+    })
   }
 
   const renderGroupCards = (groupsList) => {
-    try {
-      if (!groupsList || groupsList.length === 0) {
-        return <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
-      }
-      return groupsList.slice(0, 4).map(group => {
-        const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
-        const progress = group.progress
-        return (
-          <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)}>
-            <span className="cresoa-group-icon">✦</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <strong className="cresoa-row-title">{group.name}</strong>
-              <div className="cresoa-row-meta">
-                {progress !== null ? (
-                  <>
-                    <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
-                      <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
-                    </div>
-                    <span>{progress}% complete</span>
-                  </>
-                ) : (
-                  <span>Progress unavailable</span>
-                )}
-                {coordinator && ` · ${coordinator.name}`}
-                {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
-              </div>
-            </div>
-            <span className="cresoa-row-arrow">›</span>
-          </div>
-        )
-      })
-    } catch (e) {
-      console.error('Group card error:', e)
+    if (!groupsList || groupsList.length === 0) {
+      return <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
+    }
+    return groupsList.slice(0, 4).map(group => {
+      const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
+      const progress = group.progress
       return (
-        <div style={{ padding: '16px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p>
-          <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+        <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)}>
+          <span className="cresoa-group-icon">✦</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <strong className="cresoa-row-title">{group.name}</strong>
+            <div className="cresoa-row-meta">
+              {progress !== null ? (
+                <>
+                  <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
+                  </div>
+                  <span>{progress}% complete</span>
+                </>
+              ) : (
+                <span>Progress unavailable</span>
+              )}
+              {coordinator && ` · ${coordinator.name}`}
+              {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
+            </div>
+          </div>
+          <span className="cresoa-row-arrow">›</span>
         </div>
       )
-    }
+    })
   }
 
-  // ---- Chart data ----
+  // ---- Chart ----
   const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
   const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
   const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
 
-  // ---- Inline KPI cards (2×2) to avoid component issues ----
+  // ---- Inline KPI (2×2) ----
   const kpiCards = [
     { label: 'Revenue', value: formatMoney(summary.revenue), trend: '↑ 14.2%', meta: 'Total order value', icon: '₦', onClick: () => navigate('/dashboard/orders') },
     { label: 'Orders', value: String(summary.orders), trend: '↑ 3 today', meta: 'Orders in period', icon: '◫', onClick: () => navigate('/dashboard/orders') },
@@ -298,13 +255,16 @@ function FashionDashboard({ businessId }) {
     { label: 'Outstanding', value: formatMoney(summary.outstanding), trend: `${summary.outstanding > 0 ? '3 need action' : 'All clear'}`, meta: 'Balance to collect', icon: '!', onClick: () => navigate('/dashboard/orders?filter=attention') },
   ]
 
+  // ---- Inline Financial Health ----
+  const collectedPercent = summary.revenue ? Math.min((summary.paid / summary.revenue) * 100, 100) : 0
+  const outstandingPercent = summary.revenue ? Math.min((summary.outstanding / summary.revenue) * 100, 100) : 0
+
   return (
     <DashboardShell theme={theme}>
       <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80 }}>
 
         <Navigation businessId={businessId} />
 
-        {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
@@ -321,7 +281,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* Inline KPI grid – 2×2 */}
+        {/* KPI 2×2 */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {kpiCards.map(card => (
             <button key={card.label} type="button" onClick={card.onClick} className="cresoa-metric-card">
@@ -402,41 +362,65 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Financial Health */}
+        {/* Inline Financial Health */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
-            <FinancialHealth
-              revenue={summary.revenue}
-              collected={summary.paid}
-              outstanding={summary.outstanding}
-            />
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Revenue</span>
+                  <strong>{formatMoney(summary.revenue)}</strong>
+                </div>
+                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: '100%', height: '100%', background: 'var(--gradient-accent)', borderRadius: 99 }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
+                  <div>
+                    <strong>{formatMoney(summary.paid)}</strong>
+                    <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>({Math.round(collectedPercent)}%)</span>
+                  </div>
+                </div>
+                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
+                  <div>
+                    <strong>{formatMoney(summary.outstanding)}</strong>
+                    <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>({Math.round(outstandingPercent)}%)</span>
+                  </div>
+                </div>
+                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99 }} />
+                </div>
+              </div>
+              {summary.outstanding > 0 && (
+                <div style={{ padding: '8px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)' }}>
+                  ⚠ {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
+                </div>
+              )}
+            </div>
           </Card>
         </div>
 
-      
-        {/* Recent Orders & Recent Customers – 2-col grid */}
+        {/* Recent Orders & Customers – 2-col */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
-            <SafeRender fallback={
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p>
-                <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
-              </div>
-            }>
+            <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
               {renderOrderRows(orders)}
             </SafeRender>
           </Card>
 
           <Card>
             <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
-            <SafeRender fallback={
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load customers</p>
-                <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
-              </div>
-            }>
+            <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load customers</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
               {renderCustomerRows(customers)}
             </SafeRender>
           </Card>
@@ -445,12 +429,7 @@ function FashionDashboard({ businessId }) {
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
-            <SafeRender fallback={
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p>
-                <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
-              </div>
-            }>
+            <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
               {renderGroupCards(groupsWithProgress)}
             </SafeRender>
           </Card>
@@ -481,4 +460,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-              }
+            }
