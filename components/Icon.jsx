@@ -8,6 +8,14 @@ export const Icon = ({ name, size = 20, stroke = 'currentColor', strokeWidth = 2
       // 1. NAVIGATION & CORE
       // ═══════════════════════════════════════════════
 
+      case 'home':
+        return (
+          <>
+            <path d="M3 12l9-9 9 9" />
+            <path d="M5 10v10a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h4a1 1 0 001-1V10" />
+          </>
+        );
+
       case 'bar-chart-2':
         return (
           <>
@@ -556,7 +564,31 @@ export const Icon = ({ name, size = 20, stroke = 'currentColor', strokeWidth = 2
         );
 
       // ═══════════════════════════════════════════════
-      // 8. DEFAULT FALLBACK
+      // 8. ADDITIONAL USEFUL ICONS
+      // ═══════════════════════════════════════════════
+
+      case 'dashboard':
+        return (
+          <>
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </>
+        );
+
+      case 'production':
+        return (
+          <>
+            <path d="M4 4l16 16" />
+            <path d="M4 20l16-16" />
+            <circle cx="4" cy="4" r="2" />
+            <circle cx="20" cy="20" r="2" />
+          </>
+        );
+
+      // ═══════════════════════════════════════════════
+      // 9. DEFAULT FALLBACK
       // ═══════════════════════════════════════════════
 
       default:
