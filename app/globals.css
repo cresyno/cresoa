@@ -1,1171 +1,876 @@
-/* ============================================================
-   CRESOA – Global Styles & Design System
-   Version: 1.0
-   ============================================================ */
-
-/* ===== CSS Variables ===== */
-:root {
-  /* Core Colours */
-  --color-primary: #0F2B4A;
-  --color-primary-dark: #0A1628;
-  --color-primary-light: #1A3F66;
-  --color-accent: #D4A52A;
-  --color-accent-dark: #C79A2B;
-  --color-secondary: #2E7D5E;
-  --color-secondary-dark: #1E5A44;
-  --color-danger: #D9534F;
-  --color-danger-dark: #C0392B;
-
-  /* Neutral Colours */
-  --color-bg: #F8F6F2;
-  --color-bg-dark: #12121A;
-  --color-card: #FFFFFF;
-  --color-card-dark: #1E1E2A;
-  --color-text: #1A1A1A;
-  --color-text-secondary: #8A8A8A;
-  --color-text-muted: #C8C0B5;
-  --color-border: #E5E0D8;
-  --color-border-dark: #2A2A3A;
-
-  /* Status Colours */
-  --color-success: #2E7D5E;
-  --color-warning: #D4A52A;
-  --color-error: #D9534F;
-  --color-info: #0F2B4A;
-  --color-neutral: #6B6255;
-
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(15, 43, 74, 0.04);
-  --shadow-md: 0 4px 16px rgba(15, 43, 74, 0.06);
-  --shadow-lg: 0 8px 32px rgba(15, 43, 74, 0.08);
-  --shadow-xl: 0 12px 48px rgba(15, 43, 74, 0.12);
-
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #0F2B4A, #1A3F66);
-  --gradient-accent: linear-gradient(135deg, #D4A52A, #C79A2B);
-  --gradient-success: linear-gradient(135deg, #2E7D5E, #1E5A44);
-  --gradient-danger: linear-gradient(135deg, #D9534F, #C0392B);
-
-  /* ===== Cresoa Dashboard Variables (mapped to official palette) ===== */
-  --cresoa-bg: var(--color-bg);
-  --cresoa-surface: var(--color-card);
-  --cresoa-surface-soft: #F1EFEA;
-  --cresoa-text: var(--color-text);
-  --cresoa-text-muted: var(--color-text-secondary);
-  --cresoa-text-soft: var(--color-text-muted);
-  --cresoa-border: var(--color-border);
-  --cresoa-accent: var(--color-accent);
-  --cresoa-accent-soft: #FBF3E0;
-  --cresoa-success: var(--color-success);
-  --cresoa-success-soft: #EAF5EF;
-  --cresoa-warning: var(--color-warning);
-  --cresoa-warning-soft: #FBF3E0;
-  --cresoa-danger: var(--color-danger);
-  --cresoa-danger-soft: #FCEAEA;
-  --cresoa-info: var(--color-info);
-  --cresoa-info-soft: #E8EEF5;
-}
-
-/* ============================================================
-   DARK THEME
-   ============================================================ */
-
-[data-theme="dark"] {
-  /* Core Colours (dark mode – accent stays gold, others adapt) */
-  --color-primary: #D4A52A;
-  --color-primary-dark: #0A1628;
-  --color-primary-light: #1A3F66;
-  --color-accent: #D4A52A;
-  --color-accent-dark: #C79A2B;
-  --color-secondary: #2E7D5E;
-  --color-secondary-dark: #1E5A44;
-  --color-danger: #D9534F;
-  --color-danger-dark: #C0392B;
-
-  /* Neutral Colours (dark) */
-  --color-bg: #12121A;
-  --color-bg-dark: #0A0A10;
-  --color-card: #1E1E2A;
-  --color-card-dark: #2A2A3A;
-  --color-text: #E8E8E8;
-  --color-text-secondary: #AAAAAA;
-  --color-text-muted: #6B6B7A;
-  --color-border: #2A2A3A;
-  --color-border-dark: #3A3A4A;
-
-  /* Shadows (dark) */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.6);
-
-  /* Gradients (dark) */
-  --gradient-primary: linear-gradient(135deg, #1A3F66, #0F2B4A);
-  --gradient-accent: linear-gradient(135deg, #D4A52A, #B8921F);
-  --gradient-success: linear-gradient(135deg, #2E7D5E, #1E5A44);
-  --gradient-danger: linear-gradient(135deg, #D9534F, #B53A37);
-
-  /* Cresoa Variables (dark) */
-  --cresoa-bg: var(--color-bg);
-  --cresoa-surface: var(--color-card);
-  --cresoa-surface-soft: #2A2A3A;
-  --cresoa-text: var(--color-text);
-  --cresoa-text-muted: var(--color-text-secondary);
-  --cresoa-text-soft: var(--color-text-muted);
-  --cresoa-border: var(--color-border);
-  --cresoa-accent: var(--color-accent);
-  --cresoa-accent-soft: #3A3020;
-  --cresoa-success: var(--color-success);
-  --cresoa-success-soft: #1A2D25;
-  --cresoa-warning: var(--color-warning);
-  --cresoa-warning-soft: #3A3020;
-  --cresoa-danger: var(--color-danger);
-  --cresoa-danger-soft: #3A2020;
-  --cresoa-info: #80B5D4;
-  --cresoa-info-soft: #1A2A3A;
-}
-
-/* ============================================================
-   RESET & BASE
-   ============================================================ */
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  font-size: 14px;
-  scroll-behavior: smooth;
-}
-
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--cresoa-bg);
-  color: var(--cresoa-text);
-  transition: background-color 0.2s ease, color 0.2s ease;
-  line-height: 1.6;
-}
-
-/* ============================================================
-   DASHBOARD LAYOUT
-   ============================================================ */
-
-.cresoa-dashboard {
-  width: 100%;
-  min-height: 100vh;
-  background: var(--cresoa-bg);
-  color: var(--cresoa-text);
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.cresoa-dashboard-shell {
-  width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.cresoa-dashboard-content {
-  width: 100%;
-  min-width: 0;
-}
-
-/* ============================================================
-   CARD
-   ============================================================ */
-
-.cresoa-card {
-  background: var(--cresoa-surface);
-  border: 1px solid var(--cresoa-border);
-  border-radius: 20px;
-  box-shadow: var(--shadow-md);
-  padding: 20px;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
-}
-
-.cresoa-card:hover {
-  box-shadow: var(--shadow-lg);
-}
-
-/* ============================================================
-   SECTION HEADER
-   ============================================================ */
-
-.cresoa-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.cresoa-section-header-title {
-  margin: 0;
-  color: var(--cresoa-text);
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.cresoa-section-header-subtitle {
-  margin: 4px 0 0;
-  color: var(--cresoa-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.cresoa-section-header-action {
-  border: 0;
-  background: transparent;
-  color: var(--cresoa-accent);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 0;
-  transition: color 0.15s ease;
-}
-
-.cresoa-section-header-action:hover {
-  color: var(--cresoa-accent-dark);
-}
-
-/* ============================================================
-   BUTTONS
-   ============================================================ */
-
-.cresoa-icon-button {
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 12px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 16px;
-}
-
-.cresoa-icon-button:hover {
-  border-color: var(--cresoa-accent);
-  color: var(--cresoa-accent);
-  box-shadow: var(--shadow-sm);
-}
-
-.cresoa-icon-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.cresoa-primary-button {
-  min-height: 38px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--gradient-accent);
-  color: #FFFFFF;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.cresoa-primary-button:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.cresoa-primary-button:active {
-  transform: translateY(0);
-}
-
-.cresoa-primary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* ============================================================
-   METRIC CARDS
-   ============================================================ */
-
-.cresoa-metric-card {
-  width: 100%;
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 16px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.cresoa-metric-card:hover {
-  border-color: var(--cresoa-accent);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.cresoa-metric-icon {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--cresoa-accent-soft);
-  color: var(--cresoa-accent);
-  font-size: 16px;
-  font-weight: 900;
-}
-
-.cresoa-metric-label,
-.cresoa-metric-value,
-.cresoa-metric-meta {
-  display: block;
-}
-
-.cresoa-metric-label {
-  color: var(--cresoa-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.cresoa-metric-value {
-  margin-top: 2px;
-  color: var(--cresoa-text);
-  font-size: 18px;
-  line-height: 1.2;
-  font-weight: 800;
-}
-
-.cresoa-metric-meta {
-  margin-top: 2px;
-  color: var(--cresoa-text-soft);
-  font-size: 10px;
-}
-
-/* ============================================================
-   LIST ROWS
-   ============================================================ */
-
-.cresoa-list-row {
-  width: 100%;
-  min-width: 0;
-  padding: 10px 4px;
-  border: 0;
-  border-bottom: 1px solid var(--cresoa-border);
-  background: transparent;
-  color: var(--cresoa-text);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s ease;
-  border-radius: 8px;
-}
-
-.cresoa-list-row:hover {
-  background: var(--cresoa-accent-soft);
-}
-
-.cresoa-list-row:last-child {
-  border-bottom: 0;
-}
-
-.cresoa-avatar {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--gradient-primary);
-  color: #FFFFFF;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.cresoa-row-title,
-.cresoa-row-meta {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cresoa-row-title {
-  color: var(--cresoa-text);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.cresoa-row-meta {
-  margin-top: 2px;
-  color: var(--cresoa-text-muted);
-  font-size: 10px;
-}
-
-.cresoa-row-arrow {
-  color: var(--cresoa-text-soft);
-  font-size: 18px;
-  flex: 0 0 auto;
-  transition: transform 0.2s ease;
-}
-
-.cresoa-row-arrow.open {
-  transform: rotate(90deg);
-}
-
-/* ============================================================
-   STATUS PILLS
-   ============================================================ */
-
-.cresoa-status {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 700;
-  white-space: nowrap;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-}
-
-.cresoa-status-success {
-  background: var(--cresoa-success-soft);
-  color: var(--cresoa-success);
-}
-
-.cresoa-status-warning {
-  background: var(--cresoa-warning-soft);
-  color: var(--cresoa-warning);
-}
-
-.cresoa-status-danger {
-  background: var(--cresoa-danger-soft);
-  color: var(--cresoa-danger);
-}
-
-.cresoa-status-info {
-  background: var(--cresoa-info-soft);
-  color: var(--cresoa-info);
-}
-
-/* ============================================================
-   PRODUCTION PIPELINE
-   ============================================================ */
-
-.cresoa-pipeline {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.cresoa-pipeline-item {
-  position: relative;
-  min-width: 0;
-  padding: 4px;
-  border: 0;
-  background: transparent;
-  color: var(--cresoa-text);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: 12px;
-}
-
-.cresoa-pipeline-item:hover {
-  background: var(--cresoa-accent-soft);
-}
-
-.cresoa-pipeline-number {
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 8px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--gradient-primary);
-  color: #FFFFFF;
-  font-size: 14px;
-  font-weight: 900;
-  transition: all 0.2s ease;
-}
-
-.cresoa-pipeline-item:hover .cresoa-pipeline-number {
-  background: var(--gradient-accent);
-  transform: scale(1.05);
-}
-
-.cresoa-pipeline-label {
-  display: block;
-  color: var(--cresoa-text-muted);
-  font-size: 9px;
-  line-height: 1.3;
-  text-align: center;
-  font-weight: 600;
-}
-
-.cresoa-pipeline-line {
-  position: absolute;
-  top: 22px;
-  left: calc(50% + 22px);
-  right: calc(-50% + 22px);
-  height: 2px;
-  background: var(--cresoa-border);
-  pointer-events: none;
-}
-
-/* ============================================================
-   ANALYTICS CHART
-   ============================================================ */
-
-.cresoa-chart {
-  height: 190px;
-  display: flex;
-  align-items: stretch;
-  gap: 7px;
-  overflow-x: auto;
-  padding-top: 4px;
-}
-
-.cresoa-chart-day {
-  min-width: 32px;
-  flex: 1 0 32px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-  color: var(--cresoa-text-muted);
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.cresoa-chart-bar-wrap {
-  width: 100%;
-  height: 155px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.cresoa-chart-value {
-  min-height: 14px;
-  margin-bottom: 4px;
-  color: var(--cresoa-text-soft);
-  font-size: 8px;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.cresoa-chart-bar {
-  width: min(20px, 70%);
-  min-height: 2px;
-  border-radius: 8px 8px 4px 4px;
-  background: var(--gradient-accent);
-  transition: height 0.4s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-/* ============================================================
-   SELECT
-   ============================================================ */
-
-.cresoa-select {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 10px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  font-size: 11px;
-  font-weight: 700;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.cresoa-select:focus {
-  border-color: var(--cresoa-accent);
-  box-shadow: 0 0 0 3px var(--cresoa-accent-soft);
-}
-
-/* ============================================================
-   BUSINESS SNAPSHOT
-   ============================================================ */
-
-.cresoa-snapshot-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.cresoa-snapshot-item {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--cresoa-surface-soft);
-  border: 1px solid var(--cresoa-border);
-}
-
-.cresoa-snapshot-item span,
-.cresoa-snapshot-item strong {
-  display: block;
-}
-
-.cresoa-snapshot-item span {
-  color: var(--cresoa-text-muted);
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.cresoa-snapshot-item strong {
-  margin-top: 4px;
-  color: var(--cresoa-text);
-  font-size: 14px;
-  font-weight: 800;
-}
-
-/* ============================================================
-   GROUP ORDERS
-   ============================================================ */
-
-.cresoa-groups-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.cresoa-group-card {
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 14px;
-  background: var(--cresoa-surface-soft);
-  color: var(--cresoa-text);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.cresoa-group-card:hover {
-  border-color: var(--cresoa-accent);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
-
-.cresoa-group-icon {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--gradient-primary);
-  color: #FFFFFF;
-  font-size: 14px;
-}
-
-/* Group expandable detail */
-.cresoa-group-detail {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--cresoa-border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  animation: cresoa-fade-in 0.25s ease;
-}
-
-.cresoa-group-detail-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--cresoa-text-muted);
-}
-
-.cresoa-group-detail-row strong {
-  color: var(--cresoa-text);
-  font-weight: 600;
-}
-
-.cresoa-group-detail-button {
-  margin-top: 4px;
-  padding: 6px 14px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--gradient-primary);
-  color: #FFFFFF;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  align-self: flex-start;
-}
-
-.cresoa-group-detail-button:hover {
-  opacity: 0.85;
-  transform: translateX(4px);
-}
-
-/* Completion percentage ring */
-.cresoa-group-progress {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--cresoa-text);
-}
-
-.cresoa-group-progress-bar {
-  width: 60px;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--cresoa-border);
-  overflow: hidden;
-}
-
-.cresoa-group-progress-bar-fill {
-  height: 100%;
-  border-radius: 99px;
-  background: var(--gradient-success);
-  transition: width 0.4s ease;
-}
-
-/* ─── Measurement Form ──────────────────────────────────── */
-.measurement-form {
-  background: var(--cresoa-surface);
-  padding: 1rem;
-  border-radius: 12px;
-  border: 1px solid var(--cresoa-border);
-}
-
-.measurement-form-title {
-  margin: 0 0 0.8rem;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--cresoa-text);
-}
-
-.measurement-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.8rem;
-}
-
-.measurement-field label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--cresoa-text-muted);
-  margin-bottom: 0.2rem;
-}
-
-.measurement-field .unit {
-  font-weight: 400;
-  color: var(--cresoa-text-soft);
-}
-
-.measurement-field input {
-  width: 100%;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 6px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  font-size: 0.85rem;
-  box-sizing: border-box;
-}
-
-.measurement-field input:focus {
-  border-color: var(--cresoa-accent);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(212,165,42,0.1);
-}
-
-.measurement-field input.read-only {
-  background: var(--cresoa-bg);
-  color: var(--cresoa-text-muted);
-  cursor: default;
-}
-
-/* ─── Custom Measurements ──────────────────────────────── */
-.measurement-custom-section {
-  margin-top: 0.8rem;
-  padding-top: 0.8rem;
-  border-top: 1px solid var(--cresoa-border);
-}
-
-.measurement-custom-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.measurement-custom-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--cresoa-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.measurement-add-custom {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem 0.6rem;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 6px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  font-size: 0.7rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.measurement-add-custom:hover {
-  border-color: var(--cresoa-accent);
-  color: var(--cresoa-accent);
-}
-
-.measurement-custom-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.measurement-custom-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.measurement-custom-key {
-  min-width: 80px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--cresoa-text);
-  text-transform: capitalize;
-}
-
-.measurement-custom-item input {
-  flex: 1;
-  padding: 0.3rem 0.5rem;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 6px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  font-size: 0.8rem;
-  width: 80px;
-}
-
-.measurement-custom-item input:focus {
-  border-color: var(--cresoa-accent);
-  outline: none;
-}
-
-.measurement-custom-value {
-  font-size: 0.8rem;
-  color: var(--cresoa-text);
-}
-
-.measurement-remove-custom {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.1rem 0.3rem;
-  border: none;
-  background: transparent;
-  color: var(--cresoa-danger);
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.measurement-remove-custom:hover {
-  background: var(--cresoa-danger-soft);
-}
-
-.measurement-custom-empty {
-  color: var(--cresoa-text-muted);
-  font-size: 0.8rem;
-  padding: 0.2rem 0;
-}
-
-/* ─── Notes ────────────────────────────────────────────── */
-.measurement-notes {
-  margin-top: 0.8rem;
-}
-
-.measurement-notes label {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--cresoa-text-muted);
-  margin-bottom: 0.2rem;
-}
-
-.measurement-notes textarea {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--cresoa-border);
-  border-radius: 6px;
-  background: var(--cresoa-surface);
-  color: var(--cresoa-text);
-  font-size: 0.85rem;
-  resize: vertical;
-  min-height: 60px;
-  box-sizing: border-box;
-}
-
-.measurement-notes textarea:focus {
-  border-color: var(--cresoa-accent);
-  outline: none;
-}
-
-.measurement-notes textarea.read-only {
-  background: var(--cresoa-bg);
-  color: var(--cresoa-text-muted);
-  cursor: default;
-}
-
-/* ─── Responsive ────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .measurement-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem;
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { supabase } from '../../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
+import { Icon } from '../../../../components/Icon'
+import { Card } from '../../../../components/Card'
+import { SectionHeader } from '../../../../components/SectionHeader'
+import { StatusPill } from '../../../../components/StatusPill'
+import { Navigation } from '../../../../components/Navigation'
+import { MeasurementForm } from '../../../../components/MeasurementForm'
+import { isFeatureAvailable, getPlanLimits } from '../../../../lib/planLimits'
+import '../../../globals.css'
+
+const EMPTY_MEMBER = {
+  customer_id: '',
+  customer_name: '',
+  phone: '',
+  item: '',
+  price: '',
+  deposit: '',
+  measurements: {},
+  due_date: '',
+}
+
+const STATUS_OPTIONS = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+
+function splitName(fullName) {
+  const value = String(fullName || '').trim()
+  const parts = value.split(/\s+/).filter(Boolean)
+  return { first_name: parts[0] || '', last_name: parts.slice(1).join(' ') || null }
+}
+
+function money(value) {
+  const amount = Number(value || 0)
+  return `₦${amount.toLocaleString('en-NG')}`
+}
+
+function formatDate(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function customerLabel(customer) {
+  if (!customer) return 'Unknown'
+  if (customer.name) return customer.name
+  return [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
+}
+
+export default function GroupDetailPage() {
+  const router = useRouter()
+  const params = useParams()
+  const searchParams = useSearchParams()
+  const groupId = params?.id
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [group, setGroup] = useState(null)
+  const [members, setMembers] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [businessId, setBusinessId] = useState(null)
+  const [businessPlan, setBusinessPlan] = useState('free')
+  const [maxMembers, setMaxMembers] = useState(0)
+  const [canManage, setCanManage] = useState(false)
+  const [businessName, setBusinessName] = useState('')
+
+  // ─── Modal states ───
+  const [showMemberModal, setShowMemberModal] = useState(false)
+  const [editingMemberId, setEditingMemberId] = useState(null)
+  const [memberForm, setMemberForm] = useState(EMPTY_MEMBER)
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentMemberId, setPaymentMemberId] = useState(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentNote, setPaymentNote] = useState('')
+  const [paymentsList, setPaymentsList] = useState([])
+
+  const [showMemberDetailModal, setShowMemberDetailModal] = useState(false)
+  const [detailMember, setDetailMember] = useState(null)
+  const [detailMemberPayments, setDetailMemberPayments] = useState([])
+
+  const [showMeasurementViewModal, setShowMeasurementViewModal] = useState(false)
+  const [showMeasurementEditModal, setShowMeasurementEditModal] = useState(false)
+  const [measurementMember, setMeasurementMember] = useState(null)
+  const [tempMeasurements, setTempMeasurements] = useState({})
+
+  const requestedBusinessId = searchParams.get('business_id')
+
+  // ─── Load Data ────────────────────────────────────────────
+  const loadData = useCallback(async () => {
+    if (!groupId) return
+    setLoading(true)
+    setError('')
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      const bizId = requestedBusinessId || getCurrentBusinessId()
+      if (!bizId) { router.push('/dashboard'); return }
+      setBusinessId(bizId)
+
+      const [{ data: bizData, error: bizError }, { data: groupData, error: groupError }] = await Promise.all([
+        supabase.from('businesses').select('id, plan, sector, name').eq('id', bizId).single(),
+        supabase.from('group_orders').select('*').eq('id', groupId).eq('business_id', bizId).single(),
+      ])
+
+      if (bizError) throw bizError
+      if (groupError) throw groupError
+
+      const plan = bizData?.plan || 'free'
+      setBusinessPlan(plan)
+      setBusinessName(bizData?.name || 'Your business')
+      setCanManage(isFeatureAvailable(plan, 'groups'))
+      const limits = getPlanLimits(plan)
+      setMaxMembers(limits?.maxGroupMembers || 0)
+      setGroup(groupData)
+
+      const [{ data: memberData, error: memberError }, { data: customerData, error: customerError }] = await Promise.all([
+        supabase
+          .from('orders')
+          .select(`*, customer:customer_id (id, name, first_name, last_name, phone)`)
+          .eq('group_order_id', groupId)
+          .eq('business_id', bizId)
+          .order('created_at', { ascending: false }),
+        supabase.from('customers').select('id, name, first_name, last_name, phone').eq('business_id', bizId).order('first_name', { ascending: true }),
+      ])
+
+      if (memberError) throw memberError
+      if (customerError) console.warn('Customer list warning:', customerError)
+
+      setMembers(memberData || [])
+      setCustomers(customerData || [])
+    } catch (err) {
+      console.error('Error loading group:', err)
+      setError(err?.message || 'Failed to load group details.')
+    } finally {
+      setLoading(false)
+    }
+  }, [groupId, requestedBusinessId, router])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  // ─── Stats ────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const total = members.reduce((sum, m) => sum + Number(m.price || 0), 0)
+    const paid = members.reduce((sum, m) => sum + Number(m.amount_paid || 0), 0)
+    const delivered = members.filter(m => m.current_status === 'Delivered').length
+    const ready = members.filter(m => m.current_status === 'Ready').length
+    const notStarted = members.filter(m => m.current_status === 'Order placed').length
+    const balance = Math.max(total - paid, 0)
+    const membersWithBalance = members.filter(m => (Number(m.price || 0) - Number(m.amount_paid || 0)) > 0).length
+    return {
+      count: members.length,
+      total,
+      paid,
+      balance,
+      delivered,
+      ready,
+      notStarted,
+      membersWithBalance,
+      progress: members.length ? Math.round((delivered / members.length) * 100) : 0,
+    }
+  }, [members])
+
+  // ─── Coordinator WhatsApp ──────────────────────────────────
+  const coordinatorName = group?.coordinator?.name || group?.coordinator_name || 'Coordinator'
+  const coordinatorPhone = group?.coordinator?.phone
+
+  const getGroupSummaryMessage = () => {
+    const deliveredCount = stats.delivered
+    const totalCount = stats.count
+    const pendingCount = totalCount - deliveredCount
+    const balanceAmount = stats.balance
+    let message = `📋 *Group Order Update*\n\n`
+    message += `👥 *${group?.group_name}*\n`
+    message += `👤 Coordinator: ${coordinatorName}\n\n`
+    message += `📦 *${deliveredCount} of ${totalCount}* orders delivered\n`
+    if (pendingCount > 0) message += `⏳ ${pendingCount} orders still pending\n`
+    if (balanceAmount > 0) message += `💰 *${money(balanceAmount)}* outstanding balance\n\n`
+    message += `📊 *Member Status:*\n`
+    members.forEach(m => {
+      const name = customerLabel(m.customer) || 'Unknown'
+      const status = m.current_status || 'Order placed'
+      const price = Number(m.price || 0)
+      const paid = Number(m.amount_paid || 0)
+      const balance = price - paid
+      message += `- ${name}: ${status}${balance > 0 ? ` (${money(balance)} due)` : ''}\n`
+    })
+    return message
   }
 
-  .measurement-field input {
-    padding: 0.3rem 0.4rem;
-    font-size: 0.8rem;
+  const sendCoordinatorUpdate = () => {
+    if (!coordinatorPhone) {
+      alert('Coordinator phone number not available.')
+      return
+    }
+    const message = getGroupSummaryMessage()
+    const url = `https://wa.me/${coordinatorPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank')
   }
 
-  .measurement-custom-item {
-    flex-wrap: wrap;
+  // ─── Member CRUD ──────────────────────────────────────────
+  const closeMemberModal = () => {
+    if (!saving) { setShowMemberModal(false); setEditingMemberId(null); setMemberForm(EMPTY_MEMBER) }
   }
 
-  .measurement-custom-item input {
-    flex: 1 1 60px;
-    min-width: 50px;
+  const openAddMember = () => {
+    setError(''); setEditingMemberId(null); setMemberForm({ ...EMPTY_MEMBER, measurements: {} }); setShowMemberModal(true)
   }
-   }
-/* ============================================================
-   LOADING SKELETONS
-   ============================================================ */
 
-.cresoa-loading-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  const openEditMember = (member) => {
+    setError(''); setEditingMemberId(member.id)
+    setMemberForm({
+      customer_id: member.customer_id || '',
+      customer_name: customerLabel(member.customer),
+      phone: member.customer?.phone || '',
+      item: member.title || '',
+      price: String(member.price ?? ''),
+      deposit: String(member.amount_paid ?? ''),
+      measurements: member.measurements || {},
+      due_date: member.due_date || '',
+    })
+    setShowMemberModal(true)
+  }
+
+  const handleMemberChange = (event) => {
+    const { name, value } = event.target
+    setMemberForm(prev => ({ ...prev, [name]: value }))
+    if (name === 'customer_id' && value) {
+      const customer = customers.find(item => item.id === value)
+      if (customer) {
+        setMemberForm(prev => ({
+          ...prev,
+          customer_id: value,
+          customer_name: customerLabel(customer),
+          phone: customer.phone || '',
+        }))
+      }
+    }
+  }
+
+  const findOrCreateCustomer = async () => {
+    const name = memberForm.customer_name.trim()
+    const phone = memberForm.phone.trim()
+    if (!name) throw new Error('Customer name is required.')
+    if (memberForm.customer_id) return memberForm.customer_id
+
+    if (phone) {
+      const { data: byPhone, error: phoneError } = await supabase.from('customers').select('id').eq('business_id', businessId).eq('phone', phone).maybeSingle()
+      if (phoneError) throw phoneError
+      if (byPhone) return byPhone.id
+    }
+
+    const { first_name, last_name } = splitName(name)
+    let query = supabase.from('customers').select('id').eq('business_id', businessId).eq('first_name', first_name)
+    if (last_name) query = query.eq('last_name', last_name)
+    const { data: existing, error: existingError } = await query.maybeSingle()
+    if (existingError) throw existingError
+    if (existing) return existing.id
+
+    const payload = { business_id: businessId, first_name, last_name: last_name || null, phone: phone || null, name }
+    const { data: created, error: createError } = await supabase.from('customers').insert(payload).select('id').single()
+    if (createError) {
+      const fallbackPayload = { business_id: businessId, first_name, last_name: last_name || null, phone: phone || null }
+      const { data: fallback, error: fallbackError } = await supabase.from('customers').insert(fallbackPayload).select('id').single()
+      if (fallbackError) throw fallbackError
+      if (!fallback?.id) throw new Error('Customer was created but no ID returned.')
+      return fallback.id
+    }
+    if (!created?.id) throw new Error('Customer was created but no ID returned.')
+    return created.id
+  }
+
+  const saveMember = async (event) => {
+    event?.preventDefault()
+    setError('')
+    const name = memberForm.customer_name.trim()
+    const item = memberForm.item.trim()
+    const price = Number(memberForm.price)
+    if (!name || !item || !Number.isFinite(price) || price < 0) {
+      setError('Customer name, item, and a valid price are required.')
+      return
+    }
+    if (!editingMemberId && maxMembers > 0 && members.length >= maxMembers) {
+      setError(`Your current plan allows up to ${maxMembers} group members.`)
+      return
+    }
+    setSaving(true)
+    try {
+      const customerId = await findOrCreateCustomer()
+      const payload = {
+        business_id: businessId,
+        group_order_id: groupId,
+        customer_id: customerId,
+        title: item,
+        price,
+        amount_paid: Number(memberForm.deposit) || 0,
+        due_date: memberForm.due_date || null,
+        current_status: editingMemberId ? undefined : 'Order placed',
+        measurements: memberForm.measurements && Object.keys(memberForm.measurements).length > 0 ? memberForm.measurements : null,
+      }
+      if (editingMemberId) {
+        delete payload.current_status
+        const { error: updateError } = await supabase.from('orders').update(payload).eq('id', editingMemberId).eq('business_id', businessId).eq('group_order_id', groupId)
+        if (updateError) throw updateError
+      } else {
+        const { error: insertError } = await supabase.from('orders').insert(payload)
+        if (insertError) throw insertError
+      }
+      closeMemberModal()
+      await loadData()
+    } catch (err) {
+      console.error('Save group member error:', err)
+      setError(err?.message || 'Failed to save group member.')
+    } finally { setSaving(false) }
+  }
+
+  const handleDeleteMember = async (orderId) => {
+    if (!canManage) return
+    if (!window.confirm('Remove this member from the group?')) return
+    setError('')
+    try {
+      const { error: updateError } = await supabase.from('orders').update({ group_order_id: null }).eq('id', orderId).eq('business_id', businessId).eq('group_order_id', groupId)
+      if (updateError) throw updateError
+      await loadData()
+    } catch (err) {
+      console.error('Remove member error:', err)
+      setError(err?.message || 'Failed to remove member.')
+    }
+  }
+
+  const handleStatusChange = async (orderId, status) => {
+    if (!canManage) return
+    const { error: updateError } = await supabase.from('orders').update({ current_status: status }).eq('id', orderId).eq('business_id', businessId).eq('group_order_id', groupId)
+    if (updateError) { setError(updateError.message || 'Failed to update status.'); return }
+    setMembers(prev => prev.map(m => m.id === orderId ? { ...m, current_status: status } : m))
+  }
+
+  // ─── Payments ──────────────────────────────────────────────
+  const fetchPayments = async (orderId) => {
+    const { data, error } = await supabase.from('payment_records').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  }
+
+  const openPaymentModal = async (memberId) => {
+    const member = members.find(m => m.id === memberId)
+    if (!member) return
+    const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
+    if (balance <= 0) { alert('This order is fully paid.'); return }
+    setPaymentMemberId(memberId)
+    setPaymentAmount('')
+    setPaymentNote('')
+    try {
+      const payments = await fetchPayments(memberId)
+      setPaymentsList(payments)
+    } catch (e) { console.error(e); setPaymentsList([]) }
+    setShowPaymentModal(true)
+  }
+
+  const handleRecordPayment = async (event) => {
+    event.preventDefault()
+    const amount = parseFloat(paymentAmount)
+    if (!amount || amount <= 0) { alert('Enter a valid amount.'); return }
+    const member = members.find(m => m.id === paymentMemberId)
+    if (!member) return
+    const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
+    if (amount > balance) { alert(`Amount exceeds balance of ${money(balance)}.`); return }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      const response = await fetch(`/api/orders/${paymentMemberId}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ amount, note: paymentNote || 'Group member payment' }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to record payment')
+      setPaymentAmount('')
+      setPaymentNote('')
+      await loadData()
+      const updatedPayments = await fetchPayments(paymentMemberId)
+      setPaymentsList(updatedPayments)
+    } catch (err) {
+      console.error('Payment error:', err)
+      alert(err.message || 'Could not record payment.')
+    }
+  }
+
+  // ─── Member Detail Modal ──────────────────────────────────
+  const openMemberDetail = async (member) => {
+    setDetailMember(member)
+    try {
+      const payments = await fetchPayments(member.id)
+      setDetailMemberPayments(payments)
+    } catch (e) { console.error(e); setDetailMemberPayments([]) }
+    setShowMemberDetailModal(true)
+  }
+
+  const sendMemberStatusUpdate = (member) => {
+    const customerPhone = member.customer?.phone
+    if (!customerPhone) {
+      alert('Member phone number not available.')
+      return
+    }
+    const name = customerLabel(member.customer) || 'Customer'
+    const status = member.current_status || 'Order placed'
+    const price = Number(member.price || 0)
+    const paid = Number(member.amount_paid || 0)
+    const balance = price - paid
+    const message = `Hi ${name},\n\nThis is an update from ${businessName}.\nYour order "${member.title || 'Order'}" is currently: ${status}.\nOutstanding balance: ${balance > 0 ? money(balance) : 'Paid in full'}.\n\nFor any questions, contact ${coordinatorName}.`
+    const url = `https://wa.me/${customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank')
+  }
+
+  // ─── Measurements ──────────────────────────────────────────
+  const openMeasurementView = (member) => {
+    setMeasurementMember(member)
+    setShowMeasurementViewModal(true)
+  }
+
+  const openMeasurementEdit = (member) => {
+    setMeasurementMember(member)
+    setTempMeasurements(member.measurements || {})
+    setShowMeasurementEditModal(true)
+  }
+
+  const saveMeasurements = async () => {
+    if (!measurementMember) return
+    setSaving(true)
+    try {
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ measurements: tempMeasurements && Object.keys(tempMeasurements).length > 0 ? tempMeasurements : null })
+        .eq('id', measurementMember.id)
+        .eq('business_id', businessId)
+      if (updateError) throw updateError
+      await loadData()
+      setShowMeasurementEditModal(false)
+      setMeasurementMember(null)
+    } catch (err) {
+      console.error('Save measurements error:', err)
+      alert('Could not save measurements.')
+    } finally { setSaving(false) }
+  }
+
+  // ─── Loading / Error ──────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+          <div style={{ width: '100px', height: '32px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.8rem', marginBottom: '1rem' }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+              <div style={{ width: '60%', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ background: 'var(--cresoa-surface)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite', height: '200px' }} />
+        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
+        <Navigation businessId={businessId} />
+      </div>
+    )
 }
 
-.cresoa-skeleton-card {
-  min-height: 140px;
-  padding: 18px;
-  border-radius: 16px;
-  background: var(--cresoa-surface);
-  border: 1px solid var(--cresoa-border);
-}
-
-.cresoa-skeleton {
-  height: 11px;
-  margin-bottom: 14px;
-  border-radius: 8px;
-  background: var(--cresoa-surface-soft);
-  animation: cresoa-pulse 1.2s ease-in-out infinite;
-}
-
-.cresoa-skeleton.short {
-  width: 30%;
-}
-
-.cresoa-skeleton.medium {
-  width: 55%;
-}
-
-.cresoa-skeleton.long {
-  width: 80%;
-  height: 28px;
-}
-
-@keyframes cresoa-pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes cresoa-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ============================================================
-   EMPTY STATE
-   ============================================================ */
-
-.cresoa-empty-state {
-  padding: 30px 10px;
-  text-align: center;
-}
-
-.cresoa-empty-state-title {
-  display: block;
-  color: var(--cresoa-text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.cresoa-empty-state-message {
-  display: block;
-  margin-top: 6px;
-  color: var(--cresoa-text-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* ============================================================
-   RESPONSIVE
-   ============================================================ */
-
-@media (max-width: 760px) {
-  .cresoa-dashboard-shell {
-    padding: 14px;
+  if (error && !group) {
+    return (
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <Card style={{ padding: '2rem', textAlign: 'center' }}>
+          <Icon name="alert-circle" size={32} stroke="var(--cresoa-danger)" />
+          <h2 style={{ margin: '0.5rem 0' }}>Unable to load group</h2>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>{error}</p>
+          <button onClick={loadData} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Try again</button>
+        </Card>
+        <Navigation businessId={businessId} />
+      </div>
+    )
   }
 
-  .cresoa-card {
-    padding: 16px;
-  }
+  if (!group) return null
 
-  .cresoa-main-grid,
-  .cresoa-two-column {
-    grid-template-columns: 1fr !important;
-  }
+  // ─── Main Render ──────────────────────────────────────────
+  return (
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+      <Navigation businessId={businessId} />
 
-  .cresoa-pipeline {
-    overflow-x: auto;
-    grid-template-columns: repeat(5, minmax(72px, 1fr));
-  }
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={() => router.back()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', background: 'var(--cresoa-surface)', cursor: 'pointer', color: 'var(--cresoa-text)' }}>
+            <Icon name="arrow-left" size={17} stroke="currentColor" />
+          </button>
+          <div>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Group Order</p>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>{group.group_name}</h1>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>
+              Coordinator: <strong>{coordinatorName}</strong>
+              {group.due_date && ` · Due ${formatDate(group.due_date)}`} · {members.length} members
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {canManage && (
+            <button onClick={openAddMember} className="cresoa-primary-button">
+              <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Add member
+            </button>
+          )}
+          <button onClick={() => router.push(`/dashboard/groups/${groupId}/edit?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+            <Icon name="edit-2" size={14} stroke="currentColor" /> Edit group
+          </button>
+        </div>
+      </div>
 
-  .cresoa-groups-grid {
-    grid-template-columns: 1fr;
-  }
+      {error && (
+        <div style={{ padding: '0.6rem 1rem', marginBottom: '0.8rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{error}</span>
+          <button onClick={() => setError('')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+        </div>
+      )}
 
-  .cresoa-snapshot-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
+      {/* Dark Summary Bar */}
+      <div style={{ background: 'linear-gradient(135deg, #0F2B4A, #1A3F66)', color: '#fff', borderRadius: '16px', padding: '1.2rem 1.5rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '1rem', boxShadow: '0 8px 24px rgba(15,43,74,0.15)' }}>
+        <div>
+          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>Total</div>
+          <div style={{ fontWeight: 700, fontSize: '1.2rem' }}>{money(stats.total)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>Paid</div>
+          <div style={{ fontWeight: 700, fontSize: '1.2rem', color: '#72C49C' }}>{money(stats.paid)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>Balance</div>
+          <div style={{ fontWeight: 700, fontSize: '1.2rem', color: stats.balance > 0 ? '#EF7771' : '#72C49C' }}>{stats.balance > 0 ? money(stats.balance) : '✓ Paid'}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.7 }}>Progress</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ flex: 1, height: '6px', borderRadius: '99px', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 'inherit', background: 'var(--cresoa-accent)', width: `${stats.progress}%`, transition: 'width 0.3s' }} />
+            </div>
+            <span style={{ fontWeight: 700, fontSize: '1rem' }}>{stats.progress}%</span>
+          </div>
+          <div style={{ fontSize: '0.6rem', opacity: 0.7, marginTop: '0.2rem' }}>{stats.delivered} of {stats.count} delivered</div>
+        </div>
+      </div>
 
-@media (max-width: 480px) {
-  .cresoa-dashboard-shell {
-    padding: 11px;
-  }
+      {/* Pending Actions & Coordinator Update */}
+      <Card style={{ padding: '0.8rem 1rem', marginBottom: '1rem', background: stats.balance > 0 || stats.notStarted > 0 ? 'rgba(212,165,42,0.06)' : 'var(--cresoa-surface)', borderColor: stats.balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>📋 Pending Actions</div>
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>
+              {stats.membersWithBalance > 0 && <span style={{ color: 'var(--cresoa-danger)' }}>⚠ {stats.membersWithBalance} member{stats.membersWithBalance > 1 ? 's' : ''} ha{stats.membersWithBalance > 1 ? 've' : 's'} outstanding balance{stats.membersWithBalance > 1 ? 's' : ''}</span>}
+              {stats.notStarted > 0 && <span>⏳ {stats.notStarted} member{stats.notStarted > 1 ? 's' : ''} not yet started</span>}
+              {stats.membersWithBalance === 0 && stats.notStarted === 0 && <span>✅ All members are on track!</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {coordinatorPhone && (
+              <button onClick={sendCoordinatorUpdate} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--cresoa-success)' }}>
+                <Icon name="send" size={14} stroke="currentColor" /> Send update to coordinator
+              </button>
+            )}
+          </div>
+        </div>
+      </Card>
 
-  .cresoa-new-order-text {
-    display: none;
-  }
+      {/* Members Section */}
+      <SectionHeader title={`Members (${members.length})`} action={canManage ? 'Add member' : ''} onAction={canManage ? openAddMember : null} />
 
-  .cresoa-primary-button {
-    width: 38px;
-    padding: 0;
-  }
+      {members.length === 0 ? (
+        <Card style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+          <Icon name="users" size={32} stroke="var(--cresoa-text-muted)" />
+          <h3 style={{ margin: '0.5rem 0' }}>No members yet</h3>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>Add the first person in this group to start tracking their order.</p>
+          {canManage && <button onClick={openAddMember} className="cresoa-primary-button" style={{ marginTop: '0.5rem' }}>Add first member</button>}
+        </Card>
+      ) : (
+        <div style={{ display: 'grid', gap: '0.8rem' }}>
+          {members.map((member) => {
+            const total = Number(member.price || 0)
+            const paid = Number(member.amount_paid || 0)
+            const balance = Math.max(total - paid, 0)
+            const status = member.current_status || 'Order placed'
+            const name = customerLabel(member.customer)
 
-  .cresoa-metric-value {
-    font-size: 15px;
-  }
+            return (
+              <Card key={member.id} style={{ padding: '1rem', borderLeft: `4px solid ${balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: '1rem' }}>{name}</strong>
+                      <StatusPill status={status} />
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>
+                      {member.title || 'Untitled'} · {member.customer?.phone || 'No phone'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', marginTop: '0.3rem', display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                      <span><strong>Total:</strong> {money(total)}</span>
+                      <span><strong>Paid:</strong> {money(paid)}</span>
+                      <span style={{ color: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+                        <strong>Balance:</strong> {balance > 0 ? money(balance) : 'Paid'}
+                      </span>
+                      <span>{member.due_date ? `Due: ${formatDate(member.due_date)}` : ''}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button onClick={() => openMemberDetail(member)} title="View" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.7rem' }}>
+                      View
+                    </button>
+                    <button onClick={() => openPaymentModal(member.id)} title="Payment" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-success)' }}>
+                      <Icon name="dollar-sign" size={14} stroke="currentColor" />
+                    </button>
+                    {canManage && (
+                      <>
+                        <button onClick={() => openEditMember(member)} title="Edit" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                          <Icon name="edit-2" size={14} stroke="currentColor" />
+                        </button>
+                        <button onClick={() => openMeasurementView(member)} title="Measurements" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-accent)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-accent)' }}>
+                          <Icon name="ruler" size={14} stroke="currentColor" />
+                        </button>
+                        <button onClick={() => handleDeleteMember(member.id)} title="Remove" style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--cresoa-danger)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
+                          <Icon name="trash-2" size={14} stroke="currentColor" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
-  .cresoa-metric-card {
-    padding: 12px;
-  }
+      <div style={{ marginTop: '2rem' }}>
+        <Navigation businessId={businessId} />
+      </div>
 
-  .cresoa-chart {
-    height: 175px;
-  }
+     {/* ─── Add/Edit Member Modal ────────────────────────── */}
+      {showMemberModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={closeMemberModal}>
+          <div style={{ width: '100%', maxWidth: '600px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Group Member</span>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>{editingMemberId ? 'Edit member' : 'Add member'}</h2>
+                <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>Create or update the individual order.</p>
+              </div>
+              <button onClick={closeMemberModal} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
 
-  .cresoa-snapshot-grid {
-    grid-template-columns: 1fr;
-  }
-}
+            <form onSubmit={saveMember}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Existing customer</label>
+                  <select name="customer_id" value={memberForm.customer_id} onChange={handleMemberChange} disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }}>
+                    <option value="">New customer</option>
+                    {customers.map(c => <option key={c.id} value={c.id}>{customerLabel(c)}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+                  </select>
+                  <small style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>Select a customer to reuse their existing record, or leave as New customer.</small>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Customer name *</label>
+                  <input name="customer_name" value={memberForm.customer_name} onChange={handleMemberChange} placeholder="e.g. Amaka Okafor" required disabled={saving || !!memberForm.customer_id} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Phone</label>
+                  <input name="phone" value={memberForm.phone} onChange={handleMemberChange} placeholder="080..." disabled={saving || !!memberForm.customer_id} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Item / garment *</label>
+                  <input name="item" value={memberForm.item} onChange={handleMemberChange} placeholder="e.g. Aso Ebi blouse and wrapper" required disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Price (₦) *</label>
+                  <input type="number" min="0" step="0.01" name="price" value={memberForm.price} onChange={handleMemberChange} placeholder="0" required disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Deposit (₦)</label>
+                  <input type="number" min="0" step="0.01" name="deposit" value={memberForm.deposit} onChange={handleMemberChange} placeholder="0" disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due date</label>
+                  <input type="date" name="due_date" value={memberForm.due_date} onChange={handleMemberChange} disabled={saving} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Measurements</label>
+                  <MeasurementForm
+                    measurements={memberForm.measurements || {}}
+                    onChange={(updated) => setMemberForm(prev => ({ ...prev, measurements: updated }))}
+                  />
+                </div>
+              </div>
 
+              {error && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.8rem', margin: '0.5rem 0 0' }}>{error}</p>}
 
-/* ============================================================
-   UTILITY – GRID LAYOUTS (used in page.js)
-   ============================================================ */
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+                <button type="button" onClick={closeMemberModal} disabled={saving} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+                <button type="submit" disabled={saving} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}>
+                  {saving ? 'Saving...' : editingMemberId ? 'Save changes' : 'Add member'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-.cresoa-main-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
-  gap: 14px;
-}
+      {/* ─── Payment Modal ──────────────────────────────────── */}
+      {showPaymentModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => { if (!saving) setShowPaymentModal(false) }}>
+          <div style={{ width: '100%', maxWidth: '500px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Payments</h2>
+              <button onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
 
-.cresoa-two-column {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
+            {/* Payment list */}
+            {paymentsList.length === 0 ? (
+              <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>No payments recorded yet.</p>
+            ) : (
+              <div style={{ marginBottom: '1rem' }}>
+                {paymentsList.map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+                    <span>{money(p.amount)}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>{formatDate(p.created_at)} {p.note ? `· ${p.note}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
-/* ============================================================
-   SCROLLBAR (optional polish)
-   ============================================================ */
+            {/* Add payment form */}
+            <form onSubmit={handleRecordPayment}>
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Amount (₦)</label>
+                <input type="number" min="1" step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} placeholder="Enter amount" required autoFocus style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+              </div>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Note (optional)</label>
+                <input type="text" value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="Payment note..." style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+                <button type="submit" className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}>Record</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+      {/* ─── Member Detail Modal ───────────────────────────── */}
+      {showMemberDetailModal && detailMember && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => setShowMemberDetailModal(false)}>
+          <div style={{ width: '100%', maxWidth: '550px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{customerLabel(detailMember.customer)}</h2>
+                <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0.2rem 0 0' }}>{detailMember.title || 'Untitled'} · <StatusPill status={detailMember.current_status || 'Order placed'} /></p>
+              </div>
+              <button onClick={() => setShowMemberDetailModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
 
-::-webkit-scrollbar-track {
-  background: var(--cresoa-surface-soft);
-  border-radius: 99px;
-}
+            {/* Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div style={{ background: 'var(--cresoa-bg)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase' }}>Total</div>
+                <div style={{ fontWeight: 700 }}>{money(detailMember.price)}</div>
+              </div>
+              <div style={{ background: 'var(--cresoa-bg)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase' }}>Paid</div>
+                <div style={{ fontWeight: 700, color: 'var(--cresoa-success)' }}>{money(detailMember.amount_paid)}</div>
+              </div>
+              <div style={{ background: 'var(--cresoa-bg)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase' }}>Balance</div>
+                <div style={{ fontWeight: 700, color: (detailMember.price - detailMember.amount_paid) > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+                  {(detailMember.price - detailMember.amount_paid) > 0 ? money(detailMember.price - detailMember.amount_paid) : 'Paid'}
+                </div>
+              </div>
+            </div>
 
-::-webkit-scrollbar-thumb {
-  background: var(--cresoa-border);
-  border-radius: 99px;
-}
+            {/* Payment history */}
+            <div style={{ marginBottom: '1rem' }}>
+              <strong style={{ fontSize: '0.85rem' }}>Payments</strong>
+              {detailMemberPayments.length === 0 ? (
+                <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>No payments recorded.</p>
+              ) : (
+                <div>
+                  {detailMemberPayments.map(p => (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.2rem 0', borderBottom: '1px solid var(--cresoa-border)', fontSize: '0.8rem' }}>
+                      <span>{money(p.amount)}</span>
+                      <span style={{ color: 'var(--cresoa-text-muted)' }}>{formatDate(p.created_at)} {p.note || ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--cresoa-text-muted);
-}
+                             {/* Send update to member */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+              <button onClick={() => sendMemberStatusUpdate(detailMember)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-success)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-success)' }}>
+                <Icon name="send" size={14} stroke="currentColor" /> Send Update
+              </button>
+              <button onClick={() => { setShowMemberDetailModal(false); openPaymentModal(detailMember.id) }} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-accent)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-accent)' }}>
+                <Icon name="dollar-sign" size={14} stroke="currentColor" /> Record Payment
+              </button>
+              <button onClick={() => { setShowMemberDetailModal(false); openMeasurementView(detailMember) }} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-accent)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-accent)' }}>
+                <Icon name="ruler" size={14} stroke="currentColor" /> Measurements
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Measurement View Modal ────────────────────────── */}
+      {showMeasurementViewModal && measurementMember && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => setShowMeasurementViewModal(false)}>
+          <div style={{ width: '100%', maxWidth: '600px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Measurements – {customerLabel(measurementMember.customer)}</h2>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button onClick={() => { setShowMeasurementViewModal(false); openMeasurementEdit(measurementMember) }} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-accent)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-accent)' }}>
+                  <Icon name="edit-2" size={14} stroke="currentColor" /> Edit
+                </button>
+                <button onClick={() => setShowMeasurementViewModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                  <Icon name="x" size={20} stroke="currentColor" />
+                </button>
+              </div>
+            </div>
+            <MeasurementForm
+              measurements={measurementMember.measurements || {}}
+              readOnly
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ─── Measurement Edit Modal ────────────────────────── */}
+      {showMeasurementEditModal && measurementMember && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => { if (!saving) setShowMeasurementEditModal(false) }}>
+          <div style={{ width: '100%', maxWidth: '600px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Edit Measurements – {customerLabel(measurementMember.customer)}</h2>
+              <button onClick={() => setShowMeasurementEditModal(false)} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            <MeasurementForm
+              measurements={tempMeasurements}
+              onChange={setTempMeasurements}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+              <button onClick={() => setShowMeasurementEditModal(false)} disabled={saving} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+              <button onClick={saveMeasurements} disabled={saving} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}>
+                {saving ? 'Saving...' : 'Save measurements'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+                                                                           }                                                      
