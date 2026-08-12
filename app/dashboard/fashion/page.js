@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (all confirmed working)
+// ✅ Shared components
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
@@ -129,7 +129,7 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
-  const [chartMetric, setChartMetric] = useState('revenue') // 'revenue' | 'orders' | 'collected'
+  const [chartMetric, setChartMetric] = useState('revenue')
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -215,11 +215,9 @@ function FashionDashboard({ businessId }) {
       }
       return customersList.slice(0, 4).map(customer => {
         const name = customer.name || 'Unnamed'
-        // Calculate total spent and active orders
         const customerOrders = orders ? orders.filter(o => o.customer_id === customer.id) : []
         const totalSpent = customerOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
         const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
-        const totalOrders = customerOrders.length
         return (
           <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
             <span className="cresoa-avatar">{getInitials(name)}</span>
@@ -288,11 +286,10 @@ function FashionDashboard({ businessId }) {
     }
   }
 
-  // ---- Chart data based on selected metric ----
+  // ---- Chart data ----
   const chartData = useMemo(() => {
     if (chartMetric === 'revenue') return series.map(d => ({ ...d, value: d.revenue, label: 'Revenue' }))
     if (chartMetric === 'orders') return series.map(d => ({ ...d, value: d.orders, label: 'Orders' }))
-    // collected: we need to compute daily collected from orders (sum of amount_paid per day)
     const dailyCollected = orders.reduce((acc, o) => {
       const day = new Date(o.created_at).toISOString().split('T')[0]
       acc[day] = (acc[day] || 0) + safeAmount(o.amount_paid)
@@ -327,7 +324,6 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* KPI Cards – 2×2 grid on all screens */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
@@ -335,7 +331,6 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* Action Center – rows fully tappable */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -352,7 +347,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Production Pipeline – tappable */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -368,7 +362,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance Chart with metric selector and improved spacing */}
+        {/* Performance Chart with metric selector */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
@@ -408,8 +402,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        
-        {/* Financial Health – enhanced with clear progress and spacing */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -460,7 +452,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Recent Orders & Recent Customers – with loading/error/empty states */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -487,7 +478,6 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Group Orders – with progress bars and "Progress unavailable" */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
@@ -501,8 +491,17 @@ function FashionDashboard({ businessId }) {
             </SafeRender>
           </Card>
         </div>
-          }
+
+        {/* ✅ Bottom Navigation – no support button (handled by layout) */}
+        <div style={{ marginTop: 24, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <Navigation businessId={businessId} />
+        </div>
+
+      </div>
+    </DashboardShell>
+  )
 }
+
 // ============================================================
 // ENTRY
 // ============================================================
@@ -519,4 +518,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+                          }
