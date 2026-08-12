@@ -246,15 +246,26 @@ export default function GroupDetailPage() {
     if (existing) return existing.id
 
     const payload = { business_id: businessId, first_name, last_name: last_name || null, phone: phone || null, name }
-    const { data: created, error: createError } = await supabase.from('customers').insert(payload).select('id').single()
-    if (createError) {
-      const { data: fallback, error: fallbackError } = await supabase.from('customers').insert({ business_id: businessId, first_name, last_name: last_name || null, phone: phone || null }).select('id').single()
-      if (fallbackError) throw fallbackError
-      if (!fallback?.id) throw new Error('Customer was created but no ID returned.')
-      return fallback.id
-    }
-    if (!created?.id) throw new Error('Customer was created but no ID returned.')
-    return created.id
+    const { data: created, error: createError } = await supabase
+  .from('customers')
+  .insert(payload)
+  .select('id')
+  .single()
+
+if (createError) {
+  // fallback attempt returning the inserted id
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('customers')
+    .insert({ business_id: businessId, first_name, last_name: last_name || null, phone: phone || null })
+    .select('id')
+    .single()
+
+  if (fallbackError) throw fallbackError
+  if (!fallback?.id) throw new Error('Customer was created but no ID returned.')
+  return fallback.id
+}
+if (!created?.id) throw new Error('Customer was created but no ID returned.')
+return created.id
   }
 
   const saveMember = async (event) => {
