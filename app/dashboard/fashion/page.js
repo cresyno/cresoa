@@ -7,14 +7,14 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (confirmed working)
+// ✅ Shared components
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
-import { ActionCenter } from '../../../components/ActionCenter'  // 🆕 imported
+import { ActionCenter } from '../../../components/ActionCenter'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -53,6 +53,31 @@ function getProductionCounts(orders) {
   return counts
 }
 
+// ✅ Real action items generator
+function getActionItems(orders, customers) {
+  return orders
+    .filter(o => {
+      const status = String(o.current_status || '').toLowerCase()
+      return safeAmount(o.balance) > 0 ||
+        status === 'order placed' ||
+        status === 'fitting' ||
+        status === 'alteration'
+    })
+    .slice(0, 5)
+    .map(o => {
+      const name = getOrderCustomerName(o, customers)
+      return {
+        id: o.id,
+        customerName: name,
+        amount: o.balance,
+        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+        status: o.current_status,
+        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+        order: o
+      }
+    })
+}
+
 // ============================================================
 // DASHBOARD SHELL
 // ============================================================
@@ -88,20 +113,15 @@ function FashionDashboard({ businessId }) {
   const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
   const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
   const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
+  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
 
   const navigate = (path) => {
     const sep = path.includes('?') ? '&' : '?'
     router.push(`${path}${sep}business_id=${businessId}`)
   }
 
-  // 🧪 Dummy data to test ActionCenter
-  const dummyActionItems = [
-    { id: '1', customerName: 'Amaka Love', amount: 2150000, reason: 'Payment overdue', status: 'Order placed', actionLabel: 'Collect payment' },
-    { id: '2', customerName: 'Taiwo Abraham', amount: 8000000, reason: 'Ready for delivery', status: 'Ready', actionLabel: 'View order' },
-  ]
-
   const handleActionClick = (item) => {
-    alert(`Action clicked for ${item.customerName}`) // temporary
+    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
   }
 
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
@@ -134,19 +154,19 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* 🧪 Test ActionCenter with dummy data */}
+        {/* ✅ Real ActionCenter */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
-              title="Action Required (Test)"
-              subtitle="Testing the shared ActionCenter component"
+              title="Action Required"
+              subtitle={`${actionItems.length} item${actionItems.length > 1 ? 's' : ''} need your attention`}
               action="View all"
-              onAction={() => alert('View all clicked')}
+              onAction={() => navigate('/dashboard/orders')}
             />
             <ActionCenter
-              items={dummyActionItems}
+              items={actionItems}
               onActionClick={handleActionClick}
-              onViewAll={() => alert('View all actions')}
+              onViewAll={() => navigate('/dashboard/orders')}
             />
           </Card>
         </div>
@@ -213,4 +233,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-    }
+}
