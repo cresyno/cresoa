@@ -7,23 +7,15 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
+// ✅ Import shared components (start with just these two)
+import { Card } from '../../../components/Card'
+import { SectionHeader } from '../../../components/SectionHeader'
+
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// SIMPLE INLINE COMPONENTS (no external imports)
+// INLINE COMPONENTS (still here – we'll remove them gradually)
 // ============================================================
-function Card({ children, style = {} }) {
-  return <section className="cresoa-card" style={style}>{children}</section>
-}
-
-function SectionHeader({ title, subtitle }) {
-  return (
-    <div className="cresoa-section-header">
-      <div><h2 className="cresoa-section-header-title">{title}</h2>{subtitle && <p className="cresoa-section-header-subtitle">{subtitle}</p>}</div>
-    </div>
-  )
-}
-
 function StatusPill({ status }) {
   const value = String(status || 'Order placed')
   const lower = value.toLowerCase()
@@ -140,7 +132,7 @@ function FashionDashboard({ businessId }) {
           <div className="cresoa-metric-card"><span className="cresoa-metric-icon">!</span><div><span className="cresoa-metric-label">Outstanding</span><strong className="cresoa-metric-value">{formatMoney(summary.outstanding)}</strong><span className="cresoa-metric-meta">{summary.outstanding > 0 ? '3 need action' : 'All clear'}</span></div></div>
         </div>
 
-        {/* Production Pipeline */}
+        {/* Production Pipeline - now using Card and SectionHeader from components */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -194,4 +186,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+                       }
