@@ -7,6 +7,11 @@ import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'
+import { Card } from '../../../components/Card'
+import { SectionHeader } from '../../../components/SectionHeader'
+import { StatusPill } from '../../../components/StatusPill'
+import { Navigation } from '../../../components/Navigation'
+import '../../../globals.css'
 
 export default function GroupsPage() {
   const router = useRouter()
@@ -197,6 +202,14 @@ export default function GroupsPage() {
     return normalized.charAt(0).toUpperCase() + normalized.slice(1)
   }
 
+  const getStatusColor = (status) => {
+    const normalized = String(status || 'pending').toLowerCase()
+    if (normalized === 'completed') return 'success'
+    if (normalized === 'active') return 'info'
+    if (normalized === 'cancelled') return 'danger'
+    return 'warning'
+  }
+
   const handleDelete = async (group) => {
     const confirmed = window.confirm(
       `Delete "${group.group_name}"?\n\nLinked orders will be unassigned from this group, but the orders themselves will not be deleted.`
@@ -227,887 +240,293 @@ export default function GroupsPage() {
     }
   }
 
-  // ─── LOADING STATE ──────────────────────────────
+  // ─── LOADING ───
   if (loading) {
     return (
-      <div className="groups-page">
-        <div className="groups-shell">
-          <div className="page-header skeleton-header">
-            <div>
-              <div className="skeleton skeleton-eyebrow" />
-              <div className="skeleton skeleton-title" />
-              <div className="skeleton skeleton-subtitle" />
-            </div>
-            <div className="skeleton skeleton-button" />
-          </div>
-          <div className="stats-grid">
-            {[1, 2, 3, 4].map((i) => (
-              <div className="stat-card skeleton-card" key={i}>
-                <div className="skeleton skeleton-small" />
-                <div className="skeleton skeleton-number" />
-                <div className="skeleton skeleton-note" />
-              </div>
-            ))}
-          </div>
-          <div className="skeleton skeleton-toolbar" />
-          <div className="group-list">
-            {[1, 2, 3].map((i) => (
-              <div className="group-card skeleton-group" key={i}>
-                <div className="skeleton skeleton-group-title" />
-                <div className="skeleton skeleton-group-line" />
-                <div className="skeleton skeleton-group-line short" />
-                <div className="skeleton skeleton-group-progress" />
-              </div>
-            ))}
-          </div>
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+          <div style={{ width: '100px', height: '32px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
         </div>
-        <style jsx>{`
-          .groups-page {
-            min-height: 100vh;
-            background: var(--color-bg);
-            color: var(--color-text);
-            padding: 30px 22px 70px;
-          }
-          .groups-shell {
-            max-width: 1180px;
-            margin: 0 auto;
-          }
-          .skeleton {
-            background: linear-gradient(90deg, rgba(0,0,0,0.06), rgba(0,0,0,0.10), rgba(0,0,0,0.06));
-            background-size: 200% 100%;
-            animation: skeletonMove 1.4s infinite;
-            border-radius: 8px;
-          }
-          .skeleton-eyebrow { width: 110px; height: 12px; margin-bottom: 10px; }
-          .skeleton-title { width: 240px; height: 34px; margin-bottom: 10px; }
-          .skeleton-subtitle { width: 330px; height: 14px; }
-          .skeleton-button { width: 125px; height: 42px; border-radius: 10px; }
-          .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 22px; }
-          .skeleton-card { min-height: 125px; padding: 18px; }
-          .skeleton-small { width: 65px; height: 10px; margin-bottom: 16px; }
-          .skeleton-number { width: 90px; height: 25px; margin-bottom: 12px; }
-          .skeleton-note { width: 125px; height: 10px; }
-          .skeleton-toolbar { width: 100%; height: 48px; margin-bottom: 18px; }
-          .group-list { display: grid; gap: 14px; }
-          .skeleton-group { min-height: 190px; padding: 22px; }
-          .skeleton-group-title { width: 210px; height: 22px; margin-bottom: 16px; }
-          .skeleton-group-line { width: 55%; height: 12px; margin-bottom: 10px; }
-          .skeleton-group-line.short { width: 35%; }
-          .skeleton-group-progress { width: 100%; height: 7px; margin-top: 25px; }
-          @keyframes skeletonMove { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-          @media (max-width: 760px) {
-            .groups-page { padding: 20px 14px 60px; }
-            .skeleton-header { flex-direction: column; align-items: flex-start; }
-            .stats-grid { grid-template-columns: repeat(2,1fr); }
-            .skeleton-button { width: 100%; }
-          }
-        `}</style>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.8rem', marginBottom: '1rem' }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+              <div style={{ width: '60%', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div style={{ flex: '1', height: '48px', background: 'var(--cresoa-border)', borderRadius: '14px' }} />
+          <div style={{ width: '140px', height: '48px', background: 'var(--cresoa-border)', borderRadius: '14px' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {[1,2,3].map(i => (
+            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div><div style={{ width: '60%', height: '16px', background: 'var(--cresoa-border)', borderRadius: '6px' }} /><div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} /></div>
+                <div style={{ width: '60px', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
+        <Navigation businessId={businessId} />
       </div>
     )
   }
 
-  // ─── RESTRICTED STATE ────────────────────────────
+  // ─── RESTRICTED ───
   if (!canUseGroups) {
     const isFashion = business?.sector === 'Fashion & Custom Wear'
     return (
-      <div className="groups-page">
-        <div className="groups-shell">
-          <div className="restricted-card">
-            <div className="restricted-icon">
-              <Icon name="users" size={28} stroke="currentColor" />
-            </div>
-            <div className="restricted-content">
-              <div className="section-eyebrow">Orders management</div>
-              <h1>Group Orders</h1>
-              <p>
-                {isFashion
-                  ? 'Group orders are not included in your current plan.'
-                  : 'Group orders are currently available only for Fashion & Custom Wear businesses.'}
-              </p>
-              {isFashion && (
-                <Link href={`/dashboard/subscription?business_id=${businessId}`} className="primary-button">
-                  Upgrade plan
-                </Link>
-              )}
-            </div>
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <Navigation businessId={businessId} />
+        <Card style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '2rem', flexWrap: 'wrap' }}>
+          <div style={{ width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', background: 'rgba(212,165,42,0.12)', color: 'var(--cresoa-accent)' }}>
+            <Icon name="users" size={28} stroke="currentColor" />
           </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Orders management</p>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0' }}>Group Orders</h1>
+            <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 0.8rem' }}>
+              {isFashion
+                ? 'Group orders are not included in your current plan.'
+                : 'Group orders are currently available only for Fashion & Custom Wear businesses.'}
+            </p>
+            {isFashion && (
+              <Link href={`/dashboard/subscription?business_id=${businessId}`} className="cresoa-primary-button" style={{ display: 'inline-block', textDecoration: 'none' }}>
+                Upgrade plan
+              </Link>
+            )}
+          </div>
+        </Card>
+        <div style={{ marginTop: '2rem' }}>
+          <Navigation businessId={businessId} />
         </div>
-        <style jsx>{`
-          .groups-page { min-height: 100vh; background: var(--color-bg); color: var(--color-text); padding: 30px 22px 70px; }
-          .groups-shell { max-width: 1180px; margin: 0 auto; }
-          .restricted-card { display: flex; align-items: center; gap: 24px; padding: 45px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 18px; box-shadow: var(--shadow-sm); }
-          .restricted-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: rgba(212,165,42,0.12); color: var(--color-accent); }
-          .restricted-content { max-width: 520px; }
-          .section-eyebrow { margin-bottom: 8px; color: var(--color-text-muted); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-          .restricted-content h1 { margin: 0 0 10px; font-size: 30px; }
-          .restricted-content p { margin: 0 0 20px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
-          .primary-button { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 9px; background: var(--color-accent); color: #fff; text-decoration: none; font-size: 12px; font-weight: 700; }
-          @media (max-width: 700px) {
-            .restricted-card { flex-direction: column; text-align: center; padding: 30px 20px; }
-          }
-        `}</style>
       </div>
     )
   }
 
-  // ─── MAIN RENDER ──────────────────────────────────
+  // ─── MAIN RENDER ───
   return (
-    <div className="groups-page">
-      <div className="groups-shell">
-        {/* Header */}
-        <header className="page-header">
-          <div className="page-heading">
-            <div className="section-eyebrow">Orders management</div>
-            <h1>Group Orders</h1>
-            <p>Manage group orders, members, payments and delivery progress in one place.</p>
-          </div>
-          <Link href={`/dashboard/groups/new?business_id=${businessId || ''}`} className="new-group-button">
-            <Icon name="plus" size={16} stroke="#fff" />
-            <span>New group</span>
-          </Link>
-        </header>
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+      <Navigation businessId={businessId} />
 
-        {/* Stats */}
-        <section className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-top">
-              <span className="stat-label">Groups</span>
-              <span className="stat-icon"><Icon name="users" size={15} stroke="currentColor" /></span>
-            </div>
-            <div className="stat-value">{stats.totalGroups}</div>
-            <div className="stat-note">{filteredGroups.length} currently shown</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-top">
-              <span className="stat-label">Members</span>
-              <span className="stat-icon"><Icon name="user" size={15} stroke="currentColor" /></span>
-            </div>
-            <div className="stat-value">{stats.totalMembers}</div>
-            <div className="stat-note">
-              {memberLimit > 0
-                ? `${Math.max(0, memberLimit - stats.totalMembers)} member slots available`
-                : 'Across all groups'}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-top">
-              <span className="stat-label">Outstanding</span>
-              <span className="stat-icon danger-icon">₦</span>
-            </div>
-            <div className="stat-value money">{formatMoney(stats.totalBalance)}</div>
-            <div className="stat-note">Balance still owed</div>
-          </div>
-          <div className="stat-card progress-stat">
-            <div className="stat-top">
-              <span className="stat-label">Delivery progress</span>
-              <span className="progress-percent">{stats.progress}%</span>
-            </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${stats.progress}%` }} />
-            </div>
-            <div className="stat-note">
-              {stats.totalDelivered} of {stats.totalOrders} orders delivered
-            </div>
-          </div>
-        </section>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Orders management</p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Group Orders</h1>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>Manage group orders, members, payments and delivery progress in one place.</p>
+        </div>
+        <Link href={`/dashboard/groups/new?business_id=${businessId || ''}`} className="cresoa-primary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}>
+          <Icon name="plus" size={14} stroke="#fff" /> New group
+        </Link>
+      </div>
 
-        {/* Toolbar */}
-        <section className="groups-toolbar">
-          <div className="search-box">
-            <Icon name="search" size={15} stroke="currentColor" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search groups or coordinator"
-              aria-label="Search groups or coordinator"
-            />
-            {search && (
-              <button type="button" className="clear-search" onClick={() => setSearch('')} aria-label="Clear search">
-                ×
-              </button>
-            )}
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+        <Card style={{ padding: '0.6rem 0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Groups</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-accent)' }}>
+              <Icon name="users" size={14} stroke="currentColor" />
+            </span>
           </div>
-          <div className="filter-tabs" role="tablist">
-            {[
-              ['all', 'All'],
-              ['pending', 'Pending'],
-              ['active', 'Active'],
-              ['completed', 'Completed'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={statusFilter === value}
-                className={`filter-tab ${statusFilter === value ? 'selected' : ''}`}
-                onClick={() => setStatusFilter(value)}
-              >
-                {label}
-              </button>
-            ))}
+          <div style={{ fontWeight: 700, fontSize: '1.3rem', marginTop: '0.2rem' }}>{stats.totalGroups}</div>
+          <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem' }}>{filteredGroups.length} currently shown</div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Members</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-accent)' }}>
+              <Icon name="user" size={14} stroke="currentColor" />
+            </span>
           </div>
-        </section>
+          <div style={{ fontWeight: 700, fontSize: '1.3rem', marginTop: '0.2rem' }}>{stats.totalMembers}</div>
+          <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem' }}>
+            {memberLimit > 0
+              ? `${Math.max(0, memberLimit - stats.totalMembers)} member slots available`
+              : 'Across all groups'}
+          </div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Outstanding</span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-danger)', fontWeight: 700 }}>₦</span>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', marginTop: '0.2rem', color: 'var(--cresoa-danger)' }}>{formatMoney(stats.totalBalance)}</div>
+          <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem' }}>Balance still owed</div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Delivery</span>
+            <span style={{ color: 'var(--cresoa-success)', fontSize: '0.85rem', fontWeight: 700 }}>{stats.progress}%</span>
+          </div>
+          <div style={{ height: '6px', borderRadius: '99px', background: 'var(--cresoa-bg)', overflow: 'hidden', marginTop: '0.2rem' }}>
+            <div style={{ height: '100%', borderRadius: 'inherit', background: 'var(--cresoa-success)', width: `${stats.progress}%`, transition: 'width 0.3s' }} />
+          </div>
+          <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', marginTop: '0.2rem' }}>
+            {stats.totalDelivered} of {stats.totalOrders} orders delivered
+          </div>
+        </Card>
+      </div>
 
-        {/* Results count */}
-        <div className="results-row">
-          <div>
-            <strong>{filteredGroups.length}</strong> {filteredGroups.length === 1 ? 'group' : 'groups'}
-          </div>
-          {(search || statusFilter !== 'all') && (
-            <button type="button" className="reset-filters" onClick={() => { setSearch(''); setStatusFilter('all'); }}>
-              Clear filters
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+        <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
+          <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
+          <input
+            type="text"
+            placeholder="Search groups or coordinator..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+              <Icon name="x" size={16} stroke="currentColor" />
             </button>
           )}
         </div>
+        <div style={{ display: 'flex', gap: '0.2rem', padding: '0.2rem', background: 'var(--cresoa-bg)', borderRadius: '8px' }}>
+          {[
+            ['all', 'All'],
+            ['pending', 'Pending'],
+            ['active', 'Active'],
+            ['completed', 'Completed'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setStatusFilter(value)}
+              style={{
+                padding: '0.2rem 0.8rem',
+                borderRadius: '6px',
+                border: 0,
+                background: statusFilter === value ? 'var(--cresoa-surface)' : 'transparent',
+                color: statusFilter === value ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)',
+                fontWeight: statusFilter === value ? 700 : 400,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                boxShadow: statusFilter === value ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                transition: 'background 0.15s, color 0.15s'
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-  {/* Group list or empty state */}
-        {filteredGroups.length === 0 ? (
-          <section className="empty-state">
-            <div className="empty-icon">
-              <Icon name="users" size={28} stroke="currentColor" />
-            </div>
-            <h2>{groups.length === 0 ? 'No groups yet' : 'No matching groups'}</h2>
-            <p>
-              {groups.length === 0
-                ? 'Create your first group to manage Aso-Ebi, bulk orders and coordinated deliveries.'
-                : 'Try a different search term or remove the current filter.'}
-            </p>
-            {groups.length === 0 ? (
-              <Link href={`/dashboard/groups/new?business_id=${businessId || ''}`} className="empty-action">
-                <Icon name="plus" size={15} stroke="#fff" /> Create your first group
-              </Link>
-            ) : (
-              <button type="button" className="empty-action" onClick={() => { setSearch(''); setStatusFilter('all'); }}>
-                Show all groups
-              </button>
-            )}
-          </section>
-        ) : (
-          <section className="group-list">
-            {filteredGroups.map((group) => {
-              const memberCount = Number(group.memberCount || 0)
-              const deliveredCount = Number(group.deliveredCount || 0)
-              const groupProgress = memberCount > 0 ? Math.round((deliveredCount / memberCount) * 100) : 0
-              const status = String(group.status || 'pending').toLowerCase()
-              const isOverdue = group.due_date && new Date(`${group.due_date}T23:59:59`) < new Date() && status !== 'completed'
-              const coordinator = group.coordinator?.name ||
-                [group.coordinator?.first_name, group.coordinator?.last_name].filter(Boolean).join(' ') ||
-                'No coordinator'
-
-              return (
-                <article className="group-card" key={group.id}>
-                  <div className="group-card-main">
-                    <div className="group-card-heading">
-                      <div>
-                        <h2>{group.group_name}</h2>
-                        <div className="coordinator">Coordinator: <strong>{coordinator}</strong></div>
-                      </div>
-                      <span className={`status-badge status-${status}`}>
-                        <span className="status-dot" />
-                        {getStatusLabel(status)}
-                      </span>
-                    </div>
-
-                    <div className="group-details">
-                      <div className="detail-item">
-                        <span className="detail-label">Members</span>
-                        <strong>
-                          {memberCount}
-                          {memberLimit > 0 && ` / ${memberLimit}`}
-                        </strong>
-                      </div>
-                      <div className="detail-item">
-                        <span className="detail-label">Outstanding</span>
-                        <strong className={Number(group.totalBalance) > 0 ? 'amount-due' : 'amount-paid'}>
-                          {formatMoney(group.totalBalance)}
-                        </strong>
-                      </div>
-                      <div className="detail-item">
-                        <span className="detail-label">Due date</span>
-                        <strong className={isOverdue ? 'overdue' : ''}>
-                          {isOverdue && '⚠ '}{formatDate(group.due_date)}
-                        </strong>
-                      </div>
-                      <div className="detail-item">
-                        <span className="detail-label">Delivery</span>
-                        <strong>{groupProgress}%</strong>
-                      </div>
-                    </div>
-
-                    <div className="delivery-progress">
-                      <div className="delivery-progress-head">
-                        <span>Delivery progress</span>
-                        <span>{deliveredCount} of {memberCount} delivered</span>
-                      </div>
-                      <div className="progress-track large">
-                        <div className="progress-fill" style={{ width: `${groupProgress}%` }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="group-card-actions">
-                    <Link href={`/dashboard/groups/${group.id}?business_id=${businessId || ''}`} className="card-action primary-action">
-                      View group
-                    </Link>
-                    <Link href={`/dashboard/groups/${group.id}/edit?business_id=${businessId || ''}`} className="card-action">
-                      Edit
-                    </Link>
-                    <button
-                      type="button"
-                      className="card-action delete-action"
-                      disabled={deletingId === group.id}
-                      onClick={() => handleDelete(group)}
-                    >
-                      {deletingId === group.id ? 'Deleting…' : 'Delete'}
-                    </button>
-                  </div>
-                </article>
-              )
-            })}
-          </section>
+          {/* Results */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>
+          <strong style={{ color: 'var(--cresoa-text)' }}>{filteredGroups.length}</strong> {filteredGroups.length === 1 ? 'group' : 'groups'}
+        </span>
+        {(search || statusFilter !== 'all') && (
+          <button onClick={() => { setSearch(''); setStatusFilter('all') }} style={{ background: 'none', border: 0, color: 'var(--cresoa-accent)', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
+            Clear filters
+          </button>
         )}
       </div>
 
-      <style jsx>{`
-        .groups-page {
-          min-height: 100%;
-          padding: 28px 22px 48px;
-          background: var(--color-bg);
-          color: var(--color-text);
-        }
-        .groups-shell {
-          max-width: 1180px;
-          margin: 0 auto;
-        }
-        .page-header {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 24px;
-          margin-bottom: 24px;
-        }
-        .page-heading {
-          min-width: 0;
-        }
-        .section-eyebrow {
-          margin-bottom: 7px;
-          color: var(--color-accent);
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: .12em;
-          text-transform: uppercase;
-        }
-        .page-heading h1 {
-          margin: 0;
-          font-size: 28px;
-          font-weight: 750;
-          letter-spacing: -0.025em;
-          line-height: 1.15;
-        }
-        .page-heading p {
-          max-width: 620px;
-          margin: 8px 0 0;
-          color: var(--color-text-muted);
-          font-size: 13px;
-          line-height: 1.55;
-        }
-        .new-group-button {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          min-height: 38px;
-          padding: 0 15px;
-          border: 1px solid var(--color-accent);
-          border-radius: 8px;
-          background: var(--color-accent);
-          color: #fff;
-          font-size: 12px;
-          font-weight: 700;
-          text-decoration: none;
-          box-shadow: 0 2px 8px rgba(212,165,42,0.2);
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        .new-group-button:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 14px rgba(212,165,42,0.3);
-              }
+      {/* Group List */}
+      {filteredGroups.length === 0 ? (
+        <Card style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', margin: '0 auto 0.8rem', borderRadius: '16px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-accent)' }}>
+            <Icon name="users" size={28} stroke="currentColor" />
+          </div>
+          <h3 style={{ margin: '0 0 0.3rem', fontSize: '1.1rem' }}>{groups.length === 0 ? 'No groups yet' : 'No matching groups'}</h3>
+          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem', fontSize: '0.85rem' }}>
+            {groups.length === 0
+              ? 'Create your first group to manage Aso-Ebi, bulk orders and coordinated deliveries.'
+              : 'Try a different search term or remove the current filter.'}
+          </p>
+          {groups.length === 0 ? (
+            <Link href={`/dashboard/groups/new?business_id=${businessId || ''}`} className="cresoa-primary-button" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}>
+              <Icon name="plus" size={14} stroke="#fff" /> Create your first group
+            </Link>
+          ) : (
+            <button onClick={() => { setSearch(''); setStatusFilter('all') }} className="cresoa-primary-button" style={{ background: 'var(--cresoa-primary)' }}>
+              Show all groups
+            </button>
+          )}
+        </Card>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {filteredGroups.map((group) => {
+            const memberCount = Number(group.memberCount || 0)
+            const deliveredCount = Number(group.deliveredCount || 0)
+            const groupProgress = memberCount > 0 ? Math.round((deliveredCount / memberCount) * 100) : 0
+            const status = String(group.status || 'pending').toLowerCase()
+            const isOverdue = group.due_date && new Date(`${group.due_date}T23:59:59`) < new Date() && status !== 'completed'
+            const coordinator = group.coordinator?.name ||
+              [group.coordinator?.first_name, group.coordinator?.last_name].filter(Boolean).join(' ') ||
+              'No coordinator'
 
-              /* Stats */
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-        .stat-card {
-          padding: 16px;
-          border: 1px solid var(--color-border);
-          border-radius: 12px;
-          background: var(--color-card);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        }
-        .stat-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .stat-label {
-          color: var(--color-text-muted);
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: .06em;
-          text-transform: uppercase;
-        }
-        .stat-icon {
-          display: grid;
-          place-items: center;
-          width: 28px;
-          height: 28px;
-          border: 1px solid var(--color-border);
-          border-radius: 8px;
-          background: var(--color-bg);
-          color: var(--color-accent);
-          font-weight: 700;
-        }
-        .danger-icon {
-          color: var(--color-danger);
-        }
-        .stat-value {
-          margin-top: 10px;
-          font-size: 24px;
-          font-weight: 750;
-          line-height: 1.1;
-        }
-        .stat-value.money {
-          font-size: 20px;
-        }
-        .stat-note {
-          margin-top: 6px;
-          color: var(--color-text-muted);
-          font-size: 10px;
-        }
-        .progress-stat .stat-top {
-          margin-bottom: 12px;
-        }
-        .progress-percent {
-          color: var(--color-success);
-          font-size: 13px;
-          font-weight: 700;
-        }
-        .progress-track {
-          height: 6px;
-          border-radius: 999px;
-          background: var(--color-bg);
-          overflow: hidden;
-        }
-        .progress-fill {
-          height: 100%;
-          border-radius: inherit;
-          background: var(--color-success);
-          transition: width 0.3s ease;
-        }
+            return (
+              <Card key={group.id} style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>{group.group_name}</h3>
+                      <StatusPill status={getStatusLabel(status)} />
+                    </div>
+                    <p style={{ margin: '0.2rem 0 0', color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>
+                      Coordinator: <strong style={{ color: 'var(--cresoa-text)' }}>{coordinator}</strong>
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Link href={`/dashboard/groups/${group.id}?business_id=${businessId || ''}`} className="cresoa-primary-button" style={{ textDecoration: 'none', fontSize: '0.75rem', padding: '0.2rem 0.8rem' }}>
+                      View
+                    </Link>
+                    <Link href={`/dashboard/groups/${group.id}/edit?business_id=${businessId || ''}`} style={{ padding: '0.2rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}>
+                      Edit
+                    </Link>
+                    <button onClick={() => handleDelete(group)} disabled={deletingId === group.id} style={{ padding: '0.2rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', opacity: deletingId === group.id ? 0.5 : 1 }}>
+                      {deletingId === group.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
 
-        /* Toolbar */
-        .groups-toolbar {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 14px;
-          border: 1px solid var(--color-border);
-          border-radius: 10px;
-          background: var(--color-card);
-          margin-bottom: 10px;
-        }
-        .search-box {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex: 1;
-          max-width: 420px;
-          padding: 0 10px;
-          border: 1px solid var(--color-border);
-          border-radius: 8px;
-          background: var(--color-bg);
-          min-height: 36px;
-          color: var(--color-text-muted);
-        }
-        .search-box:focus-within {
-          border-color: var(--color-accent);
-          box-shadow: 0 0 0 3px rgba(212,165,42,0.1);
-        }
-        .search-box input {
-          width: 100%;
-          border: 0;
-          outline: 0;
-          background: transparent;
-          color: var(--color-text);
-          font-size: 11px;
-        }
-        .clear-search {
-          display: grid;
-          place-items: center;
-          width: 20px;
-          height: 20px;
-          border: 0;
-          border-radius: 50%;
-          background: var(--color-border);
-          color: var(--color-text-muted);
-          cursor: pointer;
-          font-size: 14px;
-          line-height: 1;
-        }
-        .filter-tabs {
-          display: flex;
-          gap: 3px;
-          padding: 3px;
-          background: var(--color-bg);
-          border-radius: 8px;
-        }
-        .filter-tab {
-          padding: 0 12px;
-          min-height: 30px;
-          border: 0;
-          border-radius: 6px;
-          background: transparent;
-          color: var(--color-text-muted);
-          font-size: 10px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: background 0.15s, color 0.15s;
-        }
-        .filter-tab:hover {
-          color: var(--color-text);
-        }
-        .filter-tab.selected {
-          background: var(--color-card);
-          color: var(--color-text);
-          box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-        }
-        .results-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          min-height: 28px;
-          margin-bottom: 10px;
-          font-size: 10px;
-          color: var(--color-text-muted);
-        }
-        .results-row strong {
-          color: var(--color-text);
-          font-weight: 700;
-        }
-        .reset-filters {
-          border: 0;
-          background: transparent;
-          color: var(--color-accent);
-          font-weight: 700;
-          cursor: pointer;
-          font-size: 10px;
-        }
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginTop: '0.8rem' }}>
+                  <div>
+                    <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Members</div>
+                    <div style={{ fontWeight: 600 }}>{memberCount}{memberLimit > 0 && ` / ${memberLimit}`}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Outstanding</div>
+                    <div style={{ fontWeight: 600, color: Number(group.totalBalance) > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+                      {formatMoney(group.totalBalance)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Due date</div>
+                    <div style={{ fontWeight: 600, color: isOverdue ? 'var(--cresoa-danger)' : 'var(--cresoa-text)' }}>
+                      {isOverdue && '⚠ '}{formatDate(group.due_date)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Delivery</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <div style={{ flex: 1, height: '6px', borderRadius: '99px', background: 'var(--cresoa-bg)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 'inherit', background: 'var(--cresoa-success)', width: `${groupProgress}%`, transition: 'width 0.3s' }} />
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: '0.8rem' }}>{groupProgress}%</span>
+                    </div>
+                    <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem' }}>{deliveredCount} of {memberCount} delivered</div>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
-        /* Group Cards */
-        .group-list {
-          display: grid;
-          gap: 12px;
-        }
-        .group-card {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 18px;
-          padding: 18px 20px;
-          border: 1px solid var(--color-border);
-          border-radius: 14px;
-          background: var(--color-card);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-          transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
-        }
-        .group-card:hover {
-          border-color: rgba(212,165,42,0.4);
-          box-shadow: 0 6px 20px rgba(0,0,0,0.06);
-          transform: translateY(-2px);
-        }
-        .group-card-main {
-          min-width: 0;
-        }
-        .group-card-heading {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 12px;
-        }
-        .group-card-heading h2 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 750;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .coordinator {
-          margin-top: 4px;
-          color: var(--color-text-muted);
-          font-size: 11px;
-        }
-        .coordinator strong {
-          color: var(--color-text);
-          font-weight: 600;
-        }
-
-        /* Status badge */
-        .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 0 10px;
-          min-height: 24px;
-          border-radius: 999px;
-          border: 1px solid var(--color-border);
-          background: var(--color-bg);
-          color: var(--color-text-muted);
-          font-size: 9px;
-          font-weight: 700;
-          text-transform: capitalize;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-        .status-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: currentColor;
-        }
-        .status-active { color: var(--color-success); }
-        .status-completed { color: var(--color-accent); }
-        .status-pending { color: var(--color-text-muted); }
-
-        /* Details */
-        .group-details {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-          margin-top: 14px;
-        }
-        .detail-item {
-          min-width: 0;
-        }
-        .detail-label {
-          display: block;
-          margin-bottom: 4px;
-          color: var(--color-text-muted);
-          font-size: 9px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: .04em;
-        }
-        .detail-item strong {
-          display: block;
-          font-size: 12px;
-          font-weight: 700;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .amount-due { color: var(--color-danger); }
-        .amount-paid { color: var(--color-success); }
-        .overdue { color: var(--color-danger); }
-
-        /* Progress inside card */
-        .delivery-progress {
-          margin-top: 14px;
-        }
-        .delivery-progress-head {
-          display: flex;
-          justify-content: space-between;
-          font-size: 9px;
-          color: var(--color-text-muted);
-          margin-bottom: 4px;
-        }
-        .progress-track.large {
-          height: 7px;
-        }
-
-        /* Actions */
-        .group-card-actions {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 6px;
-          padding-left: 16px;
-          border-left: 1px solid var(--color-border);
-          min-width: 90px;
-        }
-        .card-action {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 30px;
-          padding: 0 10px;
-          border: 1px solid var(--color-border);
-          border-radius: 8px;
-          background: var(--color-bg);
-          color: var(--color-text-muted);
-          font-size: 10px;
-          font-weight: 700;
-          text-decoration: none;
-          cursor: pointer;
-          transition: border-color 0.15s, background 0.15s, color 0.15s;
-        }
-        .card-action:hover {
-          border-color: var(--color-accent);
-          color: var(--color-text);
-        }
-        .primary-action {
-          border-color: var(--color-accent);
-          background: var(--color-accent);
-          color: #fff;
-        }
-        .primary-action:hover {
-          background: #c49a2a;
-          border-color: #c49a2a;
-          color: #fff;
-        }
-        .delete-action {
-          border-color: transparent;
-          background: transparent;
-          color: var(--color-danger);
-        }
-        .delete-action:hover {
-          background: rgba(217,83,79,0.06);
-          border-color: rgba(217,83,79,0.2);
-        }
-        .delete-action:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        /* Empty state */
-        .empty-state {
-          display: grid;
-          justify-items: center;
-          padding: 60px 24px;
-          border: 1px dashed var(--color-border);
-          border-radius: 14px;
-          background: var(--color-card);
-          text-align: center;
-        }
-        .empty-icon {
-          display: grid;
-          place-items: center;
-          width: 56px;
-          height: 56px;
-          border-radius: 16px;
-          border: 1px solid var(--color-border);
-          background: var(--color-bg);
-          color: var(--color-accent);
-          margin-bottom: 16px;
-        }
-        .empty-state h2 {
-          margin: 0;
-          font-size: 18px;
-          font-weight: 750;
-        }
-        .empty-state p {
-          max-width: 420px;
-          margin: 8px 0 20px;
-          color: var(--color-text-muted);
-          font-size: 12px;
-          line-height: 1.6;
-        }
-         .empty-action {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          min-height: 36px;
-          padding: 0 16px;
-          border: 0;
-          border-radius: 8px;
-          background: var(--color-accent);
-          color: #fff;
-          font-size: 11px;
-          font-weight: 700;
-          text-decoration: none;
-          cursor: pointer;
-        }
-
-        /* Responsive */
-        @media (max-width: 860px) {
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .group-details {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .group-card {
-            grid-template-columns: 1fr;
-            gap: 14px;
-          }
-          .group-card-actions {
-            flex-direction: row;
-            flex-wrap: wrap;
-            border-left: 0;
-            padding-left: 0;
-            padding-top: 12px;
-            border-top: 1px solid var(--color-border);
-            justify-content: flex-start;
-          }
-          .card-action {
-            flex: 1;
-            min-width: 70px;
-          }
-          .groups-toolbar {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .search-box {
-            max-width: 100%;
-          }
-          .filter-tabs {
-            justify-content: center;
-          }
-        }
-        @media (max-width: 480px) {
-          .groups-page {
-            padding: 16px 12px 40px;
-          }
-          .page-header {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-          .page-heading h1 {
-            font-size: 22px;
-          }
-          .stats-grid {
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-          }
-          .stat-card {
-            padding: 12px;
-          }
-          .stat-value {
-            font-size: 18px;
-          }
-          .group-card {
-            padding: 14px;
-          }
-          .group-card-heading h2 {
-            font-size: 14px;
-          }
-          .group-details {
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-          }
-          .detail-item strong {
-            font-size: 11px;
-          }
-          .group-card-actions {
-            flex-wrap: wrap;
-          }
-          .card-action {
-            flex: 1 0 auto;
-          }
-        }
-      `}</style>
+      <div style={{ marginTop: '2rem' }}>
+        <Navigation businessId={businessId} />
+      </div>
     </div>
   )
 }
