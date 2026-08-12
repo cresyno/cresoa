@@ -14,6 +14,7 @@ import { StatusPill } from '../../../components/StatusPill'
 import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
+import { ActionCenter } from '../../../components/ActionCenter'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -52,6 +53,31 @@ function getProductionCounts(orders) {
   return counts
 }
 
+// Build action items
+function getActionItems(orders, customers) {
+  return orders
+    .filter(o => {
+      const status = String(o.current_status || '').toLowerCase()
+      return safeAmount(o.balance) > 0 ||
+        status === 'order placed' ||
+        status === 'fitting' ||
+        status === 'alteration'
+    })
+    .slice(0, 5)
+    .map(o => {
+      const name = getOrderCustomerName(o, customers)
+      return {
+        id: o.id,
+        customerName: name,
+        amount: o.balance,
+        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+        status: o.current_status,
+        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+        order: o
+      }
+    })
+}
+
 // ============================================================
 // DASHBOARD SHELL
 // ============================================================
@@ -87,10 +113,15 @@ function FashionDashboard({ businessId }) {
   const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
   const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
   const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
+  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
 
   const navigate = (path) => {
     const sep = path.includes('?') ? '&' : '?'
     router.push(`${path}${sep}business_id=${businessId}`)
+  }
+
+  const handleOrderClick = (item) => {
+    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
   }
 
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
@@ -116,7 +147,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* ✅ KpiCards from shared components */}
+        {/* KpiCards */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
@@ -124,7 +155,24 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
-        {/* Production Pipeline */}
+        {/* ✅ ActionCenter */}
+        <div style={{ marginTop: 16 }}>
+          <Card>
+            <SectionHeader
+              title="Action Required"
+              subtitle={`${actionItems.length} item${actionItems.length > 1 ? 's' : ''} need your attention`}
+              action="View all"
+              onAction={() => navigate('/dashboard/orders')}
+            />
+            <ActionCenter
+              items={actionItems}
+              onActionClick={handleOrderClick}
+              onViewAll={() => navigate('/dashboard/orders')}
+            />
+          </Card>
+        </div>
+
+        {/* Production Pipeline (inline) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -158,7 +206,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ✅ Test: EmptyState (still here for confirmation) */}
+        {/* ✅ Keep EmptyState test for now */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
