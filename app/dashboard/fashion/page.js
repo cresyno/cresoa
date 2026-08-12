@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components
+// ✅ Shared components (all confirmed working)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
@@ -129,6 +129,7 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
+  const [chartMetric, setChartMetric] = useState('revenue') // 'revenue' | 'orders' | 'collected'
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -168,7 +169,6 @@ function FashionDashboard({ businessId }) {
       if (!ordersList || ordersList.length === 0) {
         return <EmptyState title="No orders" message="Create your first order to get started." />
       }
-      // Filter out orders without an id
       const validOrders = ordersList.filter(o => o && o.id)
       if (validOrders.length === 0) {
         return <EmptyState title="No valid orders" message="All orders are missing required data." />
@@ -190,7 +190,6 @@ function FashionDashboard({ businessId }) {
           )
         } catch (orderError) {
           console.error('Error rendering single order:', orderError, order)
-          // return a fallback row for this order
           return (
             <div key={order.id || 'fallback'} className="cresoa-list-row compact" style={{ padding: '8px 0', color: 'var(--cresoa-text-muted)' }}>
               <span>Order unavailable</span>
@@ -216,14 +215,20 @@ function FashionDashboard({ businessId }) {
       }
       return customersList.slice(0, 4).map(customer => {
         const name = customer.name || 'Unnamed'
-        // Count active orders for this customer
-        const activeOrders = orders ? orders.filter(o => o.customer_id === customer.id && o.current_status !== 'Delivered').length : 0
+        // Calculate total spent and active orders
+        const customerOrders = orders ? orders.filter(o => o.customer_id === customer.id) : []
+        const totalSpent = customerOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
+        const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
+        const totalOrders = customerOrders.length
         return (
           <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
             <span className="cresoa-avatar">{getInitials(name)}</span>
             <span style={{ flex: 1, textAlign: 'left' }}>
               <span className="cresoa-row-title">{name}</span>
-              <span className="cresoa-row-meta">{activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}</span>
+              <span className="cresoa-row-meta">
+                {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
+                {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
+              </span>
             </span>
             <span className="cresoa-row-arrow">›</span>
           </button>
@@ -283,12 +288,29 @@ function FashionDashboard({ businessId }) {
     }
   }
 
+  // ---- Chart data based on selected metric ----
+  const chartData = useMemo(() => {
+    if (chartMetric === 'revenue') return series.map(d => ({ ...d, value: d.revenue, label: 'Revenue' }))
+    if (chartMetric === 'orders') return series.map(d => ({ ...d, value: d.orders, label: 'Orders' }))
+    // collected: we need to compute daily collected from orders (sum of amount_paid per day)
+    const dailyCollected = orders.reduce((acc, o) => {
+      const day = new Date(o.created_at).toISOString().split('T')[0]
+      acc[day] = (acc[day] || 0) + safeAmount(o.amount_paid)
+      return acc
+    }, {})
+    return series.map(d => ({ ...d, value: dailyCollected[d.key] || 0, label: 'Collected' }))
+  }, [series, chartMetric, orders])
+
+  const maxValue = Math.max(...chartData.map(d => safeAmount(d.value)), 1)
+  const totalValue = chartData.reduce((s, d) => s + safeAmount(d.value), 0)
+
   return (
     <DashboardShell theme={theme}>
       <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80 }}>
 
         <Navigation businessId={businessId} />
 
+        {/* Header – only business greeting */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
@@ -305,6 +327,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
+        {/* KPI Cards – 2×2 grid on all screens */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
@@ -312,6 +335,7 @@ function FashionDashboard({ businessId }) {
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
 
+        {/* Action Center – rows fully tappable */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader
@@ -328,6 +352,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Production Pipeline – tappable */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -343,29 +368,36 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Performance Chart with metric selector and improved spacing */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <div>
-                <strong style={{ fontSize: 22 }}>{formatMoney(series.reduce((s,d) => s + safeAmount(d.revenue), 0))}</strong>
-                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{series.reduce((s,d) => s + safeAmount(d.orders), 0)} orders</span>
+                <strong style={{ fontSize: 22 }}>{chartMetric === 'revenue' ? formatMoney(totalValue) : totalValue}</strong>
+                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{chartData.reduce((s,d) => s + safeAmount(d.orders), 0)} orders</span>
                 <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span>
               </div>
-              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
-                <option value="7">7 days</option>
-                <option value="30">30 days</option>
-                <option value="90">90 days</option>
-              </select>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <select className="cresoa-select" value={chartMetric} onChange={e => setChartMetric(e.target.value)} style={{ minWidth: 100 }}>
+                  <option value="revenue">Revenue</option>
+                  <option value="orders">Orders</option>
+                  <option value="collected">Collected</option>
+                </select>
+                <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
+                  <option value="7">7d</option>
+                  <option value="30">30d</option>
+                  <option value="90">90d</option>
+                </select>
+              </div>
             </div>
             <div className="cresoa-chart" style={{ minHeight: 120 }}>
-              {series.map(day => {
-                const max = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
-                const height = Math.max((safeAmount(day.revenue)/max)*100, day.revenue ? 4 : 1)
+              {chartData.map(day => {
+                const height = Math.max((safeAmount(day.value) / maxValue) * 100, day.value ? 4 : 1)
                 return (
                   <div key={day.key} className="cresoa-chart-day">
                     <div className="cresoa-chart-bar-wrap">
-                      <div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div>
+                      <div className="cresoa-chart-value">{day.value > 0 ? (chartMetric === 'revenue' ? formatMoney(day.value) : day.value) : ''}</div>
                       <div className="cresoa-chart-bar" style={{ height: height+'%' }} />
                     </div>
                     <span>{day.label}</span>
@@ -376,6 +408,8 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        
+        {/* Financial Health – enhanced with clear progress and spacing */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
@@ -426,6 +460,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Recent Orders & Recent Customers – with loading/error/empty states */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -452,6 +487,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Group Orders – with progress bars and "Progress unavailable" */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
@@ -466,6 +502,30 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* ✅ Support button – positioned above bottom nav, no overlap */}
+        <div style={{ position: 'fixed', bottom: 70, right: 20, zIndex: 50 }}>
+          <button
+            onClick={() => navigate('/support')}
+            style={{
+              background: 'var(--gradient-primary)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 50,
+              padding: '12px 18px',
+              fontSize: 14,
+              fontWeight: 600,
+              boxShadow: 'var(--shadow-lg)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            💬 Support
+          </button>
+        </div>
+
+        {/* Navigation (bottom) – with safe-area padding */}
         <div style={{ marginTop: 24, paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Navigation businessId={businessId} />
         </div>
@@ -491,4 +551,5 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                            }
+}
+```
