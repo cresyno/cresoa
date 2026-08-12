@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Icon } from './Icon'  // adjust path if needed
 
 export function Navigation({ businessId }) {
   const pathname = usePathname()
@@ -17,10 +16,10 @@ export function Navigation({ businessId }) {
   }, [])
 
   const navItems = [
-    { icon: 'home', label: 'Home', path: '/dashboard/fashion' },
-    { icon: 'orders', label: 'Orders', path: '/dashboard/orders' },
-    { icon: 'production', label: 'Production', path: '/dashboard/production' },
-    { icon: 'customers', label: 'Customers', path: '/dashboard/customers' },
+    { icon: '🏠', label: 'Home', path: '/dashboard/fashion' },
+    { icon: '📦', label: 'Orders', path: '/dashboard/orders' },
+    { icon: '🧵', label: 'Production', path: '/dashboard/production' },
+    { icon: '👥', label: 'Customers', path: '/dashboard/customers' },
   ]
 
   const navigate = (path) => {
@@ -30,12 +29,11 @@ export function Navigation({ businessId }) {
 
   if (isDesktop) {
     return (
-      <nav className="cresoa-nav-desktop" style={{ display: 'flex', gap: 16, padding: '8px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+      <nav style={{ display: 'flex', gap: 16, padding: '8px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
         {navItems.map(item => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
-            className={`cresoa-nav-link ${pathname.startsWith(item.path) ? 'active' : ''}`}
             style={{
               background: 'transparent',
               border: 0,
@@ -48,7 +46,7 @@ export function Navigation({ businessId }) {
               gap: 6
             }}
           >
-            <Icon name={item.icon} size={20} />
+            <span style={{ fontSize: 20 }}>{item.icon}</span>
             <span>{item.label}</span>
           </button>
         ))}
@@ -57,12 +55,11 @@ export function Navigation({ businessId }) {
   }
 
   return (
-    <nav className="cresoa-nav-bottom" style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }}>
+    <nav style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)' }}>
       {navItems.map(item => (
         <button
           key={item.path}
           onClick={() => navigate(item.path)}
-          className={`cresoa-nav-link ${pathname.startsWith(item.path) ? 'active' : ''}`}
           style={{
             background: 'transparent',
             border: 0,
@@ -76,7 +73,7 @@ export function Navigation({ businessId }) {
             fontWeight: pathname.startsWith(item.path) ? 700 : 400
           }}
         >
-          <Icon name={item.icon} size={24} />
+          <span style={{ fontSize: 24 }}>{item.icon}</span>
           <span>{item.label}</span>
         </button>
       ))}
