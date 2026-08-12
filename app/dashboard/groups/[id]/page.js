@@ -10,7 +10,7 @@ import { SectionHeader } from '../../../../components/SectionHeader'
 import { StatusPill } from '../../../../components/StatusPill'
 import { Navigation } from '../../../../components/Navigation'
 import { isFeatureAvailable, getPlanLimits } from '../../../../lib/planLimits'
-import '../../../globals.css'
+import '../../../../globals.css'
 
 const EMPTY_MEMBER = {
   customer_id: '',
@@ -246,26 +246,15 @@ export default function GroupDetailPage() {
     if (existing) return existing.id
 
     const payload = { business_id: businessId, first_name, last_name: last_name || null, phone: phone || null, name }
-    const { data: created, error: createError } = await supabase
-  .from('customers')
-  .insert(payload)
-  .select('id')
-  .single()
-
-if (createError) {
-  // fallback attempt returning the inserted id
-  const { data: fallback, error: fallbackError } = await supabase
-    .from('customers')
-    .insert({ business_id: businessId, first_name, last_name: last_name || null, phone: phone || null })
-    .select('id')
-    .single()
-
-  if (fallbackError) throw fallbackError
-  if (!fallback?.id) throw new Error('Customer was created but no ID returned.')
-  return fallback.id
-}
-if (!created?.id) throw new Error('Customer was created but no ID returned.')
-return created.id
+    const { data: created, error: createError } = await supabase.from('customers').insert(payload).select('id').single()
+    if (createError) {
+      const { data: fallback, error: fallbackError } = await supabase.from('customers').insert({ business_id: businessId, first_name, last_name: last_name || null, phone: phone || null }).select('id').single()
+      if (fallbackError) throw fallbackError
+      if (!fallback?.id) throw new Error('Customer was created but no ID returned.')
+      return fallback.id
+    }
+    if (!created?.id) throw new Error('Customer was created but no ID returned.')
+    return created.id
   }
 
   const saveMember = async (event) => {
@@ -440,7 +429,7 @@ return created.id
         </div>
       )}
 
-      {/* Stats */}
+           {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
           <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
@@ -573,7 +562,7 @@ return created.id
                             <button onClick={() => openEditMember(member)} title="Edit member" style={{ padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
                               <Icon name="edit-2" size={14} stroke="currentColor" />
                             </button>
-                            <button onClick={() => handleDeleteMember(member.id)} title="Remove member" style={{ padding: '0.2rem 0.4rem', borderRadius': '4px', border: '1px solid var(--cresoa-danger)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
+                            <button onClick={() => handleDeleteMember(member.id)} title="Remove member" style={{ padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid var(--cresoa-danger)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
                               <Icon name="trash-2" size={14} stroke="currentColor" />
                             </button>
                           </div>
@@ -660,7 +649,7 @@ return created.id
         </div>
       )}
 
-{/* ─── Payment Modal ──────────────────────────────────── */}
+     {/* ─── Payment Modal ──────────────────────────────────── */}
       {showPaymentModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => { if (!saving) setShowPaymentModal(false) }}>
           <form style={{ width: '100%', maxWidth: '400px', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onSubmit={handleRecordPayment} onMouseDown={e => e.stopPropagation()}>
@@ -683,4 +672,4 @@ return created.id
       )}
     </div>
   )
-        }
+}
