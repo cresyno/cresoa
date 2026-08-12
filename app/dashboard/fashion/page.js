@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
-import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../lib/utils'
+import { formatMoney, formatShortDate, getInitials, safeAmount, getCustomerName } from '../../../lib/utils'
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
@@ -52,6 +52,27 @@ function getProductionCounts(orders) {
   return counts
 }
 
+// ---- Robust customer name resolver ----
+function resolveCustomerName(order, customers) {
+  if (!order) return 'Unknown Customer'
+  // First, check if order has a customer_name directly
+  if (order.customer_name && order.customer_name !== 'Unknown customer' && order.customer_name !== 'Unnamed customer') {
+    return order.customer_name
+  }
+  // Try to find by customer_id with string conversion
+  if (order.customer_id) {
+    const customer = customers.find(c => String(c.id) === String(order.customer_id))
+    if (customer) {
+      const name = getCustomerName(customer)
+      if (name && name !== 'Unknown customer' && name !== 'Unnamed customer') {
+        return name
+      }
+    }
+  }
+  // Fallback
+  return 'Unknown Customer'
+}
+
 function getActionItems(orders, customers) {
   if (!Array.isArray(orders) || !Array.isArray(customers)) return []
   try {
@@ -66,14 +87,7 @@ function getActionItems(orders, customers) {
       })
       .slice(0, 5)
       .map(o => {
-        // Get customer name properly
-        let name = 'Unknown Customer'
-        try {
-          const customerName = getOrderCustomerName(o, customers)
-          if (customerName && customerName !== 'Unknown customer' && customerName !== 'Unnamed customer') {
-            name = customerName
-          }
-        } catch (_) { /* ignore */ }
+        const name = resolveCustomerName(o, customers)
         return {
           id: o.id || 'unknown',
           customerName: name,
@@ -157,20 +171,13 @@ function FashionDashboard({ businessId }) {
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
-  // ---- Render functions ----
+  // ---- Render functions (using robust name resolver) ----
   const renderOrderRows = (ordersList) => {
     if (!ordersList || ordersList.length === 0) {
       return <EmptyState title="No orders" message="Create your first order to get started." />
     }
     return ordersList.slice(0, 4).map(order => {
-      // Get customer name properly
-      let name = 'Unknown Customer'
-      try {
-        const customerName = getOrderCustomerName(order, customers)
-        if (customerName && customerName !== 'Unknown customer' && customerName !== 'Unnamed customer') {
-          name = customerName
-        }
-      } catch (_) { /* ignore */ }
+      const name = resolveCustomerName(order, customers)
       const orderId = order.id || `temp-${Math.random()}`
       return (
         <button key={orderId} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
@@ -412,7 +419,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Recent Orders & Customers – 2-col */}
+           {/* Recent Orders & Customers – 2-col */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -463,4 +470,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-              }
+}
