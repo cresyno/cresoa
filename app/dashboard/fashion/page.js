@@ -2,20 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-
-// Shared components
-import { Card } from '../../../components/Card'
-import { SectionHeader } from '../../../components/SectionHeader'
-import { StatusPill } from '../../../components/StatusPill'
-import { DashboardLoading } from '../../../components/Loading'
-import { EmptyState } from '../../../components/EmptyState'
-import { KpiCards } from '../../../components/KpiCards'
-import { ActionCenter } from '../../../components/ActionCenter'
-import { ProductionPipeline } from '../../../components/ProductionPipeline'
-import { FinancialHealth } from '../../../components/FinancialHealth'
-import { Navigation } from '../../../components/Navigation'
-
-// Shared lib
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
 import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../lib/utils'
 import { getOrderCustomerName } from '../../../lib/order-helpers'
@@ -24,7 +10,31 @@ import { PRODUCTION_STAGES } from '../../../lib/constants'
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// ANALYTICS HELPERS
+// SIMPLE INLINE COMPONENTS (no external imports)
+// ============================================================
+function Card({ children, style = {} }) {
+  return <section className="cresoa-card" style={style}>{children}</section>
+}
+
+function SectionHeader({ title, subtitle }) {
+  return (
+    <div className="cresoa-section-header">
+      <div><h2 className="cresoa-section-header-title">{title}</h2>{subtitle && <p className="cresoa-section-header-subtitle">{subtitle}</p>}</div>
+    </div>
+  )
+}
+
+function StatusPill({ status }) {
+  const value = String(status || 'Order placed')
+  const lower = value.toLowerCase()
+  const tone = lower.includes('deliver') || lower.includes('ready') ? 'success'
+    : lower.includes('fitting') || lower.includes('alter') ? 'warning'
+    : lower.includes('cancel') ? 'danger' : 'info'
+  return <span className={`cresoa-status cresoa-status-${tone}`}>{value}</span>
+}
+
+// ============================================================
+// HELPERS
 // ============================================================
 function getDaySeries(orders, days = 7) {
   const result = []
@@ -34,18 +44,9 @@ function getDaySeries(orders, days = 7) {
     date.setHours(0,0,0,0)
     date.setDate(today.getDate() - i)
     const key = date.toISOString().split('T')[0]
-    const dayOrders = orders.filter(o => {
-      const d = new Date(o.created_at)
-      return d.toISOString().split('T')[0] === key
-    })
-    const revenue = dayOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
-    result.push({
-      key,
-      date,
-      label: date.toLocaleDateString('en-NG', { weekday: 'short' }),
-      orders: dayOrders.length,
-      revenue
-    })
+    const dayOrders = orders.filter(o => new Date(o.created_at).toISOString().split('T')[0] === key)
+    const revenue = dayOrders.reduce((s, o) => s + safeAmount(o.price), 0)
+    result.push({ key, label: date.toLocaleDateString('en-NG', { weekday: 'short' }), orders: dayOrders.length, revenue })
   }
   return result
 }
@@ -67,240 +68,14 @@ function getProductionCounts(orders) {
   return counts
 }
 
-function getActionItems(orders, customers) {
-  return orders
-    .filter(o => {
-      const status = String(o.current_status || '').toLowerCase()
-      return safeAmount(o.balance) > 0 ||
-        status === 'order placed' ||
-        status === 'fitting' ||
-        status === 'alteration'
-    })
-    .slice(0, 5)
-    .map(o => {
-      const name = getOrderCustomerName(o, customers)
-      return {
-        id: o.id,
-        customerName: name,
-        amount: o.balance,
-        reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
-        status: o.current_status,
-        actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
-        order: o
-      }
-    })
-}
-
-function getGroupProgress(groups, orders) {
-  return groups.map(group => {
-    const groupOrders = orders.filter(o => o.group_order_id === group.id)
-    const total = groupOrders.length
-    const delivered = groupOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
-    const progress = total === 0 ? null : Math.round((delivered / total) * 100)
-    return { ...group, totalOrders: total, deliveredOrders: delivered, progress }
-  })
-}
-
 // ============================================================
 // DASHBOARD SHELL
 // ============================================================
 function DashboardShell({ children, theme }) {
   return (
     <main className="cresoa-dashboard" data-theme={theme}>
-      <div className="cresoa-dashboard-shell">
-        <div className="cresoa-dashboard-content">{children}</div>
-      </div>
+      <div className="cresoa-dashboard-shell">{children}</div>
     </main>
-  )
-}
-
-// ============================================================
-// REMAINING SUB-COMPONENTS (RecentOrders, RecentCustomers, GroupOrders)
-// ============================================================
-function RecentOrdersList({ orders, customers, onOrderClick, onViewAll }) {
-  const recent = orders.slice(0, 4)
-  return (
-    <Card>
-      <SectionHeader title="Recent Orders" action="View" onAction={onViewAll} />
-      {recent.length === 0 ? (
-        <EmptyState title="No orders" message="Create your first order to get started." />
-      ) : (
-        <div style={{ display: 'grid', gap: 6 }}>
-          {recent.map(order => {
-            const name = getOrderCustomerName(order, customers)
-            return (
-              <button key={order.id} onClick={() => onOrderClick(order)} className="cresoa-list-row compact">
-                <span className="cresoa-avatar">{getInitials(name)}</span>
-                <span style={{ flex: 1, textAlign: 'left' }}>
-                  <span className="cresoa-row-title">{name}</span>
-                  <span className="cresoa-row-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
-                </span>
-                <StatusPill status={order.current_status} />
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </Card>
-  )
-}
-
-function RecentCustomersList({ customers, onCustomerClick, onViewAll }) {
-  const recent = customers.slice(0, 3)
-  return (
-    <Card>
-      <SectionHeader title="Recent Customers" action="View" onAction={onViewAll} />
-      {recent.length === 0 ? (
-        <EmptyState title="No customers" message="Add customers to see them here." />
-      ) : (
-        <div style={{ display: 'grid', gap: 6 }}>
-          {recent.map(customer => {
-            const name = customer.name || 'Unnamed'
-            return (
-              <button key={customer.id} onClick={() => onCustomerClick(customer)} className="cresoa-list-row compact">
-                <span className="cresoa-avatar">{getInitials(name)}</span>
-                <span style={{ flex: 1, textAlign: 'left' }}>
-                  <span className="cresoa-row-title">{name}</span>
-                  <span className="cresoa-row-meta">{customer.orders_count || 0} orders</span>
-                </span>
-                <span className="cresoa-row-arrow">›</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </Card>
-  )
-}
-
-function GroupOrdersList({ groups, orders, customers, onGroupClick, onViewAll }) {
-  const groupsWithProgress = getGroupProgress(groups, orders)
-  const [expandedId, setExpandedId] = useState(null)
-
-  return (
-    <Card>
-      <SectionHeader title="Group Orders" action="View" onAction={onViewAll} />
-      {groupsWithProgress.length === 0 ? (
-        <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
-      ) : (
-        <div className="cresoa-groups-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-          {groupsWithProgress.slice(0, 2).map(group => {
-            const isExpanded = expandedId === group.id
-            const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
-            return (
-              <div key={group.id} className="cresoa-group-card" onClick={() => setExpandedId(isExpanded ? null : group.id)}>
-                <span className="cresoa-group-icon">✦</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <strong className="cresoa-row-title">{group.name}</strong>
-                  <div className="cresoa-row-meta">
-                    {group.progress !== null ? (
-                      <>
-                        <div className="cresoa-group-progress-bar" style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
-                          <div style={{ width: `${group.progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
-                        </div>
-                        <span>{group.progress}% complete</span>
-                      </>
-                    ) : 'N/A'}
-                    {coordinator && ` · ${coordinator.name}`}
-                    {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
-                  </div>
-                </div>
-                <span className={`cresoa-row-arrow ${isExpanded ? 'open' : ''}`}>›</span>
-                {isExpanded && (
-                  <div className="cresoa-group-detail" style={{ marginTop: 8, borderTop: '1px solid var(--cresoa-border)', paddingTop: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total orders</span><strong>{group.totalOrders}</strong></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delivered</span><strong>{group.deliveredOrders}</strong></div>
-                    {coordinator && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Coordinator</span><strong>{coordinator.name}</strong></div>}
-                    {group.due_date && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Due date</span><strong>{formatShortDate(group.due_date)}</strong></div>}
-                    <button
-                      type="button"
-                      className="cresoa-group-detail-button"
-                      style={{ marginTop: 8, padding: '4px 12px', borderRadius: 8, background: 'var(--gradient-primary)', color: '#fff', border: 0, cursor: 'pointer' }}
-                      onClick={(e) => { e.stopPropagation(); onGroupClick(group) }}
-                    >
-                      View Group →
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </Card>
-  )
-}
-
-// ============================================================
-// PERFORMANCE CHART (uses Card, SectionHeader)
-// ============================================================
-function PerformanceChart({ series, period, onPeriodChange }) {
-  const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
-  const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
-  const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
-
-  return (
-    <Card>
-      <SectionHeader title="Performance" subtitle="Daily performance" />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <strong style={{ fontSize: 22, color: 'var(--cresoa-text)' }}>{formatMoney(totalRevenue)}</strong>
-          <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
-          <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)' }}>↑ 18% vs previous period</span>
-        </div>
-        <select value={period} onChange={e => onPeriodChange(e.target.value)} className="cresoa-select">
-          <option value="7">7 days</option>
-          <option value="30">30 days</option>
-          <option value="90">90 days</option>
-        </select>
-      </div>
-      <div className="cresoa-chart">
-        {series.map(day => {
-          const height = Math.max((safeAmount(day.revenue) / maxRevenue) * 100, day.revenue ? 4 : 1)
-          return (
-            <div key={day.key} className="cresoa-chart-day">
-              <div className="cresoa-chart-bar-wrap">
-                <div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div>
-                <div className="cresoa-chart-bar" style={{ height: `${height}%` }} />
-              </div>
-              <span>{day.label}</span>
-            </div>
-          )
-        })}
-      </div>
-    </Card>
-  )
-}
-
-// ============================================================
-// HEADER
-// ============================================================
-function DashboardHeader({ business, refreshing, onRefresh, onNewOrder, theme, onToggleTheme }) {
-  return (
-    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-      <div>
-        <p style={{ margin: 0, color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
-        <h1 style={{ margin: 0, fontSize: 'clamp(22px, 5vw, 30px)', fontWeight: 850, color: 'var(--cresoa-text)' }}>
-          {business?.name || 'Your business'}
-        </h1>
-        <p style={{ margin: '4px 0 0', color: 'var(--cresoa-text-muted)' }}>Good morning 👋</p>
-        <p style={{ margin: 0, color: 'var(--cresoa-text-muted)', fontSize: 12 }}>
-          {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}
-        </p>
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button type="button" onClick={onToggleTheme} className="cresoa-icon-button">
-          {theme === 'dark' ? '☀' : '☾'}
-        </button>
-        <button type="button" onClick={onRefresh} disabled={refreshing} className="cresoa-icon-button">
-          <span style={{ display: 'inline-block', transform: refreshing ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>↻</span>
-        </button>
-        <button type="button" onClick={onNewOrder} className="cresoa-primary-button">
-          <span>＋</span>
-          <span className="cresoa-new-order-text">New Order</span>
-        </button>
-      </div>
-    </header>
   )
 }
 
@@ -310,7 +85,6 @@ function DashboardHeader({ business, refreshing, onRefresh, onNewOrder, theme, o
 function FashionDashboard({ businessId }) {
   const router = useRouter()
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
-
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
 
@@ -329,124 +103,75 @@ function FashionDashboard({ businessId }) {
   const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
   const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
   const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
-  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
 
-  const navigateWithBusiness = (path) => {
-    const separator = path.includes('?') ? '&' : '?'
-    router.push(`${path}${separator}business_id=${businessId}`)
+  const navigate = (path) => {
+    const sep = path.includes('?') ? '&' : '?'
+    router.push(`${path}${sep}business_id=${businessId}`)
   }
 
-  const handleNewOrder = () => navigateWithBusiness('/dashboard/orders/new')
-  const handleOrder = (order) => order?.id && navigateWithBusiness(`/dashboard/orders/${order.id}`)
-  const handleCustomer = (customer) => customer?.id && navigateWithBusiness(`/dashboard/customers/${customer.id}`)
-  const handleGroup = (group) => group?.id && navigateWithBusiness(`/dashboard/groups/${group.id}`)
-  const handleOrders = () => navigateWithBusiness('/dashboard/orders')
-  const handleCustomers = () => navigateWithBusiness('/dashboard/customers')
-  const handleGroups = () => navigateWithBusiness('/dashboard/groups')
-  const handleStage = (stage) => navigateWithBusiness(`/dashboard/orders?status=${encodeURIComponent(stage)}`)
-
-  if (loading) {
-    return (
-      <DashboardShell theme={theme}>
-        <DashboardLoading />
-      </DashboardShell>
-    )
-  }
-
-  if (error) {
-    return (
-      <DashboardShell theme={theme}>
-        <Card style={{ padding: '40px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 12 }}>!</div>
-          <h2 style={{ color: 'var(--cresoa-text)' }}>Couldn't load dashboard</h2>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>{error}</p>
-          <button type="button" onClick={refresh} className="cresoa-primary-button">Try again</button>
-        </Card>
-      </DashboardShell>
-    )
-  }
+  if (loading) return <DashboardShell theme={theme}><div className="cresoa-loading-grid">Loading...</div></DashboardShell>
+  if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
   return (
     <DashboardShell theme={theme}>
       <div style={{ maxWidth: 800, margin: '0 auto' }}>
-        <Navigation businessId={businessId} />
+        {/* Header */}
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
+            <h1 style={{ fontSize: 'clamp(22px, 5vw, 30px)', fontWeight: 850, color: 'var(--cresoa-text)' }}>
+              {business?.name || 'Your business'}
+            </h1>
+            <p style={{ color: 'var(--cresoa-text-muted)' }}>Good morning 👋</p>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>{new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button">{theme === 'dark' ? '☀' : '☾'}</button>
+            <button onClick={refresh} className="cresoa-icon-button">↻</button>
+            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button">+ New Order</button>
+          </div>
+        </header>
 
-        <DashboardHeader
-          business={business}
-          refreshing={refreshing}
-          onRefresh={refresh}
-          onNewOrder={handleNewOrder}
-          theme={theme}
-          onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-        />
-
-        <KpiCards
-          metrics={summary}
-          onOrders={handleOrders}
-          onPayments={handleOrders}
-          onAttention={handleOrders}
-        />
-
-        <div style={{ marginTop: 16 }}>
-          <Card>
-            <SectionHeader
-              title="Action Required"
-              subtitle={`${actionItems.length} item${actionItems.length > 1 ? 's' : ''} need your attention`}
-              action="View all"
-              onAction={handleOrders}
-            />
-            <ActionCenter
-              items={actionItems}
-              onActionClick={(item) => handleOrder(item.order)}
-              onViewAll={handleOrders}
-            />
-          </Card>
+        {/* KPI Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">₦</span><div><span className="cresoa-metric-label">Revenue</span><strong className="cresoa-metric-value">{formatMoney(summary.revenue)}</strong><span className="cresoa-metric-meta">↑ 14.2%</span></div></div>
+          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">◫</span><div><span className="cresoa-metric-label">Orders</span><strong className="cresoa-metric-value">{summary.orders}</strong><span className="cresoa-metric-meta">↑ 3 today</span></div></div>
+          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">✓</span><div><span className="cresoa-metric-label">Collected</span><strong className="cresoa-metric-value">{formatMoney(summary.paid)}</strong><span className="cresoa-metric-meta">{summary.orders ? Math.round(summary.paid/summary.revenue*100) : 0}% collected</span></div></div>
+          <div className="cresoa-metric-card"><span className="cresoa-metric-icon">!</span><div><span className="cresoa-metric-label">Outstanding</span><strong className="cresoa-metric-value">{formatMoney(summary.outstanding)}</strong><span className="cresoa-metric-meta">{summary.outstanding > 0 ? '3 need action' : 'All clear'}</span></div></div>
         </div>
 
+        {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
-            <ProductionPipeline counts={productionCounts} onStageClick={handleStage} />
+            <div className="cresoa-pipeline">
+              {PRODUCTION_STAGES.map((stage, idx) => (
+                <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="cresoa-pipeline-item">
+                  <span className="cresoa-pipeline-number">{productionCounts[stage] || 0}</span>
+                  <span className="cresoa-pipeline-label">{stage}</span>
+                  {idx < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
+                </button>
+              ))}
+            </div>
           </Card>
         </div>
 
-        <div style={{ marginTop: 16 }}>
-          <PerformanceChart series={series} period={period} onPeriodChange={setPeriod} />
-        </div>
-
+        {/* Chart */}
         <div style={{ marginTop: 16 }}>
           <Card>
-            <SectionHeader title="Financial Health" />
-            <FinancialHealth
-              revenue={summary.revenue}
-              collected={summary.paid}
-              outstanding={summary.outstanding}
-            />
+            <SectionHeader title="Performance" subtitle="Daily performance" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div><strong style={{ fontSize: 22 }}>{formatMoney(series.reduce((s,d) => s + safeAmount(d.revenue), 0))}</strong> <span>{series.reduce((s,d) => s + safeAmount(d.orders), 0)} orders</span> <span style={{ color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span></div>
+              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select>
+            </div>
+            <div className="cresoa-chart">
+              {series.map(day => {
+                const max = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
+                const height = Math.max((safeAmount(day.revenue)/max)*100, day.revenue ? 4 : 1)
+                return <div key={day.key} className="cresoa-chart-day"><div className="cresoa-chart-bar-wrap"><div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div><div className="cresoa-chart-bar" style={{ height: height+'%' }} /></div><span>{day.label}</span></div>
+              })}
+            </div>
           </Card>
-        </div>
-
-        <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <RecentOrdersList
-            orders={orders}
-            customers={customers}
-            onOrderClick={handleOrder}
-            onViewAll={handleOrders}
-          />
-          <RecentCustomersList
-            customers={customers}
-            onCustomerClick={handleCustomer}
-            onViewAll={handleCustomers}
-          />
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          <GroupOrdersList
-            groups={groups}
-            orders={orders}
-            customers={customers}
-            onGroupClick={handleGroup}
-            onViewAll={handleGroups}
-          />
         </div>
       </div>
     </DashboardShell>
@@ -454,7 +179,7 @@ function FashionDashboard({ businessId }) {
 }
 
 // ============================================================
-// ENTRY POINT
+// ENTRY
 // ============================================================
 export default function Page() {
   const searchParams = useSearchParams()
@@ -463,13 +188,10 @@ export default function Page() {
   if (!businessId) {
     return (
       <DashboardShell theme="light">
-        <Card style={{ padding: '40px 24px', textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--cresoa-text)' }}>Business account required</h2>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>Select a business to view its dashboard.</p>
-        </Card>
+        <Card><h2>Business account required</h2><p>Select a business to view its dashboard.</p></Card>
       </DashboardShell>
     )
   }
 
   return <FashionDashboard businessId={businessId} />
-       }
+}
