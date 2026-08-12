@@ -7,13 +7,14 @@ import { formatMoney, formatShortDate, getInitials, safeAmount } from '../../../
 import { getOrderCustomerName } from '../../../lib/order-helpers'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
 
-// ✅ Shared components (only those confirmed working)
+// ✅ Shared components (confirmed working)
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { DashboardLoading } from '../../../components/Loading'
 import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
+import { ActionCenter } from '../../../components/ActionCenter'  // 🆕 imported
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -93,6 +94,16 @@ function FashionDashboard({ businessId }) {
     router.push(`${path}${sep}business_id=${businessId}`)
   }
 
+  // 🧪 Dummy data to test ActionCenter
+  const dummyActionItems = [
+    { id: '1', customerName: 'Amaka Love', amount: 2150000, reason: 'Payment overdue', status: 'Order placed', actionLabel: 'Collect payment' },
+    { id: '2', customerName: 'Taiwo Abraham', amount: 8000000, reason: 'Ready for delivery', status: 'Ready', actionLabel: 'View order' },
+  ]
+
+  const handleActionClick = (item) => {
+    alert(`Action clicked for ${item.customerName}`) // temporary
+  }
+
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
@@ -116,13 +127,29 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* KpiCards */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
           onPayments={() => navigate('/dashboard/orders?filter=payments')}
           onAttention={() => navigate('/dashboard/orders?filter=attention')}
         />
+
+        {/* 🧪 Test ActionCenter with dummy data */}
+        <div style={{ marginTop: 16 }}>
+          <Card>
+            <SectionHeader
+              title="Action Required (Test)"
+              subtitle="Testing the shared ActionCenter component"
+              action="View all"
+              onAction={() => alert('View all clicked')}
+            />
+            <ActionCenter
+              items={dummyActionItems}
+              onActionClick={handleActionClick}
+              onViewAll={() => alert('View all actions')}
+            />
+          </Card>
+        </div>
 
         {/* Production Pipeline */}
         <div style={{ marginTop: 16 }}>
@@ -158,7 +185,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* EmptyState Test (confirmed working) */}
+        {/* Keep EmptyState test */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="EmptyState Test" subtitle="Testing the shared component" />
