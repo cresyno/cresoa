@@ -577,6 +577,13 @@ export const Icon = ({ name, size = 20, stroke = 'currentColor', strokeWidth = 2
           </>
         );
 
+        case 'chevron-right':
+  return (
+    <>
+      <polyline points="9 18 15 12 9 6" />
+    </>
+  );
+
       case 'production':
         return (
           <>
