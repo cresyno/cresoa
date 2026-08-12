@@ -60,7 +60,6 @@ function getProductionCounts(orders) {
   return counts
 }
 
-// ---- Safe customer name resolver ----
 function resolveCustomerName(order, customers) {
   if (!order) return 'Unknown Customer'
   if (order.customer_name && order.customer_name !== 'Unknown customer' && order.customer_name !== 'Unnamed customer') {
@@ -82,7 +81,6 @@ function getOrderTitle(order) {
   return `Order #${order.id?.slice(0,6) || '?'}`
 }
 
-// ---- Action items ----
 function getActionItems(orders, customers) {
   if (!Array.isArray(orders) || !Array.isArray(customers)) return []
   try {
@@ -150,7 +148,6 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
-  const [chartMetric, setChartMetric] = useState('revenue') // 'revenue' | 'orders' | 'collected'
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -268,21 +265,10 @@ function FashionDashboard({ businessId }) {
     })
   }
 
-  // ---- Chart data based on selected metric ----
-  const chartData = useMemo(() => {
-    if (chartMetric === 'revenue') return series.map(d => ({ ...d, value: d.revenue, label: 'Revenue' }))
-    if (chartMetric === 'orders') return series.map(d => ({ ...d, value: d.orders, label: 'Orders' }))
-    // collected: daily collected from orders
-    const dailyCollected = orders.reduce((acc, o) => {
-      const day = new Date(o.created_at).toISOString().split('T')[0]
-      acc[day] = (acc[day] || 0) + safeAmount(o.amount_paid)
-      return acc
-    }, {})
-    return series.map(d => ({ ...d, value: dailyCollected[d.key] || 0, label: 'Collected' }))
-  }, [series, chartMetric, orders])
-
-  const maxValue = Math.max(...chartData.map(d => safeAmount(d.value)), 1)
-  const totalValue = chartData.reduce((s, d) => s + safeAmount(d.value), 0)
+  // ---- Chart ----
+  const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
+  const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
+  const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
 
   // ---- KPI Cards (2×2) ----
   const kpiCards = [
@@ -372,40 +358,29 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance with metric selector */}
+        {/* Performance Chart (Revenue only) */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
               <div>
-                <strong style={{ fontSize: 22 }}>
-                  {chartMetric === 'revenue' ? formatMoney(totalValue) : totalValue}
-                </strong>
-                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>
-                  {chartData.reduce((s,d) => s + safeAmount(d.orders), 0)} orders
-                </span>
+                <strong style={{ fontSize: 22 }}>{formatMoney(totalRevenue)}</strong>
+                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
                 <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <select className="cresoa-select" value={chartMetric} onChange={e => setChartMetric(e.target.value)} style={{ minWidth: 100 }}>
-                  <option value="revenue">Revenue</option>
-                  <option value="orders">Orders</option>
-                  <option value="collected">Collected</option>
-                </select>
-                <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
-                  <option value="7">7d</option>
-                  <option value="30">30d</option>
-                  <option value="90">90d</option>
-                </select>
-              </div>
+              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+              </select>
             </div>
             <div className="cresoa-chart" style={{ minHeight: 120 }}>
-              {chartData.map(day => {
-                const height = Math.max((safeAmount(day.value) / maxValue) * 100, day.value ? 4 : 1)
+              {series.map(day => {
+                const height = Math.max((safeAmount(day.revenue) / maxRevenue) * 100, day.revenue ? 4 : 1)
                 return (
                   <div key={day.key} className="cresoa-chart-day">
                     <div className="cresoa-chart-bar-wrap">
-                      <div className="cresoa-chart-value">{day.value > 0 ? (chartMetric === 'revenue' ? formatMoney(day.value) : day.value) : ''}</div>
+                      <div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div>
                       <div className="cresoa-chart-bar" style={{ height: height+'%' }} />
                     </div>
                     <span>{day.label}</span>
@@ -416,7 +391,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Financial Health */}
+  {/* Financial Health */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
