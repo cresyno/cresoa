@@ -10,7 +10,7 @@ import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
 import { ProductionPipeline } from '../../../components/ProductionPipeline'
-import '../../../globals.css'
+import '../../globals.css'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
