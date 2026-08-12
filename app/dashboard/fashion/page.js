@@ -16,7 +16,7 @@ import { EmptyState } from '../../../components/EmptyState'
 import { KpiCards } from '../../../components/KpiCards'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { FinancialHealth } from '../../../components/FinancialHealth'
-import { Navigation } from '../../../components/Navigation'   // ✅ Added
+import { Navigation } from '../../../components/Navigation'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -69,7 +69,7 @@ function getActionItems(orders, customers) {
       })
       .slice(0, 5)
       .map(o => {
-        let name = 'Unknown'
+        let name = 'Customer unavailable'
         try { name = getOrderCustomerName(o, customers) } catch (_) {}
         return {
           id: o.id || 'unknown',
@@ -157,12 +157,18 @@ function FashionDashboard({ businessId }) {
     if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
   }
 
+  // Retry function for sections – just triggers a global refresh
+  const handleRetry = () => refresh()
+
   if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
 
-  // Safe list rendering
+  // ---- Safe renderers ----
   const renderOrderRows = (ordersList) => {
     try {
+      if (!ordersList || ordersList.length === 0) {
+        return <EmptyState title="No orders" message="Create your first order to get started." />
+      }
       return ordersList.slice(0, 4).map(order => {
         const name = getOrderCustomerName(order, customers)
         return (
@@ -178,20 +184,30 @@ function FashionDashboard({ businessId }) {
       })
     } catch (e) {
       console.error('Order row error:', e)
-      return <EmptyState title="Error loading orders" message="Please refresh the page." />
+      return (
+        <div style={{ padding: '16px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p>
+          <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+        </div>
+      )
     }
   }
 
   const renderCustomerRows = (customersList) => {
     try {
+      if (!customersList || customersList.length === 0) {
+        return <EmptyState title="No customers" message="Add customers to see them here." />
+      }
       return customersList.slice(0, 4).map(customer => {
         const name = customer.name || 'Unnamed'
+        // Determine active orders (we don't have a count, but we can estimate from orders)
+        const activeOrders = orders ? orders.filter(o => o.customer_id === customer.id && o.current_status !== 'Delivered').length : 0
         return (
           <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
             <span className="cresoa-avatar">{getInitials(name)}</span>
             <span style={{ flex: 1, textAlign: 'left' }}>
               <span className="cresoa-row-title">{name}</span>
-              <span className="cresoa-row-meta">{customer.orders_count || 0} orders</span>
+              <span className="cresoa-row-meta">{activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}</span>
             </span>
             <span className="cresoa-row-arrow">›</span>
           </button>
@@ -199,12 +215,20 @@ function FashionDashboard({ businessId }) {
       })
     } catch (e) {
       console.error('Customer row error:', e)
-      return <EmptyState title="Error loading customers" message="Please refresh the page." />
+      return (
+        <div style={{ padding: '16px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load customers</p>
+          <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+        </div>
+      )
     }
   }
 
   const renderGroupCards = (groupsList) => {
     try {
+      if (!groupsList || groupsList.length === 0) {
+        return <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
+      }
       return groupsList.slice(0, 4).map(group => {
         const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
         const progress = group.progress
@@ -221,7 +245,9 @@ function FashionDashboard({ businessId }) {
                     </div>
                     <span>{progress}% complete</span>
                   </>
-                ) : 'N/A'}
+                ) : (
+                  <span>Progress unavailable</span>
+                )}
                 {coordinator && ` · ${coordinator.name}`}
                 {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
               </div>
@@ -232,7 +258,12 @@ function FashionDashboard({ businessId }) {
       })
     } catch (e) {
       console.error('Group card error:', e)
-      return <EmptyState title="Error loading groups" message="Please refresh the page." />
+      return (
+        <div style={{ padding: '16px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p>
+          <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+        </div>
+      )
     }
   }
 
@@ -243,7 +274,7 @@ function FashionDashboard({ businessId }) {
         {/* ✅ Navigation (top) */}
         <Navigation businessId={businessId} />
 
-        {/* Header */}
+        {/* Header – no duplicate "Dashboard / Welcome back" */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
@@ -260,7 +291,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* KPI Cards */}
+        {/* KPI Cards – already 2×2 on all screens */}
         <KpiCards
           metrics={summary}
           onOrders={() => navigate('/dashboard/orders')}
@@ -305,7 +336,7 @@ function FashionDashboard({ businessId }) {
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Performance" subtitle="Daily performance" />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <strong style={{ fontSize: 22 }}>{formatMoney(series.reduce((s,d) => s + safeAmount(d.revenue), 0))}</strong>
                 <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{series.reduce((s,d) => s + safeAmount(d.orders), 0)} orders</span>
@@ -317,7 +348,7 @@ function FashionDashboard({ businessId }) {
                 <option value="90">90 days</option>
               </select>
             </div>
-            <div className="cresoa-chart">
+            <div className="cresoa-chart" style={{ minHeight: 120 }}>
               {series.map(day => {
                 const max = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
                 const height = Math.max((safeAmount(day.revenue)/max)*100, day.revenue ? 4 : 1)
@@ -335,39 +366,80 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Financial Health */}
+        {/* Financial Health – enhanced with progress bars and spacing */}
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Financial Health" />
-            <FinancialHealth
-              revenue={summary.revenue}
-              collected={summary.paid}
-              outstanding={summary.outstanding}
-            />
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Revenue</span>
+                  <strong>{formatMoney(summary.revenue)}</strong>
+                </div>
+                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: '100%', height: '100%', background: 'var(--gradient-accent)', borderRadius: 99 }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
+                  <div>
+                    <strong>{formatMoney(summary.paid)}</strong>
+                    <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>
+                      ({summary.revenue ? Math.round((summary.paid / summary.revenue) * 100) : 0}%)
+                    </span>
+                  </div>
+                </div>
+                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: `${summary.revenue ? Math.min((summary.paid / summary.revenue) * 100, 100) : 0}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
+                  <div>
+                    <strong>{formatMoney(summary.outstanding)}</strong>
+                    <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>
+                      ({summary.revenue ? Math.round((summary.outstanding / summary.revenue) * 100) : 0}%)
+                    </span>
+                  </div>
+                </div>
+                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ width: `${summary.revenue ? Math.min((summary.outstanding / summary.revenue) * 100, 100) : 0}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99 }} />
+                </div>
+              </div>
+              {summary.outstanding > 0 && (
+                <div style={{ padding: '8px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)' }}>
+                  ⚠ {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
+                </div>
+              )}
+            </div>
           </Card>
         </div>
 
-        {/* Recent Orders + Recent Customers */}
+           {/* Recent Orders + Recent Customers (responsive 2-col) */}
         <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
-            <SafeRender fallback={<EmptyState title="Could not load orders" message="Please refresh" />}>
-              {orders.length === 0 ? (
-                <EmptyState title="No orders" message="Create your first order to get started." />
-              ) : (
-                <div style={{ display: 'grid', gap: 6 }}>{renderOrderRows(orders)}</div>
-              )}
+            <SafeRender fallback={
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p>
+                <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+              </div>
+            }>
+              {renderOrderRows(orders)}
             </SafeRender>
           </Card>
 
           <Card>
             <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
-            <SafeRender fallback={<EmptyState title="Could not load customers" message="Please refresh" />}>
-              {customers.length === 0 ? (
-                <EmptyState title="No customers" message="Add customers to see them here." />
-              ) : (
-                <div style={{ display: 'grid', gap: 6 }}>{renderCustomerRows(customers)}</div>
-              )}
+            <SafeRender fallback={
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load customers</p>
+                <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+              </div>
+            }>
+              {renderCustomerRows(customers)}
             </SafeRender>
           </Card>
         </div>
@@ -376,20 +448,19 @@ function FashionDashboard({ businessId }) {
         <div style={{ marginTop: 16 }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
-            <SafeRender fallback={<EmptyState title="Could not load groups" message="Please refresh" />}>
-              {groupsWithProgress.length === 0 ? (
-                <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
-              ) : (
-                <div className="cresoa-groups-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-                  {renderGroupCards(groupsWithProgress)}
-                </div>
-              )}
+            <SafeRender fallback={
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p>
+                <button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button>
+              </div>
+            }>
+              {renderGroupCards(groupsWithProgress)}
             </SafeRender>
           </Card>
         </div>
 
-        {/* ✅ Navigation (bottom) */}
-        <div style={{ marginTop: 24 }}>
+        {/* ✅ Navigation (bottom) – with safe-area padding */}
+        <div style={{ marginTop: 24, paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Navigation businessId={businessId} />
         </div>
 
