@@ -12,10 +12,13 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   useEffect(() => {
     async function loadBusinesses() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        // ─── Refresh session first ───
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) return;
 
-        const response = await fetch('/api/user/businesses', {
+        // ─── Add timestamp to bust cache ───
+        const timestamp = Date.now();
+        const response = await fetch(`/api/user/businesses?t=${timestamp}`, {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
         const result = await response.json();
@@ -26,8 +29,17 @@ export default function BusinessSwitcher({ currentBusinessId }) {
         console.error('Error loading businesses:', e);
       }
     }
+
+    // ─── Load immediately ───
     loadBusinesses();
-  }, [currentBusinessId]); // ✅ Refetch when currentBusinessId changes
+
+    // ─── Load again after 500ms (to catch any late DB commits) ───
+    const timer = setTimeout(() => {
+      loadBusinesses();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [currentBusinessId]);
 
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
@@ -44,7 +56,7 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   };
 
   return (
-    // ... rest of the component (unchanged)
+    // ─── The rest of the component is UNCHANGED ───
     <div style={{ position: 'relative', marginBottom: '16px' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
