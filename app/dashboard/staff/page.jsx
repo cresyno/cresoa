@@ -375,12 +375,19 @@ export default function StaffPage() {
       <SectionHeader title={`Team Members (${filteredMembers.length})`} />
 
       {filteredMembers.length === 0 ? (
-        <Card style={{ padding: '2rem', textAlign: 'center' }}>
-          <Icon name="users" size={32} stroke="var(--cresoa-text-muted)" />
-          <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No members found</h3>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>{search ? 'Try a different search term.' : 'Invite your first team member to get started.'}</p>
-        </Card>
-      ) : (
+  <Card style={{ padding: '2rem', textAlign: 'center' }}>
+    <Icon name="users" size={32} stroke="var(--cresoa-text-muted)" />
+    <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No members found</h3>
+    <p style={{ color: 'var(--cresoa-text-muted)' }}>
+      {search ? 'Try a different search term.' : 'Invite your first team member to get started.'}
+    </p>
+    {!search && (
+      <button onClick={() => setShowInviteModal(true)} className="cresoa-primary-button" style={{ marginTop: '0.5rem' }}>
+        <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Invite member
+      </button>
+    )}
+  </Card>
+) : ( ... )}
         <div style={{ display: 'grid', gap: '0.5rem' }}>
           {filteredMembers.map((member) => {
             const name = member.user?.full_name || member.user?.email || 'Unknown'
