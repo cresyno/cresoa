@@ -8,45 +8,31 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [debug, setDebug] = useState('');
 
   const loadBusinesses = async () => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        setDebug('❌ No session');
-        return;
-      }
+      if (sessionError || !session) return;
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setDebug('❌ No user');
-        return;
-      }
+      if (userError || !user) return;
 
-      // ─── Get owned businesses ───
+      // ─── Owned businesses ───
       const { data: owned, error: ownedError } = await supabase
         .from('businesses')
         .select('id, name, sector')
         .eq('owner_id', user.id);
 
-      if (ownedError) {
-        setDebug('❌ Owned error: ' + ownedError.message);
-        return;
-      }
+      if (ownedError) return;
 
-      // ─── Get member businesses ───
+      // ─── Member businesses ───
       const { data: memberships, error: memError } = await supabase
         .from('business_memberships')
         .select('business_id')
         .eq('user_id', user.id);
 
-      if (memError) {
-        setDebug('❌ Membership error: ' + memError.message);
-        return;
-      }
+      if (memError) return;
 
-      // ─── Fetch businesses from memberships ───
       let memberBusinesses = [];
       if (memberships && memberships.length > 0) {
         const ids = memberships.map(m => m.business_id);
@@ -62,17 +48,18 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
 
       setBusinesses(unique);
-      setDebug(JSON.stringify(unique, null, 2));
     } catch (e) {
-      setDebug('❌ Error: ' + e.message);
+      console.error('Error loading businesses:', e);
     }
   };
 
   useEffect(() => {
     loadBusinesses();
+    // ─── Refresh after 2 seconds to catch any late DB changes ───
+    const timer = setTimeout(loadBusinesses, 2000);
+    return () => clearTimeout(timer);
   }, [currentBusinessId]);
 
-  // ─── The rest of the component remains UNCHANGED ───
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
   const handleSwitch = (businessId) => {
@@ -87,21 +74,6 @@ export default function BusinessSwitcher({ currentBusinessId }) {
 
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
-      <div style={{
-        fontSize: '10px',
-        color: '#aaa',
-        background: '#1a1a2e',
-        padding: '6px',
-        borderRadius: '4px',
-        marginBottom: '8px',
-        wordBreak: 'break-all',
-        maxHeight: '120px',
-        overflow: 'auto',
-        fontFamily: 'monospace'
-      }}>
-        {debug || 'Loading...'}
-      </div>
-
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -116,27 +88,14 @@ export default function BusinessSwitcher({ currentBusinessId }) {
           color: '#fff',
           cursor: 'pointer',
           fontSize: '13px',
-          fontWeight: '500'
+          fontWeight: '500',
+          transition: 'all 0.2s'
         }}
       >
-        <span>{currentBusiness ? currentBusiness.name : 'Select Business'}</span>
-        <span>▼</span>
-      </button>
-
-      <button
-        onClick={loadBusinesses}
-        style={{
-          marginTop: '4px',
-          background: 'rgba(255,255,255,0.05)',
-          border: 'none',
-          color: '#D4A52A',
-          padding: '2px 8px',
-          borderRadius: '4px',
-          fontSize: '10px',
-          cursor: 'pointer'
-        }}
-      >
-        ↻ Refresh businesses
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {currentBusiness ? currentBusiness.name : 'Select Business'}
+        </span>
+        <span style={{ marginLeft: '8px' }}>▼</span>
       </button>
 
       {isOpen && (
@@ -198,4 +157,4 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       )}
     </div>
   );
-}
+                  }
