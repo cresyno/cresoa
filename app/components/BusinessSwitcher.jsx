@@ -9,35 +9,32 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    async function loadBusinesses() {
-      try {
-        // ─── Refresh session first ───
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) return;
+  // ─── Load businesses ──────────────────────────────
+  const loadBusinesses = async () => {
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) return;
 
-        // ─── Add timestamp to bust cache ───
-        const timestamp = Date.now();
-        const response = await fetch(`/api/user/businesses?t=${timestamp}`, {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        const result = await response.json();
-        if (response.ok) {
-          setBusinesses(result.businesses || []);
-        }
-      } catch (e) {
-        console.error('Error loading businesses:', e);
+      const timestamp = Date.now();
+      const response = await fetch(`/api/user/businesses?t=${timestamp}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      const result = await response.json();
+      if (response.ok) {
+        setBusinesses(result.businesses || []);
+      } else {
+        console.warn('API error:', result.error);
       }
+    } catch (e) {
+      console.error('Error loading businesses:', e);
     }
+  };
 
+  useEffect(() => {
     // ─── Load immediately ───
     loadBusinesses();
-
-    // ─── Load again after 500ms (to catch any late DB commits) ───
-    const timer = setTimeout(() => {
-      loadBusinesses();
-    }, 500);
-
+    // ─── Load again after 2 seconds (to catch any late DB commits) ───
+    const timer = setTimeout(loadBusinesses, 2000);
     return () => clearTimeout(timer);
   }, [currentBusinessId]);
 
@@ -56,7 +53,6 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   };
 
   return (
-    // ─── The rest of the component is UNCHANGED ───
     <div style={{ position: 'relative', marginBottom: '16px' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
