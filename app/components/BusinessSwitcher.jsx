@@ -8,32 +8,38 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [debug, setDebug] = useState(''); // shows raw API response
+  const [loading, setLoading] = useState(false);
 
-  // ─── Load businesses ──────────────────────────────
   const loadBusinesses = async () => {
+    setLoading(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) return;
+      if (sessionError || !session) {
+        setDebug('❌ No session');
+        setLoading(false);
+        return;
+      }
 
       const timestamp = Date.now();
       const response = await fetch(`/api/user/businesses?t=${timestamp}`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
       const result = await response.json();
+      setDebug(JSON.stringify(result, null, 2));
       if (response.ok) {
         setBusinesses(result.businesses || []);
       } else {
-        console.warn('API error:', result.error);
+        setDebug('❌ API error: ' + (result.error || 'Unknown'));
       }
     } catch (e) {
-      console.error('Error loading businesses:', e);
+      setDebug('❌ Fetch error: ' + e.message);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    // ─── Load immediately ───
     loadBusinesses();
-    // ─── Load again after 2 seconds (to catch any late DB commits) ───
     const timer = setTimeout(loadBusinesses, 2000);
     return () => clearTimeout(timer);
   }, [currentBusinessId]);
@@ -46,14 +52,28 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       router.push('/accept-invite');
       return;
     }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedBusinessId', businessId);
-    }
+    localStorage.setItem('selectedBusinessId', businessId);
     window.location.href = `/dashboard?business_id=${businessId}`;
   };
 
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
+      {/* ─── Debug output ─── */}
+      <div style={{
+        fontSize: '10px',
+        color: '#aaa',
+        background: '#1a1a2e',
+        padding: '6px',
+        borderRadius: '4px',
+        marginBottom: '8px',
+        wordBreak: 'break-all',
+        maxHeight: '120px',
+        overflow: 'auto',
+        fontFamily: 'monospace'
+      }}>
+        {loading ? 'Loading...' : debug || 'No data'}
+      </div>
+
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -68,14 +88,30 @@ export default function BusinessSwitcher({ currentBusinessId }) {
           color: '#fff',
           cursor: 'pointer',
           fontSize: '13px',
-          fontWeight: '500',
-          transition: 'all 0.2s'
+          fontWeight: '500'
         }}
       >
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span>
           {currentBusiness ? currentBusiness.name : 'Select Business'}
         </span>
-        <span style={{ marginLeft: '8px' }}>▼</span>
+        <span>▼</span>
+      </button>
+
+      {/* ─── Manual refresh button ─── */}
+      <button
+        onClick={loadBusinesses}
+        style={{
+          marginTop: '4px',
+          background: 'rgba(255,255,255,0.05)',
+          border: 'none',
+          color: '#D4A52A',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontSize: '10px',
+          cursor: 'pointer'
+        }}
+      >
+        ↻ Refresh businesses
       </button>
 
       {isOpen && (
@@ -137,4 +173,4 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       )}
     </div>
   );
-}
+            }
