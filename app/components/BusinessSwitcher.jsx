@@ -24,7 +24,18 @@ export default function BusinessSwitcher({ currentBusinessId }) {
         return;
       }
 
-      // ─── Direct Supabase query ───
+      // ─── Get owned businesses ───
+      const { data: owned, error: ownedError } = await supabase
+        .from('businesses')
+        .select('id, name, sector')
+        .eq('owner_id', user.id);
+
+      if (ownedError) {
+        setDebug('❌ Owned error: ' + ownedError.message);
+        return;
+      }
+
+      // ─── Get member businesses ───
       const { data: memberships, error: memError } = await supabase
         .from('business_memberships')
         .select('business_id')
@@ -35,19 +46,23 @@ export default function BusinessSwitcher({ currentBusinessId }) {
         return;
       }
 
-      // ─── Get the businesses ───
-      let allBusinesses = [];
+      // ─── Fetch businesses from memberships ───
+      let memberBusinesses = [];
       if (memberships && memberships.length > 0) {
         const ids = memberships.map(m => m.business_id);
         const { data: biz, error: bizError } = await supabase
           .from('businesses')
           .select('id, name, sector')
           .in('id', ids);
-        if (!bizError) allBusinesses = biz || [];
+        if (!bizError) memberBusinesses = biz || [];
       }
 
-      setBusinesses(allBusinesses);
-      setDebug(JSON.stringify(allBusinesses, null, 2));
+      // ─── Merge and deduplicate ───
+      const all = [...(owned || []), ...memberBusinesses];
+      const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
+
+      setBusinesses(unique);
+      setDebug(JSON.stringify(unique, null, 2));
     } catch (e) {
       setDebug('❌ Error: ' + e.message);
     }
@@ -57,7 +72,7 @@ export default function BusinessSwitcher({ currentBusinessId }) {
     loadBusinesses();
   }, [currentBusinessId]);
 
-  // ─── The rest of the component is the same ───
+  // ─── The rest of the component remains UNCHANGED ───
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
   const handleSwitch = (businessId) => {
