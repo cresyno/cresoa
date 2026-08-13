@@ -385,9 +385,9 @@ export default function StaffPage() {
       <button onClick={() => setShowInviteModal(true)} className="cresoa-primary-button" style={{ marginTop: '0.5rem' }}>
         <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Invite member
       </button>
-    )}
   </Card>
 ) : ( ... )}
+    
         <div style={{ display: 'grid', gap: '0.5rem' }}>
           {filteredMembers.map((member) => {
             const name = member.user?.full_name || member.user?.email || 'Unknown'
