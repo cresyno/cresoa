@@ -681,7 +681,7 @@ function DashboardLayoutContent({ children }) {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <BusinessSwitcher currentBusinessId={business?.id} />
+<BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
         </div>
 
         <div className="nav-section">
