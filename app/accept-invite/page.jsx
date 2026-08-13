@@ -46,7 +46,6 @@ function AcceptInviteForm() {
   setTimeout(() => {
     router.push(result.redirect || '/dashboard');
   }, 2000);
-      }
       } else {
         setMessage('❌ ' + (result.error || 'Failed to accept invite'));
       }
