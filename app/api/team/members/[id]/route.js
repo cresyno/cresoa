@@ -145,4 +145,4 @@ export async function DELETE(req, { params }) {
     console.error('Error removing member:', err);
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
-  }
+      }
