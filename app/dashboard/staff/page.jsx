@@ -56,6 +56,12 @@ export default function StaffPage() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [lastGeneratedEmail, setLastGeneratedEmail] = useState('')
 
+  // ─── Navigation helper (preserve business_id) ───────────
+  const navigateWithBusiness = (path) => {
+    const separator = path.includes('?') ? '&' : '?'
+    router.push(`${path}${separator}business_id=${businessId}`)
+  }
+
   // ─── Load data ────────────────────────────────────────────
   const loadData = async () => {
     if (!businessId) return
@@ -83,7 +89,6 @@ export default function StaffPage() {
       })
       const result = await response.json()
       if (response.ok) {
-        // Add status from direct query
         const membersWithStatus = await Promise.all((result.members || []).map(async (m) => {
           const { data: membership } = await supabase
             .from('business_memberships')
@@ -170,7 +175,6 @@ export default function StaffPage() {
         setLastGeneratedEmail(inviteEmail)
         setInviteMessage('✅ Invite code generated successfully!')
         setInviteEmail('')
-        // Refresh invites
         await loadData()
       } else {
         setInviteMessage('❌ ' + (result.error || 'Failed to generate invite'))
@@ -247,7 +251,7 @@ export default function StaffPage() {
   }
 
   const handleManage = (memberId) => {
-    router.push(`/dashboard/staff/${memberId}?business_id=${businessId}`)
+    navigateWithBusiness(`/dashboard/staff/${memberId}`)
   }
 
   const shareOnWhatsApp = () => {
@@ -375,19 +379,19 @@ export default function StaffPage() {
       <SectionHeader title={`Team Members (${filteredMembers.length})`} />
 
       {filteredMembers.length === 0 ? (
-  <Card style={{ padding: '2rem', textAlign: 'center' }}>
-    <Icon name="users" size={32} stroke="var(--cresoa-text-muted)" />
-    <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No members found</h3>
-    <p style={{ color: 'var(--cresoa-text-muted)' }}>
-      {search ? 'Try a different search term.' : 'Invite your first team member to get started.'}
-    </p>
-    {!search && (
-      <button onClick={() => setShowInviteModal(true)} className="cresoa-primary-button" style={{ marginTop: '0.5rem' }}>
-        <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Invite member
-      </button>
-  </Card>
-) : ( ... )}
-    
+        <Card style={{ padding: '2rem', textAlign: 'center' }}>
+          <Icon name="users" size={32} stroke="var(--cresoa-text-muted)" />
+          <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No members found</h3>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>
+            {search ? 'Try a different search term.' : 'Invite your first team member to get started.'}
+          </p>
+          {!search && canManage && (
+            <button onClick={() => setShowInviteModal(true)} className="cresoa-primary-button" style={{ marginTop: '0.5rem' }}>
+              <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Invite member
+            </button>
+          )}
+        </Card>
+      ) : (
         <div style={{ display: 'grid', gap: '0.5rem' }}>
           {filteredMembers.map((member) => {
             const name = member.user?.full_name || member.user?.email || 'Unknown'
@@ -427,7 +431,7 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* Pending Invitations */}
+   {/* Pending Invitations */}
       {pendingInvites.length > 0 && (
         <>
           <SectionHeader title="Pending Invitations" action={pendingInvites.length > 5 ? `View all (${pendingInvites.length})` : ''} onAction={pendingInvites.length > 5 ? () => setShowPendingModal(true) : null} />
@@ -652,4 +656,4 @@ export default function StaffPage() {
       </div>
     </div>
   )
-                     }
+          }
