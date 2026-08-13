@@ -40,9 +40,13 @@ function AcceptInviteForm() {
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess(true);
-        setMessage('✅ ' + result.message);
-        setTimeout(() => router.push('/dashboard'), 2000);
+  setSuccess(true);
+  setMessage('✅ ' + result.message);
+  // ─── Use the redirect URL from the API ───
+  setTimeout(() => {
+    router.push(result.redirect || '/dashboard');
+  }, 2000);
+      }
       } else {
         setMessage('❌ ' + (result.error || 'Failed to accept invite'));
       }
