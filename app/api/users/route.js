@@ -3,7 +3,6 @@ import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
-    // ─── Authenticate the requesting user ───
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json({ error: 'Missing authorization' }, { status: 401 });
@@ -14,23 +13,24 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ─── Get list of user IDs ───
     const { ids } = await req.json();
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ users: [] });
     }
 
-    // ─── Fetch each user's email ───
     const users = await Promise.all(
       ids.map(async (id) => {
         try {
           const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
           if (error || !data) {
-            return { id, email: null };
+            return { id, email: null, full_name: null };
           }
-          return { id, email: data.user.email };
+          const full_name = data.user.user_metadata?.full_name || 
+                           data.user.user_metadata?.name || 
+                           data.user.email?.split('@')[0] || null;
+          return { id, email: data.user.email, full_name };
         } catch (_) {
-          return { id, email: null };
+          return { id, email: null, full_name: null };
         }
       })
     );
