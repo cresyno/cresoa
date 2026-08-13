@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../../lib/supabaseClient';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -11,47 +10,37 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    // ─── Use supabaseAdmin to avoid RLS issues ───
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const url = new URL(req.url);
-    const businessId = url.searchParams.get('business_id');
-
-    if (businessId) {
-      const { data: business, error } = await supabaseAdmin
-        .from('businesses')
-        .select('*')
-        .eq('id', businessId)
-        .maybeSingle();
-
-      if (error || !business) {
-        return NextResponse.json({ error: 'Business not found' }, { status: 404 });
-      }
-      // Optional: verify access manually (but admin client already bypasses RLS)
-      return NextResponse.json({ success: true, business });
-    }
-
-    // ─── Return all businesses (owned + member) ───
-    const { data: owned } = await supabaseAdmin
+    // ─── Owned businesses ───
+    const { data: owned, error: ownedError } = await supabaseAdmin
       .from('businesses')
       .select('id, name, sector')
       .eq('owner_id', user.id);
 
-    const { data: memberships } = await supabaseAdmin
+    if (ownedError) throw ownedError;
+
+    // ─── Member businesses ───
+    const { data: memberships, error: memberError } = await supabaseAdmin
       .from('business_memberships')
       .select('business_id')
       .eq('user_id', user.id);
 
+    if (memberError) throw memberError;
+
     let memberBusinesses = [];
     if (memberships && memberships.length > 0) {
       const ids = memberships.map(m => m.business_id);
-      const { data: biz } = await supabaseAdmin
+      const { data: biz, error: bizError } = await supabaseAdmin
         .from('businesses')
         .select('id, name, sector')
         .in('id', ids);
-      if (biz) memberBusinesses = biz;
+      if (!bizError) memberBusinesses = biz || [];
     }
 
     const all = [...(owned || []), ...memberBusinesses];
@@ -62,4 +51,4 @@ export async function GET(req) {
     console.error('Businesses API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-    }
+}
