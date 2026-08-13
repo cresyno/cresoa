@@ -27,7 +27,7 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       }
     }
     loadBusinesses();
-  }, []);
+  }, [currentBusinessId]); // ✅ Refetch when currentBusinessId changes
 
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
@@ -44,6 +44,7 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   };
 
   return (
+    // ... rest of the component (unchanged)
     <div style={{ position: 'relative', marginBottom: '16px' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
