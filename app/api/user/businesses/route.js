@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { supabase } from '../../../../lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,39 +10,36 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
-    
-    // ─── Use supabaseAdmin to avoid RLS issues ───
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ─── Owned businesses ───
-    const { data: owned, error: ownedError } = await supabaseAdmin
+    // ─── Get all businesses where user is owner ───
+    const { data: owned, error: ownedError } = await supabase
       .from('businesses')
-      .select('id, name, sector')
+      .select('*')
       .eq('owner_id', user.id);
-
     if (ownedError) throw ownedError;
 
-    // ─── Member businesses ───
-    const { data: memberships, error: memberError } = await supabaseAdmin
+    // ─── Get all businesses where user is a member ───
+    const { data: memberships, error: memberError } = await supabase
       .from('business_memberships')
       .select('business_id')
       .eq('user_id', user.id);
-
     if (memberError) throw memberError;
 
     let memberBusinesses = [];
     if (memberships && memberships.length > 0) {
       const ids = memberships.map(m => m.business_id);
-      const { data: biz, error: bizError } = await supabaseAdmin
+      const { data: biz, error: bizError } = await supabase
         .from('businesses')
-        .select('id, name, sector')
+        .select('*')
         .in('id', ids);
       if (!bizError) memberBusinesses = biz || [];
     }
 
+    // ─── Merge and deduplicate ───
     const all = [...(owned || []), ...memberBusinesses];
     const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
 
