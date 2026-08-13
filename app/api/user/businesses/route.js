@@ -15,30 +15,25 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ─── DEBUG: return user info ───
-    const debug = { user: { id: user.id, email: user.email } };
+    // ─── DEBUG: Try to fetch memberships with explicit error handling ───
+    let memberships = [];
+    let membershipError = null;
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id);
+      if (error) throw error;
+      memberships = data || [];
+    } catch (err) {
+      membershipError = err.message;
+    }
 
     // ─── Owned businesses ───
     const { data: owned, error: ownedError } = await supabaseAdmin
       .from('businesses')
       .select('id, name, sector')
       .eq('owner_id', user.id);
-    if (ownedError) {
-      debug.ownedError = ownedError.message;
-    } else {
-      debug.owned = owned || [];
-    }
-
-    // ─── Member businesses ───
-    const { data: memberships, error: memberError } = await supabaseAdmin
-      .from('business_memberships')
-      .select('business_id')
-      .eq('user_id', user.id);
-    if (memberError) {
-      debug.memberError = memberError.message;
-    } else {
-      debug.memberships = memberships || [];
-    }
 
     let memberBusinesses = [];
     if (memberships && memberships.length > 0) {
@@ -48,26 +43,24 @@ export async function GET(req) {
         .select('id, name, sector')
         .in('id', ids);
       if (!bizError) memberBusinesses = biz || [];
-      debug.memberBusinesses = memberBusinesses;
     }
 
     const all = [...(owned || []), ...memberBusinesses];
     const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
 
-    debug.merged = unique;
-
-    // ─── Return both businesses and debug info ───
     return NextResponse.json({
       success: true,
       businesses: unique,
-      debug: debug
+      debug: {
+        user_id: user.id,
+        memberships: memberships,
+        membershipError: membershipError,
+        owned: owned || [],
+        merged: unique
+      }
     });
   } catch (error) {
     console.error('Businesses API error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message,
-      businesses: []
-    }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
