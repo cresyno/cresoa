@@ -1,36 +1,33 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
-import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
-import '../../globals.css'
+import '../../../globals.css'
 
 // ─── Helpers ────────────────────────────────────────────────
 
 function formatRelativeTime(date) {
   const now = new Date()
-  const diff = (now - date) / 1000 // seconds
+  const diff = (now - date) / 1000
   if (diff < 60) return `${Math.floor(diff)}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
 function getDateGroup(date) {
   const now = new Date()
   const d = new Date(date)
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(startOfWeek.getDate() - now.getDay())
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
+  const startOfWeek = new Date(today); startOfWeek.setDate(startOfWeek.getDate() - now.getDay())
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
   if (d >= today) return 'Today'
@@ -47,17 +44,18 @@ function getActionInfo(action) {
     'role_changed': { label: 'Role Changed', icon: 'user', color: 'var(--cresoa-info)' },
     'member_removed': { label: 'Member Removed', icon: 'trash-2', color: 'var(--cresoa-danger)' },
     'business_created': { label: 'Business Created', icon: 'building', color: 'var(--cresoa-text-muted)' },
-    'invite_accepted_from_onboarding': { label: 'Joined via Onboarding', icon: 'user-plus', color: 'var(--cresoa-success)' },
-    'business_auto_created': { label: 'Auto Created', icon: 'settings', color: 'var(--cresoa-text-muted)' },
     'order_created': { label: 'Order Created', icon: 'plus', color: 'var(--cresoa-info)' },
     'order_updated': { label: 'Order Updated', icon: 'edit-2', color: 'var(--cresoa-info)' },
     'order_status_updated': { label: 'Status Updated', icon: 'refresh-cw', color: 'var(--cresoa-warning)' },
+    'payment_recorded': { label: 'Payment Recorded', icon: 'dollar-sign', color: 'var(--cresoa-success)' },
+    'group_created': { label: 'Group Created', icon: 'layers', color: 'var(--cresoa-accent)' },
+    'group_updated': { label: 'Group Updated', icon: 'layers', color: 'var(--cresoa-accent)' },
   }
   return map[action] || { label: action?.replace(/_/g, ' ') || 'Action', icon: 'activity', color: 'var(--cresoa-text-muted)' }
 }
 
 function getLogDescription(log, userMap) {
-  const performer = userMap[log.performed_by] || 'Someone'
+  const performer = getUserDisplay(userMap, log.performed_by)
   const action = log.action
   let details = ''
   try {
@@ -68,15 +66,27 @@ function getLogDescription(log, userMap) {
   } catch (_) { details = '' }
 
   const templates = {
-    'invite_created': `${performer} invited ${details || 'a new member'} as ${log.details?.role || 'Staff'}`,
+    'invite_created': `${performer} invited ${log.details?.email || 'a new member'} as ${log.details?.role || 'Staff'}`,
     'invite_accepted': `${performer} accepted an invite`,
     'role_changed': `${performer} changed role to ${log.details?.new_role || 'Manager'}`,
     'member_removed': `${performer} removed a member`,
-    'order_created': `${performer} created an order: ${log.details?.title || 'Untitled'}`,
-    'order_updated': `${performer} updated an order`,
-    'order_status_updated': `${performer} updated order status to ${log.details?.new_status || 'Ready'}`,
+    'order_created': `${performer} created order "${log.details?.title || 'Untitled'}"`,
+    'order_updated': `${performer} updated order "${log.details?.title || ''}"`,
+    'order_status_updated': `${performer} updated status to ${log.details?.new_status || 'Ready'}`,
+    'payment_recorded': `${performer} recorded payment of ${log.details?.amount || '₦0'}`,
+    'group_created': `${performer} created group "${log.details?.name || 'Untitled'}"`,
   }
   return templates[action] || `${performer} ${action.replace(/_/g, ' ')}${details ? ': ' + details : ''}`
+}
+
+function getUserDisplay(userMap, userId) {
+  const u = userMap[userId]
+  if (u) {
+    if (u.full_name) return u.full_name
+    if (u.email) return u.email
+    return 'Unknown'
+  }
+  return userId ? userId.slice(0, 8) : 'System'
 }
 
 export default function ActivityPage() {
@@ -90,11 +100,22 @@ export default function ActivityPage() {
   const [error, setError] = useState(null)
   const [userRole, setUserRole] = useState(null)
 
+  // ─── Filters ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [filteredLogs, setFilteredLogs] = useState([])
+
+  // ─── Detail Modal ─────────────────────────────────────────
+  const [selectedLog, setSelectedLog] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+
   const navigateWithBusiness = (path) => {
     const separator = path.includes('?') ? '&' : '?'
     router.push(`${path}${separator}business_id=${businessId}`)
   }
 
+  // ─── Load data ─────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       if (!businessId) {
@@ -130,8 +151,9 @@ export default function ActivityPage() {
 
         if (fetchError) throw fetchError
         setLogs(data || [])
+        setFilteredLogs(data || [])
 
-        // Fetch user emails
+        // Fetch user info
         if (data && data.length > 0) {
           const userIds = [...new Set(data.map(log => log.performed_by).filter(Boolean))]
           if (userIds.length > 0) {
@@ -148,7 +170,7 @@ export default function ActivityPage() {
               const result = await response.json()
               if (response.ok && result.users) {
                 const map = {}
-                result.users.forEach(u => { map[u.id] = u.email || 'Unknown' })
+                result.users.forEach(u => { map[u.id] = u })
                 setUserMap(map)
               }
             }
@@ -166,15 +188,62 @@ export default function ActivityPage() {
     load()
   }, [businessId, router])
 
-  // ─── Group logs by date ──────────────────────────────────
+  // ─── Apply all filters ────────────────────────────────────
+  const applyFilters = () => {
+    let filtered = [...logs]
+
+    // Date filters
+    if (dateFrom) {
+      const from = new Date(dateFrom)
+      from.setHours(0,0,0,0)
+      filtered = filtered.filter(log => new Date(log.created_at) >= from)
+    }
+    if (dateTo) {
+      const to = new Date(dateTo)
+      to.setHours(23,59,59,999)
+      filtered = filtered.filter(log => new Date(log.created_at) <= to)
+    }
+
+    // Search filter (by performer name/email)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      filtered = filtered.filter(log => {
+        const display = getUserDisplay(userMap, log.performed_by).toLowerCase()
+        const email = userMap[log.performed_by]?.email?.toLowerCase() || ''
+        return display.includes(q) || email.includes(q)
+      })
+    }
+
+    setFilteredLogs(filtered)
+  }
+
+  const clearFilters = () => {
+    setDateFrom('')
+    setDateTo('')
+    setSearchQuery('')
+    setFilteredLogs(logs)
+  }
+
+  // ─── Apply filters whenever dependencies change ──────────
+  useEffect(() => {
+    applyFilters()
+  }, [searchQuery, dateFrom, dateTo, logs, userMap])
+
+  // ─── Group filtered logs ──────────────────────────────────
   const groupedLogs = {}
-  logs.forEach(log => {
+  filteredLogs.forEach(log => {
     const group = getDateGroup(log.created_at)
     if (!groupedLogs[group]) groupedLogs[group] = []
     groupedLogs[group].push(log)
   })
   const groupOrder = ['Today', 'Yesterday', 'This Week', 'This Month', 'Older']
   const sortedGroups = groupOrder.filter(g => groupedLogs[g])
+
+  // ─── Open detail modal ────────────────────────────────────
+  const openDetail = (log) => {
+    setSelectedLog(log)
+    setShowModal(true)
+  }
 
   if (loading) {
     return (
@@ -215,12 +284,13 @@ export default function ActivityPage() {
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Audit</p>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Activity Logs</h1>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>
-            {logs.length} activities recorded
+            {filteredLogs.length} of {logs.length} activities
           </p>
         </div>
         <div style={{ background: 'var(--cresoa-surface)', padding: '0.2rem 0.8rem', borderRadius: '20px', border: '1px solid var(--cresoa-border)', fontSize: '0.75rem', fontWeight: 600 }}>
@@ -228,28 +298,74 @@ export default function ActivityPage() {
         </div>
       </div>
 
-      {logs.length === 0 ? (
+      {/* ─── Filters ────────────────────────────────────────── */}
+      <Card style={{ padding: '0.8rem 1rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
+          {/* Search */}
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', marginBottom: '0.2rem' }}>Search</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.2rem 0.6rem', border: '1px solid var(--cresoa-border)', borderRadius: '6px', background: 'var(--cresoa-surface)' }}>
+              <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
+              <input
+                type="text"
+                placeholder="Name or email..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
+              />
+            </div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', marginBottom: '0.2rem' }}>From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', marginBottom: '0.2rem' }}>To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }}
+            />
+          </div>
+          <button onClick={applyFilters} className="cresoa-primary-button" style={{ padding: '0.3rem 1rem', fontSize: '0.8rem' }}>
+            <Icon name="filter" size={14} stroke="#fff" /> Apply
+          </button>
+          <button onClick={clearFilters} style={{ padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>
+            Clear
+          </button>
+        </div>
+      </Card>
+
+      {/* ─── Activity Feed ──────────────────────────────────── */}
+      {filteredLogs.length === 0 ? (
         <Card style={{ padding: '3rem 2rem', textAlign: 'center' }}>
           <Icon name="inbox" size={40} stroke="var(--cresoa-text-muted)" />
-          <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No activity yet</h3>
+          <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No activity found</h3>
           <p style={{ color: 'var(--cresoa-text-muted)' }}>
-            Actions like invites, role changes, and member removals will appear here.
+            {logs.length > 0 ? 'Try adjusting your filters.' : 'Actions will appear here.'}
           </p>
         </Card>
       ) : (
         sortedGroups.map(group => (
           <div key={group} style={{ marginBottom: '1.5rem' }}>
             <SectionHeader title={group} subtitle={`${groupedLogs[group].length} activities`} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {groupedLogs[group].map(log => {
                 const info = getActionInfo(log.action)
                 const description = getLogDescription(log, userMap)
                 const relativeTime = formatRelativeTime(new Date(log.created_at))
+                const userDisplay = getUserDisplay(userMap, log.performed_by)
                 return (
-                  <Card key={log.id} style={{ padding: '0.8rem 1rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Card key={log.id} style={{ padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => openDetail(log)}>
                     <div style={{
-                      width: '36px',
-                      height: '36px',
+                      width: '28px',
+                      height: '28px',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -258,20 +374,23 @@ export default function ActivityPage() {
                       color: info.color,
                       flexShrink: 0
                     }}>
-                      <Icon name={info.icon} size={18} stroke="currentColor" />
+                      <Icon name={info.icon} size={14} stroke="currentColor" />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>
+                      <div style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--cresoa-text)' }}>
                         {description}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)', display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <span>{relativeTime}</span>
                         <span>·</span>
-                        <span style={{ background: info.color + '20', color: info.color, padding: '0.1rem 0.5rem', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 600 }}>
+                        <span style={{ background: info.color + '20', color: info.color, padding: '0.05rem 0.5rem', borderRadius: '12px', fontSize: '0.6rem', fontWeight: 600 }}>
                           {info.label}
                         </span>
+                        <span>·</span>
+                        <span>{userDisplay}</span>
                       </div>
                     </div>
+                    <Icon name="chevron-right" size={16} stroke="var(--cresoa-text-muted)" />
                   </Card>
                 )
               })}
@@ -283,6 +402,34 @@ export default function ActivityPage() {
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={businessId} />
       </div>
+
+  {/* ─── Detail Modal ───────────────────────────────────── */}
+      {showModal && selectedLog && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onClick={() => setShowModal(false)}>
+          <div style={{ width: '100%', maxWidth: '550px', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Activity Detail</span>
+                <h2 style={{ fontSize: '1.2rem', margin: '0.2rem 0 0' }}>{getActionInfo(selectedLog.action).label}</h2>
+              </div>
+              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Performed by</span><br /><strong>{getUserDisplay(userMap, selectedLog.performed_by)}</strong></div>
+              <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Action</span><br /><strong>{selectedLog.action}</strong></div>
+              <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Time</span><br /><strong>{new Date(selectedLog.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></div>
+              <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Details</span><br />
+                <pre style={{ background: 'var(--cresoa-bg)', padding: '0.5rem', borderRadius: '6px', fontSize: '0.75rem', overflow: 'auto', maxHeight: '150px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {selectedLog.details ? JSON.stringify(selectedLog.details, null, 2) : '—'}
+                </pre>
+              </div>
+            </div>
+            <button onClick={() => setShowModal(false)} className="cresoa-primary-button" style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   )
-                      }
+}
