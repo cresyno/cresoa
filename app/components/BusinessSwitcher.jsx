@@ -8,42 +8,56 @@ export default function BusinessSwitcher({ currentBusinessId }) {
   const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [debug, setDebug] = useState(''); // shows raw API response
-  const [loading, setLoading] = useState(false);
+  const [debug, setDebug] = useState('');
 
   const loadBusinesses = async () => {
-    setLoading(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) {
         setDebug('❌ No session');
-        setLoading(false);
         return;
       }
 
-      const timestamp = Date.now();
-      const response = await fetch(`/api/user/businesses?t=${timestamp}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      const result = await response.json();
-      setDebug(JSON.stringify(result, null, 2));
-      if (response.ok) {
-        setBusinesses(result.businesses || []);
-      } else {
-        setDebug('❌ API error: ' + (result.error || 'Unknown'));
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        setDebug('❌ No user');
+        return;
       }
+
+      // ─── Direct Supabase query ───
+      const { data: memberships, error: memError } = await supabase
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id);
+
+      if (memError) {
+        setDebug('❌ Membership error: ' + memError.message);
+        return;
+      }
+
+      // ─── Get the businesses ───
+      let allBusinesses = [];
+      if (memberships && memberships.length > 0) {
+        const ids = memberships.map(m => m.business_id);
+        const { data: biz, error: bizError } = await supabase
+          .from('businesses')
+          .select('id, name, sector')
+          .in('id', ids);
+        if (!bizError) allBusinesses = biz || [];
+      }
+
+      setBusinesses(allBusinesses);
+      setDebug(JSON.stringify(allBusinesses, null, 2));
     } catch (e) {
-      setDebug('❌ Fetch error: ' + e.message);
+      setDebug('❌ Error: ' + e.message);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     loadBusinesses();
-    const timer = setTimeout(loadBusinesses, 2000);
-    return () => clearTimeout(timer);
   }, [currentBusinessId]);
 
+  // ─── The rest of the component is the same ───
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
   const handleSwitch = (businessId) => {
@@ -58,7 +72,6 @@ export default function BusinessSwitcher({ currentBusinessId }) {
 
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
-      {/* ─── Debug output ─── */}
       <div style={{
         fontSize: '10px',
         color: '#aaa',
@@ -71,7 +84,7 @@ export default function BusinessSwitcher({ currentBusinessId }) {
         overflow: 'auto',
         fontFamily: 'monospace'
       }}>
-        {loading ? 'Loading...' : debug || 'No data'}
+        {debug || 'Loading...'}
       </div>
 
       <button
@@ -91,13 +104,10 @@ export default function BusinessSwitcher({ currentBusinessId }) {
           fontWeight: '500'
         }}
       >
-        <span>
-          {currentBusiness ? currentBusiness.name : 'Select Business'}
-        </span>
+        <span>{currentBusiness ? currentBusiness.name : 'Select Business'}</span>
         <span>▼</span>
       </button>
 
-      {/* ─── Manual refresh button ─── */}
       <button
         onClick={loadBusinesses}
         style={{
@@ -173,4 +183,4 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       )}
     </div>
   );
-            }
+}
