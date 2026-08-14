@@ -10,7 +10,7 @@ import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
 import WhatsAppReminderModal from '../../../components/WhatsAppReminderModal'
-import '../../../globals.css'
+import '../../globals.css'
 
 // ─── Helpers ────────────────────────────────────────────────
 
