@@ -8,7 +8,7 @@ import { Icon } from '../../../../../components/Icon'
 import { Card } from '../../../../../components/Card'
 import { Navigation } from '../../../../../components/Navigation'
 import WhatsAppReminderModal from '../../../../../components/WhatsAppReminderModal'
-import '../../../../../globals.css'
+import '../../../../globals.css'
 
 export default function EditReminderPage() {
   const router = useRouter()
