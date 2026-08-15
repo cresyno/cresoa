@@ -10,7 +10,7 @@ import { Card } from '../../../../components/Card'
 import { SectionHeader } from '../../../../components/SectionHeader'
 import { Navigation } from '../../../../components/Navigation'
 import { MeasurementForm } from '../../../../components/MeasurementForm'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 // ─── STEP DEFINITIONS ──────────────────────────────────────
 const STEPS = [
