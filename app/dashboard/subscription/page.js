@@ -1,24 +1,42 @@
-// app/dashboard/subscription/page.js
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { PLANS, getPlanStatusMessage } from '../../../lib/planLimits'
+import { Icon } from '../../../components/Icon'
+import { Card } from '../../../components/Card'
+import { SectionHeader } from '../../../components/SectionHeader'
+import { Navigation } from '../../../components/Navigation'
 import { showToast } from '../../../lib/toast'
+import '../../globals.css'
 
 export default function SubscriptionPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [selectedPlan, setSelectedPlan] = useState('starter')
+  const [selectedPlan, setSelectedPlan] = useState('free')
   const [processing, setProcessing] = useState(false)
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
 
+  // ─── Billing history ──────────────────────────────────────
+  const [billingHistory, setBillingHistory] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  // ─── Cancel modal ─────────────────────────────────────────
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+
+  // ─── Navigation helper ────────────────────────────────────
+  const navigateWithBusiness = (path) => {
+    const separator = path.includes('?') ? '&' : '?'
+    router.push(`${path}${separator}business_id=${business?.id}`)
+  }
+
+  // ─── Load business ────────────────────────────────────────
   const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -34,7 +52,6 @@ export default function SubscriptionPage() {
         .single()
 
       if (error || !businessData) {
-        // No business found — redirect to onboarding
         router.push('/onboarding')
         return null
       }
@@ -49,11 +66,74 @@ export default function SubscriptionPage() {
     }
   }
 
+  // ─── Load billing history ─────────────────────────────────
+  const loadBillingHistory = async (businessId) => {
+    if (!businessId) return
+    setLoadingHistory(true)
+    try {
+      // Try to fetch from payment_records (if exists)
+      const { data: payments, error } = await supabase
+        .from('payment_records')
+        .select('*')
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) throw error
+
+      if (payments && payments.length > 0) {
+        // Map to billing history format
+        const history = payments.map(p => ({
+          id: p.id,
+          invoice: `INV-${p.id.slice(0, 6)}`,
+          date: p.created_at,
+          amount: p.amount,
+          status: 'paid',
+        }))
+        setBillingHistory(history)
+      } else {
+        // Fallback: fetch from activity logs for payment events
+        const { data: logs } = await supabase
+          .from('business_activity_logs')
+          .select('*')
+          .eq('business_id', businessId)
+          .eq('action', 'payment_recorded')
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (logs && logs.length > 0) {
+          const history = logs.map(log => ({
+            id: log.id,
+            invoice: `INV-${log.id.slice(0, 6)}`,
+            date: log.created_at,
+            amount: log.details?.amount || 0,
+            status: 'paid',
+          }))
+          setBillingHistory(history)
+        } else {
+          setBillingHistory([])
+        }
+      }
+    } catch (err) {
+      console.error('Error loading billing history:', err)
+      setBillingHistory([])
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
   useEffect(() => {
-    loadBusiness().finally(() => setLoading(false))
+    const init = async () => {
+      const biz = await loadBusiness()
+      if (biz) {
+        await loadBillingHistory(biz.id)
+      }
+      setLoading(false)
+    }
+    init()
   }, [])
 
-  // ✅ Handle Paystack callback — THIS IS THE CRITICAL PART
+  // ─── Paystack verification ────────────────────────────────
   useEffect(() => {
     const reference = searchParams?.get('reference') || searchParams?.get('trxref')
 
@@ -72,9 +152,8 @@ export default function SubscriptionPage() {
 
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
-            // Reload business data
             await loadBusiness()
-            // Redirect to clean URL after 2 seconds
+            await loadBillingHistory(business?.id)
             setTimeout(() => {
               router.replace('/dashboard/subscription')
             }, 2000)
@@ -95,6 +174,7 @@ export default function SubscriptionPage() {
     }
   }, [searchParams, router])
 
+  // ─── Upgrade handler ──────────────────────────────────────
   const handleUpgrade = async (planId) => {
     setMessage('')
     setProcessing(true)
@@ -107,7 +187,6 @@ export default function SubscriptionPage() {
         return
       }
 
-      // Fetch fresh business
       const { data: freshBusiness, error } = await supabase
         .from('businesses')
         .select('id, plan')
@@ -147,281 +226,476 @@ export default function SubscriptionPage() {
     }
   }
 
+  // ─── Cancel subscription ──────────────────────────────────
+  const handleCancelSubscription = async () => {
+    setCancelling(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      const { error } = await supabase
+        .from('businesses')
+        .update({
+          plan: 'free',
+          subscription_expires_at: null,
+        })
+        .eq('id', business.id)
+        .eq('owner_id', user.id)
+
+      if (error) throw error
+
+      await loadBusiness()
+      showToast('✅ Subscription cancelled successfully.', '#4C7A5E')
+      setShowCancelModal(false)
+    } catch (err) {
+      console.error('Cancel error:', err)
+      showToast('❌ Failed to cancel subscription.', '#AE4A34')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
+  // ─── Apply for Beta ──────────────────────────────────────
+  const handleApplyBeta = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      const { error } = await supabase
+        .from('businesses')
+        .update({
+          plan: 'beta',
+          has_applied_for_beta: true,
+        })
+        .eq('id', business.id)
+        .eq('owner_id', user.id)
+
+      if (error) throw error
+
+      await loadBusiness()
+      showToast('✅ You are now on the Beta plan! Enjoy 3 months of Pro features.', '#4C7A5E')
+    } catch (err) {
+      console.error('Beta apply error:', err)
+      showToast('❌ Failed to apply for Beta.', '#AE4A34')
+    }
+  }
+
+  // ─── Format helpers ──────────────────────────────────────
+  const formatDate = (iso) => {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const formatMoney = (value) => {
+    return `₦${Number(value || 0).toLocaleString('en-NG')}`
+  }
+
+  // ─── Status banner ────────────────────────────────────────
   const planStatus = business ? getPlanStatusMessage(business) : null
 
+  // ─── Loading ─────────────────────────────────────────────
   if (loading || verifying) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner {
             width: 40px; height: 40px;
-            border: 4px solid #e4d8c2;
-            border-top: 4px solid #1E3A5F;
+            border: 4px solid var(--cresoa-border);
+            border-top: 4px solid var(--cresoa-accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
           }
         `}</style>
         <div className="spinner"></div>
-        {verifying && <p style={{ color: '#6B6255', marginTop: '1rem' }}>Verifying payment...</p>}
+        {verifying && <p style={{ color: 'var(--cresoa-text-muted)', marginTop: '1rem' }}>Verifying payment...</p>}
       </div>
     )
   }
 
-  // ✅ Show success state if payment was just made
   if (paymentSuccess && !verifying) {
     return (
-      <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
-        <div style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'center', padding: '2rem 0' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
-          <h2 style={{ color: '#1E3A5F' }}>Payment Successful!</h2>
-          <p style={{ color: '#6B6255', marginBottom: '0.5rem' }}>
-            Your plan is being upgraded...
-          </p>
-          <p style={{ color: '#6B6255', fontSize: '0.85rem' }}>
-            Redirecting back to dashboard...
-          </p>
-          <div style={{ marginTop: '1rem' }}>
-            <div className="spinner" style={{ width: '30px', height: '30px', margin: '0 auto' }}></div>
-          </div>
-        </div>
-      </main>
+      <div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>✅</div>
+        <h2 style={{ color: 'var(--cresoa-text)' }}>Payment Successful!</h2>
+        <p style={{ color: 'var(--cresoa-text-muted)' }}>Your plan is being upgraded...</p>
+        <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>Redirecting...</p>
+        <div className="spinner" style={{ width: '30px', height: '30px', marginTop: '1rem' }}></div>
+      </div>
     )
   }
 
-  if (!business) {
-    return null
-  }
+  if (!business) return null
+
+  // ─── Plan data with feature lists ────────────────────────
+  const allPlans = [
+    {
+      key: 'free',
+      ...PLANS.free,
+      features: [
+        { text: 'Basic customer management (20 customers)', included: true },
+        { text: 'Basic order tracking (50 orders)', included: true },
+        { text: 'Payment recording', included: true },
+        { text: 'Dashboard access', included: true },
+        { text: 'Customer measurements (Fashion)', included: true },
+        { text: 'Production tracking', included: true },
+        { text: 'Group orders (Aso-Ebi)', included: false },
+        { text: 'Customer tracking links', included: false },
+        { text: 'WhatsApp reminders', included: false },
+      ]
+    },
+    {
+      key: 'starter',
+      ...PLANS.starter,
+      badge: 'Popular',
+      features: [
+        { text: 'Everything in Free', included: true },
+        { text: 'Unlimited customers', included: true },
+        { text: 'Unlimited orders', included: true },
+        { text: 'Group orders (Aso-Ebi)', included: true },
+        { text: 'Customer tracking links', included: true },
+        { text: 'WhatsApp notifications', included: true },
+        { text: 'Automatic reminders', included: true },
+        { text: 'Basic analytics', included: true },
+        { text: '2 staff accounts', included: true },
+      ]
+    },
+    {
+      key: 'pro',
+      ...PLANS.pro,
+      badge: 'Best Value',
+      features: [
+        { text: 'Everything in Starter', included: true },
+        { text: 'Advanced analytics', included: true },
+        { text: 'Bulk actions', included: true },
+        { text: '10 staff accounts', included: true },
+        { text: 'Custom branding', included: true },
+        { text: 'Data export (Excel/PDF)', included: true },
+        { text: 'API access', included: true },
+        { text: 'Priority support', included: true },
+      ]
+    }
+  ]
+
+  const showBeta = business.plan !== 'beta' && !business.has_applied_for_beta
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', padding: '1.5rem 1.2rem' }}>
-      <style>{`
-        .plan-card {
-          background: #fff;
-          border-radius: 14px;
-          padding: 1.5rem;
-          border: 2px solid #E8E0D5;
-          max-width: 380px;
-          margin: 0 auto 1rem;
-          transition: border-color 0.2s ease;
-          position: relative;
-        }
-        .plan-card.active {
-          border-color: #C79A2B;
-          box-shadow: 0 4px 16px rgba(199,154,43,0.12);
-        }
-        .plan-card .badge {
-          position: absolute;
-          top: -8px;
-          right: 12px;
-          background: #C79A2B;
-          color: #1E3A5F;
-          padding: 0.1rem 0.6rem;
-          border-radius: 12px;
-          font-size: 0.6rem;
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-        .plan-card .name {
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #1E3A5F;
-          margin: 0 0 0.2rem;
-        }
-        .plan-card .price {
-          font-size: 1.8rem;
-          font-weight: 700;
-          color: #1E3A5F;
-          margin: 0.2rem 0 0.8rem;
-        }
-        .plan-card .price span {
-          font-size: 0.9rem;
-          font-weight: 400;
-          color: #6B6255;
-        }
-        .plan-card .current-badge {
-          display: inline-block;
-          background: #4C7A5E;
-          color: #fff;
-          padding: 0.1rem 0.6rem;
-          border-radius: 12px;
-          font-size: 0.6rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          margin-bottom: 0.5rem;
-        }
-        .plan-card .features {
-          list-style: none;
-          padding: 0;
-          margin: 1rem 0;
-          text-align: left;
-        }
-        .plan-card .features li {
-          padding: 0.3rem 0;
-          border-bottom: 1px solid #F0EDE8;
-          font-size: 0.85rem;
-          color: #2B2620;
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-        .plan-card .features li:last-child { border-bottom: none; }
-        .plan-card .features li .check { color: #4C7A5E; }
-        .plan-card .features li .cross { color: #AE4A34; }
-        .btn-upgrade {
-          width: 100%;
-          padding: 0.7rem;
-          border-radius: 8px;
-          border: none;
-          background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F;
-          font-size: 0.95rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: transform 0.1s ease;
-        }
-        .btn-upgrade:active { transform: scale(0.98); }
-        .btn-upgrade:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-upgrade.current {
-          background: #E8E0D5;
-          color: #6B6255;
-          cursor: default;
-        }
-        .btn-back {
-          background: none;
-          border: none;
-          color: #1E3A5F;
-          font-size: 0.85rem;
-          padding: 0;
-          margin-bottom: 1rem;
-          cursor: pointer;
-        }
-        .btn-back:hover { text-decoration: underline; }
-        .header {
-          max-width: 380px;
-          margin: 0 auto 1.5rem;
-        }
-        .header h1 {
-          color: #1E3A5F;
-          font-size: 1.4rem;
-          margin: 0 0 0.2rem;
-        }
-        .header p {
-          color: #6B6255;
-          font-size: 0.9rem;
-          margin: 0;
-        }
-        .status-banner {
-          max-width: 380px;
-          margin: 0 auto 1rem;
-          padding: 0.8rem 1rem;
-          border-radius: 8px;
-          text-align: center;
-          font-size: 0.85rem;
-          font-weight: 600;
-        }
-        .status-banner.trial { background: #F6E9C8; color: #B4881E; }
-        .status-banner.active { background: #DCEBE2; color: #4C7A5E; }
-        .status-banner.free { background: #F0EDE8; color: #6B6255; }
-        .status-banner.beta { background: #D6E0EB; color: #1E3A5F; }
-        .spinner {
-          width: 40px; height: 40px;
-          border: 4px solid #e4d8c2;
-          border-top: 4px solid #1E3A5F;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+      <Navigation businessId={business.id} />
 
-      <button className="btn-back" onClick={() => router.push('/dashboard')}>
-        ← Back to dashboard
-      </button>
-
-      <div className="header">
-        <h1>Subscription Plans</h1>
-        <p>Choose the plan that fits your business.</p>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Billing</p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Subscription Plans</h1>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>Choose the plan that fits your business</p>
+        </div>
       </div>
 
+      {/* Status Banner */}
       {planStatus && (
-        <div className={`status-banner ${planStatus.status}`}>
+        <div style={{
+          padding: '0.6rem 1rem',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          background: planStatus.status === 'trial' ? 'var(--cresoa-warning-soft)' :
+                      planStatus.status === 'active' ? 'var(--cresoa-success-soft)' :
+                      planStatus.status === 'beta' ? 'var(--cresoa-info-soft)' :
+                      'var(--cresoa-surface-soft)',
+          color: planStatus.status === 'trial' ? 'var(--cresoa-warning)' :
+                 planStatus.status === 'active' ? 'var(--cresoa-success)' :
+                 planStatus.status === 'beta' ? 'var(--cresoa-info)' :
+                 'var(--cresoa-text-muted)',
+          textAlign: 'center',
+          fontWeight: 600,
+          fontSize: '0.9rem'
+        }}>
           {planStatus.message}
         </div>
       )}
 
-      {message && (
-        <p style={{ maxWidth: '380px', margin: '0 auto 1rem', fontSize: '0.9rem', color: '#AE4A34', textAlign: 'center' }}>
-          {message}
-        </p>
+      {/* Current Plan Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Current Plan</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-text)' }}>
+            {business.plan === 'beta' ? 'Beta' : business.plan.charAt(0).toUpperCase() + business.plan.slice(1)}
+          </div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Status</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-success)' }}>Active ✓</div>
+        </Card>
+        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            {business.plan === 'free' && !business.trial_ends_at ? 'Trial' : 'Next Billing'}
+          </div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>
+            {business.subscription_expires_at ? formatDate(business.subscription_expires_at) :
+             business.trial_ends_at ? formatDate(business.trial_ends_at) : '—'}
+          </div>
+        </Card>
+      </div>
+
+      {/* Plan Cards – 3‑column grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        {allPlans.map((plan) => {
+          const isCurrent = selectedPlan === plan.key
+          const isFree = plan.key === 'free'
+          const isStarter = plan.key === 'starter'
+          const isPro = plan.key === 'pro'
+
+          return (
+            <Card key={plan.key} style={{
+              padding: '1.5rem',
+              borderColor: isCurrent ? 'var(--cresoa-accent)' : 'var(--cresoa-border)',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              {plan.badge && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '12px',
+                  background: 'var(--cresoa-accent)',
+                  color: '#fff',
+                  padding: '0.1rem 0.8rem',
+                  borderRadius: '12px',
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase'
+                }}>
+                  {plan.badge}
+                </span>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{plan.name}</h3>
+                  <p style={{ fontSize: '1.6rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>
+                    {plan.price === 0 ? 'Free' : `₦${plan.price.toLocaleString()}`}
+                    {plan.price > 0 && <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--cresoa-text-muted)' }}> /month</span>}
+                  </p>
+                </div>
+                {isCurrent && (
+                  <span style={{
+                    background: 'var(--cresoa-success)',
+                    color: '#fff',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '12px',
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase'
+                  }}>
+                    ✓ Current
+                  </span>
+                )}
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '1rem 0' }}>
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.2rem 0',
+                      borderBottom: '1px solid var(--cresoa-border)',
+                      fontSize: '0.85rem',
+                      color: feature.included ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)'
+                    }}>
+                      <Icon name={feature.included ? 'check-circle' : 'x-circle'} size={16} stroke={feature.included ? 'var(--cresoa-success)' : 'var(--cresoa-text-muted)'} />
+                      {feature.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {isCurrent ? (
+                <button className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center', background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text-muted)', cursor: 'default', opacity: 0.7 }} disabled>
+                  ✓ Current Plan
+                </button>
+              ) : isFree && business.plan === 'free' && !business.trial_ends_at ? (
+                <button className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center', background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text-muted)', cursor: 'default', opacity: 0.7 }} disabled>
+                  Currently Free
+                </button>
+              ) : (
+                <button
+                  className="cresoa-primary-button"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => handleUpgrade(plan.key)}
+                  disabled={processing}
+                >
+                  {processing ? 'Processing...' : `Upgrade to ${plan.name}`}
+                </button>
+              )}
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Beta Card – only shown if not applied */}
+      {showBeta && (
+        <Card style={{
+          padding: '1.5rem',
+          borderColor: 'var(--cresoa-accent)',
+          background: 'var(--cresoa-accent-soft)',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>🧪 Beta Tester</h3>
+              <p style={{ margin: '0.2rem 0 0', color: 'var(--cresoa-text-muted)' }}>
+                Enjoy all Pro features for 3 months – free! Priority feedback channel included.
+              </p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0' }}>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <Icon name="check-circle" size={16} stroke="var(--cresoa-success)" /> All Pro features
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <Icon name="check-circle" size={16} stroke="var(--cresoa-success)" /> Free for 3 months
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <Icon name="check-circle" size={16} stroke="var(--cresoa-success)" /> Priority feedback channel
+                </li>
+              </ul>
+            </div>
+            <button
+              className="cresoa-primary-button"
+              onClick={handleApplyBeta}
+              style={{ flexShrink: 0, background: 'var(--cresoa-primary)', color: '#fff' }}
+            >
+              Apply for Beta
+            </button>
+          </div>
+        </Card>
       )}
 
-      {Object.entries(PLANS).map(([key, plan]) => {
-        const isCurrent = selectedPlan === key
-        const isBeta = key === 'beta'
-        if (isBeta && business?.plan !== 'beta') return null
+      {/* ─── Billing History ────────────────────────────────── */}
+      <SectionHeader title="Billing History" subtitle="Recent payments and invoices" />
 
-        return (
-          <div key={key} className={`plan-card ${isCurrent ? 'active' : ''}`}>
-            {plan.badge && <span className="badge">{plan.badge}</span>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {loadingHistory ? (
+        <Card style={{ padding: '1.5rem', textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '30px', height: '30px', margin: '0 auto' }}></div>
+          <p style={{ color: 'var(--cresoa-text-muted)', marginTop: '0.5rem' }}>Loading history...</p>
+        </Card>
+      ) : billingHistory.length === 0 ? (
+        <Card style={{ padding: '2rem', textAlign: 'center' }}>
+          <Icon name="inbox" size={40} stroke="var(--cresoa-text-muted)" />
+          <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No billing history</h3>
+          <p style={{ color: 'var(--cresoa-text-muted)' }}>Your payment history will appear here.</p>
+        </Card>
+      ) : (
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px', fontSize: '0.85rem' }}>
+              <thead style={{ background: 'var(--cresoa-bg)', borderBottom: '2px solid var(--cresoa-border)' }}>
+                <tr>
+                  <th style={{ padding: '0.6rem 1rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Invoice</th>
+                  <th style={{ padding: '0.6rem 1rem', textAlign: 'left', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Date</th>
+                  <th style={{ padding: '0.6rem 1rem', textAlign: 'right', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Amount</th>
+                  <th style={{ padding: '0.6rem 1rem', textAlign: 'right', color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billingHistory.map(item => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid var(--cresoa-border)' }}>
+                    <td style={{ padding: '0.6rem 1rem', fontWeight: 600 }}>{item.invoice}</td>
+                    <td style={{ padding: '0.6rem 1rem', color: 'var(--cresoa-text-muted)' }}>{formatDate(item.date)}</td>
+                    <td style={{ padding: '0.6rem 1rem', textAlign: 'right', fontWeight: 600 }}>{formatMoney(item.amount)}</td>
+                    <td style={{ padding: '0.6rem 1rem', textAlign: 'right' }}>
+                      <span style={{
+                        background: 'var(--cresoa-success-soft)',
+                        color: 'var(--cresoa-success)',
+                        padding: '0.1rem 0.6rem',
+                        borderRadius: '12px',
+                        fontSize: '0.7rem',
+                        fontWeight: 600
+                      }}>Paid</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* ─── Danger Zone ─────────────────────────────────────── */}
+      {business.plan !== 'free' && business.plan !== 'beta' && (
+        <div style={{ marginTop: '2rem' }}>
+          <SectionHeader title="⚠️ Danger Zone" subtitle="Actions that cannot be undone" />
+          <Card style={{ padding: '1.5rem', borderColor: 'var(--cresoa-danger)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <p className="name">{plan.name}</p>
-                <p className="price">
-                  {plan.price === 0 ? 'Free' : `₦${plan.price.toLocaleString()}`}
-                  {plan.price > 0 && <span> /month</span>}
+                <h4 style={{ margin: 0, color: 'var(--cresoa-danger)' }}>Cancel Subscription</h4>
+                <p style={{ margin: '0.2rem 0 0', color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>
+                  You'll lose access to Starter/Pro features at the end of your current billing period.
                 </p>
               </div>
-              {isCurrent && <span className="current-badge">✓ Current</span>}
-            </div>
-
-            <ul className="features">
-              {plan.features.map((feature, i) => (
-                <li key={i}>
-                  <span className="check">✓</span>
-                  {feature}
-                </li>
-              ))}
-              {key === 'free' && (
-                <>
-                  <li><span className="cross">✕</span> Group orders (Aso-Ebi)</li>
-                  <li><span className="cross">✕</span> Customer tracking links</li>
-                  <li><span className="cross">✕</span> WhatsApp reminders</li>
-                </>
-              )}
-            </ul>
-
-            {isCurrent ? (
-              <button className="btn-upgrade current" disabled>
-                ✓ Current Plan
-              </button>
-            ) : key === 'beta' ? (
-              <button className="btn-upgrade current" disabled>
-                Beta (free)
-              </button>
-            ) : (
               <button
-                className="btn-upgrade"
-                onClick={() => handleUpgrade(key)}
-                disabled={processing}
+                onClick={() => setShowCancelModal(true)}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--cresoa-danger)',
+                  background: 'transparent',
+                  color: 'var(--cresoa-danger)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--cresoa-danger)'; e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--cresoa-danger)'; }}
               >
-                {processing ? 'Processing...' : `Upgrade to ${plan.name}`}
+                Cancel Subscription
               </button>
-            )}
-          </div>
-        )
-      })}
+            </div>
+          </Card>
+        </div>
+      )}
 
-      <p style={{
-        maxWidth: '380px',
-        margin: '1.5rem auto',
-        fontSize: '0.75rem',
-        color: '#6B6255',
-        textAlign: 'center',
-      }}>
-        All plans include a 14-day free trial. Cancel anytime.
-        <br />
-        <span style={{ opacity: 0.6 }}>Starter: ₦100, Pro: ₦200 (test prices)</span>
-      </p>
-    </main>
+      {/* ─── Cancel Modal ────────────────────────────────────── */}
+      {showCancelModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onClick={() => { if (!cancelling) setShowCancelModal(false) }}>
+          <div style={{ width: '100%', maxWidth: '480px', padding: '1.5rem', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--cresoa-danger)' }}>Cancel Subscription</h2>
+            <p style={{ color: 'var(--cresoa-text-muted)', margin: '0.5rem 0 0' }}>
+              Are you sure? You'll lose access to <strong>{business.plan.charAt(0).toUpperCase() + business.plan.slice(1)}</strong> features at the end of your current billing period.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                style={{ padding: '0.4rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                Keep Plan
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={cancelling}
+                style={{ padding: '0.4rem 1.2rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-danger)', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, opacity: cancelling ? 0.6 : 1 }}
+              >
+                {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Footer ──────────────────────────────────────────── */}
+      <div style={{ marginTop: '2rem' }}>
+        <Navigation businessId={business.id} />
+      </div>
+
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .plan-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+    </div>
   )
-      }
+            }
