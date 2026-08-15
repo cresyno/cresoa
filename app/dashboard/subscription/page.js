@@ -17,7 +17,7 @@ export default function SubscriptionPage() {
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedPlan, setSelectedPlan] = useState('free')
-  const [processing, setProcessing] = useState(false)
+  const [processingPlan, setProcessingPlan] = useState(null) // track which plan is being processed
   const [message, setMessage] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
@@ -71,7 +71,6 @@ export default function SubscriptionPage() {
     if (!businessId) return
     setLoadingHistory(true)
     try {
-      // Try to fetch from payment_records (if exists)
       const { data: payments, error } = await supabase
         .from('payment_records')
         .select('*')
@@ -82,7 +81,6 @@ export default function SubscriptionPage() {
       if (error) throw error
 
       if (payments && payments.length > 0) {
-        // Map to billing history format
         const history = payments.map(p => ({
           id: p.id,
           invoice: `INV-${p.id.slice(0, 6)}`,
@@ -92,7 +90,6 @@ export default function SubscriptionPage() {
         }))
         setBillingHistory(history)
       } else {
-        // Fallback: fetch from activity logs for payment events
         const { data: logs } = await supabase
           .from('business_activity_logs')
           .select('*')
@@ -143,12 +140,8 @@ export default function SubscriptionPage() {
       const verifyPayment = async () => {
         setVerifying(true)
         try {
-          console.log('🔄 Verifying payment with reference:', reference)
-
           const res = await fetch(`/api/paystack/verify?reference=${reference}`)
           const data = await res.json()
-
-          console.log('📦 Verify response:', data)
 
           if (data.status === 'success') {
             showToast('✅ Payment confirmed! Your plan has been upgraded.', '#4C7A5E')
@@ -177,13 +170,13 @@ export default function SubscriptionPage() {
   // ─── Upgrade handler ──────────────────────────────────────
   const handleUpgrade = async (planId) => {
     setMessage('')
-    setProcessing(true)
+    setProcessingPlan(planId) // ✅ only this plan shows "Processing..."
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setMessage('Please log in first.')
-        setProcessing(false)
+        setProcessingPlan(null)
         return
       }
 
@@ -195,7 +188,7 @@ export default function SubscriptionPage() {
 
       if (error || !freshBusiness) {
         setMessage('Business not found.')
-        setProcessing(false)
+        setProcessingPlan(null)
         return
       }
 
@@ -217,12 +210,12 @@ export default function SubscriptionPage() {
         window.location.href = data.authorization_url
       } else {
         setMessage('Error: ' + data.error)
-        setProcessing(false)
+        setProcessingPlan(null)
       }
     } catch (error) {
       console.error('❌ Upgrade error:', error)
       setMessage('Error: ' + error.message)
-      setProcessing(false)
+      setProcessingPlan(null)
     }
   }
 
@@ -257,15 +250,20 @@ export default function SubscriptionPage() {
 
   // ─── Apply for Beta ──────────────────────────────────────
   const handleApplyBeta = async () => {
+    setProcessingPlan('beta')
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+
+      const betaExpiresAt = new Date()
+      betaExpiresAt.setDate(betaExpiresAt.getDate() + 90)
 
       const { error } = await supabase
         .from('businesses')
         .update({
           plan: 'beta',
           has_applied_for_beta: true,
+          beta_expires_at: betaExpiresAt.toISOString(),
         })
         .eq('id', business.id)
         .eq('owner_id', user.id)
@@ -277,6 +275,8 @@ export default function SubscriptionPage() {
     } catch (err) {
       console.error('Beta apply error:', err)
       showToast('❌ Failed to apply for Beta.', '#AE4A34')
+    } finally {
+      setProcessingPlan(null)
     }
   }
 
@@ -289,6 +289,51 @@ export default function SubscriptionPage() {
   const formatMoney = (value) => {
     return `₦${Number(value || 0).toLocaleString('en-NG')}`
   }
+
+  // ─── Get next billing info ────────────────────────────────
+  const getBillingInfo = () => {
+    if (!business) return { date: null, daysRemaining: null }
+
+    // For beta plan
+    if (business.plan === 'beta' && business.beta_expires_at) {
+      const expiry = new Date(business.beta_expires_at)
+      const now = new Date()
+      const daysRemaining = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
+      return {
+        date: formatDate(business.beta_expires_at),
+        daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
+        label: 'Beta expires'
+      }
+    }
+
+    // For paid plans
+    if (business.subscription_expires_at) {
+      const expiry = new Date(business.subscription_expires_at)
+      const now = new Date()
+      const daysRemaining = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
+      return {
+        date: formatDate(business.subscription_expires_at),
+        daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
+        label: 'Next billing'
+      }
+    }
+
+    // For trial
+    if (business.trial_ends_at) {
+      const expiry = new Date(business.trial_ends_at)
+      const now = new Date()
+      const daysRemaining = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
+      return {
+        date: formatDate(business.trial_ends_at),
+        daysRemaining: daysRemaining > 0 ? daysRemaining : 0,
+        label: 'Trial ends'
+      }
+    }
+
+    return { date: null, daysRemaining: null }
+  }
+
+  const billingInfo = getBillingInfo()
 
   // ─── Status banner ────────────────────────────────────────
   const planStatus = business ? getPlanStatusMessage(business) : null
@@ -428,11 +473,17 @@ export default function SubscriptionPage() {
         </Card>
         <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
           <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-            {business.plan === 'free' && !business.trial_ends_at ? 'Trial' : 'Next Billing'}
+            {billingInfo.label || 'Next Billing'}
           </div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>
-            {business.subscription_expires_at ? formatDate(business.subscription_expires_at) :
-             business.trial_ends_at ? formatDate(business.trial_ends_at) : '—'}
+          <div style={{ fontWeight: 700, fontSize: '1rem' }}>
+            {billingInfo.daysRemaining !== null && billingInfo.daysRemaining > 0 ? (
+              <>
+                <div style={{ fontSize: '1.1rem' }}>{billingInfo.daysRemaining} days remaining</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>{billingInfo.date}</div>
+              </>
+            ) : (
+              <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', fontWeight: 400 }}>—</span>
+            )}
           </div>
         </Card>
       </div>
@@ -441,9 +492,8 @@ export default function SubscriptionPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         {allPlans.map((plan) => {
           const isCurrent = selectedPlan === plan.key
+          const isProcessing = processingPlan === plan.key
           const isFree = plan.key === 'free'
-          const isStarter = plan.key === 'starter'
-          const isPro = plan.key === 'pro'
 
           return (
             <Card key={plan.key} style={{
@@ -492,7 +542,7 @@ export default function SubscriptionPage() {
                 )}
               </div>
 
-              <div style={{ flex: 1 }}>
+            <div style={{ flex: 1 }}>
                 <ul style={{ listStyle: 'none', padding: 0, margin: '1rem 0' }}>
                   {plan.features.map((feature, idx) => (
                     <li key={idx} style={{
@@ -524,9 +574,9 @@ export default function SubscriptionPage() {
                   className="cresoa-primary-button"
                   style={{ width: '100%', justifyContent: 'center' }}
                   onClick={() => handleUpgrade(plan.key)}
-                  disabled={processing}
+                  disabled={!!processingPlan}
                 >
-                  {processing ? 'Processing...' : `Upgrade to ${plan.name}`}
+                  {isProcessing ? 'Processing...' : `Upgrade to ${plan.name}`}
                 </button>
               )}
             </Card>
@@ -563,9 +613,10 @@ export default function SubscriptionPage() {
             <button
               className="cresoa-primary-button"
               onClick={handleApplyBeta}
+              disabled={!!processingPlan}
               style={{ flexShrink: 0, background: 'var(--cresoa-primary)', color: '#fff' }}
             >
-              Apply for Beta
+              {processingPlan === 'beta' ? 'Applying...' : 'Apply for Beta'}
             </button>
           </div>
         </Card>
@@ -688,14 +739,6 @@ export default function SubscriptionPage() {
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={business.id} />
       </div>
-
-      <style jsx>{`
-        @media (max-width: 768px) {
-          .plan-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   )
-            }
+}
