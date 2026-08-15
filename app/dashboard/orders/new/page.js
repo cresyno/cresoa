@@ -48,6 +48,7 @@ export default function NewOrderPage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [error, setError] = useState(null)
   const [businessPlan, setBusinessPlan] = useState('free')
   const [customers, setCustomers] = useState([])
@@ -256,10 +257,16 @@ export default function NewOrderPage() {
     setError(null)
   }
 
-  const handleSubmit = async (e) => {
+  // ─── Submit / Draft ────────────────────────────────────────
+  const handleSubmit = async (e, isDraft = false) => {
     e.preventDefault()
     if (!validateStep()) return
-    setSaving(true)
+
+    if (isDraft) {
+      setSavingDraft(true)
+    } else {
+      setSaving(true)
+    }
     setError(null)
 
     try {
@@ -292,7 +299,7 @@ export default function NewOrderPage() {
         description: formData.notes.trim() || null,
         price: Number(formData.price) || 0,
         amount_paid: Number(formData.amount_paid) || 0,
-        current_status: formData.current_status,
+        current_status: isDraft ? 'draft' : 'Order placed',
         due_date: formData.delivery_date || null,
         category: formData.category || null,
         quantity: Number(formData.quantity) || 1,
@@ -314,20 +321,27 @@ export default function NewOrderPage() {
       if (orderError) throw orderError
 
       // Log activity
+      const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
-        performed_by: (await supabase.auth.getUser()).data.user.id,
-        action: 'order_created',
+        performed_by: user.id,
+        action: isDraft ? 'order_draft_created' : 'order_created',
         details: { title: formData.title }
       })
 
-      navigateWithBusiness(`/dashboard/orders/${order.id}`)
+      if (isDraft) {
+        // Redirect to orders list with a toast message (optional)
+        navigateWithBusiness('/dashboard/orders')
+      } else {
+        navigateWithBusiness(`/dashboard/orders/${order.id}`)
+      }
 
     } catch (err) {
       console.error(err)
       setError(err.message || 'Unable to create order.')
     } finally {
       setSaving(false)
+      setSavingDraft(false)
     }
   }
 
@@ -410,7 +424,7 @@ export default function NewOrderPage() {
       </div>
 
       {/* ─── Step Content ────────────────────────────────────── */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e) => e.preventDefault()}>
         <Card style={{ padding: '1.5rem', marginBottom: '1rem' }}>
 
           {/* Step 1: Customer */}
@@ -458,7 +472,7 @@ export default function NewOrderPage() {
                 )}
               </div>
 
-              {selectedCustomer ? (
+       {selectedCustomer ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.8rem', border: '1px solid var(--cresoa-border)', borderRadius: '8px', background: 'var(--cresoa-surface-soft)' }}>
                   <span className="cresoa-avatar" style={{ width: '40px', height: '40px', fontSize: '16px' }}>{customerInitial}</span>
                   <div style={{ flex: 1 }}>
@@ -477,7 +491,7 @@ export default function NewOrderPage() {
                 </button>
               )}
 
-                    {isNewCustomer && (
+              {isNewCustomer && (
                 <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--cresoa-border)' }}>
                   <div style={{ display: 'grid', gap: '0.8rem' }}>
                     <div>
@@ -680,8 +694,8 @@ export default function NewOrderPage() {
           </div>
         )}
 
-        {/* ─── Navigation buttons ───────────────────────────── */}
-        <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'space-between' }}>
+           {/* ─── Navigation buttons ───────────────────────────── */}
+        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           {step > 1 ? (
             <button type="button" onClick={handleBack} style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 500 }}>
               <Icon name="arrow-left" size={14} stroke="currentColor" style={{ marginRight: '0.3rem' }} /> Back
@@ -689,14 +703,31 @@ export default function NewOrderPage() {
           ) : (
             <div />
           )}
+
           {step < STEPS.length ? (
             <button type="button" onClick={handleNext} className="cresoa-primary-button" style={{ padding: '0.5rem 1.5rem' }}>
               Continue <Icon name="arrow-right" size={14} stroke="#fff" style={{ marginLeft: '0.3rem' }} />
             </button>
           ) : (
-            <button type="submit" disabled={saving} className="cresoa-primary-button" style={{ padding: '0.5rem 1.5rem' }}>
-              {saving ? 'Creating...' : 'Create Order'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginLeft: 'auto' }}>
+              <button
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={savingDraft}
+                style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                {savingDraft ? 'Saving...' : 'Save as Draft'}
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => handleSubmit(e, false)}
+                disabled={saving}
+                className="cresoa-primary-button"
+                style={{ padding: '0.5rem 1.5rem' }}
+              >
+                {saving ? 'Creating...' : 'Create Order'}
+              </button>
+            </div>
           )}
         </div>
       </form>
@@ -707,4 +738,4 @@ export default function NewOrderPage() {
       </div>
     </div>
   )
-            }
+                }
