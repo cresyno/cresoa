@@ -60,7 +60,6 @@ export default function NewCustomerPage() {
         let bizId = businessId
 
         if (!bizId) {
-          // Try owner
           const { data: owned } = await supabase
             .from('businesses')
             .select('id')
@@ -69,7 +68,6 @@ export default function NewCustomerPage() {
           if (owned) bizId = owned.id
 
           if (!bizId) {
-            // Try membership
             const { data: membership } = await supabase
               .from('business_memberships')
               .select('business_id')
@@ -121,14 +119,17 @@ export default function NewCustomerPage() {
     setError(null)
   }
 
+  // ─── Submit ──────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // ─── Only proceed if we are on the review step ──────────
     if (step < STEPS.length) {
       handleNext()
       return
     }
 
-    // Step 4 – submit
+    // ─── Step 4: Save ────────────────────────────────────────
     const err = validateStep()
     if (err) { setError(err); return }
 
@@ -137,6 +138,8 @@ export default function NewCustomerPage() {
       return
     }
 
+    // ─── Prevent double submission ───────────────────────────
+    if (saving) return
     setSaving(true)
     setError(null)
 
@@ -182,7 +185,7 @@ export default function NewCustomerPage() {
         details: { name: `${form.first_name} ${form.last_name}` },
       })
 
-      // Redirect to customer detail page
+      // ─── Redirect to customer detail page ──────────────────
       navigateWithBusiness(`/dashboard/customers/${customerId}`)
 
     } catch (err) {
@@ -193,7 +196,6 @@ export default function NewCustomerPage() {
   }
 
   // ─── Computed ──────────────────────────────────────────────
-  const progress = ((step - 1) / (STEPS.length - 1)) * 100
   const fullName = `${form.first_name} ${form.last_name}`.trim() || 'New customer'
 
   // ─── Loading skeleton ────────────────────────────────────
@@ -431,7 +433,7 @@ export default function NewCustomerPage() {
 
         </Card>
 
-      {/* ─── Buttons ─────────────────────────────────────────── */}
+                {/* ─── Buttons ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           {step > 1 && (
             <button
@@ -473,4 +475,5 @@ export default function NewCustomerPage() {
       </div>
     </div>
   )
-                      }
+}
+              
