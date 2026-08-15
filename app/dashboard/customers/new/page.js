@@ -37,6 +37,7 @@ export default function NewCustomerPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [successMessage, setSuccessMessage] = useState('')
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(INITIAL_FORM)
   const [resolvedBusinessId, setResolvedBusinessId] = useState(null)
@@ -117,6 +118,7 @@ export default function NewCustomerPage() {
   const handleBack = () => {
     setStep(prev => Math.max(prev - 1, 1))
     setError(null)
+    setSuccessMessage('')
   }
 
   // ─── Submit ──────────────────────────────────────────────────
@@ -138,10 +140,10 @@ export default function NewCustomerPage() {
       return
     }
 
-    // ─── Prevent double submission ───────────────────────────
     if (saving) return
     setSaving(true)
     setError(null)
+    setSuccessMessage('')
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -185,8 +187,13 @@ export default function NewCustomerPage() {
         details: { name: `${form.first_name} ${form.last_name}` },
       })
 
-      // ─── Redirect to customer detail page ──────────────────
-      navigateWithBusiness(`/dashboard/customers/${customerId}`)
+      // ─── Show success message, then redirect ──────────────
+      setSuccessMessage('✅ Customer created successfully! Redirecting...')
+      setSaving(false)
+
+      setTimeout(() => {
+        navigateWithBusiness(`/dashboard/customers/${customerId}`)
+      }, 1500)
 
     } catch (err) {
       console.error('Create customer error:', err)
@@ -398,34 +405,43 @@ export default function NewCustomerPage() {
             <div>
               <SectionHeader title="Review & Save" subtitle="Check the details before creating the customer" />
               <div style={{ display: 'grid', gap: '0.8rem' }}>
-                <Card style={{ padding: '0.8rem', background: 'var(--cresoa-surface-soft)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                    <span className="cresoa-avatar" style={{ width: '40px', height: '40px', fontSize: '16px' }}>
-                      {(form.first_name?.charAt(0) || '') + (form.last_name?.charAt(0) || '') || '?'}
-                    </span>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{fullName}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{form.phone || 'No phone'}</div>
+                <Card style={{ padding: '0.8rem', background: successMessage ? 'var(--cresoa-success-soft)' : 'var(--cresoa-surface-soft)' }}>
+                  {successMessage ? (
+                    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                      <Icon name="check-circle" size={32} stroke="var(--cresoa-success)" />
+                      <p style={{ margin: '0.5rem 0 0', fontWeight: 600, color: 'var(--cresoa-success)' }}>{successMessage}</p>
                     </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                    <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Gender:</span> <strong>{form.gender || '—'}</strong></div>
-                    <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Age:</span> <strong>{form.age_category || '—'}</strong></div>
-                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--cresoa-text-muted)' }}>Email:</span> <strong>{form.email || '—'}</strong></div>
-                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--cresoa-text-muted)' }}>Address:</span> <strong>{form.address || '—'}</strong></div>
-                    {Object.keys(form.measurements || {}).filter(k => form.measurements[k]).length > 0 && (
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <span style={{ color: 'var(--cresoa-text-muted)' }}>Measurements:</span>
-                        <strong> {Object.entries(form.measurements).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}cm`).join(', ')}</strong>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                        <span className="cresoa-avatar" style={{ width: '40px', height: '40px', fontSize: '16px' }}>
+                          {(form.first_name?.charAt(0) || '') + (form.last_name?.charAt(0) || '') || '?'}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{fullName}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{form.phone || 'No phone'}</div>
+                        </div>
                       </div>
-                    )}
-                    {form.notes && (
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <span style={{ color: 'var(--cresoa-text-muted)' }}>Notes:</span>
-                        <strong> {form.notes}</strong>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                        <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Gender:</span> <strong>{form.gender || '—'}</strong></div>
+                        <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Age:</span> <strong>{form.age_category || '—'}</strong></div>
+                        <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--cresoa-text-muted)' }}>Email:</span> <strong>{form.email || '—'}</strong></div>
+                        <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--cresoa-text-muted)' }}>Address:</span> <strong>{form.address || '—'}</strong></div>
+                        {Object.keys(form.measurements || {}).filter(k => form.measurements[k]).length > 0 && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ color: 'var(--cresoa-text-muted)' }}>Measurements:</span>
+                            <strong> {Object.entries(form.measurements).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}cm`).join(', ')}</strong>
+                          </div>
+                     )}
+                        {form.notes && (
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <span style={{ color: 'var(--cresoa-text-muted)' }}>Notes:</span>
+                            <strong> {form.notes}</strong>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </Card>
               </div>
             </div>
@@ -433,13 +449,13 @@ export default function NewCustomerPage() {
 
         </Card>
 
-                {/* ─── Buttons ─────────────────────────────────────────── */}
+        {/* ─── Buttons ─────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           {step > 1 && (
             <button
               type="button"
               onClick={handleBack}
-              disabled={saving}
+              disabled={saving || !!successMessage}
               style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text)', fontWeight: 500 }}
             >
               <Icon name="arrow-left" size={14} stroke="currentColor" style={{ marginRight: '0.3rem' }} /> Back
@@ -459,11 +475,11 @@ export default function NewCustomerPage() {
           ) : (
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !!successMessage}
               className="cresoa-primary-button"
               style={{ padding: '0.6rem 1.5rem', marginLeft: 'auto' }}
             >
-              {saving ? 'Saving...' : 'Save Customer'}
+              {saving ? 'Saving...' : successMessage ? 'Saved ✓' : 'Save Customer'}
             </button>
           )}
         </div>
@@ -475,5 +491,4 @@ export default function NewCustomerPage() {
       </div>
     </div>
   )
-}
-              
+                          }
