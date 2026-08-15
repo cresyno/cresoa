@@ -9,7 +9,7 @@ import { Card } from '../../../../components/Card'
 import { SectionHeader } from '../../../../components/SectionHeader'
 import { Navigation } from '../../../../components/Navigation'
 import WhatsAppReminderModal from '../../../../components/WhatsAppReminderModal'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 export default function NewReminderPage() {
   const router = useRouter()
