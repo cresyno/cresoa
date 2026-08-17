@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '../../../lib/supabaseClient';
-import { createClient as createAdminClient } from '../../../lib/supabaseAdmin';
-import { supportEngine } from '../../../lib/support/supportEngine';
+import { createClient } from '../../../../lib/supabaseClient';
+import { createClient as createAdminClient } from '../../../../lib/supabaseAdmin';
+import { supportEngine } from '../../../../lib/support/supportEngine';
 
 export async function POST(req) {
   try {
