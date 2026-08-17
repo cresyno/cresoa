@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react';
-import { Icon } from '../../../components/Icon';
-import ChatMessage from '../../../components/support/ChatMessage';
-import ChatInput from '../../../components/support/ChatInput';
+import { Icon } from '../../components/Icon';
+import ChatMessage from '../../components/support/ChatMessage';
+import ChatInput from '../../components/support/ChatInput';
 import { useSearchParams } from 'next/navigation';
 
 export default function SupportPage() {
