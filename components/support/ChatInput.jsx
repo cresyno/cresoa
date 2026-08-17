@@ -1,6 +1,5 @@
-// components/support/ChatInput.jsx
 import { useState } from 'react';
-import Icon from '@/components/Icon';
+import { Icon } from '../../components/Icon'; // Corrected import
 
 export default function ChatInput({ onSend, disabled }) {
   const [input, setInput] = useState('');
