@@ -4,39 +4,40 @@ export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    // 1. Try Gemini (Stable model: gemini-1.5-flash)
+    // 1. Try Gemini (Google AI Studio - 100% free, no billing needed)
     let answer = await callGemini(message);
     let source = 'gemini';
 
-    // 2. If Gemini fails, fallback to hardcoded text (NO GROQ, to avoid 404 errors)
+    // 2. If Gemini fails, fallback to hardcoded text
     if (!answer || answer.startsWith('❌')) {
-      console.warn('Gemini failed, falling back to hardcoded response...');
+      console.warn('Gemini failed, using hardcoded fallback...');
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
 
     return NextResponse.json({ answer, source });
   } catch (error) {
-    console.error('Support API Error:', error);
     return NextResponse.json({ 
-      answer: "I'm having a temporary technical glitch. Please try again in a minute.", 
-      source: 'fatal_error' 
+      answer: "Critical server error. Please try again in a minute.", 
+      source: 'error' 
     });
   }
 }
 
-// ─── Gemini Caller (Only AI used) ───
+// ─── Gemini Free Tier Caller (Google AI Studio) ───
 async function callGemini(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
   
-  // If the key isn't set in Vercel, immediately return fallback
-  if (!API_KEY) return "❌ Error: GEMINI_API_KEY is missing from Vercel environment.";
+  // 1. Immediately let you know if the key isn't in Vercel
+  if (!API_KEY) return "❌ Error: GEMINI_API_KEY is completely missing in Vercel Environment Variables.";
 
   try {
-    // Using the proven stable Gemini 1.5 Flash model
-    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa, a platform for fashion designers and tailors. You provide helpful, concise answers.`;
+    // Using the exact URL for the standard free-tier model on AI Studio
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
     
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. You help fashion designers and tailors run their business. Keep answers very concise and practical.`;
+    
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -44,23 +45,29 @@ async function callGemini(message) {
       })
     });
 
+    // 2. If the API gives a 400, 403, 404, or 500 error, we read it and show it to you
     if (!res.ok) {
-      return `❌ Error: Gemini API returned status ${res.status}`;
+      let errorBody = '';
+      try { errorBody = await res.text(); } catch (e) {}
+      return `❌ Error: Gemini API returned status ${res.status}. Error details: ${errorBody || 'Unknown API error'}`;
     }
 
     const data = await res.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "❌ Error: Gemini returned an empty response.";
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) return "❌ Error: Gemini returned an empty response.";
+    return text;
   } catch (e) {
-    return `❌ Error: Gemini network request failed - ${e.message}`;
+    return `❌ Error: Gemini network request completely failed - ${e.message}`;
   }
 }
 
 // ─── Absolute Fallback (If Gemini is offline) ───
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
-  if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page. You can invite, remove, or change roles there.";
-  if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page. Use the 'New Order' button to create one.";
+  if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
+  if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page.";
   if (lower.includes('subscription') || lower.includes('plan') || lower.includes('pay')) return "To upgrade your plan, go to the Subscription page.";
-  if (lower.includes('production') || lower.includes('sewing')) return "To move an order through production, open the Production page and update the status.";
+  if (lower.includes('production') || lower.includes('sewing')) return "To move an order through production, open the Production page.";
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
