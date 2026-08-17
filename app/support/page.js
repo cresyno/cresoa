@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react';
-import { Icon } from '../../components/Icon';
+import { Suspense, useState, useRef, useEffect } from 'react';
 import ChatMessage from '../../components/support/ChatMessage';
 import ChatInput from '../../components/support/ChatInput';
 import { useSearchParams } from 'next/navigation';
 
-export default function SupportPage() {
+// We put the part that uses useSearchParams into its own component
+function SupportContent() {
   const searchParams = useSearchParams();
   const businessId = searchParams.get('business_id');
 
@@ -30,11 +30,8 @@ export default function SupportPage() {
         body: JSON.stringify({ message: text, business_id: businessId })
       });
       const data = await res.json();
-      if (data.answer) {
-        setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', text: "Tessa is having trouble connecting. Please contact support via WhatsApp." }]);
-      }
+      if (data.answer) setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
+      else setMessages(prev => [...prev, { role: 'assistant', text: "Tessa is having trouble connecting. Please contact support." }]);
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', text: "Oops! Tessa's server is offline. Please try again later." }]);
     } finally {
@@ -44,35 +41,27 @@ export default function SupportPage() {
 
   return (
     <div className="flex flex-col h-screen bg-[var(--cresoa-background)]">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--cresoa-border)] bg-[var(--cresoa-surface)]">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="font-medium text-[var(--cresoa-text)] text-lg">Tessa</span>
         </div>
       </div>
-
-      {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-1">
-        {messages.map((msg, idx) => (
-          <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
-        ))}
-        {isLoading && (
-          <div className="flex justify-start mb-3">
-            <div className="bg-[var(--cresoa-surface-secondary)] px-4 py-2.5 rounded-2xl rounded-bl-none border border-[var(--cresoa-border)]">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
-              </div>
-            </div>
-          </div>
-        )}
+        {messages.map((msg, idx) => <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />)}
+        {isLoading && <div className="flex justify-start mb-3">Loading...</div>}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Input */}
       <ChatInput onSend={handleSendMessage} disabled={isLoading} />
     </div>
   );
-        }
+}
+
+// The default export wraps the content in Suspense
+export default function SupportPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen text-[var(--cresoa-text)]">Loading Tessa...</div>}>
+      <SupportContent />
+    </Suspense>
+  );
+          }
