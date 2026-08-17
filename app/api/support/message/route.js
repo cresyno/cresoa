@@ -4,12 +4,9 @@ export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    // 1. Try Gemini (Free AI Studio Tier)
     let answer = await callGemini(message);
     let source = 'gemini';
 
-    // 2. FIX: Only fallback if answer is completely empty or null.
-    // If answer starts with '❌', we let it pass straight to the user!
     if (!answer) {
       console.warn('Gemini completely failed (returned null/empty), falling back...');
       answer = getHardcodedFallback(message);
@@ -25,15 +22,17 @@ export async function POST(req) {
   }
 }
 
-// ─── Gemini Free Tier Caller ───
+// ─── Gemini Free Tier Caller (Now using gemini-1.5-pro, which is 100% free on AI Studio) ───
 async function callGemini(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
   
   if (!API_KEY) return "❌ Error: GEMINI_API_KEY is missing in Vercel Environment Variables.";
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-    const systemPrompt = `You are Tessa, a warm, professional AI assistant for Cresoa. Keep answers concise and practical.`;
+    // CHANGED: Using 'gemini-1.5-pro' instead of 'flash' to fix the 404 error
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`;
+    
+    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. You help fashion designers and tailors run their business. Keep answers concise and practical.`;
     
     const res = await fetch(url, {
       method: 'POST',
