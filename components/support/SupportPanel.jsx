@@ -1,7 +1,8 @@
+'use client'
 import { useState, useRef, useEffect } from 'react';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
-import { Icon } from '../../components/Icon'; // Corrected import
+import { Icon } from '../../components/Icon';
 
 export default function SupportPanel({ onClose, businessId }) {
   const [messages, setMessages] = useState([
@@ -69,4 +70,4 @@ export default function SupportPanel({ onClose, businessId }) {
       <ChatInput onSend={handleSendMessage} disabled={isLoading} />
     </div>
   );
-          }
+}
