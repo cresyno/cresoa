@@ -4,13 +4,11 @@ export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    // Try strictly Gemini 3.0 Flash, and ONLY that model
-    let answer = await callGemini3(message);
-    let source = 'gemini-3.0-flash';
+    let answer = await callGemini(message);
+    let source = 'gemini-2.5-flash';
 
-    // If it fails for any reason, fallback to hardcoded text
     if (!answer) {
-      console.warn('Gemini 3.0 Flash failed, using hardcoded fallback...');
+      console.warn('Gemini 2.5 Flash failed, using hardcoded fallback...');
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
@@ -24,15 +22,15 @@ export async function POST(req) {
   }
 }
 
-// ─── Gemini 3.0 Flash Only (Google's latest free model) ───
-async function callGemini3(message) {
+// ─── Stable Gemini 2.5 Flash (Universally available on free tier) ───
+async function callGemini(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
   try {
-    // Hardcoded to the exact latest Gemini 3.0 Flash model you requested
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash-exp:generateContent?key=${API_KEY}`;
-    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Give very concise and practical advice for fashion designers.`;
+    // Using the official, stable 2.5 Flash model
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Give concise and practical advice for fashion designers.`;
     
     const res = await fetch(url, {
       method: 'POST',
@@ -42,12 +40,18 @@ async function callGemini3(message) {
       })
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // If we get an error, log it to the terminal and return null to trigger fallback
+      const errorBody = await res.text();
+      console.error(`Gemini API Error: ${res.status} - ${errorBody}`);
+      return null; 
+    }
 
     const data = await res.json();
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch (e) {
-    return null; // Trigger hardcoded fallback
+    console.error('Gemini network error:', e.message);
+    return null; 
   }
 }
 
