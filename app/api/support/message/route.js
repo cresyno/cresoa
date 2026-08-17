@@ -4,11 +4,11 @@ export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    // 1. Try Gemini
+    // 1. Try Gemini (using gemini-1.5-flash, which is extremely stable)
     let answer = await callGemini(message);
     let source = 'gemini';
 
-    // 2. If Gemini fails, try Groq
+    // 2. If Gemini fails, try Groq (using llama-3.3-70b-versatile, a very fast and smart model)
     if (!answer || answer.startsWith('❌')) {
       console.warn('Gemini failed, falling back to Groq...');
       answer = await callGroq(message);
@@ -17,13 +17,6 @@ export async function POST(req) {
 
     // 3. If both fail, show the specific error to the user
     if (!answer || answer.startsWith('❌')) {
-      console.warn('Both LLMs failed...');
-      // Instead of hiding the error, we pass the specific failure reason to the user
-      if (answer && answer.startsWith('❌')) {
-        // We keep the error so they know what to fix
-      } else {
-        answer = "❌ Error: Both AI engines failed silently. Please check that your GEMINI_API_KEY and GROQ_API_KEY are correctly added in your Vercel Environment Variables.";
-      }
       source = 'error';
     }
 
@@ -37,14 +30,14 @@ export async function POST(req) {
   }
 }
 
-// ─── Gemini Caller ───
+// ─── Gemini Caller (Model: gemini-1.5-flash) ───
 async function callGemini(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return "❌ Error: GEMINI_API_KEY is missing from Vercel environment.";
 
   try {
     const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa.`;
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -63,7 +56,7 @@ async function callGemini(message) {
   }
 }
 
-// ─── Groq Caller ───
+// ─── Groq Caller (Model: llama-3.3-70b-versatile) ───
 async function callGroq(message) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return "❌ Error: GROQ_API_KEY is missing from Vercel environment.";
@@ -74,7 +67,7 @@ async function callGroq(message) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.3-70b-versatile', // <--- Fixed model name
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: message }]
       })
     });
