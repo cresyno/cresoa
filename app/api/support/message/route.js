@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../../lib/supabaseClient';
+import { createClient } from '../../../../lib/supabaseServer';
 
 export async function POST(req) {
   try {
-    // 1. Get user using the exact pattern from your dashboard layout
+    // Use the NEW server client to check the user
+    const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { message, business_id } = await req.json();
 
-    // 2. Check membership
+    // Check membership
     const { data: membership } = await supabase
       .from('business_memberships')
       .select('role')
@@ -19,7 +20,7 @@ export async function POST(req) {
 
     if (!membership) return NextResponse.json({ error: 'No access to business' }, { status: 403 });
 
-    // 3. Tessa's brain (Hardcoded inside so it can't crash)
+    // Tessa's smart fallback logic
     let answer = "I couldn't find a specific answer to that, but please contact support via WhatsApp!";
     const lowerMsg = message.toLowerCase();
 
