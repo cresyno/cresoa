@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '../../../../lib/supabaseServer';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export async function POST(req) {
   try {
-    // Use the NEW server client to check the user
-    const supabase = createClient();
+    // Use the built-in route handler from your existing package
+    const supabase = createRouteHandlerClient({ cookies });
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -20,7 +21,7 @@ export async function POST(req) {
 
     if (!membership) return NextResponse.json({ error: 'No access to business' }, { status: 403 });
 
-    // Tessa's smart fallback logic
+    // Tessa's logic (same as before)
     let answer = "I couldn't find a specific answer to that, but please contact support via WhatsApp!";
     const lowerMsg = message.toLowerCase();
 
