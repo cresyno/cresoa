@@ -4,11 +4,13 @@ export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    let answer = await callGemini(message);
-    let source = 'gemini';
+    // Try strictly Gemini 3.0 Flash, and ONLY that model
+    let answer = await callGemini3(message);
+    let source = 'gemini-3.0-flash';
 
+    // If it fails for any reason, fallback to hardcoded text
     if (!answer) {
-      console.warn('Gemini failed, falling back to hardcoded text...');
+      console.warn('Gemini 3.0 Flash failed, using hardcoded fallback...');
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
@@ -22,40 +24,34 @@ export async function POST(req) {
   }
 }
 
-// ─── Gemini 3 Flash / 2.0 Flash (Free, fastest model) ───
-async function callGemini(message) {
+// ─── Gemini 3.0 Flash Only (Google's latest free model) ───
+async function callGemini3(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
-  // The models to try (2.0 Flash is the stable fast one, 3.0 is the newest preview)
-  const models = ['gemini-2.0-flash-exp', 'gemini-3.0-flash-exp'];
+  try {
+    // Hardcoded to the exact latest Gemini 3.0 Flash model you requested
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash-exp:generateContent?key=${API_KEY}`;
+    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Give very concise and practical advice for fashion designers.`;
+    
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${systemPrompt}\n\nUser Question: ${message}` }] }]
+      })
+    });
 
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
-      const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Give very concise and practical advice for fashion designers.`;
-      
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemPrompt}\n\nUser Question: ${message}` }] }]
-        })
-      });
+    if (!res.ok) return null;
 
-      if (!res.ok) continue; // If this model fails, try the next one in the list
-
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return text;
-    } catch (e) {
-      continue; // If network fails, try the next model
-    }
+    const data = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (e) {
+    return null; // Trigger hardcoded fallback
   }
-  return null; // Both models failed, trigger hardcoded fallback
 }
 
-// ─── Absolute Fallback (If both Gemini models fail) ───
+// ─── Absolute Fallback ───
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff')) return "To manage staff, go to the Staff page.";
