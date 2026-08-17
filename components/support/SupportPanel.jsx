@@ -1,8 +1,7 @@
-// components/support/SupportPanel.jsx
 import { useState, useRef, useEffect } from 'react';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
-import Icon from '@/components/Icon';
+import { Icon } from '../../components/Icon'; // Corrected import
 
 export default function SupportPanel({ onClose, businessId }) {
   const [messages, setMessages] = useState([
@@ -11,16 +10,13 @@ export default function SupportPanel({ onClose, businessId }) {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSendMessage = async (text) => {
-    // Add user message
     setMessages(prev => [...prev, { role: 'user', text }]);
     setIsLoading(true);
-
     try {
       const res = await fetch('/api/support/message', {
         method: 'POST',
@@ -28,7 +24,6 @@ export default function SupportPanel({ onClose, businessId }) {
         body: JSON.stringify({ message: text, business_id: businessId })
       });
       const data = await res.json();
-      
       if (data.answer) {
         setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
       } else {
@@ -43,7 +38,6 @@ export default function SupportPanel({ onClose, businessId }) {
 
   return (
     <div className="flex flex-col h-full bg-[var(--cresoa-surface)] rounded-lg shadow-2xl">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[var(--cresoa-border)]">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -54,7 +48,6 @@ export default function SupportPanel({ onClose, businessId }) {
         </button>
       </div>
 
-      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-[var(--cresoa-background)]">
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
@@ -73,8 +66,7 @@ export default function SupportPanel({ onClose, businessId }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <ChatInput onSend={handleSendMessage} disabled={isLoading} />
     </div>
   );
-      }
+          }
