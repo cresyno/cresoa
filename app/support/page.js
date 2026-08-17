@@ -1,57 +1,78 @@
 'use client'
 
-import Link from 'next/link'
+import { useState, useRef, useEffect } from 'react';
+import { Icon } from '../../../components/Icon';
+import ChatMessage from '../../../components/support/ChatMessage';
+import ChatInput from '../../../components/support/ChatInput';
+import { useSearchParams } from 'next/navigation';
 
 export default function SupportPage() {
-  const whatsappNumber = '2349049209780'
-  const message = 'Hi%20Cresoa%20Support%2C%20I%20need%20help%20with...'
+  const searchParams = useSearchParams();
+  const businessId = searchParams.get('business_id');
+
+  const [messages, setMessages] = useState([
+    { role: 'assistant', text: `Hi, I'm Tessa 👋. Ask me anything about your business.` }
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async (text) => {
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/support/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, business_id: businessId })
+      });
+      const data = await res.json();
+      if (data.answer) {
+        setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', text: "Tessa is having trouble connecting. Please contact support via WhatsApp." }]);
+      }
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'assistant', text: "Oops! Tessa's server is offline. Please try again later." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8F6F2', padding: '2rem 1.5rem', fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
-        <Link href="/" style={{ color: '#0F2B4A', textDecoration: 'none', fontSize: '0.85rem' }}>← Back</Link>
-
-        <div style={{ marginTop: '2rem', background: '#fff', borderRadius: '16px', padding: '2.5rem 2rem', border: '1px solid #E5E0D8' }}>
-          <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem' }}>💬</div>
-          <h1 style={{ color: '#0F2B4A', fontSize: '1.6rem', marginBottom: '0.3rem' }}>Support</h1>
-          <p style={{ color: '#8A8A8A', fontSize: '0.95rem', marginBottom: '1.5rem' }}>
-            Have questions? We’re here to help.
-          </p>
-          <p style={{ color: '#8A8A8A', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-            Click the button below to message us on WhatsApp. We usually reply within a few hours.
-          </p>
-          <a
-            href={`https://wa.me/${whatsappNumber}?text=${message}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              padding: '0.9rem 2rem',
-              borderRadius: '12px',
-              background: '#25D366',
-              color: '#fff',
-              fontWeight: '700',
-              fontSize: '1.05rem',
-              textDecoration: 'none',
-              boxShadow: '0 4px 16px rgba(37,211,102,0.3)',
-              transition: 'transform 0.1s ease',
-            }}
-          >
-            💬 Message us on WhatsApp
-          </a>
-          <p style={{ marginTop: '1.5rem', fontSize: '0.7rem', color: '#C8C0B5' }}>
-            Responses typically within 24 hours (Mon–Fri)
-          </p>
-        </div>
-
-        <div style={{ marginTop: '1.5rem', fontSize: '0.75rem', color: '#8A8A8A' }}>
-          <Link href="/learn" style={{ color: '#0F2B4A', textDecoration: 'underline' }}>Learn about Cresoa</Link>
-          {' · '}
-          <Link href="/dashboard" style={{ color: '#0F2B4A', textDecoration: 'underline' }}>Go to Dashboard</Link>
+    <div className="flex flex-col h-screen bg-[var(--cresoa-background)]">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-[var(--cresoa-border)] bg-[var(--cresoa-surface)]">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="font-medium text-[var(--cresoa-text)] text-lg">Tessa</span>
         </div>
       </div>
+
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        {messages.map((msg, idx) => (
+          <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
+        ))}
+        {isLoading && (
+          <div className="flex justify-start mb-3">
+            <div className="bg-[var(--cresoa-surface-secondary)] px-4 py-2.5 rounded-2xl rounded-bl-none border border-[var(--cresoa-border)]">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <ChatInput onSend={handleSendMessage} disabled={isLoading} />
     </div>
-  )
-  }
+  );
+        }
