@@ -8,7 +8,7 @@ import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner';
-import SupportLauncher from '@/components/support/SupportLauncher'; // <--- Added here
+import SupportLauncher from '../../components/support/SupportLauncher'; // <--- Added here
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
