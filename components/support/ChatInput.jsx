@@ -1,5 +1,6 @@
+'use client'
 import { useState } from 'react';
-import { Icon } from '../../components/Icon'; // Corrected import
+import { Icon } from '../../components/Icon';
 
 export default function ChatInput({ onSend, disabled }) {
   const [input, setInput] = useState('');
