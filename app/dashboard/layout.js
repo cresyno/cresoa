@@ -9,87 +9,6 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner';
 
-// ─── Helper: page‑specific header content ───
-function getPageHeader(pathname, business, stats) {
-  if (pathname === '/dashboard' || pathname === '/dashboard/repairs') {
-    const isRepairs = pathname?.startsWith('/dashboard/repairs')
-    return {
-      title: isRepairs ? '🔧 Repairs Dashboard' : '📊 Dashboard',
-      subtitle: `Welcome back, ${business?.name || 'Your business'}`
-    }
-  }
-  if (pathname.startsWith('/dashboard/orders')) {
-    return {
-      title: '📋 Orders',
-      subtitle: `${stats?.totalOrders || 0} orders · ${stats?.overdue || 0} overdue`
-    }
-  }
-  if (pathname.startsWith('/dashboard/customers')) {
-    return {
-      title: '👤 Customers',
-      subtitle: `${stats?.customers || 0} customers`
-    }
-  }
-  if (pathname.startsWith('/dashboard/groups')) {
-    return {
-      title: '👥 Group Orders',
-      subtitle: `${stats?.groups || 0} groups`
-    }
-  }
-  if (pathname.startsWith('/dashboard/reminders')) {
-    return {
-      title: '🔔 Reminders',
-      subtitle: `${stats?.dueToday || 0} due today · ${stats?.overdue || 0} overdue`
-    }
-  }
-  if (pathname.startsWith('/dashboard/staff') || pathname.startsWith('/dashboard/members')) {
-    return {
-      title: '👥 Team & Staff',
-      subtitle: 'Manage your team members'
-    }
-  }
-  if (pathname.startsWith('/dashboard/activity')) {
-    return {
-      title: '📜 Activity Logs',
-      subtitle: 'Monitor business actions and audit trails'
-    }
-  }
-  if (pathname.startsWith('/dashboard/subscription')) {
-    return {
-      title: '💳 Billing & Plan',
-      subtitle: `${business?.plan || 'Free'} plan`
-    }
-  }
-  if (pathname.startsWith('/dashboard/beta-apply')) {
-    return {
-      title: '🧪 Join Beta Program',
-      subtitle: 'Get 90 days free Pro access'
-    }
-  }
-  if (pathname.startsWith('/dashboard/settings/tracking')) {
-    return {
-      title: '🎨 Order Tracking Page',
-      subtitle: 'Customize your customer\'s tracking experience'
-    }
-  }
-  if (pathname.startsWith('/dashboard/profile')) {
-    return {
-      title: '⚙️ Profile & Settings',
-      subtitle: 'Manage your account'
-    }
-  }
-  if (pathname.startsWith('/dashboard/settings')) {
-    return {
-      title: '⚙️ Business Settings',
-      subtitle: 'Manage your business details and branding'
-    }
-  }
-  return {
-    title: '📊 Dashboard',
-    subtitle: 'Welcome back'
-  }
-}
-
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -251,7 +170,7 @@ function DashboardLayoutContent({ children }) {
 
         setBusiness(businessData)
 
-        // ─── Stats ───
+        // ─── Stats (Now unused in UI, but kept for future use) ───
         const { count: totalOrders } = await supabase
           .from('orders')
           .select('*', { count: 'exact', head: true })
@@ -333,8 +252,6 @@ function DashboardLayoutContent({ children }) {
     if (business?.sector === 'Custom Products & Services') return '🛠️ Manufacturing'
     return ''
   }
-
-  const header = getPageHeader(pathname, business, stats)
 
   if (loading) {
     return (
@@ -587,24 +504,6 @@ function DashboardLayoutContent({ children }) {
           min-width: 0;
           padding: 0;
         }
-
-        .page-header {
-          padding: 0.8rem 1.2rem 0.4rem 1.2rem;
-          background: var(--color-card);
-          border-bottom: 1px solid var(--color-border);
-        }
-        .page-header h1 {
-          font-size: 1.1rem;
-          font-weight: 700;
-          color: var(--color-text);
-          margin: 0;
-        }
-        .page-header p {
-          font-size: 0.75rem;
-          color: var(--color-text-muted);
-          margin: 0.1rem 0 0;
-        }
-
         .dashboard-header {
           display: flex;
           justify-content: flex-end;
@@ -653,8 +552,6 @@ function DashboardLayoutContent({ children }) {
           .sidebar.open { transform: translateX(0); }
           .overlay.open { display: block; }
           .main-content { padding-top: 3rem; }
-          .page-header { padding: 0.6rem 1rem 0.2rem 1rem; }
-          .page-header h1 { font-size: 1rem; }
         }
       `}</style>
 
@@ -681,7 +578,7 @@ function DashboardLayoutContent({ children }) {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-<BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
+          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
         </div>
 
         <div className="nav-section">
@@ -699,7 +596,7 @@ function DashboardLayoutContent({ children }) {
           ))}
         </div>
 
-        {showTeamActivity && (
+         {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
             <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
@@ -752,29 +649,24 @@ function DashboardLayoutContent({ children }) {
         </div>
       </div>
 
-<div className="main-content">
-  <div className="dashboard-header">
-    <div></div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-      {business && !business.has_applied_for_beta && isOwner && (
-        <a href={baseUrl('/dashboard/beta-apply')} className="beta-btn">🧪 Join Beta</a>
-      )}
-      <span className="date">
-        {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-      </span>
-    </div>
-  </div>
+      <div className="main-content">
+        <div className="dashboard-header">
+          <div></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {business && !business.has_applied_for_beta && isOwner && (
+              <a href={baseUrl('/dashboard/beta-apply')} className="beta-btn">🧪 Join Beta</a>
+            )}
+            <span className="date">
+              {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+        </div>
 
-  {/* ─── BANNER ─── */}
-  <Banner />
+        {/* ─── BANNER ─── */}
+        <Banner />
 
-  <div className="page-header">
-    <h1>{header.title}</h1>
-    <p>{header.subtitle}</p>
-  </div>
-
-  {children}
-</div>
+        {children}
+      </div>
     </div>
   )
 }
@@ -789,4 +681,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-        }
+           }
