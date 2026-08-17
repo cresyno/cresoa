@@ -8,6 +8,7 @@ import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner';
+import SupportLauncher from '@/components/support/SupportLauncher'; // <--- Added here
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
@@ -596,7 +597,7 @@ function DashboardLayoutContent({ children }) {
           ))}
         </div>
 
-         {showTeamActivity && (
+      {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
             <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
@@ -665,6 +666,9 @@ function DashboardLayoutContent({ children }) {
         {/* ─── BANNER ─── */}
         <Banner />
 
+        {/* ─── TESSA SUPPORT LAUNCHER ─── */}
+        <SupportLauncher businessId={business?.id} />
+
         {children}
       </div>
     </div>
@@ -681,4 +685,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-           }
+        }
