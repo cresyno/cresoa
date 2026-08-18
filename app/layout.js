@@ -11,6 +11,7 @@ const inter = Inter({ subsets: ['latin'] })
 export default function RootLayout({ children }) {
   const pathname = usePathname()
   const isTrackingPage = pathname?.startsWith('/track/')
+  const isTessaPage = pathname?.startsWith('/dashboard/tessa') // ✅ New check for Tessa's own page
   const [theme, setTheme] = useState('light')
 
   // Load theme from localStorage on mount
@@ -34,8 +35,8 @@ export default function RootLayout({ children }) {
       <body className={inter.className}>
         {children}
 
-        {/* Tessa AI Floating Assistant - Replaces the old WhatsApp button */}
-        {!isTrackingPage && <TessaFloatingWidget />}
+        {/* Tessa AI Floating Assistant - Hidden on tracking pages AND the Tessa chat page */}
+        {!isTrackingPage && !isTessaPage && <TessaFloatingWidget />}
 
         <style>{`
           /* ─── GLOBAL CSS VARIABLES ─── */
