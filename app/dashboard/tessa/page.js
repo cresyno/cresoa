@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-// ❌ REMOVED: import { Icon } from '../../../components/Icon';
 import ChatMessage from '../../../components/support/ChatMessage';
 
 function TessaChatContent() {
@@ -48,10 +47,10 @@ function TessaChatContent() {
   }, [messages]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--color-bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--color-bg)' }}>
       
-      {/* Clean Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)' }}>
+      {/* Clean Header - fixed at top */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button onClick={() => router.push(`/dashboard/support?business_id=${businessId}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
             <span style={{ fontSize: '1.2rem' }}>‹</span>
@@ -66,7 +65,7 @@ function TessaChatContent() {
         </div>
       </div>
 
-      {/* Chat Area */}
+      {/* Chat Area - Takes remaining space, scrollable */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
@@ -85,8 +84,8 @@ function TessaChatContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Premium Input Bar with Multicolor Animated Send Button */}
-      <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      {/* Input Bar - Fixed at bottom */}
+      <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', flex: 1, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '24px', padding: '0.2rem 0.2rem 0.2rem 1rem' }}>
           <input 
             type="text" 
@@ -98,7 +97,6 @@ function TessaChatContent() {
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--color-text)', fontSize: '0.95rem', padding: '0.6rem 0' }}
           />
           
-          {/* Animated Multicolor Send Button (Self-contained) */}
           <div className="rainbow-glow-btn-wrapper" style={{ flexShrink: 0 }}>
             <button 
               onClick={handleSendMessage} 
@@ -117,7 +115,6 @@ function TessaChatContent() {
                 transition: 'opacity 0.2s ease'
               }}
             >
-              {/* Inline SVG for "Send" - No external Icon import needed */}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -136,4 +133,4 @@ export default function TessaChatPage() {
       <TessaChatContent />
     </Suspense>
   );
-        }
+}
