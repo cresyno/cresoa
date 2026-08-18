@@ -8,7 +8,6 @@ import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner';
-import SupportLauncher from '../../components/support/SupportLauncher'; // <--- Added here
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
@@ -18,7 +17,6 @@ function DashboardLayoutContent({ children }) {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
-  const [stats, setStats] = useState({})
   const [userRole, setUserRole] = useState(null)
 
   const toggleTheme = () => {
@@ -129,7 +127,7 @@ function DashboardLayoutContent({ children }) {
           }
         }
 
-        // ─── Beta expiry and trial logic ───
+        // Beta expiry and trial logic
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
@@ -170,47 +168,6 @@ function DashboardLayoutContent({ children }) {
         }
 
         setBusiness(businessData)
-
-        // ─── Stats (Now unused in UI, but kept for future use) ───
-        const { count: totalOrders } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('business_id', businessData.id)
-
-        const { count: totalCustomers } = await supabase
-          .from('customers')
-          .select('*', { count: 'exact', head: true })
-          .eq('business_id', businessData.id)
-
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('due_date, current_status')
-          .eq('business_id', businessData.id)
-
-        const today = new Date().toISOString().split('T')[0]
-        const overdue = orders?.filter(o => {
-          if (!o.due_date || o.current_status === 'Delivered') return false
-          const due = new Date(o.due_date)
-          due.setHours(0,0,0,0)
-          const now2 = new Date()
-          now2.setHours(0,0,0,0)
-          return due < now2
-        }).length || 0
-
-        const dueToday = orders?.filter(o => o.due_date === today && o.current_status !== 'Delivered').length || 0
-        const { count: groups } = await supabase
-          .from('group_orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('business_id', businessData.id)
-
-        setStats({
-          totalOrders: totalOrders || 0,
-          customers: totalCustomers || 0,
-          overdue,
-          dueToday,
-          groups: groups || 0
-        })
-
       } catch (error) {
         console.error('Dashboard layout error:', error)
         router.push('/onboarding')
@@ -232,7 +189,6 @@ function DashboardLayoutContent({ children }) {
     }
   }, [searchParams, business, loading])
 
-  // ─── Handlers ───
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -272,20 +228,15 @@ function DashboardLayoutContent({ children }) {
     )
   }
 
-  // ─── Role‑based visibility ───
   const isStaff = userRole === 'Staff'
   const isManager = userRole === 'Manager'
   const isOwner = userRole === 'Owner'
 
-  // Team & Activity: Staff can't see
   const showTeamActivity = !isStaff
-
-  // Settings section: Owner sees all, Manager sees only Profile, Staff sees nothing
   const showSettingsSection = isOwner || isManager
   const showBusinessSettings = isOwner
   const showBilling = isOwner
   const showBeta = isOwner
-  const showTracking = isOwner && (business?.plan === 'pro' || business?.plan === 'beta')
   const showProfile = isOwner || isManager
 
   const baseUrl = (path) => business?.id ? `${path}?business_id=${business.id}` : path
@@ -493,11 +444,11 @@ function DashboardLayoutContent({ children }) {
           color: #D4A52A;
         }
         .sidebar .bottom .support-link {
-          color: #25D366;
+          color: #D4A52A; /* Changed text color to match accent for support link */
         }
         .sidebar .bottom .support-link:hover {
-          background: rgba(37,211,102,0.06);
-          color: #25D366;
+          background: rgba(212,165,42,0.06);
+          color: #D4A52A;
         }
 
         .main-content {
@@ -597,7 +548,7 @@ function DashboardLayoutContent({ children }) {
           ))}
         </div>
 
-      {showTeamActivity && (
+        {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
             <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
@@ -635,15 +586,16 @@ function DashboardLayoutContent({ children }) {
             <span className="icon"><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} stroke="currentColor" /></span>
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </button>
-          <a
-            href="https://wa.me/2349049209780"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="support-link"
+
+             {/* ✅ FIXED: Points to internal Support Hub and keeps the business_id */}
+          <a 
+            href={baseUrl('/dashboard/support')} 
+            className="support-link" 
             onClick={handleNavClick}
           >
-            <span className="icon"><Icon name="message-circle" size={16} stroke="currentColor" /></span> Contact Support
+            <span className="icon"><Icon name="message-circle" size={16} stroke="currentColor" /></span> Support Hub
           </a>
+
           <button className="logout" onClick={handleLogout}>
             <span className="icon"><Icon name="log-out" size={16} stroke="currentColor" /></span> Logout
           </button>
@@ -663,11 +615,8 @@ function DashboardLayoutContent({ children }) {
           </div>
         </div>
 
-        {/* ─── BANNER ─── */}
+        {/* Banner component - kept as is */}
         <Banner />
-
-        {/* ─── TESSA SUPPORT LAUNCHER ─── */}
-        <SupportLauncher businessId={business?.id} />
 
         {children}
       </div>
@@ -685,4 +634,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-        }
+              }
