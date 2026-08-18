@@ -16,8 +16,8 @@ export async function POST(req) {
 
     const { business_id, subject, category, description } = await req.json();
 
-    // Validate Business ID
-    if (!business_id || business_id === 'null' || business_id === 'undefined' || business_id.trim() === '') {
+    // 🛑 ABSOLUTE ID GUARD (Handles "", "null", "undefined", and whitespace)
+    if (!business_id || typeof business_id !== 'string' || business_id.trim() === '') {
       return NextResponse.json({ error: 'Invalid Business ID provided' }, { status: 400 });
     }
 
@@ -25,8 +25,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ✅ NEW LOGIC: Check if user is the OWNER of the business or a MEMBER
-    // First, check if this user owns the business directly
+    // Check if the user is the owner
     const { data: businessData, error: bizError } = await supabase
       .from('businesses')
       .select('owner_id')
@@ -41,7 +40,7 @@ export async function POST(req) {
     if (businessData.owner_id === user.id) {
       hasAccess = true;
     } else {
-      // If not the owner, check the memberships table
+      // If not the owner, check memberships
       const { data: membership } = await supabase
         .from('business_memberships')
         .select('role')
@@ -58,7 +57,6 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Access denied to this business' }, { status: 403 });
     }
 
-    // Create the ticket
     const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
