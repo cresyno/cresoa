@@ -1135,6 +1135,63 @@ body {
 .faq-q { font-weight: 500; color: var(--color-text); margin: 0; font-size: 0.95rem; }
 .faq-a { color: var(--color-text-muted); font-size: 0.85rem; margin: 0.25rem 0 0 0; }
 
+/* --- Tessa Chat UI CSS --- */
+.tessa-msg-user {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 1rem 1rem 0 1rem;
+  max-width: 80%;
+  word-wrap: break-word;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.tessa-msg-ai {
+  background: var(--color-card);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 0.6rem 1rem;
+  border-radius: 1rem 1rem 1rem 0;
+  max-width: 80%;
+  word-wrap: break-word;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.tessa-input {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.tessa-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(212, 165, 42, 0.1); }
+.tessa-send-btn {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.7rem 1.2rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  display: flex; align-items: center; justify-content: center;
+}
+.tessa-send-btn:hover { opacity: 0.9; }
+.tessa-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Bouncing dots animation */
+.dot-bounce {
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: #9ca3af;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
 /* ============================================================
    LOADING SKELETONS
    ============================================================ */
