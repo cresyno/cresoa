@@ -4,7 +4,6 @@ import { cookies } from 'next/headers';
 
 export async function POST(req) {
   try {
-    // ✅ Read the token from the Authorization header
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     
@@ -17,7 +16,12 @@ export async function POST(req) {
 
     const { business_id, subject, category, description } = await req.json();
 
-    if (!business_id || !subject || !category || !description) {
+    // 🛑 STRICT ID CHECK: Handles "null", "undefined", and empty strings
+    if (!business_id || typeof business_id !== 'string' || business_id.trim() === '' || business_id === 'null' || business_id === 'undefined') {
+      return NextResponse.json({ error: 'Invalid Business ID provided' }, { status: 400 });
+    }
+
+    if (!subject || !category || !description) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
