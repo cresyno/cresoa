@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Icon } from '../../../../components/Icon';
+import { Suspense, useState, useRef, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Icon } from '../../../components/Icon';
 
-export default function TessaChatPage() {
+function TessaChatContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const businessId = searchParams.get('business_id');
 
   const [messages, setMessages] = useState([
@@ -38,12 +39,16 @@ export default function TessaChatPage() {
   };
 
   const handleBack = () => {
-    window.location.href = `/dashboard/support?business_id=${businessId}`;
+    // ✅ PREVENTS FULL PAGE RELOAD LOOP
+    if (businessId) {
+      router.push(`/dashboard/support?business_id=${businessId}`);
+    } else {
+      router.push('/dashboard/support');
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', background: 'var(--color-bg)' }}>
-      
       {/* Premium Header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.5rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -97,4 +102,13 @@ export default function TessaChatPage() {
       </div>
     </div>
   );
-      }
+}
+
+// ✅ SUSPENSE WRAPPER STOPS THE HYDRATION RELOAD LOOP
+export default function TessaChatPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>Loading Tessa...</div>}>
+      <TessaChatContent />
+    </Suspense>
+  );
+}
