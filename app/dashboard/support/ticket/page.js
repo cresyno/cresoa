@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Icon } from '../../../../components/Icon';
-// ✅ 1. IMPORT THE SUPABASE CLIENT
 import { supabase } from '../../../../lib/supabaseClient';
 
 export default function ClientTicketPage() {
@@ -11,9 +10,9 @@ export default function ClientTicketPage() {
   const router = useRouter();
   const businessId = searchParams.get('business_id');
 
-  // Redirect if business_id is missing
   useEffect(() => {
-    if (!businessId || businessId.trim() === '') {
+    // 🛑 CATCH THE BAD ID IN THE URL BEFORE ANYTHING ELSE
+    if (!businessId || businessId.trim() === '' || businessId === 'null' || businessId === 'undefined') {
       router.push('/dashboard/support');
     }
   }, [businessId, router]);
@@ -25,21 +24,18 @@ export default function ClientTicketPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    if (businessId) fetchTickets();
+    if (businessId && businessId !== 'null' && businessId.trim() !== '') fetchTickets();
   }, [businessId]);
 
-  // ✅ 2. ADD AUTHORIZATION HEADER TO GET REQUEST
   const fetchTickets = async () => {
-    if (!businessId) return;
+    if (!businessId || businessId === 'null' || businessId.trim() === '') return;
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
       const res = await fetch(`/api/support/tickets?business_id=${businessId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.tickets) setTickets(data.tickets);
@@ -50,13 +46,15 @@ export default function ClientTicketPage() {
     }
   };
 
-  // ✅ 3. ADD AUTHORIZATION HEADER TO POST REQUEST
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!businessId) {
-      alert('Business ID is missing. Please reload the page.');
+    
+    // 🛑 FINAL FRONTEND GUARD
+    if (!businessId || businessId.trim() === '' || businessId === 'null' || businessId === 'undefined') {
+      alert('Business ID is invalid. Please go back to the dashboard and try again.');
       return;
     }
+
     if (!formData.subject || !formData.category || !formData.description) return;
     setIsSubmitting(true);
     try {
@@ -73,7 +71,7 @@ export default function ClientTicketPage() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // ✅ TOKEN PASSED HERE
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ business_id: businessId, ...formData })
       });
@@ -97,6 +95,7 @@ export default function ClientTicketPage() {
     router.push(`/dashboard/support?business_id=${businessId}`);
   };
 
+  // ... [Keep the rest of your return (UI) exactly the same] ...
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', background: 'var(--color-bg)', minHeight: 'calc(100vh - 80px)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
@@ -164,4 +163,4 @@ export default function ClientTicketPage() {
       </div>
     </div>
   );
-}
+        }
