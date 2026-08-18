@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Icon } from '../../../components/Icon';
+import { Icon } from '../../../../components/Icon';
 
 function TessaChatContent() {
   const searchParams = useSearchParams();
