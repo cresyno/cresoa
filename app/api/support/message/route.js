@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
-// ─── 1. PASTE YOUR FULL PDF TEXT HERE ───
-const FULL_PDF_TEXT = `
+// ════════════════════════════════════════════════════════════════
+// ⚠️ PASTE YOUR ENTIRE PDF TEXT (Q&As) INSIDE THE BACKTICKS BELOW
+// ════════════════════════════════════════════════════════════════
+const CRESOA_KNOWLEDGE = `
 
 # Cresoa Knowledge Base
 
@@ -211,15 +213,17 @@ Double check your email and password are correct. If you've forgotten your passw
 **What do I do if I need help with something not covered here?**
 Reach out to Cresoa Support directly, and a member of the team will help you sort it out.
 
+
 `;
 
-// ─── 2. SMART SPLITTER ───
+// ─── 1. SMART SPLITTER & RETRIEVER (Makes her extremely smart) ───
 function splitIntoChunks(text) {
+  if (!text || text.trim() === '') return [];
   return text.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 }
 
-// ─── 3. SMART RETRIEVER ───
 function getRelevantChunks(query, chunks) {
+  if (chunks.length === 0) return ["No context available yet. Please upload the knowledge base."];
   const keywords = query.toLowerCase().split(' ').filter(w => w.length > 3);
   const scored = chunks.map(chunk => {
     const lowerChunk = chunk.toLowerCase();
@@ -230,44 +234,40 @@ function getRelevantChunks(query, chunks) {
     return { text: chunk, score };
   });
   const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
-  return topChunks.map(c => c.text);
+  return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 4. THE REFINED SYSTEM PROMPT ───
+// ─── 2. THE POLISHED, PROFESSIONAL SYSTEM PROMPT ───
 const SYSTEM_PROMPT = `
-You are Tessa, a warm, professional, and polite AI assistant for the Cresoa platform.
+You are Tessa, a warm, professional, and highly knowledgeable AI assistant for the Cresoa platform.
 
 RULES FOR BEHAVIOR:
-1. GREETINGS & SMALL TALK: If the user says hi, hello, thanks, okay, how are you, etc., reply warmly and professionally. Do not tell them to contact support just because they said "thanks". Use natural conversational flow.
+1. GREETINGS & SMALL TALK: If the user says hi, hello, thanks, okay, how are you, etc., reply warmly and naturally. Never tell them to contact support just because they said "thanks" or "okay".
 
-2. PLATFORM QUESTIONS: When the user asks a question about their business on Cresoa (orders, staff, groups, subscriptions), answer strictly and ONLY using the "Platform Context" provided below.
+2. PLATFORM QUESTIONS: When the user asks a business question about Cresoa, you MUST answer strictly and ONLY using the "Platform Context" provided below. If it is not in the context, say so honestly.
 
 3. FORMATTING RULES (CRITICAL):
-   - NEVER use asterisks (*) or double asterisks (**) in your output. No markdown formatting.
-   - Use simple dashes (-) or numbers (1. 2. 3.) for lists if needed.
-   - NEVER say phrases like "based on the user manual", "according to the context", "the manual says", or "as per our records". Just answer the user directly as if you are a knowledgeable human assistant sitting next to them.
+   - NEVER use asterisks (*) or double asterisks (**) in your output. Use simple dashes (-) or numbers (1. 2. 3.) for lists.
+   - NEVER say phrases like "based on the manual", "according to the context", "the manual says", or "per our records". Answer directly and naturally like a human expert.
 
-4. OFF-TOPIC QUESTIONS: If the user asks about politics, celebrities, or general life advice, gently deflect and reply: "I'm Tessa, your Cresoa AI assistant. My focus is strictly on helping you manage your fashion business. How can I assist you with the platform today?"
-
-Here is the official Platform Context:
-"""
-${CRESOA_KNOWLEDGE}
-"""
+4. OFF-TOPIC QUESTIONS: If they ask about politics, celebrities, or general life, reply: "I'm Tessa, your Cresoa AI assistant. My focus is strictly on helping you manage your fashion business on the Cresoa platform. How can I help you today?"
 `;
 
-// ─── 5. API HANDLER ───
+// ─── 3. API HANDLER ───
 export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    const chunks = splitIntoChunks(FULL_PDF_TEXT);
+    // A. If PDF text is available, find the most relevant 3 chunks
+    const chunks = splitIntoChunks(CRESOA_KNOWLEDGE);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
+    // B. Build the final prompt
     const prompt = `
 ${SYSTEM_PROMPT}
 
-User Manual Context:
+Platform Context:
 """
 ${contextString}
 """
@@ -292,7 +292,7 @@ User Question: ${message}
   }
 }
 
-// ─── 6. GEMINI 3.5 FLASH-LITE CALLER ───
+// ─── 4. GEMINI 3.5 FLASH-LITE CALLER ───
 async function callGemini(prompt) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
