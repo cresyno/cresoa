@@ -14,47 +14,61 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { business_id, subject, category, description } = await req.json();
+    // We now expect email instead of business_id
+    const { email, subject, category, description } = await req.json();
 
-    if (!subject || !category || !description) {
+    if (!email || !subject || !category || !description) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 🧠 FINAL BUSINESS RESOLVER (IGNORES URL ID COMPLETELY)
+    // 1. RESOLVE USER UUID USING THE EMAIL
+    const { data: targetUser, error: userError } = await supabase
+      .from('auth.users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (userError || !targetUser) {
+      return NextResponse.json({ 
+        error: `User with email "${email}" does not exist in the system.` 
+      }, { status: 404 });
+    }
+
+    // 2. RESOLVE BUSINESS ID USING THE FOUND USER ID
     let resolvedBusinessId = null;
 
-    // 1. Try to find any business the user owns
+    // Try to find the business they own
     const { data: owned } = await supabase
       .from('businesses')
       .select('id')
-      .eq('owner_id', user.id)
+      .eq('owner_id', targetUser.id)
       .limit(1)
       .maybeSingle();
     if (owned) resolvedBusinessId = owned.id;
 
-    // 2. If not owner, try to find a membership (Manager/Staff)
+    // If they don't own one, try to find a membership
     if (!resolvedBusinessId) {
       const { data: membership } = await supabase
         .from('business_memberships')
         .select('business_id')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUser.id)
         .limit(1)
         .maybeSingle();
       if (membership) resolvedBusinessId = membership.business_id;
     }
 
-    // 3. If still no business, return a clear error
+    // If no business is found, the user is not linked to any business
     if (!resolvedBusinessId) {
       return NextResponse.json({ 
-        error: 'You do not have any business associated with your account. Please contact support.' 
+        error: `User with email "${email}" is not associated with any valid business account.` 
       }, { status: 404 });
     }
 
-    // ✅ Insert the ticket using the resolved ID
+    // 3. INSERT THE TICKET
     const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
-        user_id: user.id,
+        user_id: targetUser.id,
         business_id: resolvedBusinessId,
         subject: subject,
         category: category,
