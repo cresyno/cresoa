@@ -1,16 +1,20 @@
 export default function ChatMessage({ message, isUser }) {
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}>
+    <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: '0.5rem' }}>
       <div 
-        className={`
-          max-w-[80%] px-4 py-2.5 text-sm leading-relaxed 
-          ${isUser 
-            ? 'bg-[var(--color-primary)] text-white rounded-2xl rounded-tr-sm' // User (Right side)
-            : 'bg-[var(--color-card)] text-[var(--color-text)] border border-[var(--color-border)] rounded-2xl rounded-tl-sm' // Tessa (Left side)
-          }
-        `}
+        style={{
+          maxWidth: '80%',
+          padding: '0.6rem 1rem',
+          fontSize: '0.95rem',
+          lineHeight: '1.5',
+          backgroundColor: isUser ? 'var(--color-primary)' : 'var(--color-card)',
+          color: isUser ? 'white' : 'var(--color-text)',
+          border: isUser ? 'none' : '1px solid var(--color-border)',
+          // Rounded corners with a "trim" to mimic the screenshot's bubble style
+          borderRadius: isUser ? '16px 16px 2px 16px' : '16px 16px 16px 2px'
+        }}
       >
-        <p>{message}</p>
+        <p style={{ margin: 0 }}>{message}</p>
       </div>
     </div>
   );
