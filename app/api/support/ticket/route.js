@@ -14,28 +14,25 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let { business_id, subject, category, description } = await req.json();
+    const { business_id, subject, category, description } = await req.json();
 
-    // Validate required fields
     if (!subject || !category || !description) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ─── MAGIC BUSINESS ID RESOLVER (Works even if URL has ?business_id=) ───
+    // 🧠 FINAL BUSINESS RESOLVER (IGNORES URL ID COMPLETELY)
     let resolvedBusinessId = null;
 
-    // Level 1: Check if the provided ID is a valid UUID and exists in the businesses table
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (business_id && uuidRegex.test(business_id)) {
-      const { data: check } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('id', business_id)
-        .maybeSingle();
-      if (check) resolvedBusinessId = business_id;
-    }
+    // 1. Try to find any business the user owns
+    const { data: owned } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', user.id)
+      .limit(1)
+      .maybeSingle();
+    if (owned) resolvedBusinessId = owned.id;
 
-    // Level 2: If Level 1 fails, find the user's first valid membership (Manager or Staff)
+    // 2. If not owner, try to find a membership (Manager/Staff)
     if (!resolvedBusinessId) {
       const { data: membership } = await supabase
         .from('business_memberships')
@@ -46,30 +43,19 @@ export async function POST(req) {
       if (membership) resolvedBusinessId = membership.business_id;
     }
 
-    // Level 3: If Level 2 fails, find the first business they own (Owner)
-    if (!resolvedBusinessId) {
-      const { data: owned } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      if (owned) resolvedBusinessId = owned.id;
-    }
-
-    // If we still have no ID, the user is truly disconnected from any business
+    // 3. If still no business, return a clear error
     if (!resolvedBusinessId) {
       return NextResponse.json({ 
-        error: 'We could not find any business associated with your account. Please ensure you are logged into the correct profile.' 
+        error: 'You do not have any business associated with your account. Please contact support.' 
       }, { status: 404 });
     }
 
-    // ✅ INSERT THE TICKET using the resolved business ID
+    // ✅ Insert the ticket using the resolved ID
     const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
         user_id: user.id,
-        business_id: resolvedBusinessId, // We use the resolved ID here
+        business_id: resolvedBusinessId,
         subject: subject,
         category: category,
         description: description,
