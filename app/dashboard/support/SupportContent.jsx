@@ -47,54 +47,54 @@ export default function SupportContent({ businessId }) {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-[var(--color-bg)] p-4 max-w-6xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', background: 'var(--color-bg)', padding: '1rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexShrink: 0 }}>
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text)]">Support Hub</h1>
-          <p className="text-xs text-[var(--color-text-muted)]">Get help with Tessa, submit a ticket, or chat with a human.</p>
+          <h1 className="support-hub-title" style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--color-text)', margin: 0 }}>Support Hub</h1>
+          <p className="support-hub-subtitle" style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '0.25rem 0 0' }}>Get help with Tessa, submit a ticket, or chat with a human.</p>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 overflow-hidden">
-        <div className="flex-1 flex flex-col bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 p-4 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="font-medium text-[var(--color-text)] text-sm">Tessa · AI Assistant</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 2s infinite' }}></div>
+            <span style={{ fontWeight: '500', color: 'var(--color-text)', fontSize: '0.875rem' }}>Tessa · AI Assistant</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[var(--color-card)]">
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--color-card)' }}>
             {messages.map((msg, idx) => (
               <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
             ))}
             {isLoading && (
-              <div className="flex justify-start mb-3">
-                <div className="bg-[var(--color-bg)] px-4 py-2.5 rounded-2xl rounded-bl-none border border-[var(--color-border)]">
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '0.75rem' }}>
+                <div style={{ background: 'var(--color-bg)', padding: '0.6rem 1rem', borderRadius: '1rem 1rem 1rem 0', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <span style={{ width: '6px', height: '6px', background: '#9ca3af', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both' }}></span>
+                    <span style={{ width: '6px', height: '6px', background: '#9ca3af', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '-0.16s' }}></span>
+                    <span style={{ width: '6px', height: '6px', background: '#9ca3af', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '-0.32s' }}></span>
                   </div>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
-          <div className="border-t border-[var(--color-border)] flex-shrink-0">
+          <div style={{ borderTop: '1px solid var(--color-border)', flexShrink: 0 }}>
             <ChatInput onSend={handleSendMessage} disabled={isLoading} />
           </div>
         </div>
 
-        <div className="w-full lg:w-72 flex flex-col gap-4 flex-shrink-0 overflow-y-auto pb-4">
-          <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-5 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center flex-shrink-0">
-                <Icon name="file-text" className="w-5 h-5 text-[var(--color-accent)]" />
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', flexShrink: 0, paddingBottom: '1rem' }}>
+          <div className="card-surface" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="file-text" className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
               </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-[var(--color-text)] text-sm mb-1">Submit a Ticket</h3>
-                <p className="text-[var(--color-text-muted)] text-xs mb-3">Non-urgent issues? Our team will respond via email within 24 hours.</p>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontWeight: '500', color: 'var(--color-text)', fontSize: '0.875rem', margin: '0 0 0.25rem' }}>Submit a Ticket</h3>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', margin: '0 0 0.75rem' }}>Non-urgent issues? Our team will respond via email within 24 hours.</p>
                 <button 
                   onClick={() => setIsTicketModalOpen(true)}
-                  className="w-full py-2 bg-[var(--color-primary)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                  className="btn-primary" style={{ width: '100%', padding: '0.5rem 1rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Open Ticket Form
                 </button>
@@ -115,4 +115,4 @@ export default function SupportContent({ businessId }) {
       )}
     </div>
   );
-}
+      }
