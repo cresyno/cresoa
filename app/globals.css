@@ -982,6 +982,81 @@ body {
   }
 }
 
+/* --- Support Hub UI Fixes --- */
+.support-hub-title {
+  color: var(--color-text);
+}
+.support-hub-subtitle {
+  color: var(--color-text-muted);
+}
+
+/* Chat Messages */
+.chat-message-user {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 1rem 1rem 0 1rem;
+  padding: 0.6rem 1rem;
+  max-width: 80%;
+}
+.chat-message-ai {
+  background: var(--color-card);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem 1rem 1rem 0;
+  padding: 0.6rem 1rem;
+  max-width: 80%;
+}
+
+/* Input Field */
+.support-input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  width: 100%;
+  outline: none;
+}
+.support-input:focus {
+  border-color: var(--color-accent);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover { opacity: 0.9; }
+
+.btn-whatsapp {
+  background: #25D366;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.btn-whatsapp:hover { opacity: 0.9; }
+
+/* Tickets and Card Wrappers */
+.card-surface {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
 /* ============================================================
    LOADING SKELETONS
    ============================================================ */
