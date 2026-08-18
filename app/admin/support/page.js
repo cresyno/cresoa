@@ -1,0 +1,129 @@
+'use client'
+
+import { useState, useEffect } from 'react';
+import { Icon } from '../../../components/Icon';
+
+export default function AdminSupportPage() {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    fetchTickets();
+  }, []);
+
+  const fetchTickets = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/support/tickets?admin=true');
+      const data = await res.json();
+      if (data.tickets) setTickets(data.tickets);
+    } catch (error) {
+      console.error('Failed to fetch admin tickets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (ticketId, newStatus) => {
+    try {
+      await fetch('/api/support/ticket/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId, status: newStatus })
+      });
+      fetchTickets(); // Refresh list
+    } catch (error) {
+      alert('Failed to update status');
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!replyMessage.trim() || !selectedTicket) return;
+    setIsSending(true);
+    try {
+      await fetch('/api/support/ticket/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketId: selectedTicket.id,
+          message: replyMessage,
+          status: 'resolved'
+        })
+      });
+      setSelectedTicket(null);
+      setReplyMessage('');
+      fetchTickets(); // Refresh list
+    } catch (error) {
+      alert('Failed to send reply');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const filteredTickets = statusFilter === 'all' 
+    ? tickets 
+    : tickets.filter(t => t.status === statusFilter);
+
+  return (
+    <div style={{ padding: '2rem', background: 'var(--color-bg)', minHeight: '100vh', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ color: 'var(--color-text)', fontSize: '1.8rem', fontWeight: '700', marginBottom: '0.5rem' }}>Admin · Support Tickets</h1>
+      <p style={{ color: 'var(--color-text-muted)', marginBottom: '2rem' }}>Manage tickets, reply to customers, and track resolution.</p>
+
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        {['all', 'open', 'in_progress', 'resolved'].map((status) => (
+          <button key={status} onClick={() => setStatusFilter(status)} style={{ padding: '0.4rem 1rem', borderRadius: '20px', border: '1px solid var(--color-border)', background: statusFilter === status ? 'var(--color-primary)' : 'transparent', color: statusFilter === status ? '#fff' : 'var(--color-text)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}>
+            {status.replace('_', ' ')}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p style={{ color: 'var(--color-text-muted)' }}>Loading tickets...</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {filteredTickets.map((ticket) => (
+            <div key={ticket.id} style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem', color: 'var(--color-text)' }}>{ticket.subject}</h4>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span>{ticket.category}</span> • <span>Business: {ticket.business_id ? 'View in DB' : 'N/A'}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <select value={ticket.status} onChange={(e) => handleStatusChange(ticket.id, e.target.value)} style={{ padding: '0.25rem 0.5rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.8rem' }}>
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                  <button onClick={() => setSelectedTicket(ticket)} style={{ padding: '0.25rem 0.75rem', borderRadius: '6px', border: 'none', background: 'var(--color-primary)', color: '#fff', fontSize: '0.8rem', cursor: 'pointer' }}>Reply</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Reply Modal */}
+      {selectedTicket && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 999, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--color-card)', borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '1.5rem', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 0.5rem', color: 'var(--color-text)' }}>Reply to Customer</h3>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Replying to: <strong>{selectedTicket.subject}</strong></p>
+            <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)} rows="5" placeholder="Type your resolution message here... This will be sent via email using Brevo." style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical' }} />
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button onClick={() => { setSelectedTicket(null); setReplyMessage(''); }} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSendReply} disabled={!replyMessage.trim() || isSending} style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontWeight: 600, opacity: (!replyMessage.trim() || isSending) ? '0.7' : '1' }}>
+                {isSending ? 'Sending...' : 'Send Email & Resolve'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
