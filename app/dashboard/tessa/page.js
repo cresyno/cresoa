@@ -6,7 +6,6 @@ import { Icon } from '../../../components/Icon';
 import ChatMessage from '../../../components/support/ChatMessage';
 import ChatInput from '../../../components/support/ChatInput';
 
-// The actual logic is isolated here so Suspense can handle the URL params safely
 function TessaChatContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -19,10 +18,18 @@ function TessaChatContent() {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to the bottom of the chat
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  // A list of useful starting points (Quick Action Chips)
+  const suggestions = [
+    "What are the subscription plans?",
+    "How do I add a staff member?",
+    "What are the Aso-Ebi limits?",
+    "How do I reset my password?"
+  ];
+
+  const handleSuggestionClick = (text) => {
+    setInput(text);
+    // Optional: auto-send immediately if you want. For now, just fill the input.
+  };
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -50,10 +57,9 @@ function TessaChatContent() {
     }
   };
 
-  // Use router.push for smooth back navigation (stops the reload loop)
-  const handleBack = () => {
-    router.push(`/dashboard/support?business_id=${businessId}`);
-  };
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', background: 'var(--color-bg)' }}>
@@ -61,7 +67,7 @@ function TessaChatContent() {
       {/* Premium Header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.5rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', padding: '0.25rem' }}>
+          <button onClick={() => router.push(`/dashboard/support?business_id=${businessId}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', padding: '0.25rem' }}>
             <Icon name="arrow-left" className="w-5 h-5" />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -72,7 +78,7 @@ function TessaChatContent() {
       </div>
 
       {/* Chat Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--color-bg)' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1.5rem 0.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
         ))}
@@ -90,8 +96,32 @@ function TessaChatContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div style={{ padding: '1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', gap: '0.75rem' }}>
+      {/* Quick Action Chips (New!) */}
+      <div style={{ padding: '0.5rem 1.5rem 1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', background: 'var(--color-bg)' }}>
+        {suggestions.map((s, idx) => (
+          <button 
+            key={idx}
+            onClick={() => handleSuggestionClick(s)}
+            style={{
+              padding: '0.4rem 1rem',
+              fontSize: '0.75rem',
+              background: 'var(--color-card)',
+              color: 'var(--color-text)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+            onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-border)'}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Polished Input Area */}
+      <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', gap: '0.75rem', boxShadow: '0 -4px 12px rgba(0,0,0,0.02)' }}>
         <input 
           type="text" 
           value={input} 
@@ -100,8 +130,9 @@ function TessaChatContent() {
           placeholder="Ask Tessa..." 
           disabled={isLoading}
           className="tessa-input"
+          style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: '0.95rem', outline: 'none' }}
         />
-        <button onClick={handleSendMessage} disabled={!input.trim() || isLoading} className="tessa-send-btn">
+        <button onClick={handleSendMessage} disabled={!input.trim() || isLoading} className="tessa-send-btn" style={{ padding: '0.75rem 1.2rem', borderRadius: '12px', background: 'var(--color-primary)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'opacity 0.2s' }}>
           <Icon name="send" className="w-5 h-5" />
         </button>
       </div>
@@ -109,11 +140,10 @@ function TessaChatContent() {
   );
 }
 
-// The Suspense wrapper prevents the "useSearchParams" hydration crash
 export default function TessaChatPage() {
   return (
     <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>Loading Tessa...</div>}>
       <TessaChatContent />
     </Suspense>
   );
-        }
+          }
