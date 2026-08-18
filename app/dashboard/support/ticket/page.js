@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Icon } from '../../../../components/Icon';
+// ✅ 1. IMPORT THE SUPABASE CLIENT
+import { supabase } from '../../../../lib/supabaseClient';
 
 export default function ClientTicketPage() {
   const searchParams = useSearchParams();
@@ -12,7 +14,7 @@ export default function ClientTicketPage() {
   // Redirect if business_id is missing
   useEffect(() => {
     if (!businessId || businessId.trim() === '') {
-      router.push('/dashboard/support'); // safe fallback
+      router.push('/dashboard/support');
     }
   }, [businessId, router]);
 
@@ -26,11 +28,19 @@ export default function ClientTicketPage() {
     if (businessId) fetchTickets();
   }, [businessId]);
 
+  // ✅ 2. ADD AUTHORIZATION HEADER TO GET REQUEST
   const fetchTickets = async () => {
     if (!businessId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/support/tickets?business_id=${businessId}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch(`/api/support/tickets?business_id=${businessId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
       if (data.tickets) setTickets(data.tickets);
     } catch (error) {
@@ -40,6 +50,7 @@ export default function ClientTicketPage() {
     }
   };
 
+  // ✅ 3. ADD AUTHORIZATION HEADER TO POST REQUEST
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!businessId) {
@@ -49,9 +60,21 @@ export default function ClientTicketPage() {
     if (!formData.subject || !formData.category || !formData.description) return;
     setIsSubmitting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        alert('Session expired. Please log out and log back in.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await fetch('/api/support/ticket', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // ✅ TOKEN PASSED HERE
+        },
         body: JSON.stringify({ business_id: businessId, ...formData })
       });
       if (res.ok) {
@@ -76,9 +99,6 @@ export default function ClientTicketPage() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', background: 'var(--color-bg)', minHeight: 'calc(100vh - 80px)' }}>
-      {/* ... (rest of your UI is exactly the same as before) ... */}
-      {/* I'm keeping the UI exactly as you had it, just the hooks and API calls are now guarded */}
-      
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', fontSize: '1.2rem' }}>‹</button>
         <h1 style={{ color: 'var(--color-text)', fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Support Tickets</h1>
@@ -144,4 +164,4 @@ export default function ClientTicketPage() {
       </div>
     </div>
   );
-        }
+}
