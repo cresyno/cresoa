@@ -1057,6 +1057,85 @@ body {
   padding: 1.25rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
+
+/* --- Quick Help Hub Styles --- */
+.support-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+.support-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  border-color: var(--color-accent);
+}
+.support-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.75rem auto;
+  background: rgba(212, 165, 42, 0.1);
+}
+.support-card-title { font-weight: 600; color: var(--color-text); font-size: 1rem; margin: 0 0 0.25rem 0; }
+.support-card-desc { color: var(--color-text-muted); font-size: 0.85rem; line-height: 1.4; }
+
+/* --- The Modal System --- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal-box {
+  background: var(--color-card);
+  border-radius: 20px;
+  max-width: 400px; width: 100%;
+  padding: 2rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  animation: modalFadeIn 0.2s ease-out;
+}
+@keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+.modal-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
+.modal-title { font-size: 1.1rem; font-weight: 600; color: var(--color-text); margin: 0 0 0.5rem 0; }
+.modal-desc { color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem; }
+
+.modal-textarea {
+  width: 100%; padding: 0.75rem; border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  resize: vertical; min-height: 80px;
+  font-family: inherit; font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+.modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+.btn-modal-primary {
+  padding: 0.6rem 1.5rem; border-radius: 10px; border: none;
+  background: var(--color-primary); color: #fff; font-weight: 600; cursor: pointer;
+}
+.btn-modal-close {
+  padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid var(--color-border);
+  background: transparent; color: var(--color-text); cursor: pointer;
+}
+.btn-modal-primary:hover { opacity: 0.9; }
+.btn-modal-close:hover { background: var(--color-bg); }
+
+.faq-item { border-bottom: 1px solid var(--color-border); padding: 0.75rem 0; }
+.faq-item:last-child { border-bottom: none; }
+.faq-q { font-weight: 500; color: var(--color-text); margin: 0; font-size: 0.95rem; }
+.faq-a { color: var(--color-text-muted); font-size: 0.85rem; margin: 0.25rem 0 0 0; }
+}
+
 /* ============================================================
    LOADING SKELETONS
    ============================================================ */
