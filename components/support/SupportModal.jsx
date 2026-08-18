@@ -8,20 +8,30 @@ export default function SupportModal({ type, businessId, onClose }) {
   const router = useRouter();
   const [waMessage, setWaMessage] = useState('Hello, I need help with my Cresoa account.');
 
+  // === SAFE NAVIGATION GUARD ===
+  const safeBusinessId = businessId && businessId.trim() !== '' ? businessId : null;
+
   const handleWhatsAppSend = () => {
     const url = `https://wa.me/2349049209780?text=${encodeURIComponent(waMessage)}`;
     window.open(url, '_blank');
     onClose();
   };
 
-  // ✅ FIXED: Correctly navigates to our new Tessa page with business_id
   const handleTessaNavigate = () => {
-    router.push(`/dashboard/tessa?business_id=${businessId}`);
+    if (!safeBusinessId) {
+      router.push('/dashboard'); // fallback if no business_id
+    } else {
+      router.push(`/dashboard/tessa?business_id=${safeBusinessId}`);
+    }
     onClose();
   };
 
   const handleTicketNavigate = () => {
-    router.push(`/dashboard/support/ticket?business_id=${businessId}`);
+    if (!safeBusinessId) {
+      router.push('/dashboard'); // fallback
+    } else {
+      router.push(`/dashboard/support/ticket?business_id=${safeBusinessId}`);
+    }
     onClose();
   };
 
@@ -62,4 +72,4 @@ export default function SupportModal({ type, businessId, onClose }) {
       <div className="modal-box">{renderContent()}</div>
     </div>
   );
-}
+                                                                                                                                                                                                     }
