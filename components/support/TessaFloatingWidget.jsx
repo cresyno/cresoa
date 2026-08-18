@@ -17,7 +17,6 @@ export default function TessaFloatingWidget() {
   const handleClick = () => {
     setShowBubble(false);
     
-    // ✅ FIX: Extract business_id safely using browser window (No useSearchParams!)
     let businessId = null;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -34,14 +33,23 @@ export default function TessaFloatingWidget() {
   if (!mounted) return null;
 
   return (
-    <div className="tessa-float-wrapper" style={{ position: 'fixed', bottom: '24px', left: '24px', zIndex: 999, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+    <div className="tessa-float-wrapper" style={{ 
+      position: 'fixed', 
+      bottom: '100px', /* Moved up to clear the bottom navigation */
+      right: '20px',   /* Moved to the right hand side */
+      left: 'auto',    /* Resets the left alignment */
+      zIndex: 999, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'flex-end' /* Aligns button to the right, bubble extends left */
+    }}>
       
-      {/* Animated Speech Bubble */}
+      {/* Animated Speech Bubble - Tail aligned to the right */}
       <div className={`tessa-bubble ${showBubble ? 'visible' : 'hidden'}`} style={{
         background: 'var(--color-card)',
         border: '1px solid var(--color-border)',
         padding: '12px 16px',
-        borderRadius: '16px 16px 16px 4px',
+        borderRadius: '16px 16px 4px 16px', /* Adjusted rounding for right side */
         marginBottom: '12px',
         boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
         maxWidth: '200px',
@@ -49,14 +57,16 @@ export default function TessaFloatingWidget() {
         transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
         opacity: showBubble ? 1 : 0,
         transform: `translateY(${showBubble ? 0 : 20}px) scale(${showBubble ? 1 : 0.9})`,
-        pointerEvents: showBubble ? 'auto' : 'none'
+        pointerEvents: showBubble ? 'auto' : 'none',
+        textAlign: 'right'
       }}>
         <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 500, lineHeight: 1.4 }}>
           I'm Tessa, your personal assistant.<br/>
           <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>Need help with anything?</span>
         </p>
+        {/* Tail of the bubble - Adjusted to point right */}
         <div style={{
-          position: 'absolute', bottom: '-6px', left: '20px',
+          position: 'absolute', bottom: '-6px', right: '20px', /* Changed left to right */
           width: '12px', height: '12px',
           background: 'var(--color-card)',
           borderRight: '1px solid var(--color-border)',
@@ -99,4 +109,4 @@ export default function TessaFloatingWidget() {
       `}</style>
     </div>
   );
-                                                                 }
+}
