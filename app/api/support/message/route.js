@@ -5,11 +5,10 @@ export async function POST(req) {
     const { message } = await req.json();
 
     let answer = await callGemini(message);
-    let source = 'gemini-2.5-flash';
+    let source = 'gemini-3.6-flash';
 
-    // If Gemini returns null, it means a network error happened. Use the fallback.
     if (!answer) {
-      console.warn('Gemini network request completely failed (timeout/etc).');
+      console.warn('Gemini 3.6 Flash failed, falling back to hardcoded...');
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
@@ -17,20 +16,21 @@ export async function POST(req) {
     return NextResponse.json({ answer, source });
   } catch (error) {
     return NextResponse.json({ 
-      answer: "Critical server error. Please try again in a minute.", 
+      answer: "Critical server error.", 
       source: 'error' 
     });
   }
 }
 
-// ─── Gemini 2.5 Flash (Now reports errors to the screen!) ───
+// ─── Gemini 3.6 Flash (Exactly what the API error told us to use) ───
 async function callGemini(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) return "❌ ERROR: GEMINI_API_KEY is completely missing in Vercel.";
+  if (!API_KEY) return "❌ ERROR: GEMINI_API_KEY is missing in Vercel.";
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Keep answers concise and practical.`;
+    // Updated to the exact model name Google requested
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${API_KEY}`;
+    const systemPrompt = `You are Tessa, a warm, professional AI assistant for Cresoa. Keep answers concise and practical.`;
     
     const res = await fetch(url, {
       method: 'POST',
@@ -40,7 +40,6 @@ async function callGemini(message) {
       })
     });
 
-    // ⚠️ CRITICAL CHANGE: If the API gives an error, return it to the chat!
     if (!res.ok) {
       let errorBody = '';
       try { errorBody = await res.text(); } catch (e) {}
@@ -49,12 +48,9 @@ async function callGemini(message) {
 
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) return "❌ ERROR: Gemini returned an empty response.";
-    return text;
+    return text || "❌ ERROR: Gemini returned an empty response.";
   } catch (e) {
-    // This catches network timeouts, which we fall back to hardcoded for
-    return null; 
+    return null; // Trigger hardcoded fallback on network timeout
   }
 }
 
