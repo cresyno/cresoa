@@ -2,9 +2,8 @@
 
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Icon } from '../../../components/Icon';
+// ❌ REMOVED: import { Icon } from '../../../components/Icon';
 import ChatMessage from '../../../components/support/ChatMessage';
-import ChatInput from '../../../components/support/ChatInput';
 
 function TessaChatContent() {
   const searchParams = useSearchParams();
@@ -17,19 +16,6 @@ function TessaChatContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
-
-  // A list of useful starting points (Quick Action Chips)
-  const suggestions = [
-    "What are the subscription plans?",
-    "How do I add a staff member?",
-    "What are the Aso-Ebi limits?",
-    "How do I reset my password?"
-  ];
-
-  const handleSuggestionClick = (text) => {
-    setInput(text);
-    // Optional: auto-send immediately if you want. For now, just fill the input.
-  };
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -62,33 +48,36 @@ function TessaChatContent() {
   }, [messages]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', background: 'var(--color-bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--color-bg)' }}>
       
-      {/* Premium Header */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '1rem 1.5rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)', justifyContent: 'space-between' }}>
+      {/* Clean Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-card)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={() => router.push(`/dashboard/support?business_id=${businessId}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', padding: '0.25rem' }}>
-            <Icon name="arrow-left" className="w-5 h-5" />
+          <button onClick={() => router.push(`/dashboard/support?business_id=${businessId}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
+            <span style={{ fontSize: '1.2rem' }}>‹</span>
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 2s infinite' }}></div>
-            <span style={{ fontWeight: '600', color: 'var(--color-text)', fontSize: '1rem' }}>Tessa AI</span>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }}></div>
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '1rem', color: 'var(--color-text)' }}>Tessa AI</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Online</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Chat Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 1.5rem 0.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
         ))}
         {isLoading && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div className="tessa-msg-ai">
+          <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '0.5rem 0' }}>
+            <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', padding: '0.6rem 1rem', borderRadius: '18px 18px 18px 0', display: 'inline-block' }}>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
-                <span className="dot-bounce"></span>
-                <span className="dot-bounce" style={{ animationDelay: '-0.16s' }}></span>
-                <span className="dot-bounce" style={{ animationDelay: '-0.32s' }}></span>
+                <span style={{ width: '6px', height: '6px', background: '#9ca3af', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both' }}></span>
+                <span style={{ width: '6px', height: '6px', background: '#9ca3af', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '-0.16s' }}></span>
+                <span style={{ width: '6px', height: '6px', background: '#9ca3af', borderRadius: '50%', display: 'inline-block', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '-0.32s' }}></span>
               </div>
             </div>
           </div>
@@ -96,45 +85,46 @@ function TessaChatContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Action Chips (New!) */}
-      <div style={{ padding: '0.5rem 1.5rem 1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', background: 'var(--color-bg)' }}>
-        {suggestions.map((s, idx) => (
-          <button 
-            key={idx}
-            onClick={() => handleSuggestionClick(s)}
-            style={{
-              padding: '0.4rem 1rem',
-              fontSize: '0.75rem',
-              background: 'var(--color-card)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-accent)'}
-            onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--color-border)'}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {/* Polished Input Area */}
-      <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', gap: '0.75rem', boxShadow: '0 -4px 12px rgba(0,0,0,0.02)' }}>
-        <input 
-          type="text" 
-          value={input} 
-          onChange={(e) => setInput(e.target.value)} 
-          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} 
-          placeholder="Ask Tessa..." 
-          disabled={isLoading}
-          className="tessa-input"
-          style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '12px', background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: '0.95rem', outline: 'none' }}
-        />
-        <button onClick={handleSendMessage} disabled={!input.trim() || isLoading} className="tessa-send-btn" style={{ padding: '0.75rem 1.2rem', borderRadius: '12px', background: 'var(--color-primary)', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'opacity 0.2s' }}>
-          <Icon name="send" className="w-5 h-5" />
-        </button>
+      {/* Premium Input Bar with Multicolor Animated Send Button */}
+      <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flex: 1, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '24px', padding: '0.2rem 0.2rem 0.2rem 1rem' }}>
+          <input 
+            type="text" 
+            value={input} 
+            onChange={(e) => setInput(e.target.value)} 
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} 
+            placeholder="Message" 
+            disabled={isLoading}
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--color-text)', fontSize: '0.95rem', padding: '0.6rem 0' }}
+          />
+          
+          {/* Animated Multicolor Send Button (Self-contained) */}
+          <div className="rainbow-glow-btn-wrapper" style={{ flexShrink: 0 }}>
+            <button 
+              onClick={handleSendMessage} 
+              disabled={!input.trim() || isLoading} 
+              style={{ 
+                background: 'var(--color-primary)', 
+                width: '100%', 
+                height: '100%', 
+                border: 'none', 
+                borderRadius: '50%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                cursor: 'pointer', 
+                opacity: (!input.trim() || isLoading) ? '0.6' : '1',
+                transition: 'opacity 0.2s ease'
+              }}
+            >
+              {/* Inline SVG for "Send" - No external Icon import needed */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -146,4 +136,4 @@ export default function TessaChatPage() {
       <TessaChatContent />
     </Suspense>
   );
-          }
+        }
