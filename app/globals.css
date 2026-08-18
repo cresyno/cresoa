@@ -1129,6 +1129,7 @@ body {
 }
 .btn-modal-primary:hover { opacity: 0.9; }
 .btn-modal-close:hover { background: var(--color-bg); }
+}
 
 .faq-item { border-bottom: 1px solid var(--color-border); padding: 0.75rem 0; }
 .faq-item:last-child { border-bottom: none; }
