@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react';
-import { Icon } from '../../../../components/Icon';
 
 export default function TessaChatPage() {
   const [messages, setMessages] = useState([
@@ -13,7 +12,6 @@ export default function TessaChatPage() {
     if (!input.trim()) return;
     setMessages([...messages, { role: 'user', text: input }]);
     setInput('');
-    // No API call – just a dummy reply
     setTimeout(() => {
       setMessages(prev => [...prev, { role: 'assistant', text: "I'm in safe mode. No API calls." }]);
     }, 800);
@@ -47,7 +45,7 @@ export default function TessaChatPage() {
         ))}
       </div>
 
-      {/* Input */}
+      {/* Input - NO ICON COMPONENT HERE */}
       <div style={{ padding: '1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', gap: '0.5rem' }}>
         <input 
           value={input} 
@@ -56,10 +54,10 @@ export default function TessaChatPage() {
           placeholder="Type anything..." 
           style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)' }}
         />
-        <button onClick={handleSend} style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'var(--color-primary)', color: '#fff', border: 'none' }}>
-          <Icon name="send" className="w-5 h-5" />
+        <button onClick={handleSend} style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'var(--color-primary)', color: '#fff', border: 'none', fontWeight: 'bold' }}>
+          Send
         </button>
       </div>
     </div>
   );
-}
+            }
