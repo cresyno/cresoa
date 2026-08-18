@@ -1,10 +1,30 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '../../../lib/supabaseServer';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+// ─── SELF-CONTAINED SERVER CLIENT (No external import) ───
+function createSupabaseServerClient() {
+  const cookieStore = cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) { return cookieStore.get(name)?.value; },
+        set(name, value, options) {
+          try { cookieStore.set(name, value, options); } catch {}
+        },
+        remove(name, options) {
+          try { cookieStore.set(name, '', { ...options, maxAge: 0 }); } catch {}
+        }
+      }
+    }
+  );
+}
 
 export async function POST(req) {
   try {
-    // ✅ USES THE CORRECT SERVER-SIDE AUTH
-    const supabase = createClient();
+    const supabase = createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -16,7 +36,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Verify user is actually a member of this business
+    // Verify membership
     const { data: membership } = await supabase
       .from('business_memberships')
       .select('role')
