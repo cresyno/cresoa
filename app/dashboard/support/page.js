@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Icon } from '../../../components/Icon';
-import SupportModal from '../../../components/support/SupportModal';
+import SupportModal from '../../components/support/SupportModal';
 
 export default function SupportPage() {
   const searchParams = useSearchParams();
