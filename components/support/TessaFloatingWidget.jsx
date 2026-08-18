@@ -1,27 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function TessaFloatingWidget() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [showBubble, setShowBubble] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Auto-hide the greeting bubble after 8 seconds
     const timer = setTimeout(() => setShowBubble(false), 8000);
     return () => clearTimeout(timer);
   }, []);
 
   const handleClick = () => {
-    setShowBubble(false); // Hide the bubble when clicked
-    const businessId = searchParams.get('business_id');
+    setShowBubble(false);
     
-    // If the user is inside a business context, send them straight to Tessa.
-    // If not, fallback to the general Support Hub.
+    // ✅ FIX: Extract business_id safely using browser window (No useSearchParams!)
+    let businessId = null;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      businessId = params.get('business_id');
+    }
+    
     if (businessId) {
       router.push(`/dashboard/tessa?business_id=${businessId}`);
     } else {
@@ -53,7 +55,6 @@ export default function TessaFloatingWidget() {
           I'm Tessa, your personal assistant.<br/>
           <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>Need help with anything?</span>
         </p>
-        {/* Tail of the bubble */}
         <div style={{
           position: 'absolute', bottom: '-6px', left: '20px',
           width: '12px', height: '12px',
@@ -86,7 +87,6 @@ export default function TessaFloatingWidget() {
         <span>Ask Tessa</span>
       </button>
 
-      {/* Embedded CSS for the widget's animations */}
       <style jsx>{`
         .tessa-float-btn:hover {
           transform: scale(1.05);
@@ -99,4 +99,4 @@ export default function TessaFloatingWidget() {
       `}</style>
     </div>
   );
-        }
+                                                                 }
