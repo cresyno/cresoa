@@ -4,10 +4,14 @@ import { cookies } from 'next/headers';
 
 export async function POST(req) {
   try {
-    // ✅ Uses the official, stable Next.js API helper
+    // ✅ Read the token from the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.split(' ')[1];
+    
     const supabase = createRouteHandlerClient({ cookies });
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -29,7 +33,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Access denied to this business' }, { status: 403 });
     }
 
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
         user_id: user.id,
@@ -42,8 +46,8 @@ export async function POST(req) {
       .select()
       .single();
 
-    if (error) {
-      console.error('Ticket creation error:', error);
+    if (insertError) {
+      console.error('Ticket creation error:', insertError);
       return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 });
     }
 
