@@ -1,30 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-
-// ─── SELF-CONTAINED SERVER CLIENT (No external import) ───
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        get(name) { return cookieStore.get(name)?.value; },
-        set(name, value, options) {
-          try { cookieStore.set(name, value, options); } catch {}
-        },
-        remove(name, options) {
-          try { cookieStore.set(name, '', { ...options, maxAge: 0 }); } catch {}
-        }
-      }
-    }
-  );
-}
 
 export async function POST(req) {
   try {
-    const supabase = createSupabaseServerClient();
+    // ✅ Uses the official, stable Next.js API helper
+    const supabase = createRouteHandlerClient({ cookies });
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -45,7 +26,7 @@ export async function POST(req) {
       .maybeSingle();
 
     if (!membership) {
-      return NextResponse.json({ error: 'You do not have access to this business' }, { status: 403 });
+      return NextResponse.json({ error: 'Access denied to this business' }, { status: 403 });
     }
 
     const { data, error } = await supabase
