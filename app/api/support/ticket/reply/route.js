@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { sendTicketReplyEmail } from '../../../../lib/email';
+import { sendTicketReplyEmail } from '../../../../../lib/email';
 
 export async function POST(req) {
   try {
