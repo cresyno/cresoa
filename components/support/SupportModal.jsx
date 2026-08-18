@@ -1,26 +1,28 @@
 'use client'
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Icon } from '../../components/Icon';
 
 export default function SupportModal({ type, businessId, onClose }) {
+  const router = useRouter();
   const [waMessage, setWaMessage] = useState('Hello, I need help with my Cresoa account.');
 
-  // 1. Open WhatsApp with pre-filled message
   const handleWhatsAppSend = () => {
     const url = `https://wa.me/2349049209780?text=${encodeURIComponent(waMessage)}`;
     window.open(url, '_blank');
     onClose();
   };
 
-  // 2. Navigate to Independent Tessa Chat
+  // ✅ FIXED: Correctly navigates to our new Tessa page with business_id
   const handleTessaNavigate = () => {
-    window.location.href = `/dashboard/support/tessa?business_id=${businessId}`;
+    router.push(`/dashboard/tessa?business_id=${businessId}`);
+    onClose();
   };
 
-  // 3. Navigate to Ticket Form (Placeholder for now)
   const handleTicketNavigate = () => {
-    window.location.href = `/dashboard/support/ticket?business_id=${businessId}`;
+    router.push(`/dashboard/support/ticket?business_id=${businessId}`);
+    onClose();
   };
 
   const renderContent = () => {
