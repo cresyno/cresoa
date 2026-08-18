@@ -16,19 +16,30 @@ export async function POST(req) {
 
     const { business_id, subject, category, description } = await req.json();
 
-    // 🔥 STRICT ID VALIDATION: Must be a real UUID
+    // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!business_id || !uuidRegex.test(business_id)) {
-      return NextResponse.json({ 
-        error: 'Invalid Business ID format' 
-      }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid Business ID format' }, { status: 400 });
     }
 
     if (!subject || !category || !description) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ✅ CREATE TICKET DIRECTLY — No membership checks, no business lookups
+    // 🔍 Verify the business actually exists in the database
+    const { data: business, error: bizError } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('id', business_id)
+      .maybeSingle();
+
+    if (bizError || !business) {
+      return NextResponse.json({ 
+        error: `Business with ID "${business_id}" does not exist. Please use a valid business ID.` 
+      }, { status: 404 });
+    }
+
+    // ✅ Insert the ticket (now safe from FK violation)
     const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
@@ -44,7 +55,10 @@ export async function POST(req) {
 
     if (insertError) {
       console.error('Ticket creation error:', insertError);
-      return NextResponse.json({ error: 'Failed to create ticket' }, { status: 500 });
+      // Return the actual Supabase error to help debugging
+      return NextResponse.json({ 
+        error: `Database error: ${insertError.message || insertError.details || 'Unknown error'}` 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ ticket: data });
