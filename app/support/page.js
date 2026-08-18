@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import SupportContent from './SupportContent'; // We'll extract the main logic
+import SupportContent from '@SupportContent'; // We'll extract the main logic
 
 // The default export wraps the content in Suspense
 export default function SupportPage() {
