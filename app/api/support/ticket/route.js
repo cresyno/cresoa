@@ -14,32 +14,64 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { business_id, subject, category, description } = await req.json();
+    let { business_id, subject, category, description } = await req.json();
 
-    // Validate UUID format
+    // 1. VALIDATE THE PASSED ID
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!business_id || !uuidRegex.test(business_id)) {
-      return NextResponse.json({ error: 'Invalid Business ID format' }, { status: 400 });
+    let isValidId = business_id && uuidRegex.test(business_id);
+
+    // 2. TRY TO FIND THE BUSINESS IN THE DATABASE
+    let businessExists = false;
+    if (isValidId) {
+      const { data: businessCheck, error: bizError } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', business_id)
+        .maybeSingle();
+      
+      if (!bizError && businessCheck) {
+        businessExists = true;
+      }
+    }
+
+    // 🧠 ULTIMATE SELF-CORRECTION: If the passed ID is invalid or doesn't exist, find the user's first valid business
+    if (!businessExists) {
+      console.warn(`Provided business ID "${business_id}" is invalid. Attempting to auto-resolve...`);
+      
+      // Find the first business the user is a member of (Owner, Manager, or Staff)
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (membershipError || !membershipData) {
+        // If the user isn't a member of any business, check if they own one
+        const { data: ownedBusiness, error: ownerError } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('owner_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (ownerError || !ownedBusiness) {
+          return NextResponse.json({ 
+            error: 'You are not a member of any business. Please switch to a valid business or contact support.' 
+          }, { status: 403 });
+        }
+        business_id = ownedBusiness.id;
+      } else {
+        business_id = membershipData.business_id;
+      }
+      console.log(`Ticket will be created for auto-resolved business ID: ${business_id}`);
     }
 
     if (!subject || !category || !description) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 🔍 Verify the business actually exists in the database
-    const { data: business, error: bizError } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('id', business_id)
-      .maybeSingle();
-
-    if (bizError || !business) {
-      return NextResponse.json({ 
-        error: `Business with ID "${business_id}" does not exist. Please use a valid business ID.` 
-      }, { status: 404 });
-    }
-
-    // ✅ Insert the ticket (now safe from FK violation)
+    // ✅ INSERT THE TICKET
     const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
@@ -55,7 +87,6 @@ export async function POST(req) {
 
     if (insertError) {
       console.error('Ticket creation error:', insertError);
-      // Return the actual Supabase error to help debugging
       return NextResponse.json({ 
         error: `Database error: ${insertError.message || insertError.details || 'Unknown error'}` 
       }, { status: 500 });
