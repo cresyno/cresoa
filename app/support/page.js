@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Icon } from '../../../components/Icon';
-import ChatMessage from '../../../components/support/ChatMessage';
-import ChatInput from '../../../components/support/ChatInput';
-import WhatsAppCard from '../../../components/support/WhatsAppCard';
-import TicketForm from '../../../components/support/TicketForm';
+import { Icon } from '../../components/Icon';
+import ChatMessage from '../../components/support/ChatMessage';
+import ChatInput from '../../components/support/ChatInput';
+import WhatsAppCard from '../../components/support/WhatsAppCard';
+import TicketForm from '../../components/support/TicketForm';
 
 export default function SupportPage() {
   const searchParams = useSearchParams();
