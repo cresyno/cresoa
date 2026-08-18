@@ -9,6 +9,13 @@ export default function ClientTicketPage() {
   const router = useRouter();
   const businessId = searchParams.get('business_id');
 
+  // Redirect if business_id is missing
+  useEffect(() => {
+    if (!businessId || businessId.trim() === '') {
+      router.push('/dashboard/support'); // safe fallback
+    }
+  }, [businessId, router]);
+
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ subject: '', category: '', description: '' });
@@ -16,10 +23,11 @@ export default function ClientTicketPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    fetchTickets();
-  }, []);
+    if (businessId) fetchTickets();
+  }, [businessId]);
 
   const fetchTickets = async () => {
+    if (!businessId) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/support/tickets?business_id=${businessId}`);
@@ -34,6 +42,10 @@ export default function ClientTicketPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!businessId) {
+      alert('Business ID is missing. Please reload the page.');
+      return;
+    }
     if (!formData.subject || !formData.category || !formData.description) return;
     setIsSubmitting(true);
     try {
@@ -45,10 +57,11 @@ export default function ClientTicketPage() {
       if (res.ok) {
         setSuccessMessage('✅ Ticket submitted! We’ll get back to you within 24 hours.');
         setFormData({ subject: '', category: '', description: '' });
-        fetchTickets(); // Refresh the list
-        setTimeout(() => setSuccessMessage(''), 5000); // Auto-dismiss banner
+        fetchTickets();
+        setTimeout(() => setSuccessMessage(''), 5000);
       } else {
-        alert('Failed to submit ticket. Please try again.');
+        const errData = await res.json();
+        alert(`Failed: ${errData.error || 'Please try again.'}`);
       }
     } catch (error) {
       alert('Network error. Please check your connection.');
@@ -63,21 +76,20 @@ export default function ClientTicketPage() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', background: 'var(--color-bg)', minHeight: 'calc(100vh - 80px)' }}>
+      {/* ... (rest of your UI is exactly the same as before) ... */}
+      {/* I'm keeping the UI exactly as you had it, just the hooks and API calls are now guarded */}
       
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', fontSize: '1.2rem' }}>‹</button>
         <h1 style={{ color: 'var(--color-text)', fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Support Tickets</h1>
       </div>
 
-      {/* Success Banner */}
       {successMessage && (
         <div style={{ background: '#2E7D5E15', color: '#2E7D5E', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid #2E7D5E30', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
           {successMessage}
         </div>
       )}
 
-      {/* Submit Form */}
       <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
         <h3 style={{ color: 'var(--color-text)', fontSize: '1rem', fontWeight: '600', margin: '0 0 1rem' }}>Submit a New Ticket</h3>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -107,7 +119,6 @@ export default function ClientTicketPage() {
         </form>
       </div>
 
-      {/* Ticket History - Professional, Minimalist (No Status Pills) */}
       <div>
         <h3 style={{ color: 'var(--color-text)', fontSize: '1rem', fontWeight: '600', margin: '0 0 1rem' }}>Recent Tickets</h3>
         {loading ? (
@@ -124,7 +135,6 @@ export default function ClientTicketPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>{ticket.category}</span>
-                  {/* ✅ NO PILL. Just plain text, muted color */}
                   <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{ticket.status}</span>
                 </div>
               </div>
@@ -134,4 +144,4 @@ export default function ClientTicketPage() {
       </div>
     </div>
   );
-    }
+        }
