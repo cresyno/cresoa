@@ -16,67 +16,60 @@ export async function POST(req) {
 
     let { business_id, subject, category, description } = await req.json();
 
-    // 1. VALIDATE THE PASSED ID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    let isValidId = business_id && uuidRegex.test(business_id);
+    // Validate required fields
+    if (!subject || !category || !description) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
 
-    // 2. TRY TO FIND THE BUSINESS IN THE DATABASE
-    let businessExists = false;
-    if (isValidId) {
-      const { data: businessCheck, error: bizError } = await supabase
+    // ─── MAGIC BUSINESS ID RESOLVER (Works even if URL has ?business_id=) ───
+    let resolvedBusinessId = null;
+
+    // Level 1: Check if the provided ID is a valid UUID and exists in the businesses table
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (business_id && uuidRegex.test(business_id)) {
+      const { data: check } = await supabase
         .from('businesses')
         .select('id')
         .eq('id', business_id)
         .maybeSingle();
-      
-      if (!bizError && businessCheck) {
-        businessExists = true;
-      }
+      if (check) resolvedBusinessId = business_id;
     }
 
-    // 🧠 ULTIMATE SELF-CORRECTION: If the passed ID is invalid or doesn't exist, find the user's first valid business
-    if (!businessExists) {
-      console.warn(`Provided business ID "${business_id}" is invalid. Attempting to auto-resolve...`);
-      
-      // Find the first business the user is a member of (Owner, Manager, or Staff)
-      const { data: membershipData, error: membershipError } = await supabase
+    // Level 2: If Level 1 fails, find the user's first valid membership (Manager or Staff)
+    if (!resolvedBusinessId) {
+      const { data: membership } = await supabase
         .from('business_memberships')
         .select('business_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
-
-      if (membershipError || !membershipData) {
-        // If the user isn't a member of any business, check if they own one
-        const { data: ownedBusiness, error: ownerError } = await supabase
-          .from('businesses')
-          .select('id')
-          .eq('owner_id', user.id)
-          .limit(1)
-          .maybeSingle();
-
-        if (ownerError || !ownedBusiness) {
-          return NextResponse.json({ 
-            error: 'You are not a member of any business. Please switch to a valid business or contact support.' 
-          }, { status: 403 });
-        }
-        business_id = ownedBusiness.id;
-      } else {
-        business_id = membershipData.business_id;
-      }
-      console.log(`Ticket will be created for auto-resolved business ID: ${business_id}`);
+      if (membership) resolvedBusinessId = membership.business_id;
     }
 
-    if (!subject || !category || !description) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Level 3: If Level 2 fails, find the first business they own (Owner)
+    if (!resolvedBusinessId) {
+      const { data: owned } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (owned) resolvedBusinessId = owned.id;
     }
 
-    // ✅ INSERT THE TICKET
+    // If we still have no ID, the user is truly disconnected from any business
+    if (!resolvedBusinessId) {
+      return NextResponse.json({ 
+        error: 'We could not find any business associated with your account. Please ensure you are logged into the correct profile.' 
+      }, { status: 404 });
+    }
+
+    // ✅ INSERT THE TICKET using the resolved business ID
     const { data, error: insertError } = await supabase
       .from('support_tickets')
       .insert({
         user_id: user.id,
-        business_id: business_id,
+        business_id: resolvedBusinessId, // We use the resolved ID here
         subject: subject,
         category: category,
         description: description,
