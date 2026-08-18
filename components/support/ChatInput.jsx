@@ -1,4 +1,3 @@
-'use client'
 import { useState } from 'react';
 import { Icon } from '../../components/Icon';
 
@@ -14,19 +13,19 @@ export default function ChatInput({ onSend, disabled }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3 border-t border-[var(--cresoa-border)] bg-[var(--cresoa-surface)]">
+    <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3 border-t border-[var(--color-border)] bg-[var(--color-card)]">
       <input
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="Ask Tessa..."
         disabled={disabled}
-        className="flex-1 bg-transparent border-none outline-none text-[var(--cresoa-text)] placeholder-gray-400 text-sm"
+        className="flex-1 bg-[var(--color-bg)] border border-[var(--color-border)] outline-none rounded-lg px-3 py-2 text-[var(--color-text)] placeholder-[var(--color-text-muted)] text-sm focus:ring-2 focus:ring-[var(--color-accent)]/30"
       />
       <button 
         type="submit" 
         disabled={!input.trim() || disabled}
-        className="p-2 text-[var(--cresoa-primary)] disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+        className="p-2 bg-[var(--color-primary)] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
       >
         <Icon name="send" className="w-5 h-5" />
       </button>
