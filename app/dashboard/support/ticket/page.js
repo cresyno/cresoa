@@ -10,12 +10,6 @@ export default function ClientTicketPage() {
   const router = useRouter();
   const businessId = searchParams.get('business_id');
 
-  useEffect(() => {
-    if (!businessId || businessId.trim() === '' || businessId === 'null' || businessId === 'undefined') {
-      router.push('/dashboard/support');
-    }
-  }, [businessId, router]);
-
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ subject: '', category: '', description: '' });
@@ -23,17 +17,19 @@ export default function ClientTicketPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    if (businessId && businessId !== 'null' && businessId.trim() !== '') fetchTickets();
-  }, [businessId]);
+    fetchTickets();
+  }, []);
 
   const fetchTickets = async () => {
-    if (!businessId || businessId === 'null' || businessId.trim() === '') return;
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(`/api/support/tickets?business_id=${businessId}`, {
+      // Pass the businessId if it exists; if not, let the backend handle the fallback
+      const url = businessId ? `/api/support/tickets?business_id=${businessId}` : '/api/support/tickets';
+      
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -47,14 +43,6 @@ export default function ClientTicketPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // 🛑 IMMEDIATE REDIRECT IF BAD ID
-    if (!businessId || businessId.trim() === '' || businessId === 'null' || businessId === 'undefined') {
-      alert('Business ID is missing. Redirecting you back to the Support Hub.');
-      router.push('/dashboard/support');
-      return;
-    }
-
     if (!formData.subject || !formData.category || !formData.description) return;
     setIsSubmitting(true);
     try {
@@ -73,6 +61,7 @@ export default function ClientTicketPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
+        // Pass the businessId (it might be null or invalid, but the backend will resolve it automatically!)
         body: JSON.stringify({ business_id: businessId, ...formData })
       });
       if (res.ok) {
@@ -97,7 +86,7 @@ export default function ClientTicketPage() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', background: 'var(--color-bg)', minHeight: 'calc(100vh - 80px)' }}>
-      {/* ... (Keep your UI exactly the same) ... */}
+      {/* ... (Keep the UI exactly as it is) ... */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', fontSize: '1.2rem' }}>‹</button>
         <h1 style={{ color: 'var(--color-text)', fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Support Tickets</h1>
@@ -134,4 +123,4 @@ export default function ClientTicketPage() {
       </div>
     </div>
   );
-                   }
+        }
