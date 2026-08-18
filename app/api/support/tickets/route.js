@@ -1,31 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-
-// ─── SELF-CONTAINED SERVER CLIENT ───
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        get(name) { return cookieStore.get(name)?.value; },
-        set(name, value, options) {
-          try { cookieStore.set(name, value, options); } catch {}
-        },
-        remove(name, options) {
-          try { cookieStore.set(name, '', { ...options, maxAge: 0 }); } catch {}
-        }
-      }
-    }
-  );
-}
 
 export async function GET(req) {
   try {
-    // ✅ Uses the self-contained client instead of importing from lib
-    const supabase = createSupabaseServerClient();
+    const supabase = createRouteHandlerClient({ cookies });
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -39,7 +18,6 @@ export async function GET(req) {
       if (!businessId) return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
       query = query.eq('business_id', businessId);
       
-      // Verify membership
       const { data: membership } = await supabase
         .from('business_memberships')
         .select('role')
@@ -48,7 +26,6 @@ export async function GET(req) {
         .maybeSingle();
       if (!membership) return NextResponse.json({ error: 'Access denied to this business' }, { status: 403 });
     } else {
-      // Admin check
       if (user.email !== 'taiwoabraham640@gmail.com') {
         return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
       }
