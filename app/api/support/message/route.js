@@ -7,8 +7,9 @@ export async function POST(req) {
     let answer = await callGemini(message);
     let source = 'gemini-2.5-flash';
 
+    // If Gemini returns null, it means a network error happened. Use the fallback.
     if (!answer) {
-      console.warn('Gemini 2.5 Flash failed, using hardcoded fallback...');
+      console.warn('Gemini network request completely failed (timeout/etc).');
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
@@ -16,21 +17,20 @@ export async function POST(req) {
     return NextResponse.json({ answer, source });
   } catch (error) {
     return NextResponse.json({ 
-      answer: "I'm having a technical glitch. Please try again in a minute.", 
+      answer: "Critical server error. Please try again in a minute.", 
       source: 'error' 
     });
   }
 }
 
-// ─── Stable Gemini 2.5 Flash (Universally available on free tier) ───
+// ─── Gemini 2.5 Flash (Now reports errors to the screen!) ───
 async function callGemini(message) {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) return null;
+  if (!API_KEY) return "❌ ERROR: GEMINI_API_KEY is completely missing in Vercel.";
 
   try {
-    // Using the official, stable 2.5 Flash model
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Give concise and practical advice for fashion designers.`;
+    const systemPrompt = `You are Tessa, a warm, professional, and empathetic AI assistant for Cresoa. Keep answers concise and practical.`;
     
     const res = await fetch(url, {
       method: 'POST',
@@ -40,17 +40,20 @@ async function callGemini(message) {
       })
     });
 
+    // ⚠️ CRITICAL CHANGE: If the API gives an error, return it to the chat!
     if (!res.ok) {
-      // If we get an error, log it to the terminal and return null to trigger fallback
-      const errorBody = await res.text();
-      console.error(`Gemini API Error: ${res.status} - ${errorBody}`);
-      return null; 
+      let errorBody = '';
+      try { errorBody = await res.text(); } catch (e) {}
+      return `❌ ERROR: Gemini API returned status ${res.status}. Details: ${errorBody}`;
     }
 
     const data = await res.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) return "❌ ERROR: Gemini returned an empty response.";
+    return text;
   } catch (e) {
-    console.error('Gemini network error:', e.message);
+    // This catches network timeouts, which we fall back to hardcoded for
     return null; 
   }
 }
