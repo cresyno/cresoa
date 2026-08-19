@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card } from '@/components/Card'
-import { Icon } from '@/components/Icon'
-import { Navigation } from '@/components/Navigation'
+import { Card } from '../../../../components/Card'
+import { Icon } from '../../../../components/Icon'
+import { Navigation } from '../../../../components/Navigation'
 
 export default function NewInventoryItemPage() {
   const router = useRouter()
@@ -57,7 +57,6 @@ export default function NewInventoryItemPage() {
 
       <Card style={{ padding: '1.5rem' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: 'var(--cresoa-text-muted)', marginBottom: '0.25rem' }}>Item Name *</label>
             <input type="text" value={form.item_name} onChange={(e) => setForm({...form, item_name: e.target.value})} required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }} />
@@ -117,4 +116,4 @@ export default function NewInventoryItemPage() {
       </div>
     </div>
   )
-    }
+  }
