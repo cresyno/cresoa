@@ -216,12 +216,13 @@ Reach out to Cresoa Support directly, and a member of the team will help you sor
 
 `;
 
-// ─── 1. SMART SPLITTER & RETRIEVER (Makes her extremely smart) ───
+// ─── 1. SMART SPLITTER (Breaks the PDF into chunks) ───
 function splitIntoChunks(text) {
   if (!text || text.trim() === '') return [];
   return text.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 }
 
+// ─── 2. SMART RETRIEVER (Finds the 3 most relevant chunks) ───
 function getRelevantChunks(query, chunks) {
   if (chunks.length === 0) return ["No context available yet. Please upload the knowledge base."];
   const keywords = query.toLowerCase().split(' ').filter(w => w.length > 3);
@@ -237,7 +238,7 @@ function getRelevantChunks(query, chunks) {
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 2. THE POLISHED, PROFESSIONAL SYSTEM PROMPT ───
+// ─── 3. THE POLISHED SYSTEM PROMPT ───
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, professional, and highly knowledgeable AI assistant for the Cresoa platform.
 
@@ -253,17 +254,12 @@ RULES FOR BEHAVIOR:
 4. OFF-TOPIC QUESTIONS: If they ask about politics, celebrities, or general life, reply: "I'm Tessa, your Cresoa AI assistant. My focus is strictly on helping you manage your fashion business on the Cresoa platform. How can I help you today?"
 `;
 
-// ─── 3. API HANDLER ───
-export async function POST(req) {
+// ─── 4. GROQ PRIMARY CALLER (Using validated model) ───
+async function callGroq(message, contextString) {
+  const API_KEY = process.env.GROQ_API_KEY;
+  if (!API_KEY) return null;
+
   try {
-    const { message } = await req.json();
-
-    // A. If PDF text is available, find the most relevant 3 chunks
-    const chunks = splitIntoChunks(CRESOA_KNOWLEDGE);
-    const relevantContext = getRelevantChunks(message, chunks);
-    const contextString = relevantContext.join('\n\n---\n\n');
-
-    // B. Build the final prompt
     const prompt = `
 ${SYSTEM_PROMPT}
 
@@ -274,30 +270,39 @@ ${contextString}
 
 User Question: ${message}
 `;
-
-    let answer = await callGemini(prompt);
-    let source = 'gemini';
-
-    if (!answer) {
-      answer = "Tessa is experiencing technical difficulties. Please try again in a moment.";
-      source = 'fallback';
-    }
-
-    return NextResponse.json({ answer, source });
-  } catch (error) {
-    return NextResponse.json({ 
-      answer: "Tessa is experiencing high traffic. Please try again in a moment.", 
-      source: 'emergency_fallback' 
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b', // Primary brain
+        messages: [{ role: 'system', content: `You are Tessa, a warm, professional AI assistant.` }, { role: 'user', content: prompt }]
+      })
     });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || null;
+  } catch (e) {
+    return null; 
   }
 }
 
-// ─── 4. GEMINI 3.5 FLASH-LITE CALLER ───
-async function callGemini(prompt) {
+// ─── 5. GEMINI FALLBACK CALLER (gemini-3.5-flash-lite) ───
+async function callGemini(message, contextString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
   try {
+    const prompt = `
+${SYSTEM_PROMPT}
+
+Platform Context:
+"""
+${contextString}
+"""
+
+User Question: ${message}
+`;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`;
     const res = await fetch(url, {
       method: 'POST',
@@ -312,3 +317,51 @@ async function callGemini(prompt) {
     return null; 
   }
 }
+
+// ─── 6. HARDCODED FALLBACK ───
+function getHardcodedFallback(message) {
+  const lower = message.toLowerCase();
+  if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page. You can invite, remove, or change roles there.";
+  if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page. Use the 'New Order' button to create one.";
+  if (lower.includes('subscription') || lower.includes('plan') || lower.includes('pay')) return "To upgrade your plan, go to the Subscription page.";
+  if (lower.includes('production') || lower.includes('sewing')) return "To move an order through production, open the Production page and update the status.";
+  return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
+}
+
+// ─── 7. API ORCHESTRATOR (The flow logic) ───
+export async function POST(req) {
+  try {
+    const { message } = await req.json();
+
+    // A. Extract relevant chunks from the PDF
+    const chunks = splitIntoChunks(FULL_PDF_TEXT);
+    const relevantContext = getRelevantChunks(message, chunks);
+    const contextString = relevantContext.join('\n\n---\n\n');
+
+    // B. GROQ PRIMARY
+    let answer = await callGroq(message, contextString);
+    let source = 'groq';
+
+    // C. GEMINI FALLBACK (If Groq fails)
+    if (!answer) {
+      console.warn('Groq failed, falling back to Gemini 3.5 Flash Lite...');
+      answer = await callGemini(message, contextString);
+      source = 'gemini';
+    }
+
+    // D. HARDCODED FALLBACK (If both fail)
+    if (!answer) {
+      console.warn('Both AIs failed, using hardcoded fallback...');
+      answer = getHardcodedFallback(message);
+      source = 'fallback';
+    }
+
+    return NextResponse.json({ answer, source });
+  } catch (error) {
+    console.error('Support API Error:', error);
+    return NextResponse.json({ 
+      answer: "Tessa is experiencing high traffic. Please try again in a moment.", 
+      source: 'emergency_fallback' 
+    });
+  }
+                                }
