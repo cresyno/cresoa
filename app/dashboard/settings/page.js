@@ -7,7 +7,8 @@ import { Card } from '../../../components/Card'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
-// ─── Hardcoded Icons (self-contained) ──────────────────────
+import { HexColorPicker } from 'https://esm.sh/react-colorful@6.0.0?bundle'
+
 const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
   const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className }
   const icons = {
@@ -38,7 +39,6 @@ export default function SettingsPage() {
     router.push(`${path}${separator}business_id=${businessId}`)
   }
 
-  // ─── State ──────────────────────────────────────────────────
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -46,8 +46,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
 
-  const [activeTab, setActiveTab] = useState('general') // general | contact | branding | notifications | workflow
-  const [editModal, setEditModal] = useState(null) // null or which section is being edited
+  const [activeTab, setActiveTab] = useState('general')
+  const [editModal, setEditModal] = useState(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -64,7 +64,6 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState(null)
   const [logoUrl, setLogoUrl] = useState('')
 
-  // ─── Load business data ───────────────────────────────────
   useEffect(() => {
     const load = async () => {
       if (!businessId) { router.push('/dashboard'); return }
@@ -106,7 +105,6 @@ export default function SettingsPage() {
     load()
   }, [businessId])
 
-  // ─── Handlers ──────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData({ ...formData, [name]: value })
@@ -196,7 +194,6 @@ export default function SettingsPage() {
     }
   }
 
-  // ─── Helper: modal content ────────────────────────────────
   const renderModalContent = () => {
     if (editModal === 'general') {
       return (
@@ -231,33 +228,66 @@ export default function SettingsPage() {
       return (
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Branding & Tracking</h3>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Primary Color</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', overflow: 'hidden', cursor: 'pointer' }}>
-                <div style={{ width: '100%', height: '100%', background: formData.tracking_primary_color }} />
-                <input type="color" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+          <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--cresoa-bg)', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Logo</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cresoa-card)', border: '1px solid var(--cresoa-border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {logoPreview ? <img src={logoPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="building" size={24} stroke="var(--cresoa-text-muted)" />}
               </div>
-              <input type="text" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} id="logo-upload-branding" />
+              <label htmlFor="logo-upload-branding" style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}><Icon name="upload" size={14} stroke="#fff" /> Upload</label>
+              {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}>Remove</button>}
             </div>
           </div>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Background Color</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', overflow: 'hidden', cursor: 'pointer' }}>
-                <div style={{ width: '100%', height: '100%', background: formData.tracking_bg_color }} />
-                <input type="color" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Primary Color</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: `2px solid ${formData.tracking_primary_color}`, background: formData.tracking_primary_color, boxShadow: 'var(--shadow-sm)' }} />
+                <div style={{ flex: 1, minWidth: '150px' }}>
+                  <HexColorPicker 
+                    color={formData.tracking_primary_color} 
+                    onChange={(newColor) => setFormData({ ...formData, tracking_primary_color: newColor })} 
+                    style={{ width: '100%', maxWidth: '220px', height: '180px' }}
+                  />
+                </div>
+                <input 
+                  type="text" 
+                  value={formData.tracking_primary_color} 
+                  onChange={(e) => setFormData({ ...formData, tracking_primary_color: e.target.value })} 
+                  style={{ width: '100%', maxWidth: '80px', padding: '0.5rem', borderRadius: '6px', border: '2px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}
+                />
               </div>
-              <input type="text" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Background Color</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: `2px solid ${formData.tracking_bg_color}`, background: formData.tracking_bg_color, boxShadow: 'var(--shadow-sm)' }} />
+                <div style={{ flex: 1, minWidth: '150px' }}>
+                  <HexColorPicker 
+                    color={formData.tracking_bg_color} 
+                    onChange={(newColor) => setFormData({ ...formData, tracking_bg_color: newColor })} 
+                    style={{ width: '100%', maxWidth: '220px', height: '180px' }}
+                  />
+                </div>
+                <input 
+                  type="text" 
+                  value={formData.tracking_bg_color} 
+                  onChange={(e) => setFormData({ ...formData, tracking_bg_color: e.target.value })} 
+                  style={{ width: '100%', maxWidth: '80px', padding: '0.5rem', borderRadius: '6px', border: '2px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}
+                />
+              </div>
             </div>
           </div>
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Welcome Message</label>
-            <input type="text" name="tracking_welcome_message" value={formData.tracking_welcome_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Footer Message</label>
-            <input type="text" name="tracking_footer_message" value={formData.tracking_footer_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+          <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Welcome Message</label>
+              <input type="text" name="tracking_welcome_message" value={formData.tracking_welcome_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Footer Message</label>
+              <input type="text" name="tracking_footer_message" value={formData.tracking_footer_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+            </div>
           </div>
         </div>
       )
@@ -265,7 +295,6 @@ export default function SettingsPage() {
     return null
   }
 
-  // ─── Loading ──────────────────────────────────────────────
   if (loading) {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
@@ -276,19 +305,16 @@ export default function SettingsPage() {
     )
   }
 
-  // ─── Render ──────────────────────────────────────────────
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1000px', margin: '0 auto', paddingBottom: '100px', position: 'relative' }}>
       <Navigation businessId={businessId} />
 
-      {/* Header */}
       <div style={{ marginBottom: '1.5rem', marginTop: '0.5rem' }}>
         <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Business</p>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Settings</h1>
         <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>Manage your business details, branding, and workflow</p>
       </div>
 
-      {/* Tabs - Replaced styling to use Gold Accent & Premium Underline */}
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--cresoa-border)', marginBottom: '1.5rem', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '0.5rem', scrollbarWidth: 'none' }}>
         {[
           { id: 'general', label: 'General', icon: 'building' },
@@ -296,7 +322,7 @@ export default function SettingsPage() {
           { id: 'branding', label: 'Branding', icon: 'palette' },
           { id: 'notifications', label: 'Notifications', icon: 'bell' },
           { id: 'workflow', label: 'Workflow', icon: 'layers' },
-        ].map(tab => (
+             ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -321,7 +347,6 @@ export default function SettingsPage() {
         ))}
       </div>
 
-          {/* Tab Content */}
       <div style={{ minHeight: '300px' }}>
         {activeTab === 'general' && (
           <Card style={{ padding: '1.5rem' }}>
@@ -367,7 +392,6 @@ export default function SettingsPage() {
               <div><strong style={{ color: 'var(--cresoa-text)' }}>Welcome Message:</strong> {formData.tracking_welcome_message}</div>
               <div><strong style={{ color: 'var(--cresoa-text)' }}>Footer Message:</strong> {formData.tracking_footer_message}</div>
             </div>
-            {/* Live Preview */}
             <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '10px', background: formData.tracking_bg_color, border: '1px solid var(--cresoa-border)' }}>
               <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Live Preview</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -393,7 +417,6 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {/* Replaced "Users" with "Workflow" Tab */}
         {activeTab === 'workflow' && (
           <Card style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
@@ -431,7 +454,6 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Edit Modal */}
       {editModal && (
         <div style={{
           position: 'fixed',
@@ -445,27 +467,46 @@ export default function SettingsPage() {
           justifyContent: 'center',
           zIndex: 1000,
           padding: '1rem',
-          backdropFilter: 'blur(2px)',
+          backdropFilter: 'blur(4px)',
         }}>
           <div style={{
-            background: 'var(--cresoa-card)',
-            borderRadius: '16px',
-            maxWidth: '400px',
+            backgroundColor: 'var(--cresoa-card)',
+            borderRadius: '20px',
+            maxWidth: '440px',
             width: '100%',
-            padding: '1.5rem',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            padding: '1.5rem 1.5rem 2rem',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
             position: 'relative',
+            border: '1px solid var(--cresoa-border)',
           }}>
             {renderModalContent()}
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button onClick={() => setEditModal(null)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleSave} disabled={saving} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer', fontWeight: 500 }}>{saving ? 'Saving...' : 'Save Changes'}</button>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+              <button onClick={() => setEditModal(null)} style={{ 
+                padding: '0.6rem 1.2rem', 
+                borderRadius: '8px', 
+                border: '2px solid var(--cresoa-border)', 
+                background: 'transparent', 
+                color: 'var(--cresoa-text)', 
+                cursor: 'pointer', 
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving} style={{ 
+                padding: '0.6rem 1.5rem', 
+                borderRadius: '8px', 
+                border: 'none', 
+                background: 'var(--cresoa-primary)', 
+                color: '#fff', 
+                cursor: 'pointer', 
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                opacity: saving ? '0.7' : '1'
+              }}>{saving ? 'Saving...' : 'Save Changes'}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Sticky Save Bar */}
       <div style={{
         position: 'fixed',
         bottom: 0,
@@ -486,7 +527,17 @@ export default function SettingsPage() {
           {lastSaved ? <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)' }}>Last saved: {lastSaved}</span> : <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)' }}>Unsaved changes</span>}
           {success && <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-success)', marginLeft: '0.5rem' }}>✅ Saved</span>}
         </div>
-        <button onClick={handleSave} disabled={saving} style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', opacity: saving ? '0.7' : '1' }}>
+        <button onClick={handleSave} disabled={saving} style={{ 
+          padding: '0.6rem 1.8rem', 
+          borderRadius: '8px', 
+          border: 'none', 
+          background: 'var(--cresoa-primary)', 
+          color: '#fff', 
+          fontWeight: 600, 
+          cursor: 'pointer', 
+          fontSize: '0.9rem', 
+          opacity: saving ? '0.7' : '1' 
+        }}>
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
@@ -496,4 +547,4 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-          }
+    }
