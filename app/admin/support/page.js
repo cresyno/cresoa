@@ -35,7 +35,7 @@ export default function AdminSupportPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId, status: newStatus })
       });
-      fetchTickets(); // Refresh list
+      fetchTickets();
     } catch (error) {
       alert('Failed to update status');
     }
@@ -56,7 +56,7 @@ export default function AdminSupportPage() {
       });
       setSelectedTicket(null);
       setReplyMessage('');
-      fetchTickets(); // Refresh list
+      fetchTickets();
     } catch (error) {
       alert('Failed to send reply');
     } finally {
@@ -91,7 +91,7 @@ export default function AdminSupportPage() {
                 <div>
                   <h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem', color: 'var(--color-text)' }}>{ticket.subject}</h4>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <span>{ticket.category}</span> • <span>Business: {ticket.business_id ? 'View in DB' : 'N/A'}</span>
+                    <span>{ticket.email || 'No email'}</span> • <span>{ticket.category}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -108,13 +108,12 @@ export default function AdminSupportPage() {
         </div>
       )}
 
-      {/* Reply Modal */}
       {selectedTicket && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 999, backdropFilter: 'blur(4px)' }}>
           <div style={{ background: 'var(--color-card)', borderRadius: '16px', maxWidth: '500px', width: '100%', padding: '1.5rem', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 0.5rem', color: 'var(--color-text)' }}>Reply to Customer</h3>
-            <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Replying to: <strong>{selectedTicket.subject}</strong></p>
-            <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)} rows="5" placeholder="Type your resolution message here... This will be sent via email using Brevo." style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical' }} />
+            <p style={{ margin: '0 0 1rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Replying to: <strong>{selectedTicket.subject}</strong><br/><span style={{ fontSize: '0.75rem' }}>{selectedTicket.email}</span></p>
+            <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)} rows="5" placeholder="Type your resolution message here..." style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical' }} />
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
               <button onClick={() => { setSelectedTicket(null); setReplyMessage(''); }} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer' }}>Cancel</button>
               <button onClick={handleSendReply} disabled={!replyMessage.trim() || isSending} style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontWeight: 600, opacity: (!replyMessage.trim() || isSending) ? '0.7' : '1' }}>
@@ -126,4 +125,4 @@ export default function AdminSupportPage() {
       )}
     </div>
   );
-}
+                                        }
