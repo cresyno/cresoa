@@ -312,13 +312,11 @@ If you are unsure about a feature, ask Tessa first before contacting support; sh
 
 `;
 
-    
-  // ─── 1. SMART RAG ENGINE ─────────────────────────────────────
+    // ─── 1. SMART RAG ENGINE ─────────────────────────────────────
 function splitIntoChunks(text) {
   if (!text || text.trim() === '') return [];
   return text.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 }
-
 function getRelevantChunks(query, chunks) {
   if (chunks.length === 0) return ["No context available."];
   const keywords = query.toLowerCase().split(' ').filter(w => w.length > 3);
@@ -332,6 +330,7 @@ function getRelevantChunks(query, chunks) {
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
+// ─── 2. STRICT SYSTEM PROMPT ──────────────────────────────
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, professional, and helpful assistant for the Cresoa business management platform.
 
@@ -348,6 +347,7 @@ HOW TO HANDLE MISSING INFORMATION:
 - If you genuinely cannot deduce an answer, say: "I don't have that specific information yet. Please contact support via WhatsApp or submit a ticket."
 `;
 
+// ─── 3. GROQ PRIMARY CALLER ──────────────────────────────────
 async function callGroq(message, contextString) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
@@ -369,6 +369,7 @@ async function callGroq(message, contextString) {
   } catch (e) { return null; }
 }
 
+// ─── 4. GEMINI FALLBACK CALLER ──────────────────────────────
 async function callGemini(message, contextString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -382,27 +383,29 @@ async function callGemini(message, contextString) {
   } catch (e) { return null; }
 }
 
+// ─── 5. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
   if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page.";
-  if (lower.includes('subscription') || lower.includes('plan') || lower.includes('pay')) return "To upgrade your plan, go to the Subscription page.";
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
+// ─── 6. POST‑PROCESSING FILTER ──────────────────────────────
 function cleanResponse(text) {
   if (!text) return text;
   return text.replace(/[*_#`~]/g, '').trim();
 }
 
+// ─── 7. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
-    // ✅ EXACT AUTH PATTERN FROM THE TICKET SYSTEM (PROVEN TO WORK)
+    // 1. ✅ PROVEN AUTH PATTERN (Exactly like your Ticket System)
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     const supabase = createRouteHandlerClient({ cookies });
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -412,10 +415,12 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // 2. Fetch RAG chunks
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
+    // 3. Try Groq, then Gemini, then fallback
     let answer = await callGroq(message, contextString);
     let source = 'groq';
     if (!answer) {
@@ -429,14 +434,14 @@ export async function POST(req) {
     }
     const cleanedAnswer = cleanResponse(answer);
 
-    // Save conversation history (using the same authenticated client)
+    // 4. Save conversation history to the database we just fixed (graceful failure if it fails)
     try {
       await supabase.from('support_messages').insert([
         { business_id, user_id: user.id, sender_type: 'user', message },
         { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
       ]);
     } catch (memoryError) {
-      console.warn('Memory error (ignored):', memoryError);
+      console.warn('Memory saving error (ignored):', memoryError);
     }
 
     return NextResponse.json({ answer: cleanedAnswer, source });
@@ -447,4 +452,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-            }
+}
