@@ -6,6 +6,7 @@ import { Icon } from '../../../components/Icon';
 export default function AdminSupportPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -17,12 +18,19 @@ export default function AdminSupportPage() {
 
   const fetchTickets = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       const res = await fetch('/api/support/tickets');
+      if (!res.ok) {
+        const err = await res.json();
+        setErrorMessage(`Error ${res.status}: ${err.error || 'Unknown error'}`);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
       if (data.tickets) setTickets(data.tickets);
     } catch (error) {
-      console.error('Failed to fetch admin tickets');
+      setErrorMessage('Network error. Could not connect to the admin server.');
     } finally {
       setLoading(false);
     }
@@ -73,6 +81,12 @@ export default function AdminSupportPage() {
       <h1 style={{ color: 'var(--color-text)', fontSize: '1.8rem', fontWeight: '700', marginBottom: '0.5rem' }}>Admin · Support Tickets</h1>
       <p style={{ color: 'var(--color-text-muted)', marginBottom: '2rem' }}>Manage tickets, reply to customers, and track resolution.</p>
 
+      {errorMessage && (
+        <div style={{ background: 'var(--color-danger)15', color: 'var(--color-danger)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--color-danger)30', marginBottom: '1rem' }}>
+          <strong>Error:</strong> {errorMessage}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         {['all', 'open', 'in_progress', 'resolved'].map((status) => (
           <button key={status} onClick={() => setStatusFilter(status)} style={{ padding: '0.4rem 1rem', borderRadius: '20px', border: '1px solid var(--color-border)', background: statusFilter === status ? 'var(--color-primary)' : 'transparent', color: statusFilter === status ? '#fff' : 'var(--color-text)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500 }}>
@@ -83,6 +97,8 @@ export default function AdminSupportPage() {
 
       {loading ? (
         <p style={{ color: 'var(--color-text-muted)' }}>Loading tickets...</p>
+      ) : tickets.length === 0 ? (
+        <p style={{ color: 'var(--color-text-muted)' }}>No tickets have been submitted yet. Check back later.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {filteredTickets.map((ticket) => (
@@ -125,4 +141,4 @@ export default function AdminSupportPage() {
       )}
     </div>
   );
-                                        }
+  }
