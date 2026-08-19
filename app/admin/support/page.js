@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from '../../../components/Icon';
+import { supabase } from '../../../lib/supabaseClient';
 
 export default function AdminSupportPage() {
   const [tickets, setTickets] = useState([]);
@@ -20,7 +21,16 @@ export default function AdminSupportPage() {
     setLoading(true);
     setErrorMessage('');
     try {
-      const res = await fetch('/api/support/tickets');
+      // ✅ Get the session token from Supabase client
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch('/api/support/tickets', {
+        headers: {
+          'Authorization': `Bearer ${token}` // Pass the token here
+        }
+      });
+      
       if (!res.ok) {
         const err = await res.json();
         setErrorMessage(`Error ${res.status}: ${err.error || 'Unknown error'}`);
@@ -38,9 +48,14 @@ export default function AdminSupportPage() {
 
   const handleStatusChange = async (ticketId, newStatus) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       await fetch('/api/support/ticket/status', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ ticketId, status: newStatus })
       });
       fetchTickets();
@@ -53,9 +68,14 @@ export default function AdminSupportPage() {
     if (!replyMessage.trim() || !selectedTicket) return;
     setIsSending(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       await fetch('/api/support/ticket/reply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           ticketId: selectedTicket.id,
           message: replyMessage,
@@ -141,4 +161,4 @@ export default function AdminSupportPage() {
       )}
     </div>
   );
-  }
+}
