@@ -17,7 +17,6 @@ export default function ClientTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // 1. Pre-fill the email on load
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -28,13 +27,12 @@ export default function ClientTicketPage() {
     init();
   }, []);
 
-  // 2. Submit the ticket - NO AUTH HEADERS, just plain form data
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.subject || !formData.category || !formData.description) return;
-    
     setIsSubmitting(true);
     try {
+      // ✅ Sends directly to the new backend. No headers, no auth, no business_id.
       const res = await fetch('/api/support/ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,7 +40,7 @@ export default function ClientTicketPage() {
       });
       
       if (res.ok) {
-        setSuccessMessage('✅ Ticket submitted! We’ll get back to you via email within 24 hours.');
+        setSuccessMessage('✅ Ticket submitted! We’ll reply to your email within 24 hours.');
         setFormData(prev => ({ ...prev, subject: '', category: '', description: '' }));
         setTimeout(() => setSuccessMessage(''), 5000);
       } else {
@@ -56,41 +54,30 @@ export default function ClientTicketPage() {
     }
   };
 
-  const handleBack = () => {
-    router.push('/dashboard/support');
-  };
+  const handleBack = () => router.push('/dashboard/support');
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', background: 'var(--color-bg)', minHeight: 'calc(100vh - 80px)' }}>
-      
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', fontSize: '1.2rem' }}>‹</button>
         <h1 style={{ color: 'var(--color-text)', fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>Submit a Ticket</h1>
       </div>
-
-      {/* Success Banner */}
       {successMessage && (
         <div style={{ background: '#2E7D5E15', color: '#2E7D5E', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid #2E7D5E30', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
           {successMessage}
         </div>
       )}
-
-      {/* Clean Submit Form */}
       <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
         <h3 style={{ color: 'var(--color-text)', fontSize: '1rem', fontWeight: '600', margin: '0 0 1rem' }}>Contact Support</h3>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Your Email Address (We'll reply here)</label>
             <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem' }} />
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Subject</label>
             <input type="text" value={formData.subject} onChange={(e) => setFormData({...formData, subject: e.target.value})} placeholder="Briefly describe the issue" required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem' }} />
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Category</label>
             <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem' }}>
@@ -103,12 +90,10 @@ export default function ClientTicketPage() {
               <option value="other">Other</option>
             </select>
           </div>
-
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>Description</label>
             <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} rows="4" placeholder="Provide detailed information so we can help you faster..." required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.95rem', resize: 'vertical', fontFamily: 'inherit' }} />
           </div>
-
           <button type="submit" disabled={isSubmitting} style={{ width: '100%', padding: '0.7rem', borderRadius: '10px', border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: '600', fontSize: '1rem', cursor: 'pointer', opacity: isSubmitting ? '0.7' : '1' }}>
             {isSubmitting ? 'Submitting...' : 'Submit Ticket'}
           </button>
@@ -116,4 +101,4 @@ export default function ClientTicketPage() {
       </div>
     </div>
   );
-        }
+}
