@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+
 export async function POST(req) {
   try {
     const { email, subject, category, description } = await req.json();
@@ -8,15 +9,14 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ✅ Just insert the raw ticket. No auth checks, no user ID validations.
-    const supabaseAdmin = createAdminClient();
+    // ✅ Insert directly into the tickets table. RLS is bypassed because we use supabaseAdmin.
     const { data, error: insertError } = await supabaseAdmin
       .from('support_tickets')
       .insert({
-        email: email,      // We add an 'email' column to your table
-        subject: subject,
-        category: category,
-        description: description,
+        email,
+        subject,
+        category,
+        description,
         status: 'open'
       })
       .select()
