@@ -239,7 +239,7 @@ export default function WorkflowSettingsPage() {
         </Card>
       )}
 
-      {/* ─── STICKY SAVE BAR ──────────────────────────────────── */}
+      {/* ─── STICKY SAVE BAR (Now properly elevated) ──────────── */}
       {isEditing && (
         <div style={{
           position: 'fixed',
@@ -248,11 +248,11 @@ export default function WorkflowSettingsPage() {
           right: 0,
           background: 'var(--cresoa-card)',
           borderTop: '1px solid var(--cresoa-border)',
-          padding: '0.75rem 1.5rem',
+          padding: '0.75rem 1.5rem calc(0.75rem + env(safe-area-inset-bottom))',
           display: 'flex',
           justifyContent: 'flex-end',
           alignItems: 'center',
-          zIndex: 100,
+          zIndex: 999, // 🛑 ELEVATED SO IT FLOATS OVER BOTTOM NAV
           boxShadow: '0 -4px 12px rgba(0,0,0,0.04)',
         }}>
           <button 
@@ -283,4 +283,4 @@ export default function WorkflowSettingsPage() {
       </div>
     </div>
   );
-  }
+}
