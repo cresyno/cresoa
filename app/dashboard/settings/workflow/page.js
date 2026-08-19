@@ -13,6 +13,7 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
     'chevron-down': <svg {...props}><polyline points="6 9 12 15 18 9"/></svg>,
     'check': <svg {...props}><polyline points="20 6 9 17 4 12"/></svg>,
     'layers': <svg {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+    'plus': <svg {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   }
   return icons[name] || <span />
 }
@@ -27,10 +28,10 @@ export default function WorkflowSettingsPage() {
     router.push(`${path}${separator}business_id=${businessId}`);
   };
 
-  const [stages, setStages] = useState(['', '', '', '', '']);
+  const [stages, setStages] = useState(['']);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // Toggle between View and Edit mode
+  const [isEditing, setIsEditing] = useState(false);
 
   // ─── Fetch current stages on load ────────────────────────
   useEffect(() => {
@@ -40,22 +41,25 @@ export default function WorkflowSettingsPage() {
       try {
         const res = await fetch(`/api/settings/workflow?business_id=${businessId}`);
         const data = await res.json();
+        
+        let fetchedStages = [];
         if (data.stages && data.stages.length > 0) {
-          // Pre-fill the array with fetched names, pad with empty strings if fewer than 5
-          const filledStages = data.stages.map(s => s.stage_name);
-          while (filledStages.length < 5) filledStages.push('');
-          setStages(filledStages.slice(0, 5));
-        } else {
-          // If no stages are saved yet, default to empty strings to force them to set it
-          setStages(['', '', '', '', '']);
+          fetchedStages = data.stages.map(s => s.stage_name);
         }
+
+        // If the database is totally empty, give them intelligent defaults
+        if (fetchedStages.length === 0) {
+          fetchedStages = ['Order Placed', 'Cutting', 'Sewing', 'Ready for Pickup', 'Delivered'];
+        }
+
+        setStages(fetchedStages);
       } catch (e) { console.error(e); }
       setLoading(false);
     };
     fetchStages();
   }, [businessId]);
 
-  // ─── Reorder Handlers ─────────────────────────────────────
+  // ─── Handlers ─────────────────────────────────────────────
   const handleMoveUp = (index) => {
     if (index === 0 || !isEditing) return;
     const newStages = [...stages];
@@ -70,7 +74,11 @@ export default function WorkflowSettingsPage() {
     setStages(newStages);
   };
 
-  // ─── Save Handler ──────────────────────────────────────────
+  const handleAddStage = () => {
+    if (!isEditing) return;
+    setStages([...stages, '']);
+  };
+
   const handleSave = async () => {
     const filledStages = stages.filter(s => s.trim() !== '');
     if (filledStages.length < 2) {
@@ -85,14 +93,14 @@ export default function WorkflowSettingsPage() {
         body: JSON.stringify({ business_id: businessId, stages: filledStages })
       });
       if (res.ok) {
-        // Exit edit mode immediately and refresh data to confirm saving
         setIsEditing(false);
+        // Immediately refresh the View Mode
         const updatedRes = await fetch(`/api/settings/workflow?business_id=${businessId}`);
         const data = await updatedRes.json();
-        if (data.stages) {
-          const filled = data.stages.map(s => s.stage_name);
-          while (filled.length < 5) filled.push('');
-          setStages(filled.slice(0, 5));
+        if (data.stages && data.stages.length > 0) {
+          setStages(data.stages.map(s => s.stage_name));
+        } else {
+          setStages(['Order Placed', 'Cutting', 'Sewing', 'Ready for Pickup', 'Delivered']);
         }
         alert('Workflow stages updated successfully!');
       } else {
@@ -105,7 +113,7 @@ export default function WorkflowSettingsPage() {
   };
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px', background: 'var(--cresoa-bg)' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '100px', background: 'var(--cresoa-bg)' }}>
       <Navigation businessId={businessId} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
@@ -114,7 +122,7 @@ export default function WorkflowSettingsPage() {
       </div>
 
       <p style={{ color: 'var(--cresoa-text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-        Define the 5 stages your orders go through. This will update the Production page for your industry.
+        Define the stages your orders go through. This will update the Production page for your industry.
       </p>
 
       {loading ? (
@@ -152,7 +160,7 @@ export default function WorkflowSettingsPage() {
                     alignItems: 'center', 
                     gap: '1rem', 
                     padding: '0.75rem 0', 
-                    borderBottom: index < 4 ? '1px solid var(--cresoa-border)' : 'none' 
+                    borderBottom: index < stages.length - 1 ? '1px solid var(--cresoa-border)' : 'none' 
                   }}>
                     <span style={{ fontWeight: 600, color: 'var(--cresoa-text-muted)', minWidth: '24px' }}>{index + 1}.</span>
                     <span style={{ color: stage ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)', fontStyle: stage ? 'normal' : 'italic' }}>
@@ -177,7 +185,7 @@ export default function WorkflowSettingsPage() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '1rem' }}>
                 {stages.map((stage, index) => (
                   <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid var(--cresoa-border)', paddingBottom: '0.5rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -197,22 +205,77 @@ export default function WorkflowSettingsPage() {
                         newStages[index] = e.target.value;
                         setStages(newStages);
                       }}
-                      placeholder={`Stage ${index + 1} (e.g. "Cutting")`}
+                      placeholder={`Stage ${index + 1}`}
                       style={{ flex: 1, padding: '0.5rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
                     />
                   </div>
                 ))}
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                <button onClick={handleSave} disabled={saving} style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', fontWeight: 600, cursor: 'pointer', opacity: saving ? '0.7' : '1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Icon name="check" size={14} stroke="#fff" /> {saving ? 'Saving...' : 'Save Workflow'}
-                </button>
-              </div>
+              {/* Add Stage Button */}
+              <button 
+                onClick={handleAddStage}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  border: '1px dashed var(--cresoa-border)',
+                  background: 'transparent',
+                  color: 'var(--cresoa-text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  marginTop: '0.5rem'
+                }}
+              >
+                <Icon name="plus" size={14} stroke="currentColor" /> Add New Stage
+              </button>
+
             </div>
           )}
 
         </Card>
+      )}
+
+      {/* ─── STICKY SAVE BAR ──────────────────────────────────── */}
+      {isEditing && (
+        <div style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'var(--cresoa-card)',
+          borderTop: '1px solid var(--cresoa-border)',
+          padding: '0.75rem 1.5rem',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          zIndex: 100,
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.04)',
+        }}>
+          <button 
+            onClick={handleSave} 
+            disabled={saving} 
+            style={{ 
+              padding: '0.5rem 2rem', 
+              borderRadius: '8px', 
+              border: 'none', 
+              background: 'var(--cresoa-primary)', 
+              color: '#fff', 
+              fontWeight: 600, 
+              cursor: 'pointer', 
+              fontSize: '0.9rem', 
+              opacity: saving ? '0.7' : '1',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <Icon name="check" size={14} stroke="#fff" /> {saving ? 'Saving...' : 'Save Workflow'}
+          </button>
+        </div>
       )}
 
       <div style={{ marginTop: '2rem' }}>
@@ -220,4 +283,4 @@ export default function WorkflowSettingsPage() {
       </div>
     </div>
   );
-                                }
+  }
