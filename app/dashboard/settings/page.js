@@ -3,31 +3,46 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
-import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
+// ─── HARDCODED ICONS (No imports, purely self-contained) ───
+const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
+  const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className }
+  const icons = {
+    'building': <svg {...props}><path d="M3 21h18"/><path d="M9 8h1"/><path d="M9 12h1"/><path d="M9 16h1"/><path d="M14 8h1"/><path d="M14 12h1"/><path d="M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>,
+    'phone': <svg {...props}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+    'message-circle': <svg {...props}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>,
+    'map-pin': <svg {...props}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+    'palette': <svg {...props}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.4 0 .7 0 1-.1.5-.1 1-.5 1-1v-2.2c0-.6.4-1 1-1h1.6c4.6 0 8.4-3.8 8.4-8.4C23 5.8 18.2 2 12 2z"/></svg>,
+    'layers': <svg {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+    'chevron-right': <svg {...props}><polyline points="9 18 15 12 9 6"/></svg>,
+    'check': <svg {...props}><polyline points="20 6 9 17 4 12"/></svg>,
+    'upload': <svg {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+    'x': <svg {...props}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+    'check-circle': <svg {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+    'alert-circle': <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  }
+  return icons[name] || <span />
+}
+
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const businessId = getCurrentBusinessId() || searchParams.get('business_id')
+  const businessId = searchParams.get('business_id')
 
-  // ─── Navigation helper ────────────────────────────────────
   const navigateWithBusiness = (path) => {
     const separator = path.includes('?') ? '&' : '?'
     router.push(`${path}${separator}business_id=${businessId}`)
   }
 
+  const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [business, setBusiness] = useState(null)
-
-  // ─── Form state for editing ──────────────────────────────
-  const [editMode, setEditMode] = useState(null) // 'info', 'branding', or null
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [editMode, setEditMode] = useState(null) // null, 'general', 'contact', 'branding'
 
   const [formData, setFormData] = useState({
     name: '',
@@ -175,44 +190,27 @@ export default function SettingsPage() {
     }
   }
 
-  // ─── Loading / Error states ──────────────────────────────
   if (loading) {
     return (
-      <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', paddingBottom: '80px' }}>
+      <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
         <Navigation businessId={businessId} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{ height: '120px', background: 'var(--cresoa-border)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
-          ))}
+          {[1,2,3,4].map(i => <div key={i} style={{ height: '120px', background: 'var(--cresoa-border)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />)}
         </div>
         <style>{`@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }`}</style>
       </div>
     )
   }
 
-  if (error && !business) {
-    return (
-      <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', paddingBottom: '80px' }}>
-        <Navigation businessId={businessId} />
-        <Card style={{ padding: '2rem', textAlign: 'center', marginTop: '2rem' }}>
-          <p style={{ color: 'var(--cresoa-danger)' }}>{error}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--cresoa-primary)', color: '#fff', border: 'none', borderRadius: '6px' }}>Retry</button>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '900px', margin: '0 auto', paddingBottom: '80px' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
 
-      {/* ─── Header ──────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '2rem', marginTop: '0.5rem' }}>
-        <div>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Business</p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Settings</h1>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>Manage your business details, branding, and workflow</p>
-        </div>
+      {/* Header */}
+      <div style={{ marginBottom: '1.5rem', marginTop: '0.5rem' }}>
+        <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Business</p>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Settings</h1>
+        <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>Manage your details, branding, and workflow</p>
       </div>
 
       {success && (
@@ -226,132 +224,149 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ─── Settings Hub Grid ──────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+      {/* ─── Mobile-First, 1-Column List ─── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-        {/* Card 1: General Info */}
-        <Card style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="building" size={20} stroke="var(--cresoa-accent)" />
+        {/* Card 1: Business Profile & Logo */}
+        <Card style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="building" size={18} stroke="var(--cresoa-accent)" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Profile & General</h3>
             </div>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>General Info</h3>
+            {editMode !== 'general' && <button onClick={() => setEditMode('general')} style={{ background: 'transparent', border: '1px solid var(--cresoa-border)', padding: '0.25rem 0.75rem', borderRadius: '6px', color: 'var(--cresoa-text)', fontSize: '0.8rem', cursor: 'pointer' }}>✏️ Edit</button>}
           </div>
-          {editMode === 'info' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
-              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Business Name" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cresoa-bg)', border: '1px solid var(--cresoa-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {logoPreview ? <img src={logoPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Logo</span>}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, color: 'var(--cresoa-text)' }}>{formData.name || 'Business Name'}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Business Profile</div>
+            </div>
+          </div>
+
+          {editMode === 'general' && (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: 'var(--cresoa-text-muted)', marginBottom: '0.25rem' }}>Business Name</label>
+                <input type="text" name="name" value={formData.name} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              </div>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, color: 'var(--cresoa-text-muted)', marginBottom: '0.25rem' }}>Logo</label>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} id="logo-upload" />
+                  <label htmlFor="logo-upload" style={{ padding: '0.25rem 0.8rem', borderRadius: '6px', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '0.8rem', cursor: 'pointer' }}><Icon name="upload" size={14} stroke="#fff" /> Upload</label>
+                  {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.25rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.8rem', cursor: 'pointer' }}>Remove</button>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '0.3rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>{saving ? 'Saving...' : 'Save'}</button>
+                <button onClick={() => setEditMode(null)} style={{ padding: '0.3rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Card 2: Contact & Location */}
+        <Card style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="phone" size={18} stroke="var(--cresoa-accent)" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Contact & Location</h3>
+            </div>
+            {editMode !== 'contact' && <button onClick={() => setEditMode('contact')} style={{ background: 'transparent', border: '1px solid var(--cresoa-border)', padding: '0.25rem 0.75rem', borderRadius: '6px', color: 'var(--cresoa-text)', fontSize: '0.8rem', cursor: 'pointer' }}>✏️ Edit</button>}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem' }}>
+            <div><Icon name="phone" size={14} /> {formData.phone || 'Not set'}</div>
+            <div><Icon name="message-circle" size={14} /> {formData.whatsapp || 'Not set'}</div>
+            <div><Icon name="map-pin" size={14} /> {formData.location || 'Not set'}</div>
+          </div>
+
+          {editMode === 'contact' && (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <input type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
               <input type="text" name="whatsapp" value={formData.whatsapp} onChange={handleChange} placeholder="WhatsApp" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
               <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="Location" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-            </div>
-          ) : (
-            <div style={{ flex: 1, color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', lineHeight: '1.6' }}>
-              <p style={{ margin: '0 0 0.25rem 0', fontWeight: 500, color: 'var(--cresoa-text)' }}>{business?.name || 'Not set'}</p>
-              <p style={{ margin: 0 }}>📞 {business?.phone || 'Not set'}</p>
-              <p style={{ margin: 0 }}>💬 {business?.whatsapp || 'Not set'}</p>
-              <p style={{ margin: 0 }}>📍 {business?.location || 'Not set'}</p>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '0.3rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>{saving ? 'Saving...' : 'Save'}</button>
+                <button onClick={() => setEditMode(null)} style={{ padding: '0.3rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+              </div>
             </div>
           )}
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-            {editMode === 'info' ? (
-              <button onClick={handleSave} disabled={saving} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer' }}>{saving ? 'Saving...' : 'Save Info'}</button>
-            ) : (
-              <button onClick={() => setEditMode('info')} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer' }}>✏️ Edit</button>
-            )}
-            {editMode === 'info' && <button onClick={() => setEditMode(null)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-border)', color: 'var(--cresoa-text)', cursor: 'pointer' }}>Cancel</button>}
-          </div>
         </Card>
 
-        {/* Card 2: Branding & Tracking */}
-        <Card style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="palette" size={20} stroke="var(--cresoa-accent)" />
-            </div>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Branding & Tracking</h3>
+            {editMode !== 'branding' && <button onClick={() => setEditMode('branding')} style={{ background: 'transparent', border: '1px solid var(--cresoa-border)', padding: '0.25rem 0.75rem', borderRadius: '6px', color: 'var(--cresoa-text)', fontSize: '0.8rem', cursor: 'pointer' }}>✏️ Edit</button>}
           </div>
-          {editMode === 'branding' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+
+          <div style={{ fontSize: '0.9rem', color: 'var(--cresoa-text-muted)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div>🎨 Primary: <span style={{ color: formData.tracking_primary_color }}>{formData.tracking_primary_color}</span></div>
+            <div>🖼️ Background: <span style={{ color: formData.tracking_bg_color }}>{formData.tracking_bg_color}</span></div>
+            <div>📢 Message: {formData.tracking_welcome_message}</div>
+            <div>🔚 Footer: {formData.tracking_footer_message}</div>
+          </div>
+
+          {editMode === 'branding' && (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div><label style={{ fontSize: '0.8rem', display: 'block' }}>Primary Color</label><input type="color" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ width: '100%', padding: '0.25rem', border: 'none', cursor: 'pointer' }} /></div>
+                <div><label style={{ fontSize: '0.8rem', display: 'block' }}>Background Color</label><input type="color" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ width: '100%', padding: '0.25rem', border: 'none', cursor: 'pointer' }} /></div>
+                <div><label style={{ fontSize: '0.8rem', display: 'block' }}>Welcome Message</label><input type="text" name="tracking_welcome_message" value={formData.tracking_welcome_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} /></div>
+                <div><label style={{ fontSize: '0.8rem', display: 'block' }}>Footer Message</label><input type="text" name="tracking_footer_message" value={formData.tracking_footer_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '0.3rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer', fontSize: '0.8rem' }}>{saving ? 'Saving...' : 'Save'}</button>
+                <button onClick={() => setEditMode(null)} style={{ padding: '0.3rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* ─── DEDICATED TRACKING PAGE PREVIEW ─── */}
+          <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '10px', background: formData.tracking_bg_color, border: '1px solid var(--cresoa-border)' }}>
+            <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Preview</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingTop: '0.5rem' }}>
+              {logoPreview ? <img src={logoPreview} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: formData.tracking_primary_color }} />}
               <div>
-                <label style={{ fontSize: '0.8rem', display: 'block', marginBottom: '0.25rem' }}>Logo</label>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} id="logo-upload" />
-                  <label htmlFor="logo-upload" style={{ padding: '0.3rem 1rem', borderRadius: '6px', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '0.8rem', cursor: 'pointer' }}>Upload</label>
-                  {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.8rem' }}>Remove</button>}
-                </div>
-                {logoPreview && <div style={{ marginTop: '0.5rem', width: '60px', height: '60px', borderRadius: '50%', border: '1px solid var(--cresoa-border)', overflow: 'hidden' }}><img src={logoPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+                <div style={{ color: formData.tracking_primary_color, fontWeight: 600, fontSize: '0.9rem' }}>{formData.tracking_welcome_message}</div>
+                <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>{formData.tracking_footer_message}</div>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <span>Primary:</span>
-                <input type="color" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ width: '30px', height: '30px', border: 'none', cursor: 'pointer' }} />
-                <input type="text" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ flex: 1, padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <span>Background:</span>
-                <input type="color" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ width: '30px', height: '30px', border: 'none', cursor: 'pointer' }} />
-                <input type="text" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ flex: 1, padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
-              </div>
-              <input type="text" name="tracking_welcome_message" value={formData.tracking_welcome_message} onChange={handleChange} placeholder="Welcome Message" style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
-              <input type="text" name="tracking_footer_message" value={formData.tracking_footer_message} onChange={handleChange} placeholder="Footer Message" style={{ padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
             </div>
-          ) : (
-            <div style={{ flex: 1, color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', lineHeight: '1.6' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <span style={{ width: '16px', height: '16px', borderRadius: '4px', background: formData.tracking_primary_color }} />
-                <span>Primary Color: <strong>{formData.tracking_primary_color}</strong></span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <span style={{ width: '16px', height: '16px', borderRadius: '4px', background: formData.tracking_bg_color }} />
-                <span>Background: <strong>{formData.tracking_bg_color}</strong></span>
-              </div>
-              <p style={{ margin: '0 0 0.25rem 0' }}>📢 {formData.tracking_welcome_message}</p>
-              <p style={{ margin: 0 }}>🔚 {formData.tracking_footer_message}</p>
+            <div style={{ marginTop: '0.5rem', padding: '0.4rem', background: 'rgba(255,255,255,0.5)', borderRadius: '6px', border: `1px solid ${formData.tracking_primary_color}` }}>
+              <span style={{ color: formData.tracking_primary_color, fontWeight: 600, fontSize: '0.8rem' }}>Order #1234</span>
+              <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', marginLeft: '0.75rem' }}>Status: In Progress</span>
             </div>
-          )}
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-            {editMode === 'branding' ? (
-              <button onClick={handleSave} disabled={saving} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer' }}>{saving ? 'Saving...' : 'Save Branding'}</button>
-            ) : (
-              <button onClick={() => setEditMode('branding')} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer' }}>✏️ Edit</button>
-            )}
-            {editMode === 'branding' && <button onClick={() => setEditMode(null)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-border)', color: 'var(--cresoa-text)', cursor: 'pointer' }}>Cancel</button>}
           </div>
         </Card>
 
-           {/* Card 3: Workflow Stages (The new button!) */}
+        {/* Card 4: Workflow Stages (Working Button) */}
         <Card 
           style={{ 
-            padding: '1.5rem', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            height: '100%',
+            padding: '1.25rem', 
             cursor: 'pointer',
-            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-            background: 'var(--cresoa-surface)'
+            transition: 'all 0.15s ease'
           }}
           onClick={() => navigateWithBusiness('/dashboard/settings/workflow')}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="layers" size={20} stroke="var(--cresoa-accent)" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="layers" size={18} stroke="var(--cresoa-accent)" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Workflow Stages</h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Customize the 5 stages for your industry</p>
+              </div>
             </div>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Workflow Stages</h3>
-          </div>
-          
-          <div style={{ flex: 1, color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1rem' }}>
-            <p style={{ margin: '0 0 0.5rem 0' }}>
-              <strong>What is this?</strong> The 5 stages your orders move through on your dashboard and tracking page (e.g., Cutting, Sewing, Delivered).
-            </p>
-            <p style={{ margin: 0 }}>
-              Click here to <strong>customize the names</strong> of these stages to match your specific industry (Fashion, Repairs, Manufacturing, etc.).
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--cresoa-border)', paddingTop: '1rem', marginTop: 'auto' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--cresoa-primary)' }}>Configure your stages →</span>
-            <Icon name="chevron-right" size={18} stroke="var(--cresoa-primary)" />
+            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--cresoa-primary)' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 500, marginRight: '0.25rem' }}>Configure</span>
+              <Icon name="chevron-right" size={16} stroke="var(--cresoa-primary)" />
+            </div>
           </div>
         </Card>
 
@@ -362,4 +377,4 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-}
+            }
