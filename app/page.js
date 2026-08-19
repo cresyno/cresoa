@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link';
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
 
@@ -394,15 +395,15 @@ export default function HomePage() {
         <div className="nav-links">
           <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
           <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
-          <button onClick={() => navigateTo('/pricing')} className="nav-btn">Pricing</button>
-          <button onClick={() => navigateTo('/support')} className="nav-btn">Support</button>
+          <Link href="/pricing" className="nav-btn">Pricing</Link>
+<Link href="/support" className="nav-btn">Support</Link>
           <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
         </div>
 
         <div className="nav-actions">
           <ThemeToggle />
-          <button onClick={() => navigateTo('/login')} style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit' }}>Log in</button>
-          <button onClick={() => navigateTo('/signup')} className="nav-btn nav-btn-primary">Start Beta</button>
+          <Link href="/login" ...>Log in</Link>
+<Link href="/signup" className="nav-btn nav-btn-primary">Start Beta</Link>
           <button className="hamburger" onClick={toggleMobileMenu}>
             {ICONS.menu}
           </button>
@@ -417,11 +418,11 @@ export default function HomePage() {
         </button>
         <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
         <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
-        <button onClick={() => navigateTo('/pricing')} className="nav-btn">Pricing</button>
-        <button onClick={() => navigateTo('/support')} className="nav-btn">Support</button>
+        <Link href="/pricing" className="nav-btn">Pricing</Link>
+<Link href="/support" className="nav-btn">Support</Link>
         <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
-        <button onClick={() => navigateTo('/login')} className="nav-btn">Log in</button>
-        <button onClick={() => navigateTo('/signup')} className="nav-btn nav-btn-primary">Start Beta</button>
+<Link href="/login" className="nav-btn">Log in</Link>
+<Link href="/signup" className="nav-btn nav-btn-primary">Start Beta</Link>
         <div style={{ paddingTop: '0.5rem' }}>
           <ThemeToggle />
         </div>
@@ -441,7 +442,9 @@ export default function HomePage() {
               Track orders, manage customers, and get paid—all in one platform. No more messy notebooks, WhatsApp chaos, or missed payments.
             </p>
             <div className="cta-group">
-              <button onClick={() => navigateTo('/signup')} className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem' }}>
+              <Link href="/signup" className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>
+  Start Beta {ICONS.arrowRight}
+</Link>
                 Start Beta {ICONS.arrowRight}
               </button>
               <button onClick={(e) => scrollToSection(e, 'features')} className="btn btn-outline" style={{ fontSize: '1rem', padding: '0.9rem 2rem' }}>
@@ -710,12 +713,12 @@ export default function HomePage() {
             <span><strong style={{ color: 'var(--color-text)' }}>Cresoa</strong> · Built in Nigeria for Nigerian businesses</span>
           </div>
           <div className="links">
-            <button onClick={() => navigateTo('/login')}>Log in</button>
-            <button onClick={() => navigateTo('/signup')}>Sign up</button>
+            <Link href="/login">Log in</Link>
+<Link href="/signup">Sign up</Link>
             <button onClick={(e) => scrollToSection(e, 'why')}>Why Cresoa</button>
             <button onClick={(e) => scrollToSection(e, 'features')}>Features</button>
-            <button onClick={() => navigateTo('/pricing')}>Pricing</button>
-            <button onClick={() => navigateTo('/support')}>Support</button>
+          <Link href="/pricing">Pricing</Link>
+<Link href="/support">Support</Link>
             <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
           </div>
           <p style={{ opacity: 0.6, fontSize: '0.7rem', marginTop: '0.5rem' }}>
