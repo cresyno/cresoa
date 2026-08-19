@@ -18,7 +18,7 @@ export default function AdminSupportPage() {
   const fetchTickets = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/support/tickets?admin=true');
+      const res = await fetch('/api/support/tickets');
       const data = await res.json();
       if (data.tickets) setTickets(data.tickets);
     } catch (error) {
