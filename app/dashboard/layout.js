@@ -13,7 +13,6 @@ function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [user, setUser] = useState(null) // Store user for Admin check
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -38,35 +37,33 @@ function DashboardLayoutContent({ children }) {
     }
   }, [])
 
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
-    { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
-    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-    { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
-    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-  ]
-
-  const repairNavItems = [
-    { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-    { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-    { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
-    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-  ]
-
-  const isRepairs = pathname?.startsWith('/dashboard/repairs')
-  const currentNavItems = isRepairs ? repairNavItems : navItems
+  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
+  const baseNavItems = {
+    fashion: [
+      { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
+      { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
+      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+      { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
+      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+    ],
+    repairs: [
+      { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
+      { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+      { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
+      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+    ]
+  };
 
   // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        if (!authUser) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
           router.push('/login')
           return
         }
-        setUser(authUser) // Save user email for Admin check
 
         const businessIdFromUrl = searchParams.get('business_id')
         let businessData = null
@@ -84,7 +81,7 @@ function DashboardLayoutContent({ children }) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
-            .eq('owner_id', authUser.id)
+            .eq('owner_id', user.id)
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
@@ -92,7 +89,7 @@ function DashboardLayoutContent({ children }) {
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
-              .eq('user_id', authUser.id)
+              .eq('user_id', user.id)
               .maybeSingle()
             if (membershipData) {
               const { data: memberBusiness } = await supabase
@@ -118,11 +115,11 @@ function DashboardLayoutContent({ children }) {
             .from('business_memberships')
             .select('role')
             .eq('business_id', businessData.id)
-            .eq('user_id', authUser.id)
+            .eq('user_id', user.id)
             .maybeSingle()
           if (roleData) {
             setUserRole(roleData.role)
-          } else if (businessData.owner_id === authUser.id) {
+          } else if (businessData.owner_id === user.id) {
             setUserRole('Owner')
           } else {
             setUserRole('Staff')
@@ -181,23 +178,39 @@ function DashboardLayoutContent({ children }) {
     load()
   }, [router, searchParams])
 
-  // ─── Force reload if URL business_id doesn't match current business ───
+  // ─── 🔒 STRONG SECURITY TIES: Redirect if the user is on the wrong industry URL ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
       if (urlBusinessId && urlBusinessId !== business.id) {
         window.location.reload()
+        return
+      }
+
+      const currentSector = business.sector || 'fashion';
+      
+      // If it's a Fashion business, block them from accessing /repairs routes
+      if (currentSector === 'fashion' && pathname?.startsWith('/dashboard/repairs')) {
+        router.push('/dashboard/fashion?business_id=' + business.id);
+      }
+      
+      // If it's a Repairs business, block them from accessing /orders /groups (Fashion specific)
+      if (currentSector === 'repairs') {
+        if (pathname?.startsWith('/dashboard/orders') || pathname?.startsWith('/dashboard/groups')) {
+          router.push('/dashboard/repairs?business_id=' + business.id);
+        }
       }
     }
-  }, [searchParams, business, loading])
+  }, [loading, business, pathname, router, searchParams])
 
+  // ─── Handlers ───
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
   const isActive = (path) => {
-    if (path === '/dashboard' || path === '/dashboard/repairs') {
+    if (path === '/dashboard' || path === '/dashboard/repairs' || path === '/dashboard/fashion') {
       return pathname === path
     }
     return pathname?.startsWith(path)
@@ -206,11 +219,16 @@ function DashboardLayoutContent({ children }) {
   const handleNavClick = () => setSidebarOpen(false)
 
   const getIndustryBadge = () => {
-    if (isRepairs) return '🔧 Repairs'
-    if (business?.sector === 'Fashion & Custom Wear') return '👗 Fashion'
-    if (business?.sector === 'Custom Products & Services') return '🛠️ Manufacturing'
+    const sector = business?.sector || 'fashion';
+    if (sector === 'repairs') return '🔧 Repairs';
+    if (sector === 'fashion' || business?.sector === 'Fashion & Custom Wear') return '👗 Fashion';
+    if (business?.sector === 'Custom Products & Services') return '🛠️ Manufacturing';
     return ''
   }
+
+  // Determine the current nav items based on the business sector
+  const currentSector = business?.sector || 'fashion';
+  const currentNavItems = baseNavItems[currentSector] || baseNavItems.fashion;
 
   if (loading) {
     return (
@@ -302,7 +320,7 @@ function DashboardLayoutContent({ children }) {
           width: 260px;
           min-height: 100vh;
           background: #0A1628;
-          padding: 0.8rem 0.8rem; /* Reduced padding for compactness */
+          padding: 0.8rem 0.8rem;
           flex-shrink: 0;
           position: sticky;
           top: 0;
@@ -320,7 +338,7 @@ function DashboardLayoutContent({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding-bottom: 0.6rem; /* Reduced padding */
+          padding-bottom: 0.6rem;
           border-bottom: 1px solid rgba(255,255,255,0.06);
           margin-bottom: 0.6rem;
         }
@@ -332,7 +350,7 @@ function DashboardLayoutContent({ children }) {
         }
         .sidebar .brand .sub {
           color: #8899AA;
-          font-size: 0.45rem; /* Smaller text */
+          font-size: 0.45rem;
           line-height: 1.4;
         }
         .sidebar .brand .sub .badge {
@@ -357,7 +375,7 @@ function DashboardLayoutContent({ children }) {
         }
 
         .sidebar .nav-section {
-          margin-bottom: 0.2rem; /* Tighter spacing */
+          margin-bottom: 0.2rem;
         }
         .sidebar .nav-section .section-label {
           color: rgba(255,255,255,0.25);
@@ -372,11 +390,11 @@ function DashboardLayoutContent({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding: 0.2rem 0.7rem; /* Tighter padding */
+          padding: 0.2rem 0.7rem;
           border-radius: 6px;
           color: #8899AA;
           text-decoration: none;
-          font-size: 0.75rem; /* Smaller, cleaner font */
+          font-size: 0.75rem;
           font-weight: 500;
           transition: all 0.15s ease;
         }
@@ -409,7 +427,7 @@ function DashboardLayoutContent({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding: 0.2rem 0.7rem; /* Tighter padding */
+          padding: 0.2rem 0.7rem;
           border-radius: 6px;
           color: #8899AA;
           text-decoration: none;
@@ -526,6 +544,7 @@ function DashboardLayoutContent({ children }) {
 
         <div className="nav-section">
           <div className="section-label">Business</div>
+          {/* ⚡ Dynamic Navigation Renders Here */}
           {currentNavItems.map((item) => (
             <a
               key={item.path}
@@ -564,7 +583,7 @@ function DashboardLayoutContent({ children }) {
                 <span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan
               </a>
             )}
-            {showProfile && (
+                 {showProfile && (
               <a href={baseUrl('/dashboard/profile')} className={isActive('/dashboard/profile') ? 'active' : ''} onClick={handleNavClick}>
                 <span className="icon"><Icon name="user" size={16} stroke="currentColor" /></span> Profile & Settings
               </a>
@@ -572,8 +591,8 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
-        {/* 👑 New Admin Section - Only visible to you */}
-        {user?.email === 'taiwoabraham640@gmail.com' && (
+        {/* Admin Section */}
+        {business?.sector === 'fashion' && user?.email === 'taiwoabraham640@gmail.com' && (
           <div className="nav-section">
             <div className="section-label">Admin</div>
             <a
@@ -637,4 +656,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-              }
+                }
