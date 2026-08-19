@@ -592,19 +592,19 @@ const baseNavItems = {
           </div>
         )}
 
-        {/* Admin Section */}
-        {business?.sector === 'fashion' && user?.email === 'taiwoabraham640@gmail.com' && (
-          <div className="nav-section">
-            <div className="section-label">Admin</div>
-            <a
-              href={baseUrl('/admin/support')}
-              className={isActive('/admin') ? 'active' : ''}
-              onClick={handleNavClick}
-            >
-              <span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets
-            </a>
-          </div>
-        )}
+        {/* 👑 Admin Section - Visible to super admin only */}
+{user?.email === 'taiwoabraham640@gmail.com' && (
+  <div className="nav-section">
+    <div className="section-label">Admin</div>
+    <a
+      href={baseUrl('/admin/support')}
+      className={isActive('/admin') ? 'active' : ''}
+      onClick={handleNavClick}
+    >
+      <span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets
+    </a>
+  </div>
+)}
 
         <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}>
