@@ -395,6 +395,7 @@ export default function HomePage() {
           <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
           <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
           <button onClick={() => navigateTo('/pricing')} className="nav-btn">Pricing</button>
+          <button onClick={() => navigateTo('/support')} className="nav-btn">Support</button>
           <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
         </div>
 
@@ -417,6 +418,7 @@ export default function HomePage() {
         <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
         <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
         <button onClick={() => navigateTo('/pricing')} className="nav-btn">Pricing</button>
+        <button onClick={() => navigateTo('/support')} className="nav-btn">Support</button>
         <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
         <button onClick={() => navigateTo('/login')} className="nav-btn">Log in</button>
         <button onClick={() => navigateTo('/signup')} className="nav-btn nav-btn-primary">Start Beta</button>
@@ -713,6 +715,7 @@ export default function HomePage() {
             <button onClick={(e) => scrollToSection(e, 'why')}>Why Cresoa</button>
             <button onClick={(e) => scrollToSection(e, 'features')}>Features</button>
             <button onClick={() => navigateTo('/pricing')}>Pricing</button>
+            <button onClick={() => navigateTo('/support')}>Support</button>
             <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
           </div>
           <p style={{ opacity: 0.6, fontSize: '0.7rem', marginTop: '0.5rem' }}>
