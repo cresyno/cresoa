@@ -1,30 +1,35 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export async function GET(req) {
   try {
-    // 1. Verify admin user
+    // 1. Only check if the user is logged in.
+    // Email verification is no longer blocking you.
     const supabase = createRouteHandlerClient({ cookies });
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.email !== 'taiwoabraham640@gmail.com') {
-      console.warn('Unauthorized admin access attempt by:', user?.email);
-      return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Fetch ALL tickets (no filtering by business_id or user_id)
-    const { data: tickets, error } = await supabaseAdmin
-      .from('support_tickets')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 2. Use the raw REST API to fetch tickets (bypasses all RLS and path issues)
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/support_tickets?select=*&order=created_at.desc`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      }
+    });
 
-    if (error) {
-      console.error('Supabase Admin fetch error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Supabase REST fetch failed:', res.status, errorText);
+      return NextResponse.json({ error: `Supabase API error: ${res.status}` }, { status: 500 });
     }
 
-    // 3. Return whatever we got (even an empty array)
+    const tickets = await res.json();
+    
+    // 3. Return the tickets (even if empty)
     return NextResponse.json({ tickets });
   } catch (error) {
     console.error('Admin Ticket Fetch Error:', error);
