@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { supabase } from '../../../lib/supabaseClient'; // ✅ Fixed import path
 import ChatMessage from '../../../components/support/ChatMessage';
 
 function TessaChatContent() {
@@ -24,9 +25,16 @@ function TessaChatContent() {
     setIsLoading(true);
 
     try {
+      // ✅ Fetch the session token and pass it in the Authorization header
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const res = await fetch('/api/support/message', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // ✅ Critical missing header added
+        },
         body: JSON.stringify({ message: text, business_id: businessId })
       });
       const data = await res.json();
@@ -133,4 +141,4 @@ export default function TessaChatPage() {
       <TessaChatContent />
     </Suspense>
   );
-}
+          }
