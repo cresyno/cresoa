@@ -252,7 +252,7 @@ export default function WorkflowSettingsPage() {
     display: 'flex',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    zIndex: 9999,                         // ✅ CHANGE 2: Forces it above everything else
+    zIndex: 99999,                         // ✅ CHANGE 2: Forces it above everything else
     boxShadow: '0 -4px 12px rgba(0,0,0,0.15)',
   }}>
     <button 
