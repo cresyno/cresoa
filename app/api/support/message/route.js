@@ -217,52 +217,63 @@ Reach out to Cresoa Support directly, and a member of the team will help you sor
 
 `;
 
-// ─── 1. SMART SPLITTER (Breaks the PDF into chunks) ───
-      
-    
 
+
+// ─── 2. SMART RETRIEVER ─────────────────────────────────────
 function splitIntoChunks(text) {
   if (!text || text.trim() === '') return [];
   return text.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 }
 
 function getRelevantChunks(query, chunks) {
-  if (chunks.length === 0) return ["No context available yet."];
+  if (chunks.length === 0) return ["No context available in the knowledge base."];
   const keywords = query.toLowerCase().split(' ').filter(w => w.length > 3);
   const scored = chunks.map(chunk => {
     const lowerChunk = chunk.toLowerCase();
     let score = 0;
-    for (const word of keywords) { if (lowerChunk.includes(word)) score++; }
+    for (const word of keywords) if (lowerChunk.includes(word)) score++;
     return { text: chunk, score };
   });
   const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-const SYSTEM_PROMPT = `You are Tessa, a warm, professional AI assistant for Cresoa.`;
+// ─── 3. STRICT SYSTEM PROMPT (Enforces the rules) ──────────
+const SYSTEM_PROMPT = `
+You are Tessa, a warm, professional, and highly knowledgeable AI assistant for the Cresoa platform.
 
+RULES (MUST FOLLOW EXACTLY):
+1. NO EMOJIS. Do not use emojis in your replies.
+2. NO ASTERISKS. Do not use * or ** in your text.
+3. USE SIMPLE DASHES OR NUMBERS: Use "-" or "1. 2. 3." for lists.
+4. DO NOT MENTION THE MANUAL: Never say "based on the manual", "per the context", etc. Just answer directly.
+5. ONLY USE THE CONTEXT PROVIDED. If you don't know the answer from the Platform Context below, say: "I don't have that specific information yet. Please contact support."
+`;
+
+// ─── 4. GROQ PRIMARY CALLER ────────────────────────────────
 async function callGroq(message, contextString) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
 
   try {
-    const prompt = `${SYSTEM_PROMPT}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        messages: [{ role: 'system', content: 'You are Tessa, a warm AI assistant.' }, { role: 'user', content: prompt }]
+        model: 'openai/gpt-oss-20b', // The working Groq model
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `Platform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
+        ]
       })
     });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || null;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
+// ─── 5. GEMINI FALLBACK CALLER ─────────────────────────────
 async function callGemini(message, contextString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -278,18 +289,18 @@ async function callGemini(message, contextString) {
     if (!res.ok) return null;
     const data = await res.json();
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
+// ─── 6. HARDCODED FALLBACK ─────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff')) return "To manage staff, go to the Staff page.";
   if (lower.includes('order')) return "Orders are managed in the Orders page.";
-  return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
+  return "I'm currently connecting to my AI brain. Please contact support if you need immediate help.";
 }
 
+// ─── 7. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
     const { message } = await req.json();
@@ -298,27 +309,29 @@ export async function POST(req) {
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
+    // 1. Try Groq
     let answer = await callGroq(message, contextString);
     let source = 'groq';
 
+    // 2. If Groq fails, try Gemini
     if (!answer) {
+      console.warn('Groq failed, falling back to Gemini...');
       answer = await callGemini(message, contextString);
       source = 'gemini';
     }
 
+    // 3. If both fail, use hardcoded fallback
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
 
     return NextResponse.json({ answer, source });
-
   } catch (error) {
-    console.error('CRASH ERROR:', error); // This prints to Vercel logs
+    console.error('API Error:', error);
     return NextResponse.json({ 
-      // 🔴 THIS WILL SHOW THE REAL ERROR IN YOUR CHAT
-      answer: `❌ CRITICAL ERROR: ${error.message || error}`, 
-      source: 'debug_error' 
+      answer: "Tessa is experiencing technical difficulties. Please try again in a moment.", 
+      source: 'emergency_fallback' 
     });
   }
-}
+  }
