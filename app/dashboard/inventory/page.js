@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
-import { Card } from '@/components/Card'
-import { SectionHeader } from '@/components/SectionHeader'
-import { Icon } from '@/components/Icon'
-import { Navigation } from '@/components/Navigation'
+import { supabase } from '../../../lib/supabaseClient'
+import { Card } from '../../../components/Card'
+import { SectionHeader } from '../../../components/SectionHeader'
+import { Icon } from '../../../components/Icon'
+import { Navigation } from '../../../components/Navigation'
 
 export default function InventoryPage() {
   const router = useRouter()
@@ -126,4 +126,4 @@ export default function InventoryPage() {
       </div>
     </div>
   )
-    }
+}
