@@ -19,7 +19,7 @@ export async function GET(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant', // <-- Updated to the correct model
+        model: 'mixtral-8x7b-32768', // <-- Tried-and-true stable model
         messages: [
           { role: 'system', content: `You are Tessa, a warm, professional AI assistant for Cresoa. Keep answers concise and practical.` },
           { role: 'user', content: message }
