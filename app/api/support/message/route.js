@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -333,7 +332,6 @@ function getRelevantChunks(query, chunks) {
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 2. STRICT SYSTEM PROMPT ──────────────────────────────
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, professional, and helpful assistant for the Cresoa business management platform.
 
@@ -350,7 +348,6 @@ HOW TO HANDLE MISSING INFORMATION:
 - If you genuinely cannot deduce an answer, say: "I don't have that specific information yet. Please contact support via WhatsApp or submit a ticket."
 `;
 
-// ─── 3. GROQ PRIMARY CALLER ──────────────────────────────────
 async function callGroq(message, contextString) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
@@ -372,7 +369,6 @@ async function callGroq(message, contextString) {
   } catch (e) { return null; }
 }
 
-// ─── 4. GEMINI FALLBACK CALLER ──────────────────────────────
 async function callGemini(message, contextString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -386,7 +382,6 @@ async function callGemini(message, contextString) {
   } catch (e) { return null; }
 }
 
-// ─── 5. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
@@ -395,23 +390,19 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 6. POST‑PROCESSING FILTER ──────────────────────────────
 function cleanResponse(text) {
   if (!text) return text;
   return text.replace(/[*_#`~]/g, '').trim();
 }
 
-// ─── 7. MAIN ORCHESTRATOR (with Memory & Bulletproof Auth) ──
 export async function POST(req) {
   try {
-    // 1. Authenticate using Authorization header (proven to work)
+    // ✅ EXACT AUTH PATTERN FROM THE TICKET SYSTEM (PROVEN TO WORK)
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -421,12 +412,10 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 2. Fetch RAG chunks
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 3. Try Groq, then Gemini, then fallback
     let answer = await callGroq(message, contextString);
     let source = 'groq';
     if (!answer) {
@@ -440,35 +429,12 @@ export async function POST(req) {
     }
     const cleanedAnswer = cleanResponse(answer);
 
-    // 4. Memory (Database operations with graceful failure)
+    // Save conversation history (using the same authenticated client)
     try {
-      // Use the standard authenticated client (already have user)
-      const supabase = createRouteHandlerClient({ cookies });
-      
-      // Fetch last 5 messages (ignore errors)
-      const { data: history, error: fetchError } = await supabase
-        .from('support_messages')
-        .select('sender_type, message')
-        .eq('business_id', business_id)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (!fetchError && history && history.length > 0) {
-        const historyString = history.reverse().map(msg => 
-          `${msg.sender_type === 'user' ? 'User' : 'Tessa'}: ${msg.message}`
-        ).join('\n');
-        // We could re-call AI with memory, but to keep it simple we'll just save for now.
-        // The next query will benefit from history if we store it properly.
-      }
-
-      // Save user and assistant messages (ignore insert errors)
-      await supabase
-        .from('support_messages')
-        .insert([
-          { business_id, user_id: user.id, sender_type: 'user', message },
-          { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
-        ]);
+      await supabase.from('support_messages').insert([
+        { business_id, user_id: user.id, sender_type: 'user', message },
+        { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
+      ]);
     } catch (memoryError) {
       console.warn('Memory error (ignored):', memoryError);
     }
@@ -481,4 +447,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-      }
+            }
