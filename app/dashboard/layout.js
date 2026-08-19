@@ -38,23 +38,24 @@ function DashboardLayoutContent({ children }) {
   }, [])
 
   // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
-  const baseNavItems = {
-    fashion: [
-      { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
-      { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
-      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-      { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
-      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-    ],
-    repairs: [
-      { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-      { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-      { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
-      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-    ]
-  };
-
+  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
+const baseNavItems = {
+  fashion: [
+    { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
+    { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
+    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+    { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
+    { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
+    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+  ],
+  repairs: [
+    { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
+    { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+    { name: 'Parts', path: '/dashboard/inventory', icon: 'package' },
+    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+  ]
+};
   // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
