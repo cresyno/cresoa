@@ -13,6 +13,7 @@ function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [user, setUser] = useState(null) // Store user for Admin check
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -60,11 +61,12 @@ function DashboardLayoutContent({ children }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (!authUser) {
           router.push('/login')
           return
         }
+        setUser(authUser) // Save user email for Admin check
 
         const businessIdFromUrl = searchParams.get('business_id')
         let businessData = null
@@ -82,7 +84,7 @@ function DashboardLayoutContent({ children }) {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
-            .eq('owner_id', user.id)
+            .eq('owner_id', authUser.id)
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
@@ -90,7 +92,7 @@ function DashboardLayoutContent({ children }) {
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
-              .eq('user_id', user.id)
+              .eq('user_id', authUser.id)
               .maybeSingle()
             if (membershipData) {
               const { data: memberBusiness } = await supabase
@@ -116,11 +118,11 @@ function DashboardLayoutContent({ children }) {
             .from('business_memberships')
             .select('role')
             .eq('business_id', businessData.id)
-            .eq('user_id', user.id)
+            .eq('user_id', authUser.id)
             .maybeSingle()
           if (roleData) {
             setUserRole(roleData.role)
-          } else if (businessData.owner_id === user.id) {
+          } else if (businessData.owner_id === authUser.id) {
             setUserRole('Owner')
           } else {
             setUserRole('Staff')
@@ -300,7 +302,7 @@ function DashboardLayoutContent({ children }) {
           width: 260px;
           min-height: 100vh;
           background: #0A1628;
-          padding: 1rem 0.8rem;
+          padding: 0.8rem 0.8rem; /* Reduced padding for compactness */
           flex-shrink: 0;
           position: sticky;
           top: 0;
@@ -318,9 +320,9 @@ function DashboardLayoutContent({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding-bottom: 0.8rem;
+          padding-bottom: 0.6rem; /* Reduced padding */
           border-bottom: 1px solid rgba(255,255,255,0.06);
-          margin-bottom: 0.8rem;
+          margin-bottom: 0.6rem;
         }
         .sidebar .brand .logo-text {
           color: #fff;
@@ -330,7 +332,7 @@ function DashboardLayoutContent({ children }) {
         }
         .sidebar .brand .sub {
           color: #8899AA;
-          font-size: 0.5rem;
+          font-size: 0.45rem; /* Smaller text */
           line-height: 1.4;
         }
         .sidebar .brand .sub .badge {
@@ -353,17 +355,13 @@ function DashboardLayoutContent({ children }) {
           font-weight: 600;
           text-transform: uppercase;
         }
-        .sidebar .brand .sub .plan.beta {
-          background: #1E3A5F;
-          color: #C79A2B;
-        }
 
         .sidebar .nav-section {
-          margin-bottom: 0.4rem;
+          margin-bottom: 0.2rem; /* Tighter spacing */
         }
         .sidebar .nav-section .section-label {
           color: rgba(255,255,255,0.25);
-          font-size: 0.5rem;
+          font-size: 0.45rem;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           padding: 0.2rem 0.7rem;
@@ -374,11 +372,11 @@ function DashboardLayoutContent({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding: 0.3rem 0.7rem;
-          borderRadius: 6px;
+          padding: 0.2rem 0.7rem; /* Tighter padding */
+          border-radius: 6px;
           color: #8899AA;
           text-decoration: none;
-          font-size: 0.8rem;
+          font-size: 0.75rem; /* Smaller, cleaner font */
           font-weight: 500;
           transition: all 0.15s ease;
         }
@@ -393,7 +391,7 @@ function DashboardLayoutContent({ children }) {
         }
         .sidebar .nav-section a .icon {
           font-size: 0.9rem;
-          width: 20px;
+          width: 18px;
           text-align: center;
           flex-shrink: 0;
         }
@@ -411,11 +409,11 @@ function DashboardLayoutContent({ children }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          padding: 0.3rem 0.7rem;
+          padding: 0.2rem 0.7rem; /* Tighter padding */
           border-radius: 6px;
           color: #8899AA;
           text-decoration: none;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 500;
           transition: all 0.15s ease;
           background: none;
@@ -444,18 +442,14 @@ function DashboardLayoutContent({ children }) {
           color: #D4A52A;
         }
         .sidebar .bottom .support-link {
-          color: #D4A52A; /* Changed text color to match accent for support link */
+          color: #D4A52A;
         }
         .sidebar .bottom .support-link:hover {
           background: rgba(212,165,42,0.06);
           color: #D4A52A;
         }
 
-        .main-content {
-          flex: 1;
-          min-width: 0;
-          padding: 0;
-        }
+        .main-content { flex: 1; min-width: 0; padding: 0; }
         .dashboard-header {
           display: flex;
           justify-content: flex-end;
@@ -464,10 +458,7 @@ function DashboardLayoutContent({ children }) {
           background: var(--color-card);
           border-bottom: 1px solid var(--color-border);
         }
-        .dashboard-header .date {
-          font-size: 0.7rem;
-          color: var(--color-text-muted);
-        }
+        .dashboard-header .date { font-size: 0.7rem; color: var(--color-text-muted); }
         .beta-btn {
           display: inline-flex;
           align-items: center;
@@ -529,7 +520,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '0.4rem' }}>
           <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
         </div>
 
@@ -581,13 +572,26 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
+        {/* 👑 New Admin Section - Only visible to you */}
+        {user?.email === 'taiwoabraham640@gmail.com' && (
+          <div className="nav-section">
+            <div className="section-label">Admin</div>
+            <a
+              href={baseUrl('/admin/support')}
+              className={isActive('/admin') ? 'active' : ''}
+              onClick={handleNavClick}
+            >
+              <span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets
+            </a>
+          </div>
+        )}
+
         <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}>
             <span className="icon"><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} stroke="currentColor" /></span>
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </button>
 
-             {/* ✅ FIXED: Points to internal Support Hub and keeps the business_id */}
           <a 
             href={baseUrl('/dashboard/support')} 
             className="support-link" 
@@ -615,7 +619,6 @@ function DashboardLayoutContent({ children }) {
           </div>
         </div>
 
-        {/* Banner component - kept as is */}
         <Banner />
 
         {children}
