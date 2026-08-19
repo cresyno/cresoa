@@ -36,7 +36,7 @@ export default function RootLayout({ children }) {
         {children}
 
         {/* Tessa AI Floating Assistant - Hidden on tracking pages AND the Tessa chat page */}
-        {!isTrackingPage && !isTessaPage && <TessaFloatingWidget />}
+        {pathname?.startsWith('/dashboard') && !isTessaPage && <TessaFloatingWidget />}
 
         <style>{`
           /* ─── GLOBAL CSS VARIABLES ─── */
