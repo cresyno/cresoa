@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -313,6 +312,7 @@ If you are unsure about a feature, ask Tessa first before contacting support; sh
 
 `;
 
+    
 // ─── 1. SMART RAG ENGINE ─────────────────────────────────────
 function splitIntoChunks(text) {
   if (!text || text.trim() === '') return [];
@@ -332,7 +332,7 @@ function getRelevantChunks(query, chunks) {
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 2. STRICT SYSTEM PROMPT (Force reasoning and follow-ups) ───
+// ─── 2. STRICT SYSTEM PROMPT ──────────────────────────────
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, professional, and helpful assistant for the Cresoa business management platform.
 
@@ -344,11 +344,10 @@ ABSOLUTE RULES YOU MUST FOLLOW:
 
 HOW TO ANSWER FOLLOW-UP QUESTIONS:
 - If the user asks a specific follow-up question, look at the "Conversation History" provided below.
-- Do NOT repeat the entire guide or list of steps. Answer ONLY the specific sub-question.
-- If they ask "Where do I click?", simply tell them the exact button name and location.
+- Do NOT repeat the entire guide. Answer ONLY the specific sub-question they are asking.
 
 HOW TO HANDLE MISSING INFORMATION:
-- Use the "Platform Context" provided below as your main source of truth.
+- Use the "Platform Context" as your main source of truth.
 - If the exact answer is not in the Platform Context, use your general understanding of the Cresoa platform to deduce the most logical answer.
 - If you genuinely cannot deduce an answer, say: "I don't have that specific information yet. Please contact support via WhatsApp or submit a ticket."
 
@@ -356,10 +355,10 @@ BEHAVIOR:
 - Always be concise. Do not write long paragraphs. Use bullet points with single dashes (-) when listing steps.
 `;
 
-// ─── 3. GET CONVERSATION HISTORY (Memory System) ────────────
+// ─── 3. GET CONVERSATION HISTORY (using authenticated client) ──
 async function getConversationHistory(userId, businessId) {
-  // Get the last 5 messages for memory
-  const { data, error } = await supabaseAdmin
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data, error } = await supabase
     .from('support_messages')
     .select('sender_type, message')
     .eq('business_id', businessId)
@@ -368,7 +367,6 @@ async function getConversationHistory(userId, businessId) {
     .limit(5);
   
   if (error || !data) return "";
-  // Reverse to put them in chronological order
   return data.reverse().map(msg => 
     `${msg.sender_type === 'user' ? 'User' : 'Tessa'}: ${msg.message}`
   ).join('\n');
@@ -419,17 +417,15 @@ async function callGemini(message, contextString, historyString) {
 // ─── 6. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
-  if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page. You can invite, remove, or change roles there.";
-  if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page. Use the 'New Order' button to create one.";
+  if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
+  if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page.";
   if (lower.includes('subscription') || lower.includes('plan') || lower.includes('pay')) return "To upgrade your plan, go to the Subscription page.";
-  if (lower.includes('production') || lower.includes('sewing')) return "To move an order through production, open the Production page and update the status.";
-  return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
+  return "I'm currently connecting to my AI brain. Please contact support if you need immediate help.";
 }
 
-// ─── 7. POST-PROCESSING FILTER (Removes markdown/asterisks) ───
+// ─── 7. POST-PROCESSING FILTER ──────────────────────────────
 function cleanResponse(text) {
   if (!text) return text;
-  // Kill all markdown characters: *, _, #, `, ~
   return text.replace(/[*_#`~]/g, '').trim();
 }
 
@@ -453,7 +449,7 @@ export async function POST(req) {
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 3. Fetch Memory (Last 5 messages)
+    // 3. Fetch Memory (Last 5 messages) using the authenticated client
     const historyString = await getConversationHistory(user.id, business_id);
 
     // 4. Try Groq
@@ -473,11 +469,11 @@ export async function POST(req) {
       source = 'fallback';
     }
 
-    // 7. Clean the response (remove asterisks/markdown)
+    // 7. Clean the response
     const cleanedAnswer = cleanResponse(answer);
 
-    // 8. Save the conversation to the database (New and Reply)
-    await supabaseAdmin.from('support_messages').insert([
+    // 8. Save the conversation to the database (using same client)
+    await supabase.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message },
       { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
     ]);
@@ -490,4 +486,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-  }
+      }
