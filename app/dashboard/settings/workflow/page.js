@@ -239,45 +239,45 @@ export default function WorkflowSettingsPage() {
         </Card>
       )}
 
-      {/* ─── STICKY SAVE BAR (Now properly elevated) ──────────── */}
-      {isEditing && (
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: 'var(--cresoa-card)',
-          borderTop: '1px solid var(--cresoa-border)',
-          padding: '0.75rem 1.5rem calc(0.75rem + env(safe-area-inset-bottom))',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          zIndex: 999, // 🛑 ELEVATED SO IT FLOATS OVER BOTTOM NAV
-          boxShadow: '0 -4px 12px rgba(0,0,0,0.04)',
-        }}>
-          <button 
-            onClick={handleSave} 
-            disabled={saving} 
-            style={{ 
-              padding: '0.5rem 2rem', 
-              borderRadius: '8px', 
-              border: 'none', 
-              background: 'var(--cresoa-primary)', 
-              color: '#fff', 
-              fontWeight: 600, 
-              cursor: 'pointer', 
-              fontSize: '0.9rem', 
-              opacity: saving ? '0.7' : '1',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem'
-            }}
-          >
-            <Icon name="check" size={14} stroke="#fff" /> {saving ? 'Saving...' : 'Save Workflow'}
-          </button>
-        </div>
-      )}
-
+      {/* ─── STICKY SAVE BAR ────────────────────────────────────── */}
+{isEditing && (
+  <div style={{
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: 'var(--cresoa-primary)',  // ✅ CHANGE 1: Navy Blue background
+    borderTop: '1px solid var(--cresoa-border)',
+    padding: '0.75rem 1.5rem calc(0.75rem + env(safe-area-inset-bottom))',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 9999,                         // ✅ CHANGE 2: Forces it above everything else
+    boxShadow: '0 -4px 12px rgba(0,0,0,0.15)',
+  }}>
+    <button 
+      onClick={handleSave} 
+      disabled={saving} 
+      style={{ 
+        padding: '0.5rem 2rem', 
+        borderRadius: '8px', 
+        border: 'none', 
+        background: '#fff',              // ✅ CHANGE 3: White background button
+        color: 'var(--cresoa-primary)',  // ✅ CHANGE 3: Navy text
+        fontWeight: 600, 
+        cursor: 'pointer', 
+        fontSize: '0.9rem', 
+        opacity: saving ? '0.7' : '1',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem'
+      }}
+    >
+      <Icon name="check" size={14} stroke="var(--cresoa-primary)" /> {saving ? 'Saving...' : 'Save Workflow'}
+    </button>
+  </div>
+)}
+  
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={businessId} />
       </div>
