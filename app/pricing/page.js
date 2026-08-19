@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Icon } from '../components/Icon';
-import ThemeToggle from '../components/ThemeToggle';
-import Logo from '../components/Logo';
+import { Icon } from '../../components/Icon';
+import ThemeToggle from '../../components/ThemeToggle';
+import Logo from '../../components/Logo';
 
 export default function PricingPage() {
   // FAQ accordion state
