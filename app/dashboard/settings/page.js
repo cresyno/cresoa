@@ -7,8 +7,7 @@ import { Card } from '../../../components/Card'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
-import { HexColorPicker } from 'https://esm.sh/react-colorful@6.0.0?bundle'
-
+// ─── Hardcoded Icons (self-contained) ──────────────────────
 const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
   const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className }
   const icons = {
@@ -63,6 +62,9 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [logoUrl, setLogoUrl] = useState('')
+
+  // ─── Brand Color Palette for Swatches ──────────────────────
+  const brandColors = ['#D4A52A', '#0F2B4A', '#FFFFFF', '#000000', '#2E7D5E', '#D9534F', '#F8F6F2', '#C79A2B'];
 
   useEffect(() => {
     const load = async () => {
@@ -228,6 +230,8 @@ export default function SettingsPage() {
       return (
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Branding & Tracking</h3>
+          
+          {/* Logo Section inside Branding */}
           <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--cresoa-bg)', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Logo</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -239,46 +243,81 @@ export default function SettingsPage() {
               {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}>Remove</button>}
             </div>
           </div>
+
+          {/* SWATCHES + HEX INPUT COLOR PICKER */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Primary Color</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: `2px solid ${formData.tracking_primary_color}`, background: formData.tracking_primary_color, boxShadow: 'var(--shadow-sm)' }} />
-                <div style={{ flex: 1, minWidth: '150px' }}>
-                  <HexColorPicker 
-                    color={formData.tracking_primary_color} 
-                    onChange={(newColor) => setFormData({ ...formData, tracking_primary_color: newColor })} 
-                    style={{ width: '100%', maxWidth: '220px', height: '180px' }}
+                {/* Brand Swatches */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {brandColors.map((c) => (
+                    <div
+                      key={c}
+                      onClick={() => setFormData({ ...formData, tracking_primary_color: c })}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '8px',
+                        background: c,
+                        border: formData.tracking_primary_color === c ? '2px solid var(--cresoa-primary)' : '1px solid var(--cresoa-border)',
+                        cursor: 'pointer',
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                    />
+                  ))}
+                </div>
+                {/* Hex Input + Preview */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: formData.tracking_primary_color }} />
+                  <input 
+                    type="text" 
+                    value={formData.tracking_primary_color} 
+                    onChange={(e) => setFormData({ ...formData, tracking_primary_color: e.target.value })} 
+                    style={{ width: '100%', maxWidth: '90px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}
                   />
                 </div>
-                <input 
-                  type="text" 
-                  value={formData.tracking_primary_color} 
-                  onChange={(e) => setFormData({ ...formData, tracking_primary_color: e.target.value })} 
-                  style={{ width: '100%', maxWidth: '80px', padding: '0.5rem', borderRadius: '6px', border: '2px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}
-                />
               </div>
             </div>
+
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Background Color</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '10px', border: `2px solid ${formData.tracking_bg_color}`, background: formData.tracking_bg_color, boxShadow: 'var(--shadow-sm)' }} />
-                <div style={{ flex: 1, minWidth: '150px' }}>
-                  <HexColorPicker 
-                    color={formData.tracking_bg_color} 
-                    onChange={(newColor) => setFormData({ ...formData, tracking_bg_color: newColor })} 
-                    style={{ width: '100%', maxWidth: '220px', height: '180px' }}
+                {/* Brand Swatches */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {brandColors.map((c) => (
+                    <div
+                      key={c}
+                      onClick={() => setFormData({ ...formData, tracking_bg_color: c })}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '8px',
+                        background: c,
+                        border: formData.tracking_bg_color === c ? '2px solid var(--cresoa-primary)' : '1px solid var(--cresoa-border)',
+                        cursor: 'pointer',
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                    />
+                  ))}
+                </div>
+                {/* Hex Input + Preview */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: formData.tracking_bg_color }} />
+                  <input 
+                    type="text" 
+                    value={formData.tracking_bg_color} 
+                    onChange={(e) => setFormData({ ...formData, tracking_bg_color: e.target.value })} 
+                    style={{ width: '100%', maxWidth: '90px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}
                   />
                 </div>
-                <input 
-                  type="text" 
-                  value={formData.tracking_bg_color} 
-                  onChange={(e) => setFormData({ ...formData, tracking_bg_color: e.target.value })} 
-                  style={{ width: '100%', maxWidth: '80px', padding: '0.5rem', borderRadius: '6px', border: '2px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}
-                />
               </div>
             </div>
+
           </div>
+
+              {/* MESSAGES */}
           <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Welcome Message</label>
@@ -322,7 +361,7 @@ export default function SettingsPage() {
           { id: 'branding', label: 'Branding', icon: 'palette' },
           { id: 'notifications', label: 'Notifications', icon: 'bell' },
           { id: 'workflow', label: 'Workflow', icon: 'layers' },
-             ].map(tab => (
+        ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -547,4 +586,4 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-    }
+              }
