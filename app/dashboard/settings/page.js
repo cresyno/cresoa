@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { Card } from '../../../components/Card'
@@ -24,7 +24,6 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
     'check-circle': <svg {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
     'alert-circle': <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
     'bell': <svg {...props}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
-    'user': <svg {...props}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   }
   return icons[name] || <span />
 }
@@ -47,7 +46,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
 
-  const [activeTab, setActiveTab] = useState('general') // general | contact | branding | notifications | users
+  const [activeTab, setActiveTab] = useState('general') // general | contact | branding | notifications | workflow
   const [editModal, setEditModal] = useState(null) // null or which section is being edited
 
   const [formData, setFormData] = useState({
@@ -234,15 +233,21 @@ export default function SettingsPage() {
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Branding & Tracking</h3>
           <div style={{ marginBottom: '0.8rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Primary Color</label>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input type="color" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ width: '40px', height: '40px', border: 'none', cursor: 'pointer' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', overflow: 'hidden', cursor: 'pointer' }}>
+                <div style={{ width: '100%', height: '100%', background: formData.tracking_primary_color }} />
+                <input type="color" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+              </div>
               <input type="text" name="tracking_primary_color" value={formData.tracking_primary_color} onChange={handleChange} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
             </div>
           </div>
           <div style={{ marginBottom: '0.8rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Background Color</label>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input type="color" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ width: '40px', height: '40px', border: 'none', cursor: 'pointer' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', overflow: 'hidden', cursor: 'pointer' }}>
+                <div style={{ width: '100%', height: '100%', background: formData.tracking_bg_color }} />
+                <input type="color" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+              </div>
               <input type="text" name="tracking_bg_color" value={formData.tracking_bg_color} onChange={handleChange} style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
             </div>
           </div>
@@ -283,14 +288,14 @@ export default function SettingsPage() {
         <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>Manage your business details, branding, and workflow</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--cresoa-border)', marginBottom: '1.5rem', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '0.5rem' }}>
+      {/* Tabs - Replaced styling to use Gold Accent & Premium Underline */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--cresoa-border)', marginBottom: '1.5rem', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '0.5rem', scrollbarWidth: 'none' }}>
         {[
           { id: 'general', label: 'General', icon: 'building' },
           { id: 'contact', label: 'Contact', icon: 'phone' },
           { id: 'branding', label: 'Branding', icon: 'palette' },
           { id: 'notifications', label: 'Notifications', icon: 'bell' },
-          { id: 'users', label: 'Users', icon: 'user' },
+          { id: 'workflow', label: 'Workflow', icon: 'layers' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -300,23 +305,23 @@ export default function SettingsPage() {
               alignItems: 'center',
               gap: '0.4rem',
               padding: '0.4rem 1rem',
-              borderRadius: '20px',
               border: 'none',
-              background: activeTab === tab.id ? 'var(--cresoa-primary)' : 'transparent',
-              color: activeTab === tab.id ? '#fff' : 'var(--cresoa-text-muted)',
+              background: 'transparent',
+              color: activeTab === tab.id ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--cresoa-accent)' : '2px solid transparent',
               cursor: 'pointer',
               fontWeight: 500,
               fontSize: '0.85rem',
               transition: 'all 0.2s',
             }}
           >
-            <Icon name={tab.icon} size={16} stroke={activeTab === tab.id ? '#fff' : 'currentColor'} />
+            <Icon name={tab.icon} size={16} stroke={activeTab === tab.id ? 'var(--cresoa-accent)' : 'currentColor'} />
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
+          {/* Tab Content */}
       <div style={{ minHeight: '300px' }}>
         {activeTab === 'general' && (
           <Card style={{ padding: '1.5rem' }}>
@@ -388,11 +393,40 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {activeTab === 'users' && (
-          <Card style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>
-            <Icon name="user" size={32} stroke="var(--cresoa-text-muted)" />
-            <h3 style={{ margin: '0.5rem 0 0.25rem', fontWeight: 500 }}>Users & Permissions</h3>
-            <p>User management is coming soon.</p>
+        {/* Replaced "Users" with "Workflow" Tab */}
+        {activeTab === 'workflow' && (
+          <Card style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="layers" size={18} stroke="var(--cresoa-accent)" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Workflow Stages</h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Customize the 5 stages for your industry</p>
+                </div>
+              </div>
+              <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', lineHeight: '1.6', margin: '0 0 0.5rem 0' }}>
+                Define the 5 stages your orders go through. This will update the Production page for your industry.
+              </p>
+              <button
+                onClick={() => navigateWithBusiness('/dashboard/settings/workflow')}
+                style={{
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--cresoa-primary)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <Icon name="layers" size={14} stroke="#fff" /> Configure Workflow
+              </button>
+            </div>
           </Card>
         )}
       </div>
