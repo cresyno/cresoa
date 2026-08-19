@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -329,27 +332,50 @@ function getRelevantChunks(query, chunks) {
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 2. STRICT SYSTEM PROMPT (No technology mention, no markdown) ───
+// ─── 2. STRICT SYSTEM PROMPT (Force reasoning and follow-ups) ───
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, professional, and helpful assistant for the Cresoa business management platform.
 
-RULES YOU MUST FOLLOW STRICTLY:
-1. NEVER use asterisks (* or **), hashtags (#), or any markdown in your replies.
+ABSOLUTE RULES YOU MUST FOLLOW:
+1. NEVER use asterisks (*), hashtags (#), backticks (`), or underscores (_) in your replies.
 2. NEVER use emojis or emoticons.
-3. NEVER mention any AI provider, technology, model, or "I am powered by..." – simply answer as Tessa.
-4. NEVER say "according to the manual", "based on the context", or "per the knowledge base". Just give a direct, natural answer.
-5. You may use bullet points with dashes (-) or numbered lists (1. 2. 3.) when helpful.
-6. If you don't know the answer, say: "I don't have that information yet. Please contact support via WhatsApp or submit a ticket."
-7. For off‑topic questions (politics, celebrities, etc.), politely deflect: "I'm Tessa, your Cresoa assistant. My focus is on helping you with your business on the Cresoa platform. How can I help with that today?"
+3. NEVER say "I am powered by AI", "As an AI model", or mention any technology provider.
+4. NEVER say "according to the manual". Just answer naturally.
 
-INSTRUCTIONS FOR REASONING:
-- Use the provided Platform Context as your primary source of truth.
-- If the context does not contain the exact answer, use your general understanding of the platform to give a helpful, relevant response based on what you do know.
-- Always aim to be concise and practical.
+HOW TO ANSWER FOLLOW-UP QUESTIONS (CRITICAL):
+- If the user asks a specific follow-up question (e.g., "Where will I click?", "What's the first step?"), look at the "Conversation History" provided below.
+- Do NOT repeat the entire guide or list of steps. Answer ONLY the specific sub-question they are asking.
+- If they ask "Where do I click?", simply tell them the exact button name and location (e.g., "Go to the Orders page and click the 'New Order' button at the top right").
+
+HOW TO HANDLE MISSING INFORMATION:
+- Use the "Platform Context" provided below as your main source of truth.
+- If the exact answer is not in the Platform Context, use your general understanding of the Cresoa platform to deduce the most logical answer based on common UI patterns (e.g., buttons are often at the top right, settings are often in the sidebar).
+- If you genuinely cannot deduce an answer, say: "I don't have that specific information yet. Please contact support via WhatsApp or submit a ticket."
+
+BEHAVIOR:
+- Always be concise. Do not write long paragraphs. Use bullet points with single dashes (-) when listing steps.
 `;
 
-// ─── 3. GROQ PRIMARY CALLER ──────────────────────────────────
-async function callGroq(message, contextString) {
+// ─── 3. GET CONVERSATION HISTORY (Memory System) ────────────
+async function getConversationHistory(userId, businessId) {
+  // Get the last 5 messages for memory
+  const { data, error } = await supabaseAdmin
+    .from('support_messages')
+    .select('sender_type, message')
+    .eq('business_id', businessId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  
+  if (error || !data) return "";
+  // Reverse to put them in chronological order
+  return data.reverse().map(msg => 
+    `${msg.sender_type === 'user' ? 'User' : 'Tessa'}: ${msg.message}`
+  ).join('\n');
+}
+
+// ─── 4. GROQ PRIMARY CALLER ──────────────────────────────────
+async function callGroq(message, contextString, historyString) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
 
@@ -361,7 +387,7 @@ async function callGroq(message, contextString) {
         model: 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Platform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
+          { role: 'user', content: `Conversation History:\n${historyString}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
         ]
       })
     });
@@ -371,13 +397,13 @@ async function callGroq(message, contextString) {
   } catch (e) { return null; }
 }
 
-// ─── 4. GEMINI FALLBACK CALLER ──────────────────────────────
-async function callGemini(message, contextString) {
+// ─── 5. GEMINI FALLBACK CALLER ──────────────────────────────
+async function callGemini(message, contextString, historyString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
   try {
-    const prompt = `${SYSTEM_PROMPT}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
+    const prompt = `${SYSTEM_PROMPT}\n\nConversation History:\n${historyString}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`;
     const res = await fetch(url, {
       method: 'POST',
@@ -390,7 +416,7 @@ async function callGemini(message, contextString) {
   } catch (e) { return null; }
 }
 
-// ─── 5. HARDCODED FALLBACK ──────────────────────────────────
+// ─── 6. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page. You can invite, remove, or change roles there.";
@@ -400,41 +426,61 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 6. POST-PROCESSING FILTER (Removes any stray asterisks) ───
+// ─── 7. POST-PROCESSING FILTER (Removes markdown/asterisks) ───
 function cleanResponse(text) {
   if (!text) return text;
-  // Remove any * characters (including **)
-  return text.replace(/\*/g, '').trim();
+  // Kill all markdown characters: *, _, #, `, ~
+  return text.replace(/[*_#`~]/g, '').trim();
 }
 
-// ─── 7. MAIN ORCHESTRATOR ──────────────────────────────────
+// ─── 8. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
-    const { message } = await req.json();
+    // 1. Authenticate user
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
+    const { message, business_id } = await req.json();
+    if (!message || !business_id) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // 2. Fetch RAG chunks
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 1. Try Groq
-    let answer = await callGroq(message, contextString);
+    // 3. Fetch Memory (Last 5 messages)
+    const historyString = await getConversationHistory(user.id, business_id);
+
+    // 4. Try Groq
+    let answer = await callGroq(message, contextString, historyString);
     let source = 'groq';
 
-    // 2. If Groq fails, try Gemini
+    // 5. If Groq fails, try Gemini
     if (!answer) {
       console.warn('Groq failed, falling back to Gemini...');
-      answer = await callGemini(message, contextString);
+      answer = await callGemini(message, contextString, historyString);
       source = 'gemini';
     }
 
-    // 3. If both fail, use hardcoded fallback
+    // 6. If both fail, use hardcoded fallback
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
 
-    // 4. Post-process: remove any asterisks
+    // 7. Clean the response (remove asterisks/markdown)
     const cleanedAnswer = cleanResponse(answer);
+
+    // 8. Save the conversation to the database (New and Reply)
+    await supabaseAdmin.from('support_messages').insert([
+      { business_id, user_id: user.id, sender_type: 'user', message },
+      { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
+    ]);
 
     return NextResponse.json({ answer: cleanedAnswer, source });
   } catch (error) {
@@ -444,4 +490,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-}
+  }
