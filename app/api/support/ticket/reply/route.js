@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
-import { sendTicketReplyEmail } from '../../../../lib/email';
+import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
+import { sendTicketReplyEmail } from '../../../../../lib/email';
 
 export async function POST(req) {
   try {
