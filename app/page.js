@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link';
+import Link from 'next/link'
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
 
@@ -167,6 +167,7 @@ export default function HomePage() {
           font-size: 0.85rem; font-weight: 500; border: 1px solid var(--color-border);
           background: transparent; color: var(--color-text-muted);
           transition: all 0.2s ease; cursor: pointer; font-family: inherit;
+          text-decoration: none;
         }
         .nav-btn:hover { border-color: var(--color-accent); color: var(--color-text); background: rgba(212,165,42,0.03); }
         .nav-btn-primary {
@@ -213,6 +214,7 @@ export default function HomePage() {
         }
         .mobile-drawer .nav-btn, .mobile-drawer .nav-btn-primary {
           display: flex; justify-content: flex-start; width: 100%; padding: 0.6rem 1rem;
+          text-decoration: none;
         }
 
         /* ─── Hero ─── */
@@ -299,8 +301,7 @@ export default function HomePage() {
         .step-item p { margin: 0; color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.5; }
         .step-item .time { font-size: 0.65rem; color: var(--color-text-muted); }
 
-        
-        /* ─── Pricing ─── */
+         /* ─── Pricing ─── */
         .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
         .pricing-card {
           background: var(--color-card); border-radius: 16px; padding: 2rem 1.5rem;
@@ -353,8 +354,8 @@ export default function HomePage() {
         /* ─── Footer ─── */
         .footer { border-top: 1px solid var(--color-border); padding: 2.5rem 1.5rem; margin-top: 1rem; text-align: center; color: var(--color-text-muted); font-size: 0.8rem; }
         .footer .links { display: flex; justify-content: center; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
-        .footer .links button { color: var(--color-text); text-decoration: none; transition: color 0.2s; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 0.8rem; }
-        .footer .links button:hover { color: var(--color-accent); }
+        .footer .links a { color: var(--color-text); text-decoration: none; transition: color 0.2s; }
+        .footer .links a:hover { color: var(--color-accent); }
 
         /* ─── Responsive ─── */
         @media (max-width: 768px) {
@@ -396,14 +397,14 @@ export default function HomePage() {
           <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
           <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
           <Link href="/pricing" className="nav-btn">Pricing</Link>
-<Link href="/support" className="nav-btn">Support</Link>
+          <Link href="/support" className="nav-btn">Support</Link>
           <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
         </div>
 
         <div className="nav-actions">
           <ThemeToggle />
-          <Link href="/login" ...>Log in</Link>
-<Link href="/signup" className="nav-btn nav-btn-primary">Start Beta</Link>
+          <Link href="/login" style={{ color: 'var(--color-text-muted)', background: 'none', border: 'none', fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none' }}>Log in</Link>
+          <Link href="/signup" className="nav-btn nav-btn-primary">Start Beta</Link>
           <button className="hamburger" onClick={toggleMobileMenu}>
             {ICONS.menu}
           </button>
@@ -419,10 +420,10 @@ export default function HomePage() {
         <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
         <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
         <Link href="/pricing" className="nav-btn">Pricing</Link>
-<Link href="/support" className="nav-btn">Support</Link>
+        <Link href="/support" className="nav-btn">Support</Link>
         <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
-<Link href="/login" className="nav-btn">Log in</Link>
-<Link href="/signup" className="nav-btn nav-btn-primary">Start Beta</Link>
+        <Link href="/login" className="nav-btn">Log in</Link>
+        <Link href="/signup" className="nav-btn nav-btn-primary">Start Beta</Link>
         <div style={{ paddingTop: '0.5rem' }}>
           <ThemeToggle />
         </div>
@@ -443,10 +444,8 @@ export default function HomePage() {
             </p>
             <div className="cta-group">
               <Link href="/signup" className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>
-  Start Beta {ICONS.arrowRight}
-</Link>
                 Start Beta {ICONS.arrowRight}
-              </button>
+              </Link>
               <button onClick={(e) => scrollToSection(e, 'features')} className="btn btn-outline" style={{ fontSize: '1rem', padding: '0.9rem 2rem' }}>
                 Learn more
               </button>
@@ -559,7 +558,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* =========================================================
+  {/* =========================================================
           HOW IT WORKS
           ========================================================= */}
       <section className="container" style={{ padding: '2rem 1.5rem' }}>
@@ -594,9 +593,9 @@ export default function HomePage() {
           </div>
         </div>
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-          <button onClick={() => navigateTo('/signup')} className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem' }}>
+          <Link href="/signup" className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>
             Start Beta {ICONS.arrowRight}
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -620,9 +619,9 @@ export default function HomePage() {
               <li><span className="cross">{ICONS.x}</span> Staff accounts</li>
               <li><span className="cross">{ICONS.x}</span> WhatsApp integration</li>
             </ul>
-            <button onClick={() => navigateTo('/signup')} className="btn btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
+            <Link href="/signup" className="btn btn-outline" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}>
               Start Free
-            </button>
+            </Link>
           </div>
 
           <div className="pricing-card popular">
@@ -637,9 +636,9 @@ export default function HomePage() {
               <li><span className="check">{ICONS.check}</span> WhatsApp integration</li>
               <li><span className="check">{ICONS.check}</span> Customer tracking links</li>
             </ul>
-            <button onClick={() => navigateTo('/signup')} className="btn" style={{ width: '100%', justifyContent: 'center' }}>
+            <Link href="/signup" className="btn" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}>
               Start Beta
-            </button>
+            </Link>
           </div>
 
           <div className="pricing-card">
@@ -653,9 +652,9 @@ export default function HomePage() {
               <li><span className="check">{ICONS.check}</span> Data export (Excel/PDF)</li>
               <li><span className="check">{ICONS.check}</span> Priority support</li>
             </ul>
-            <button onClick={() => navigateTo('/signup')} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+            <Link href="/signup" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}>
               Start Beta
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -690,12 +689,12 @@ export default function HomePage() {
         <h2>Ready to take control of your business?</h2>
         <p>Join 47 Nigerian SMEs already using Cresoa.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', justifyContent: 'center' }}>
-          <button onClick={() => navigateTo('/signup')} className="btn" style={{ fontSize: '1.05rem', padding: '0.9rem 2.5rem' }}>
+          <Link href="/signup" className="btn" style={{ fontSize: '1.05rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>
             Start Beta {ICONS.arrowRight}
-          </button>
-          <button onClick={() => navigateTo('/login')} className="btn btn-outline" style={{ fontSize: '1.05rem', padding: '0.9rem 2rem', background: 'transparent', color: '#fff', borderColor: 'rgba(255,255,255,0.3)' }}>
+          </Link>
+          <Link href="/login" className="btn btn-outline" style={{ fontSize: '1.05rem', padding: '0.9rem 2rem', background: 'transparent', color: '#fff', borderColor: 'rgba(255,255,255,0.3)', textDecoration: 'none' }}>
             Log in
-          </button>
+          </Link>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1.2rem', color: '#A0B4C9', fontSize: '0.75rem' }}>
           <span>{ICONS.check} 90-day beta</span>
@@ -714,11 +713,11 @@ export default function HomePage() {
           </div>
           <div className="links">
             <Link href="/login">Log in</Link>
-<Link href="/signup">Sign up</Link>
+            <Link href="/signup">Sign up</Link>
             <button onClick={(e) => scrollToSection(e, 'why')}>Why Cresoa</button>
             <button onClick={(e) => scrollToSection(e, 'features')}>Features</button>
-          <Link href="/pricing">Pricing</Link>
-<Link href="/support">Support</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/support">Support</Link>
             <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
           </div>
           <p style={{ opacity: 0.6, fontSize: '0.7rem', marginTop: '0.5rem' }}>
