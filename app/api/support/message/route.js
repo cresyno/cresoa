@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
 // ════════════════════════════════════════════════════════════════
 // ⚠️ PASTE YOUR ENTIRE PDF TEXT (Q&As) INSIDE THE BACKTICKS BELOW
 // ════════════════════════════════════════════════════════════════
-const CRESOA_KNOWLEDGE = `
+const FULL_PDF_TEXT = `
 
 # Cresoa Knowledge Base
 
@@ -217,151 +218,107 @@ Reach out to Cresoa Support directly, and a member of the team will help you sor
 `;
 
 // ─── 1. SMART SPLITTER (Breaks the PDF into chunks) ───
+      
+    
+
 function splitIntoChunks(text) {
   if (!text || text.trim() === '') return [];
   return text.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 }
 
-// ─── 2. SMART RETRIEVER (Finds the 3 most relevant chunks) ───
 function getRelevantChunks(query, chunks) {
-  if (chunks.length === 0) return ["No context available yet. Please upload the knowledge base."];
+  if (chunks.length === 0) return ["No context available yet."];
   const keywords = query.toLowerCase().split(' ').filter(w => w.length > 3);
   const scored = chunks.map(chunk => {
     const lowerChunk = chunk.toLowerCase();
     let score = 0;
-    for (const word of keywords) {
-      if (lowerChunk.includes(word)) score++;
-    }
+    for (const word of keywords) { if (lowerChunk.includes(word)) score++; }
     return { text: chunk, score };
   });
   const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 3. THE POLISHED SYSTEM PROMPT ───
-const SYSTEM_PROMPT = `
-You are Tessa, a warm, professional, and highly knowledgeable AI assistant for the Cresoa platform.
+const SYSTEM_PROMPT = `You are Tessa, a warm, professional AI assistant for Cresoa.`;
 
-RULES FOR BEHAVIOR:
-1. GREETINGS & SMALL TALK: If the user says hi, hello, thanks, okay, how are you, etc., reply warmly and naturally. Never tell them to contact support just because they said "thanks" or "okay".
-
-2. PLATFORM QUESTIONS: When the user asks a business question about Cresoa, you MUST answer strictly and ONLY using the "Platform Context" provided below. If it is not in the context, say so honestly.
-
-3. FORMATTING RULES (CRITICAL):
-   - NEVER use asterisks (*) or double asterisks (**) in your output. Use simple dashes (-) or numbers (1. 2. 3.) for lists.
-   - NEVER say phrases like "based on the manual", "according to the context", "the manual says", or "per our records". Answer directly and naturally like a human expert.
-
-4. OFF-TOPIC QUESTIONS: If they ask about politics, celebrities, or general life, reply: "I'm Tessa, your Cresoa AI assistant. My focus is strictly on helping you manage your fashion business on the Cresoa platform. How can I help you today?"
-`;
-
-// ─── 4. GROQ PRIMARY CALLER (Using validated model) ───
 async function callGroq(message, contextString) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
 
   try {
-    const prompt = `
-${SYSTEM_PROMPT}
-
-Platform Context:
-"""
-${contextString}
-"""
-
-User Question: ${message}
-`;
+    const prompt = `${SYSTEM_PROMPT}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b', // Primary brain
-        messages: [{ role: 'system', content: `You are Tessa, a warm, professional AI assistant.` }, { role: 'user', content: prompt }]
+        model: 'openai/gpt-oss-20b',
+        messages: [{ role: 'system', content: 'You are Tessa, a warm AI assistant.' }, { role: 'user', content: prompt }]
       })
     });
-
     if (!res.ok) return null;
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || null;
   } catch (e) {
-    return null; 
+    return null;
   }
 }
 
-// ─── 5. GEMINI FALLBACK CALLER (gemini-3.5-flash-lite) ───
 async function callGemini(message, contextString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
   try {
-    const prompt = `
-${SYSTEM_PROMPT}
-
-Platform Context:
-"""
-${contextString}
-"""
-
-User Question: ${message}
-`;
+    const prompt = `${SYSTEM_PROMPT}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
-
     if (!res.ok) return null;
     const data = await res.json();
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch (e) {
-    return null; 
+    return null;
   }
 }
 
-// ─── 6. HARDCODED FALLBACK ───
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
-  if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page. You can invite, remove, or change roles there.";
-  if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page. Use the 'New Order' button to create one.";
-  if (lower.includes('subscription') || lower.includes('plan') || lower.includes('pay')) return "To upgrade your plan, go to the Subscription page.";
-  if (lower.includes('production') || lower.includes('sewing')) return "To move an order through production, open the Production page and update the status.";
+  if (lower.includes('staff')) return "To manage staff, go to the Staff page.";
+  if (lower.includes('order')) return "Orders are managed in the Orders page.";
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 7. API ORCHESTRATOR (The flow logic) ───
 export async function POST(req) {
   try {
     const { message } = await req.json();
 
-    // A. Extract relevant chunks from the PDF
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // B. GROQ PRIMARY
     let answer = await callGroq(message, contextString);
     let source = 'groq';
 
-    // C. GEMINI FALLBACK (If Groq fails)
     if (!answer) {
-      console.warn('Groq failed, falling back to Gemini 3.5 Flash Lite...');
       answer = await callGemini(message, contextString);
       source = 'gemini';
     }
 
-    // D. HARDCODED FALLBACK (If both fail)
     if (!answer) {
-      console.warn('Both AIs failed, using hardcoded fallback...');
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
 
     return NextResponse.json({ answer, source });
+
   } catch (error) {
-    console.error('Support API Error:', error);
+    console.error('CRASH ERROR:', error); // This prints to Vercel logs
     return NextResponse.json({ 
-      answer: "Tessa is experiencing high traffic. Please try again in a moment.", 
-      source: 'emergency_fallback' 
+      // 🔴 THIS WILL SHOW THE REAL ERROR IN YOUR CHAT
+      answer: `❌ CRITICAL ERROR: ${error.message || error}`, 
+      source: 'debug_error' 
     });
   }
-                                }
+}
