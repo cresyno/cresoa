@@ -13,6 +13,7 @@ function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [user, setUser] = useState(null)
   const [business, setBusiness] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -38,33 +39,34 @@ function DashboardLayoutContent({ children }) {
   }, [])
 
   // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
-  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
-const baseNavItems = {
-  fashion: [
-    { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
-    { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
-    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-    { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
-    { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
-    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-  ],
-  repairs: [
-    { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-    { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-    { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-    { name: 'Parts', path: '/dashboard/inventory', icon: 'package' },
-    { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-  ]
-};
+  const baseNavItems = {
+    fashion: [
+      { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
+      { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
+      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+      { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
+      { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
+      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+    ],
+    repairs: [
+      { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
+      { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+      { name: 'Parts', path: '/dashboard/inventory', icon: 'package' },
+      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+    ]
+  };
+
   // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (!authUser) {
           router.push('/login')
           return
         }
+        setUser(authUser)
 
         const businessIdFromUrl = searchParams.get('business_id')
         let businessData = null
@@ -82,7 +84,7 @@ const baseNavItems = {
           const { data: ownedBusiness } = await supabase
             .from('businesses')
             .select('*')
-            .eq('owner_id', user.id)
+            .eq('owner_id', authUser.id)
             .maybeSingle()
           if (ownedBusiness) {
             businessData = ownedBusiness
@@ -90,7 +92,7 @@ const baseNavItems = {
             const { data: membershipData } = await supabase
               .from('business_memberships')
               .select('business_id, role')
-              .eq('user_id', user.id)
+              .eq('user_id', authUser.id)
               .maybeSingle()
             if (membershipData) {
               const { data: memberBusiness } = await supabase
@@ -116,11 +118,11 @@ const baseNavItems = {
             .from('business_memberships')
             .select('role')
             .eq('business_id', businessData.id)
-            .eq('user_id', user.id)
+            .eq('user_id', authUser.id)
             .maybeSingle()
           if (roleData) {
             setUserRole(roleData.role)
-          } else if (businessData.owner_id === user.id) {
+          } else if (businessData.owner_id === authUser.id) {
             setUserRole('Owner')
           } else {
             setUserRole('Staff')
@@ -179,7 +181,7 @@ const baseNavItems = {
     load()
   }, [router, searchParams])
 
-  // ─── 🔒 STRONG SECURITY TIES: Redirect if the user is on the wrong industry URL ───
+  // ─── 🔒 STRONG SECURITY TIES ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
@@ -190,12 +192,10 @@ const baseNavItems = {
 
       const currentSector = business.sector || 'fashion';
       
-      // If it's a Fashion business, block them from accessing /repairs routes
       if (currentSector === 'fashion' && pathname?.startsWith('/dashboard/repairs')) {
         router.push('/dashboard/fashion?business_id=' + business.id);
       }
       
-      // If it's a Repairs business, block them from accessing /orders /groups (Fashion specific)
       if (currentSector === 'repairs') {
         if (pathname?.startsWith('/dashboard/orders') || pathname?.startsWith('/dashboard/groups')) {
           router.push('/dashboard/repairs?business_id=' + business.id);
@@ -204,7 +204,6 @@ const baseNavItems = {
     }
   }, [loading, business, pathname, router, searchParams])
 
-  // ─── Handlers ───
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -222,12 +221,10 @@ const baseNavItems = {
   const getIndustryBadge = () => {
     const sector = business?.sector || 'fashion';
     if (sector === 'repairs') return '🔧 Repairs';
-    if (sector === 'fashion' || business?.sector === 'Fashion & Custom Wear') return '👗 Fashion';
-    if (business?.sector === 'Custom Products & Services') return '🛠️ Manufacturing';
+    if (sector === 'fashion') return '👗 Fashion';
     return ''
   }
 
-  // Determine the current nav items based on the business sector
   const currentSector = business?.sector || 'fashion';
   const currentNavItems = baseNavItems[currentSector] || baseNavItems.fashion;
 
@@ -545,7 +542,6 @@ const baseNavItems = {
 
         <div className="nav-section">
           <div className="section-label">Business</div>
-          {/* ⚡ Dynamic Navigation Renders Here */}
           {currentNavItems.map((item) => (
             <a
               key={item.path}
@@ -584,7 +580,7 @@ const baseNavItems = {
                 <span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan
               </a>
             )}
-                 {showProfile && (
+            {showProfile && (
               <a href={baseUrl('/dashboard/profile')} className={isActive('/dashboard/profile') ? 'active' : ''} onClick={handleNavClick}>
                 <span className="icon"><Icon name="user" size={16} stroke="currentColor" /></span> Profile & Settings
               </a>
@@ -592,19 +588,19 @@ const baseNavItems = {
           </div>
         )}
 
-        {/* 👑 Admin Section - Visible to super admin only */}
-{user?.email === 'taiwoabraham640@gmail.com' && (
-  <div className="nav-section">
-    <div className="section-label">Admin</div>
-    <a
-      href={baseUrl('/admin/support')}
-      className={isActive('/admin') ? 'active' : ''}
-      onClick={handleNavClick}
-    >
-      <span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets
-    </a>
-  </div>
-)}
+ {/* 👑 Admin Section - Visible to super admin only */}
+        {user?.email === 'taiwoabraham640@gmail.com' && (
+          <div className="nav-section">
+            <div className="section-label">Admin</div>
+            <a
+              href={baseUrl('/admin/support')}
+              className={isActive('/admin') ? 'active' : ''}
+              onClick={handleNavClick}
+            >
+              <span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets
+            </a>
+          </div>
+        )}
 
         <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}>
@@ -657,4 +653,4 @@ export default function DashboardLayout({ children }) {
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   )
-                }
+              }
