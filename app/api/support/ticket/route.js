@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export async function POST(req) {
   try {
@@ -9,7 +9,6 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ✅ Insert directly into the tickets table. RLS is bypassed because we use supabaseAdmin.
     const { data, error: insertError } = await supabaseAdmin
       .from('support_tickets')
       .insert({
