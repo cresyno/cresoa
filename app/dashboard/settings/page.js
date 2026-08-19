@@ -302,6 +302,15 @@ export default function SettingsPage() {
           )}
         </Card>
 
+            {/* Card 3: Branding & Tracking (With Live Preview) */}
+        <Card style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="palette" size={18} stroke="var(--cresoa-accent)" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Branding & Tracking</h3>
+            </div>
             {editMode !== 'branding' && <button onClick={() => setEditMode('branding')} style={{ background: 'transparent', border: '1px solid var(--cresoa-border)', padding: '0.25rem 0.75rem', borderRadius: '6px', color: 'var(--cresoa-text)', fontSize: '0.8rem', cursor: 'pointer' }}>✏️ Edit</button>}
           </div>
 
