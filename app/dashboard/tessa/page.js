@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../../../lib/supabaseClient';
 import ChatMessage from '../../../components/support/ChatMessage';
 
 function TessaChatContent() {
@@ -10,25 +10,13 @@ function TessaChatContent() {
   const router = useRouter();
   const businessId = searchParams.get('business_id');
   const textareaRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const [messages, setMessages] = useState([
     { role: 'assistant', text: `Hi 👋, I'm Tessa. Ask me anything about your business.` }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef(null);
-
-  // ─── Auto-Expand Textarea (Max 5 lines) ──────────────────
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const lineHeight = parseInt(getComputedStyle(textareaRef.current).lineHeight);
-      const maxHeight = lineHeight * 5; // Stop expanding at 5 lines
-      const newHeight = Math.min(textareaRef.current.scrollHeight, maxHeight);
-      textareaRef.current.style.height = newHeight + 'px';
-      textareaRef.current.style.overflowY = newHeight >= maxHeight ? 'auto' : 'hidden';
-    }
-  }, [input]);
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -37,7 +25,6 @@ function TessaChatContent() {
     // Reset textarea height after send
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.overflowY = 'hidden';
     }
     setMessages(prev => [...prev, { role: 'user', text }]);
     setIsLoading(true);
@@ -67,10 +54,18 @@ function TessaChatContent() {
     }
   };
 
-  // ─── Auto-scroll to bottom ─────────────────────────────────
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle textarea auto-expansion (max 5 lines)
+  const handleInput = (e) => {
+    const textarea = e.target;
+    textarea.style.height = 'auto'; // Reset the height
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'; // 120px = roughly 5 lines
+    setInput(textarea.value);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--color-bg)' }}>
@@ -91,8 +86,8 @@ function TessaChatContent() {
         </div>
       </div>
 
-      {/* Chat Area - Fills all available space, scrolls internally */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
+      {/* Chat Area - Fills remaining space, scrolled content has bottom padding for the input bar */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 140px 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
         ))}
@@ -110,20 +105,28 @@ function TessaChatContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Bar - Fixed at bottom, expands upwards with textarea */}
-      <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-card)', display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexShrink: 0 }}>
+      {/* Input Bar - Positioned FIXED, elevated exactly above the bottom navigation bar */}
+      <div style={{ 
+        position: 'fixed', 
+        bottom: '80px', // ⚠️ Matches your bottom navigation height exactly
+        left: 0, 
+        right: 0, 
+        background: 'var(--color-card)', 
+        borderTop: '1px solid var(--color-border)',
+        padding: '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom))', 
+        display: 'flex', 
+        alignItems: 'flex-end', 
+        gap: '0.75rem', 
+        zIndex: 10,
+        boxShadow: '0 -4px 12px rgba(0,0,0,0.04)'
+      }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', flex: 1, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '24px', padding: '0.4rem 0.4rem 0.4rem 1rem' }}>
           
-          {/* 🔥 REPLACED INPUT WITH SMART TEXTAREA */}
           <textarea 
             ref={textareaRef}
             rows={1}
             value={input} 
-            onChange={(e) => setInput(e.target.value)} 
-            onKeyDown={(e) => {
-              // Enter adds a new line naturally. No interference needed.
-              // We only prevent accidental form submission if it were inside a form tag.
-            }}
+            onChange={handleInput}
             placeholder="Message" 
             disabled={isLoading}
             style={{ 
@@ -133,10 +136,10 @@ function TessaChatContent() {
               outline: 'none', 
               color: 'var(--color-text)', 
               fontSize: '0.95rem', 
-              padding: '0.3rem 0',
+              padding: '0.5rem 0',
               resize: 'none',
-              minHeight: '24px',
-              maxHeight: '120px', // Roughly 5 lines
+              minHeight: '40px',
+              maxHeight: '120px',
               lineHeight: '1.5',
               fontFamily: 'inherit',
               overflowY: 'hidden'
@@ -179,4 +182,4 @@ export default function TessaChatPage() {
       <TessaChatContent />
     </Suspense>
   );
-}
+        }
