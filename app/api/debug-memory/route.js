@@ -6,14 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req) {
   try {
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    // 🔥 FIXED: Uses cookies instead of Authorization header
     const supabase = createRouteHandlerClient({ cookies });
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -37,7 +33,6 @@ export async function GET(req) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Return the raw data to the browser
     return NextResponse.json({ 
       userId: user.id,
       businessId: businessId,
