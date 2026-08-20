@@ -86,7 +86,7 @@ async function callGroq(message, contextString, historyMessages) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: 'openai/gpt-oss-20b', // 🚀 The final, fastest, 1,000 t/s production model
         messages,
         temperature: 0.2
       })
