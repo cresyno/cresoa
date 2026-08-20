@@ -44,54 +44,98 @@ You are Tessa, a warm, friendly, and highly intelligent support assistant for Cr
 RULES:
 1. Use the chat history first. "Another 2" means 2 more sentences about the exact previous topic. Never drift.
 2. Use the Knowledge Base only for brand-new topics.
-3. Never expose AI technology providers. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Do not start every reply with this introduction.
+3. Never invent features or expose any AI technology provider. Just say "I'm Tessa, your Cresoa support assistant."
 `;
 
 // ─── 3. GET CONVERSATION HISTORY (8 messages memory) ────────
 async function getConversationHistory(userId, businessId) {
   const supabase = createRouteHandlerClient({ cookies });
+  
   const { data, error } = await supabase
     .from('support_messages')
     .select('sender_type, message')
     .eq('business_id', businessId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(8);
+    .limit(8); 
   
-  if (error || !data) return [];
-  return data.reverse().map(msg => ({
+  if (error || !data) {
+    console.error('❌ Supabase Memory Fetch Error:', error);
+    return [];
+  }
+
+  // Map into exact structural format Groq expects
+  const formattedHistory = data.reverse().map(msg => ({
     role: msg.sender_type === 'user' ? 'user' : 'assistant',
     content: msg.message
   }));
+
+  console.log(`🧠 Loaded ${formattedHistory.length} structural messages from database history.`);
+  return formattedHistory;
 }
 
-// ─── 4. GROQ PRIMARY CALLER ──────────────────────────────────
+// ─── 4. GROQ CALLER (WITH STRUCTURED HISTORY & LOW TEMP) ────
 async function callGroq(message, contextString, historyMessages) {
   const API_KEY = process.env.GROQ_API_KEY;
-  if (!API_KEY) return null;
-
+  if (!API_KEY) {
+    console.error("❌ Missing GROQ_API_KEY environment variable.");
+    return null;
+  }
+  
   try {
-    const dynamicSystem = `${SYSTEM_PROMPT}\n\nRelevant Platform Knowledge Base Context:\n"""\n${contextString}\n"""`;
-    const messages = [
-      { role: 'system', content: dynamicSystem },
-      ...historyMessages,
+    // 💡 Isolate document context clearly within the System instructions
+    const structuredSystemPrompt = `
+${SYSTEM_PROMPT}
+
+CRITICAL OPERATIONAL INSTRUCTIONS:
+- You are checking a live chat log array.
+- Prioritize explicit facts stated by the user directly in the chat history transcript (like their name, preferences, or selections) over the static platform documentation.
+- If the user asks about an explicit detail they provided in previous messages (e.g., their name, business name, or previous prompt details), extract it right from the chat transcript context below. Do not use generic platform text to answer personal details.
+
+PLATFORM KNOWLEDGE BASE RECORDS (Use ONLY for brand new feature queries or company FAQs):
+"""
+${contextString}
+"""
+`;
+
+    // Filter out potential null or empty records safely
+    const cleanHistory = (historyMessages || []).filter(m => m && m.content);
+
+    // Build the clear message payload array for Groq
+    const finalizedMessages = [
+      { role: 'system', content: structuredSystemPrompt },
+      ...cleanHistory,
       { role: 'user', content: message }
     ];
 
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // Debug tracking printout for terminal observation
+    console.log("🔥 LOGGING DATA CURRENTLY TRANSMITTED TO GROQ:\n", JSON.stringify(finalizedMessages, null, 2));
+
+    const res = await fetch('https://groq.com', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 
+        'Authorization': `Bearer ${API_KEY}`, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b', // Smartest Groq model
-        messages: messages,
-        temperature: 0.2 // Locks reasoning to strict context
+        model: 'openai/gpt-oss-120b', 
+        messages: finalizedMessages,
+        temperature: 0.1 // Lowered to force strict context compliance over creativity
       })
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ Groq API Error Status ${res.status}:`, errText);
+      return null;
+    }
+
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || null;
-  } catch (e) { return null; }
+  } catch (e) { 
+    console.error('❌ callGroq Exception:', e);
+    return null; 
+  }
 }
 
 // ─── 5. HARDCODED FALLBACK ──────────────────────────────────
@@ -102,10 +146,9 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 6. MAIN ORCHESTRATOR (Race-Condition Fixed) ───────────
+// ─── 6. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
-    // 1. Auth
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!token) {
@@ -123,23 +166,24 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 🔥 FIX STEP 1: Save the User's message IMMEDIATELY before history fetch
+    // 🔥 FIX STEP 1: Save the incoming message IMMEDIATELY to prevent asynchronous data truncation.
     await supabase.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message }
     ]);
 
-    // 2. Parse RAG chunks
+    // Parse knowledge documentation text
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 🔥 FIX STEP 2: Fetch history (guaranteed to include the message we just saved)
+    // 🔥 FIX STEP 2: Fetch history now. This ensures the current message is already registered in the array block.
     const historyMessages = await getConversationHistory(user.id, business_id);
 
-    // 3. Call Groq
+    // Call Groq (Primary integration engine)
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
+    // 🔒 ULTIMATE FALLBACK
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
@@ -147,11 +191,12 @@ export async function POST(req) {
 
     const cleanedAnswer = answer.trim();
 
-    // 🔥 FIX STEP 3: Save the Assistant's answer AFTER the AI replies
+    // 🔥 FIX STEP 3: Write ONLY the assistant response back down into the database logs.
     try {
-      await supabase.from('support_messages').insert([
+      const { error: insertError } = await supabase.from('support_messages').insert([
         { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
       ]);
+      if (insertError) console.error('❌ Database insertion failed for assistant log:', insertError);
     } catch (memoryError) {
       console.warn('Memory saving error (ignored):', memoryError);
     }
@@ -164,4 +209,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-}
+                  }
