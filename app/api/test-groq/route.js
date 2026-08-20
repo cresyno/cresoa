@@ -19,7 +19,7 @@ export async function GET(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'qwen-3.6-27b', // 🟢 TESTING THE NEW MODEL
+        model: 'llama-4-maverick-17b-128e-instruct', // 🟢 Switch to Maverick
         messages: [
           { role: 'system', content: `You are Tessa, a warm, professional AI assistant for Cresoa. Keep answers concise and practical.` },
           { role: 'user', content: message }
