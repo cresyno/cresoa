@@ -44,7 +44,7 @@ You are Tessa, a warm, friendly, and highly intelligent support assistant for Cr
 RULES:
 1. Use the chat history first. "Another 2" means 2 more sentences about the exact previous topic. Never drift.
 2. Use the Knowledge Base only for brand-new topics.
-3.  Never expose AI technology providers. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Do not start every reply with this introduction.
+3. Never expose AI technology providers. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Do not start every reply with this introduction.
 `;
 
 // ─── 3. GET CONVERSATION HISTORY (8 messages memory) ────────
@@ -58,18 +58,14 @@ async function getConversationHistory(userId, businessId) {
     .order('created_at', { ascending: false })
     .limit(8);
   
-  if (error || !data) {
-    console.error('❌ Supabase Memory Fetch Error:', error);
-    return [];
-  }
-
+  if (error || !data) return [];
   return data.reverse().map(msg => ({
     role: msg.sender_type === 'user' ? 'user' : 'assistant',
     content: msg.message
   }));
 }
 
-// ─── 4. GROQ PRIMARY CALLER (With memory & context fix) ─────
+// ─── 4. GROQ PRIMARY CALLER ──────────────────────────────────
 async function callGroq(message, contextString, historyMessages) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
@@ -86,9 +82,9 @@ async function callGroq(message, contextString, historyMessages) {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: 'openai/gpt-oss-120b', // Smartest Groq model
         messages: messages,
-        temperature: 0.2
+        temperature: 0.2 // Locks reasoning to strict context
       })
     });
 
@@ -106,9 +102,10 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 6. MAIN ORCHESTRATOR ──────────────────────────────────
+// ─── 6. MAIN ORCHESTRATOR (Race-Condition Fixed) ───────────
 export async function POST(req) {
   try {
+    // 1. Auth
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!token) {
@@ -126,12 +123,20 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // 🔥 FIX STEP 1: Save the User's message IMMEDIATELY before history fetch
+    await supabase.from('support_messages').insert([
+      { business_id, user_id: user.id, sender_type: 'user', message }
+    ]);
+
+    // 2. Parse RAG chunks
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
+    // 🔥 FIX STEP 2: Fetch history (guaranteed to include the message we just saved)
     const historyMessages = await getConversationHistory(user.id, business_id);
 
+    // 3. Call Groq
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
@@ -142,9 +147,9 @@ export async function POST(req) {
 
     const cleanedAnswer = answer.trim();
 
+    // 🔥 FIX STEP 3: Save the Assistant's answer AFTER the AI replies
     try {
       await supabase.from('support_messages').insert([
-        { business_id, user_id: user.id, sender_type: 'user', message },
         { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
       ]);
     } catch (memoryError) {
@@ -159,4 +164,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-    }
+}
