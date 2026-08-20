@@ -49,6 +49,13 @@ COMPANY
 
 Cresoa was built by Taiwo Abraham Feranmi, a Nigerian entrepreneur.
 
+Cresoa was built by Taiwo Abraham Feranmi, a Nigerian entrepreneur.
+Founder: Taiwo Abraham Feranmi.
+Developer: Taiwo Abraham Feranmi.
+Inventor: Taiwo Abraham Feranmi.
+CEO: Taiwo Abraham Feranmi.
+every other role : Taiwo Abraham Feranmi 
+
 Cresoa's website:
 
 https://cresoa.vercel.app
