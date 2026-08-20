@@ -345,8 +345,25 @@ Never sacrifice accuracy just to produce an answer.
 When the answer is unknown, saying "I don't know" is better than inventing an answer.
 `;
 
-// ─── 3. GROQ PRIMARY CALLER ──────────────────────────────────
-async function callGroq(message, contextString) {
+// ─── 3. GET CONVERSATION HISTORY (Memory System) ────────────
+async function getConversationHistory(userId, businessId) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data, error } = await supabase
+    .from('support_messages')
+    .select('sender_type, message')
+    .eq('business_id', businessId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  
+  if (error || !data) return "";
+  return data.reverse().map(msg => 
+    `${msg.sender_type === 'user' ? 'User' : 'Tessa'}: ${msg.message}`
+  ).join('\n');
+}
+
+// ─── 4. GROQ PRIMARY CALLER ──────────────────────────────────
+async function callGroq(message, contextString, historyString) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
   try {
@@ -357,7 +374,7 @@ async function callGroq(message, contextString) {
         model: 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Platform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
+          { role: 'user', content: `Conversation History:\n${historyString}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
         ]
       })
     });
@@ -367,12 +384,12 @@ async function callGroq(message, contextString) {
   } catch (e) { return null; }
 }
 
-// ─── 4. GEMINI FALLBACK CALLER ──────────────────────────────
-async function callGemini(message, contextString) {
+// ─── 5. GEMINI FALLBACK CALLER ──────────────────────────────
+async function callGemini(message, contextString, historyString) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
   try {
-    const prompt = `${SYSTEM_PROMPT}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
+    const prompt = `${SYSTEM_PROMPT}\n\nConversation History:\n${historyString}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`;
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
     if (!res.ok) return null;
@@ -381,7 +398,7 @@ async function callGemini(message, contextString) {
   } catch (e) { return null; }
 }
 
-// ─── 5. HARDCODED FALLBACK ──────────────────────────────────
+// ─── 6. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
@@ -390,16 +407,16 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 6. POST‑PROCESSING FILTER ──────────────────────────────
+// ─── 7. POST‑PROCESSING FILTER ──────────────────────────────
 function cleanResponse(text) {
   if (!text) return text;
   return text.replace(/[*_#`~]/g, '').trim();
 }
 
-// ─── 7. MAIN ORCHESTRATOR ──────────────────────────────────
+// ─── 8. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
-    // 1. Authenticate using Authorization header (proven to work)
+    // 1. Authenticate using Authorization header
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!token) {
@@ -422,21 +439,28 @@ export async function POST(req) {
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 3. Try Groq, then Gemini, then fallback
-    let answer = await callGroq(message, contextString);
+    // 3. Fetch Memory (Last 5 messages)
+    const historyString = await getConversationHistory(user.id, business_id);
+
+    // 4. Try Groq
+    let answer = await callGroq(message, contextString, historyString);
     let source = 'groq';
+
+    // 5. If Groq fails, try Gemini
     if (!answer) {
       console.warn('Groq failed, falling back to Gemini...');
-      answer = await callGemini(message, contextString);
+      answer = await callGemini(message, contextString, historyString);
       source = 'gemini';
     }
+
+    // 6. If both fail, use hardcoded fallback
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
     }
     const cleanedAnswer = cleanResponse(answer);
 
-    // 4. Save conversation history (graceful failure if DB fails)
+    // 7. Save conversation history (graceful failure if DB fails)
     try {
       await supabase.from('support_messages').insert([
         { business_id, user_id: user.id, sender_type: 'user', message },
