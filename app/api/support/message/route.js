@@ -139,10 +139,9 @@ export async function POST(req) {
 
     const historyMessages = await getConversationHistory(user.id, business_id);
 
-    // 🔥 PRIMARY: Try Gemini first
-    let answer = await callGemini(message, contextString, historyMessages);
-    let source = 'gemini';
-
+    // 🔥 PRIMARY: Try Groq only
+let answer = await callGroq(message, contextString, historyMessages);
+let source = 'groq';
     // 🔁 FALLBACK: If Gemini fails, try Groq
     if (!answer) {
       console.warn('Gemini failed, falling back to Groq...');
