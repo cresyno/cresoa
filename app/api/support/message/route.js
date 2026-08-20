@@ -37,18 +37,17 @@ function getRelevantChunks(query, chunks) {
   return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
-// ─── 2. MINIMAL, HUMAN, WARM SYSTEM PROMPT ──────────────────
+// ─── 2. THE CONCISE 3-RULE SYSTEM PROMPT ────────────────────
 const SYSTEM_PROMPT = `
-You are Tessa, a warm, friendly, and highly intelligent support assistant for Cresoa, a business management platform for Nigerian SMEs.
-You speak like a helpful human expert, not a robot. You may use emojis, markdown lists, and a natural conversational tone.
+You are Tessa, a warm, friendly, and highly intelligent support assistant for Cresoa.
 
-YOUR RULES (Strictly prioritized):
-1. Priority 1: Check the CONVERSATION HISTORY first. Use it for all follow-up questions. For example, if the user asks "Another 2", give 2 MORE points about the previous topic. NEVER switch topics randomly.
-2. Priority 2: Use the PLATFORM CONTEXT only if the question is a completely new topic that the history doesn't cover.
-3. Never invent features, buttons, or plan limits not found in the Platform Context. If you genuinely don't know, politely say so and suggest contacting support.
+RULES:
+1. Use the chat history first. "Another 2" means 2 more sentences about the exact previous topic. Never drift.
+2. Use the Knowledge Base only for brand-new topics.
+3. Never invent features or expose any AI technology provider. Just say "I'm Tessa, your Cresoa support assistant."
 `;
 
-// ─── 3. GET CONVERSATION HISTORY (Returns array of objects) ──
+// ─── 3. GET CONVERSATION HISTORY (8 messages memory) ────────
 async function getConversationHistory(userId, businessId) {
   const supabase = createRouteHandlerClient({ cookies });
   const { data, error } = await supabase
@@ -57,7 +56,7 @@ async function getConversationHistory(userId, businessId) {
     .eq('business_id', businessId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(5);
+    .limit(8); // Increased to 8 messages for better memory
   
   if (error || !data) return [];
   return data.reverse().map(msg => ({
@@ -66,30 +65,7 @@ async function getConversationHistory(userId, businessId) {
   }));
 }
 
-// ─── 4. GROQ PRIMARY CALLER ──────────────────────────────────
-async function callGroq(message, contextString, historyMessages) {
-  const API_KEY = process.env.GROQ_API_KEY;
-  if (!API_KEY) return null;
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...historyMessages, // Inject chat history first
-          { role: 'user', content: `Platform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
-        ]
-      })
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.choices?.[0]?.message?.content || null;
-  } catch (e) { return null; }
-}
-
-// ─── 5. GEMINI FALLBACK CALLER ──────────────────────────────
+// ─── 4. GEMINI PRIMARY CALLER ────────────────────────────────
 async function callGemini(message, contextString, historyMessages) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -106,19 +82,40 @@ async function callGemini(message, contextString, historyMessages) {
   } catch (e) { return null; }
 }
 
+// ─── 5. GROQ FALLBACK CALLER ─────────────────────────────────
+async function callGroq(message, contextString, historyMessages) {
+  const API_KEY = process.env.GROQ_API_KEY;
+  if (!API_KEY) return null;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-120b', // Switched to the new model as you suggested
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...historyMessages,
+          { role: 'user', content: `Platform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
+        ]
+      })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || null;
+  } catch (e) { return null; }
+}
+
 // ─── 6. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
   if (lower.includes('order') || lower.includes('buba')) return "Orders are managed in the Orders page.";
-  if (lower.includes('subscription') || lower.includes('plan') || lower.includes('pay')) return "To upgrade your plan, go to the Subscription page.";
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
 // ─── 7. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
-    // 1. Authenticate user via Authorization header
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!token) {
@@ -136,26 +133,24 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 2. Fetch Memory (Last 5 messages as proper array)
-    const historyMessages = await getConversationHistory(user.id, business_id);
-
-    // 3. Fetch RAG chunks (only if needed, but we still fetch them cheaply)
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 4. Try Groq (with history injected first)
-    let answer = await callGroq(message, contextString, historyMessages);
-    let source = 'groq';
+    const historyMessages = await getConversationHistory(user.id, business_id);
 
-    // 5. If Groq fails, try Gemini
+    // 🔥 PRIMARY: Try Gemini first
+    let answer = await callGemini(message, contextString, historyMessages);
+    let source = 'gemini';
+
+    // 🔁 FALLBACK: If Gemini fails, try Groq
     if (!answer) {
-      console.warn('Groq failed, falling back to Gemini...');
-      answer = await callGemini(message, contextString, historyMessages);
-      source = 'gemini';
+      console.warn('Gemini failed, falling back to Groq...');
+      answer = await callGroq(message, contextString, historyMessages);
+      source = 'groq';
     }
 
-    // 6. If both fail, use hardcoded fallback
+    // 🔒 ULTIMATE FALLBACK
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
@@ -163,7 +158,6 @@ export async function POST(req) {
 
     const cleanedAnswer = answer.trim();
 
-    // 7. Save conversation history to the database (for next time)
     try {
       await supabase.from('support_messages').insert([
         { business_id, user_id: user.id, sender_type: 'user', message },
@@ -181,4 +175,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-      }
+}
