@@ -84,7 +84,7 @@ function TessaChatContent() {
       </div>
 
       {/* Chat Area - Scrollable, with bottom padding adjusted to clear the input bar */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 110px 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 90px 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
         {messages.map((msg, idx) => (
           <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
         ))}
@@ -105,7 +105,7 @@ function TessaChatContent() {
       {/* Fixed Input Bar - Lowered to 70px to sit above your bottom navigation */}
       <div style={{ 
         position: 'fixed', 
-        bottom: '70px', // Lowered from 80px to 70px
+        bottom: '0px', // Lowered from 80px to 70px
         left: 0, 
         right: 0, 
         background: 'var(--color-card)', 
