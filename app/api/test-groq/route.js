@@ -12,6 +12,7 @@ export async function GET(req) {
       return NextResponse.json({ error: 'GROQ_API_KEY is missing in Vercel environment' }, { status: 500 });
     }
 
+    // 🔥 TESTING openai/gpt-oss-20b
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -19,7 +20,7 @@ export async function GET(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'groq/meta-llama/llama-4-maverick-17b-128e-instruct',
+        model: 'openai/gpt-oss-20b', // ✅ The final, stable, fast model
         messages: [
           { role: 'system', content: `You are Tessa, a warm, professional AI assistant for Cresoa. Keep answers concise and practical.` },
           { role: 'user', content: message }
@@ -42,7 +43,7 @@ export async function GET(req) {
     return NextResponse.json({ 
       success: true, 
       message: reply,
-      source: 'groq_qwen_test' 
+      source: 'groq_test_openai_gpt_oss_20b' 
     });
 
   } catch (error) {
