@@ -3,11 +3,12 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { readFileSync } from 'fs';
 import path from 'path';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
 // ════════════════════════════════════════════════════════════════
-// 📄 LOAD KNOWLEDGE BASE FROM EXTERNAL .MD FILE
+// 📄 LOAD KNOWLEDGE BASE
 // ════════════════════════════════════════════════════════════════
 let FULL_PDF_TEXT = '';
 try {
@@ -47,25 +48,28 @@ RULES:
 3. Never expose AI technology providers. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Do not start every reply with this introduction.
 `;
 
-// ─── 3. GET CONVERSATION HISTORY (8 messages memory) ────────
+// ─── 3. GET CONVERSATION HISTORY (Using supabaseAdmin) ─────
 async function getConversationHistory(userId, businessId) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('support_messages')
     .select('sender_type, message')
     .eq('business_id', businessId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(8);
-  
-  if (error || !data) return [];
+
+  if (error || !data) {
+    console.error('❌ Admin Memory Fetch Error:', error);
+    return [];
+  }
+
   return data.reverse().map(msg => ({
     role: msg.sender_type === 'user' ? 'user' : 'assistant',
     content: msg.message
   }));
 }
 
-// ─── 4. GROQ PRIMARY CALLER (Diagnostic Log Added Here) ─────
+// ─── 4. GROQ PRIMARY CALLER ──────────────────────────────────
 async function callGroq(message, contextString, historyMessages) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
@@ -78,15 +82,12 @@ async function callGroq(message, contextString, historyMessages) {
       { role: 'user', content: message }
     ];
 
-    // 🔥 DIAGNOSTIC LOG: Exactly as the other AI prescribed
-    console.log("🔥 LOGGING DATA CURRENTLY TRANSMITTED TO GROQ:", JSON.stringify(messages, null, 2));
-
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'openai/gpt-oss-120b',
-        messages: messages,
+        messages,
         temperature: 0.2
       })
     });
@@ -105,10 +106,9 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 6. MAIN ORCHESTRATOR (Race-Condition Fixed) ───────────
+// ─── 6. MAIN ORCHESTRATOR (Admin Client for Memory) ─────────
 export async function POST(req) {
   try {
-    // 1. Auth
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
     if (!token) {
@@ -126,20 +126,20 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 🔥 RACE CONDITION FIX: Save User message IMMEDIATELY
-    await supabase.from('support_messages').insert([
+    // 🔥 STEP 1: Save USER message using ADMIN client (bypasses RLS)
+    await supabaseAdmin.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message }
     ]);
 
-    // 2. Parse RAG chunks
+    // 2. RAG chunks
     const chunks = splitIntoChunks(FULL_PDF_TEXT);
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 3. Fetch history (guaranteed to include current message)
+    // 3. Fetch history (Admin client ensures we always get data)
     const historyMessages = await getConversationHistory(user.id, business_id);
 
-    // 4. Call Groq
+    // 4. Groq
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
@@ -150,14 +150,10 @@ export async function POST(req) {
 
     const cleanedAnswer = answer.trim();
 
-    // 🔥 SAVE Assistant answer AFTER AI replies
-    try {
-      await supabase.from('support_messages').insert([
-        { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
-      ]);
-    } catch (memoryError) {
-      console.warn('Memory saving error (ignored):', memoryError);
-    }
+    // 🔥 STEP 2: Save ASSISTANT message using ADMIN client
+    await supabaseAdmin.from('support_messages').insert([
+      { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
+    ]);
 
     return NextResponse.json({ answer: cleanedAnswer, source });
   } catch (error) {
@@ -167,4 +163,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-}
+                             }
