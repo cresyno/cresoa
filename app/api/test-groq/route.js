@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const message = searchParams.get('message') || 'Hello, Tessa!';
+    const message = searchParams.get('message') || 'Hello, Tessa! Tell me a fun fact.';
 
     const API_KEY = process.env.GROQ_API_KEY;
     if (!API_KEY) {
@@ -19,7 +19,7 @@ export async function GET(req) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b', // <-- Using the model you researched
+        model: 'qwen-3.6-27b', // 🟢 TESTING THE NEW MODEL
         messages: [
           { role: 'system', content: `You are Tessa, a warm, professional AI assistant for Cresoa. Keep answers concise and practical.` },
           { role: 'user', content: message }
@@ -29,6 +29,7 @@ export async function GET(req) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Groq Test Error:', response.status, errorText);
       return NextResponse.json({ 
         error: `Groq API returned status ${response.status}`, 
         details: errorText 
@@ -41,7 +42,7 @@ export async function GET(req) {
     return NextResponse.json({ 
       success: true, 
       message: reply,
-      source: 'groq_test' 
+      source: 'groq_qwen_test' 
     });
 
   } catch (error) {
