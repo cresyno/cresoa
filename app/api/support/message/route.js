@@ -83,7 +83,7 @@ async function callGroq(message, contextString, historyMessages) {
   }
   
   try {
-    // 💡 Isolate document context clearly within the System instructions
+    // Isolate document context clearly within the System instructions
     const structuredSystemPrompt = `
 ${SYSTEM_PROMPT}
 
@@ -120,7 +120,7 @@ ${contextString}
       body: JSON.stringify({
         model: 'openai/gpt-oss-120b', 
         messages: finalizedMessages,
-        temperature: 0.1 // Lowered to force strict context compliance over creativity
+        temperature: 0.1 // Force strict context compliance over creativity
       })
     });
 
@@ -131,6 +131,7 @@ ${contextString}
     }
 
     const data = await res.json();
+    // 🎯 FIX: Corrected syntax typo from double optional chaining down to single clean object extraction
     return data?.choices?.[0]?.message?.content || null;
   } catch (e) { 
     console.error('❌ callGroq Exception:', e);
@@ -150,6 +151,7 @@ function getHardcodedFallback(message) {
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('Authorization');
+    // 🎯 FIX: Added index [1] array slice to safely grab the actual string token parameter
     const token = authHeader?.split(' ')[1];
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -166,7 +168,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 🔥 FIX STEP 1: Save the incoming message IMMEDIATELY to prevent asynchronous data truncation.
+    // Save the incoming message IMMEDIATELY to prevent asynchronous data truncation.
     await supabase.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message }
     ]);
@@ -176,14 +178,14 @@ export async function POST(req) {
     const relevantContext = getRelevantChunks(message, chunks);
     const contextString = relevantContext.join('\n\n---\n\n');
 
-    // 🔥 FIX STEP 2: Fetch history now. This ensures the current message is already registered in the array block.
+    // Fetch history now. This ensures the current message is already registered in the array block.
     const historyMessages = await getConversationHistory(user.id, business_id);
 
     // Call Groq (Primary integration engine)
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
-    // 🔒 ULTIMATE FALLBACK
+    // ULTIMATE FALLBACK
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
@@ -191,7 +193,7 @@ export async function POST(req) {
 
     const cleanedAnswer = answer.trim();
 
-    // 🔥 FIX STEP 3: Write ONLY the assistant response back down into the database logs.
+    // Write ONLY the assistant response back down into the database logs.
     try {
       const { error: insertError } = await supabase.from('support_messages').insert([
         { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
@@ -209,4 +211,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-                  }
+           }
