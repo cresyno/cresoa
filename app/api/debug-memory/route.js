@@ -9,11 +9,16 @@ export async function GET(req) {
     const businessId = searchParams.get('business_id');
     const userId = searchParams.get('user_id');
 
+    // 🔍 Return the raw parameters for inspection
     if (!businessId || !userId) {
-      return NextResponse.json({ error: 'Missing business_id or user_id' }, { status: 400 });
+      return NextResponse.json({
+        error: 'Missing parameters',
+        received: { business_id: businessId, user_id: userId },
+        rawUrl: req.url,
+      }, { status: 400 });
     }
 
-    // 🔥 FETCH DIRECTLY USING THE ADMIN CLIENT (Bypasses RLS and Auth entirely)
+    // Fetch messages
     const { data, error } = await supabaseAdmin
       .from('support_messages')
       .select('sender_type, message, created_at')
