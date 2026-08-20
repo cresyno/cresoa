@@ -56,56 +56,49 @@ async function getConversationHistory(userId, businessId) {
     .eq('business_id', businessId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(8); // Increased to 8 messages for better memory
+    .limit(8);
   
-  if (error || !data) return [];
+  if (error || !data) {
+    console.error('❌ Supabase Memory Fetch Error:', error);
+    return [];
+  }
+
   return data.reverse().map(msg => ({
     role: msg.sender_type === 'user' ? 'user' : 'assistant',
     content: msg.message
   }));
 }
 
-// ─── 4. GEMINI PRIMARY CALLER ────────────────────────────────
-async function callGemini(message, contextString, historyMessages) {
-  const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) return null;
-  try {
-    const historyString = historyMessages.map(m => 
-      `${m.role === 'user' ? 'User' : 'Tessa'}: ${m.content}`
-    ).join('\n');
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nConversation History:\n${historyString}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`;
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] }) });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch (e) { return null; }
-}
-
-// ─── 5. GROQ FALLBACK CALLER ─────────────────────────────────
+// ─── 4. GROQ PRIMARY CALLER (With memory & context fix) ─────
 async function callGroq(message, contextString, historyMessages) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
+
   try {
+    const dynamicSystem = `${SYSTEM_PROMPT}\n\nRelevant Platform Knowledge Base Context:\n"""\n${contextString}\n"""`;
+    const messages = [
+      { role: 'system', content: dynamicSystem },
+      ...historyMessages,
+      { role: 'user', content: message }
+    ];
+
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b', // Switched to the new model as you suggested
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...historyMessages,
-          { role: 'user', content: `Platform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}` }
-        ]
+        model: 'openai/gpt-oss-120b',
+        messages: messages,
+        temperature: 0.2
       })
     });
+
     if (!res.ok) return null;
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || null;
   } catch (e) { return null; }
 }
 
-// ─── 6. HARDCODED FALLBACK ──────────────────────────────────
+// ─── 5. HARDCODED FALLBACK ──────────────────────────────────
 function getHardcodedFallback(message) {
   const lower = message.toLowerCase();
   if (lower.includes('staff') || lower.includes('team')) return "To manage staff, go to the Staff page.";
@@ -113,7 +106,7 @@ function getHardcodedFallback(message) {
   return "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
 }
 
-// ─── 7. MAIN ORCHESTRATOR ──────────────────────────────────
+// ─── 6. MAIN ORCHESTRATOR ──────────────────────────────────
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -139,17 +132,9 @@ export async function POST(req) {
 
     const historyMessages = await getConversationHistory(user.id, business_id);
 
-    // 🔥 PRIMARY: Try Groq only
-let answer = await callGroq(message, contextString, historyMessages);
-let source = 'groq';
-    // 🔁 FALLBACK: If Gemini fails, try Groq
-    if (!answer) {
-      console.warn('Gemini failed, falling back to Groq...');
-      answer = await callGroq(message, contextString, historyMessages);
-      source = 'groq';
-    }
+    let answer = await callGroq(message, contextString, historyMessages);
+    let source = 'groq';
 
-    // 🔒 ULTIMATE FALLBACK
     if (!answer) {
       answer = getHardcodedFallback(message);
       source = 'fallback';
@@ -174,4 +159,4 @@ let source = 'groq';
       source: 'emergency_fallback' 
     });
   }
-}
+    }
