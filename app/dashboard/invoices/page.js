@@ -7,7 +7,7 @@ import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
-// ─── SELF-CONTAINED SVGs (No imports) ───
+// ─── SELF-CONTAINED SVG ICONS (No imports) ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
@@ -41,13 +41,37 @@ export default function InvoicesPage() {
           return
         }
 
-        const bizId = getCurrentBusinessId()
+        // 1. Try URL param / localStorage first
+        let bizId = getCurrentBusinessId()
+
+        // 2. If not found, fetch user's first business from memberships
         if (!bizId) {
-          router.push('/dashboard')
-          return
+          const { data: membership, error: membershipError } = await supabase
+            .from('business_memberships')
+            .select('business_id')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+
+          if (membershipError) throw membershipError
+
+          if (membership) {
+            bizId = membership.business_id
+            // Store in localStorage for future visits
+            localStorage.setItem('selectedBusinessId', bizId)
+            // Update URL with business_id for consistency
+            router.replace(`/dashboard/invoices?business_id=${bizId}`)
+          } else {
+            // No business assigned to this user
+            router.push('/dashboard')
+            return
+          }
         }
+
         setBusinessId(bizId)
 
+        // 3. Now fetch invoices
         const { data, error: invoicesError } = await supabase
           .from('invoices')
           .select(`
