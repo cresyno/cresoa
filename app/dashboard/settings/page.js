@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-// ─── Self-contained SVGs (No external imports) ───
+// ─── Self-contained SVGs ───
 const InvoiceIcon = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     close: <path d="M18 6L6 18M6 6l12 12" />,
@@ -22,7 +22,7 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
   const invoiceRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // ─── REAL DATA ONLY ──────────────────────────────
+  // ─── REAL DATA ──────────────────────────────
   const customerName = order?.customers?.name || order?.customers?.first_name || '';
   const businessName = business?.name || '';
   const businessLogo = business?.logo_url || business?.tracking_logo_url || '';
@@ -36,24 +36,26 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
   const orderId = order?.id || '';
   const orderDate = order?.created_at ? new Date(order.created_at) : new Date();
 
-  // ─── Bank Details (Auto-fill from business table) ───
+  // ─── MANDATORY BANK DETAILS (Auto-fill if exists) ───
   const [bankName, setBankName] = useState(business?.bank_name || '');
   const [accountNumber, setAccountNumber] = useState(business?.account_number || '');
   const [accountName, setAccountName] = useState(business?.account_name || '');
 
-  // ─── Derived Invoice Fields ─────────────────────────────
+  const isBankDetailsComplete = bankName.trim() && accountNumber.trim() && accountName.trim();
+
+  // ─── Invoice Numbers & Dates ───
   const invoiceNumber = `INV-${orderDate.getFullYear()}${String(orderDate.getMonth()+1).padStart(2, '0')}${String(orderDate.getDate()).padStart(2, '0')}-001`;
   const dueDate = new Date(orderDate);
   dueDate.setDate(dueDate.getDate() + 7);
 
-  // ─── Editable State ──────────────────────────────────────
+  // ─── Editable State ───
   const [itemDesc, setItemDesc] = useState(orderTitle);
   const [itemQty, setItemQty] = useState(orderQuantity);
   const [itemRate, setItemRate] = useState(orderPrice / (orderQuantity || 1));
   const [customNote, setCustomNote] = useState('Thank you for your patronage! We appreciate your business.');
   const [paymentStatus, setPaymentStatus] = useState('Balance Due');
 
-  // ─── Calculated Totals ──────────────────────────────────
+  // ─── Totals ───
   const itemAmount = itemQty * itemRate;
   const subTotal = itemAmount;
   const vat = 0;
@@ -63,10 +65,7 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
   const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`;
   const formatDate = (date) => date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // ─── MANDATORY BANK DETAILS VALIDATION ──────────────────
-  const isBankDetailsComplete = bankName.trim() && accountNumber.trim() && accountName.trim();
-
-  // ─── LOGO PRE-LOAD (Fix for PDF) ──────────────────────
+  // ─── Logo Pre-load ───
   const [logoLoaded, setLogoLoaded] = useState(null);
   useEffect(() => {
     if (!businessLogo) return;
@@ -77,7 +76,7 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
     img.onerror = () => setLogoLoaded(null);
   }, [businessLogo]);
 
-  // ─── PDF & Share Logic (Blocks if bank details missing) ───
+  // ─── Blocks download/share if incomplete ───
   const handleDownloadPDF = async () => {
     if (!isBankDetailsComplete) {
       alert('Please fill in Bank Name, Account Number, and Account Name before downloading.');
@@ -94,8 +93,7 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`${invoiceNumber}.pdf`);
     } catch (err) {
-      console.error(err);
-      alert('PDF generation failed. Please try again.');
+      alert('PDF generation failed.');
     } finally {
       setIsGenerating(false);
     }
@@ -115,7 +113,6 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
       const imgData = canvas.toDataURL('image/png');
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       const pdfBlob = pdf.output('blob');
-
       if (navigator.share) {
         await navigator.share({
           title: `Invoice ${invoiceNumber}`,
@@ -134,15 +131,12 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
     }
   };
 
-  // ─── Render ──────────────────────────────────────────────
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
       <style>{`
         @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @media print { .no-print { display: none !important; } }
       `}</style>
-
-      {/* Bottom Sheet Modal */}
       <div style={{ width: '100%', maxWidth: '600px', maxHeight: '88vh', backgroundColor: 'var(--color-card)', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', boxShadow: '0 -8px 32px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' }} onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
@@ -158,28 +152,16 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
 
         {/* Scrollable Area */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', backgroundColor: 'var(--color-bg)' }}>
-          
-          {/* ─── PROFESSIONAL INVOICE CANVAS (PDF Target) ─── */}
+          {/* Invoice Canvas */}
           <div ref={invoiceRef} style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', marginBottom: '1rem', color: '#1a1a1a' }}>
-            
-            {/* 1. Brand Header */}
+            {/* Brand Header */}
             <div style={{ borderBottom: '2px solid var(--color-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {logoLoaded ? (
-                  <img src={logoLoaded} alt={businessName} style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '6px' }} />
-                ) : (
-                  <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
-                    {businessName.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                {logoLoaded ? <img src={logoLoaded} alt={businessName} style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '6px' }} /> : <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>{businessName.charAt(0).toUpperCase()}</div>}
                 <div>
                   <h2 style={{ margin: 0, color: 'var(--color-primary)', fontSize: '1.2rem', fontWeight: 700 }}>{businessName}</h2>
                   <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>{businessLocation}</p>
-                  <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>
-                    {businessPhone}
-                    {businessPhone && businessEmail ? ' | ' : ''}
-                    {businessEmail}
-                  </p>
+                  <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>{businessPhone}{businessPhone && businessEmail ? ' | ' : ''}{businessEmail}</p>
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -189,14 +171,14 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
               </div>
             </div>
 
-            {/* 2. Bill To */}
+            {/* Bill To */}
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ fontSize: '0.7rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>BILL TO</div>
               <div style={{ fontWeight: 600, fontSize: '1rem', color: '#111' }}>{customerName}</div>
               {order?.customers?.phone && <div style={{ fontSize: '0.8rem', color: '#666' }}>{order.customers.phone}</div>}
             </div>
 
-            {/* 3. Itemized Table */}
+            {/* Itemized Table */}
             <div style={{ width: '100%', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead style={{ background: '#f8f9fa' }}>
@@ -218,50 +200,32 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
               </table>
             </div>
 
-            {/* 4. Totals Breakdown */}
+            {/* Totals */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
               <div style={{ width: '200px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.8rem', color: '#555' }}>
-                  <span>Subtotal:</span><span>{formatMoney(subTotal)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.8rem', color: '#555' }}>
-                  <span>VAT 7.5%:</span><span>{formatMoney(vat)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.8rem', color: '#555' }}>
-                  <span>Discount:</span><span>{formatMoney(discount)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '2px solid #eee', fontSize: '1rem', fontWeight: 700, color: '#111' }}>
-                  <span>TOTAL:</span><span>{formatMoney(grandTotal)}</span>
-                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.8rem', color: '#555' }}><span>Subtotal:</span><span>{formatMoney(subTotal)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.8rem', color: '#555' }}><span>VAT 7.5%:</span><span>{formatMoney(vat)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.8rem', color: '#555' }}><span>Discount:</span><span>{formatMoney(discount)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '2px solid #eee', fontSize: '1rem', fontWeight: 700, color: '#111' }}><span>TOTAL:</span><span>{formatMoney(grandTotal)}</span></div>
               </div>
             </div>
 
-            {/* 5. Status Badge */}
-            <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', color: '#666' }}>Status:</span>
-              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: paymentStatus === 'Paid in Full' ? '#e6f4ea' : '#fff3e0', color: paymentStatus === 'Paid in Full' ? '#1e7e34' : '#e65100' }}>
-                {paymentStatus}
-              </span>
-            </div>
-
-            {/* 6. Payment Details (Mandatory) */}
+            {/* Payment Details - ALWAYS RENDERED */}
             <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.8rem', color: '#333' }}>
               <strong style={{ display: 'block', marginBottom: '4px' }}>PAYMENT DETAILS</strong>
               <div>Bank: {bankName || '___________________'} | Acct: {accountNumber || '___________________'} | Name: {accountName || '___________________'}</div>
             </div>
 
-            {/* 7. Custom Note */}
-            <div style={{ fontSize: '0.8rem', color: '#666', fontStyle: 'italic' }}>
-              {customNote}
-            </div>
+            {/* Custom Note */}
+            <div style={{ fontSize: '0.8rem', color: '#666', fontStyle: 'italic' }}>{customNote}</div>
 
-            {/* 8. Footer - Powered by Cresoa */}
+            {/* Footer */}
             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #eee', textAlign: 'center', fontSize: '0.7rem', color: '#999' }}>
               Powered by Cresoa — Business management made simple.
             </div>
           </div>
 
-          {/* ─── EDITING INPUTS (Outside PDF) ─── */}
+          {/* EDITING INPUTS */}
           <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
               <div>
@@ -290,47 +254,22 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
               </select>
             </div>
 
-            {/* MANDATORY BANK DETAILS INPUTS */}
+            {/* MANDATORY BANK DETAILS INPUTS - Always visible */}
             <div style={{ border: '1px solid var(--color-danger)', borderRadius: '8px', padding: '0.75rem', background: 'rgba(220,53,69,0.05)' }}>
-              <strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-danger)', marginBottom: '0.5rem' }}>
-                Bank Details (Required)
-              </strong>
+              <strong style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-danger)', marginBottom: '0.5rem' }}>Bank Details (Required)</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <input
-                  type="text"
-                  placeholder="Bank Name (e.g. GTBank)"
-                  value={bankName}
-                  onChange={e => setBankName(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', background: 'var(--color-bg)' }}
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Account Number"
-                  value={accountNumber}
-                  onChange={e => setAccountNumber(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', background: 'var(--color-bg)' }}
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Account Name (e.g. John Doe)"
-                  value={accountName}
-                  onChange={e => setAccountName(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', background: 'var(--color-bg)' }}
-                  required
-                />
+                <input type="text" placeholder="Bank Name (e.g. GTBank)" value={bankName} onChange={e => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', background: 'var(--color-bg)' }} required />
+                <input type="text" placeholder="Account Number" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', background: 'var(--color-bg)' }} required />
+                <input type="text" placeholder="Account Name (e.g. John Doe)" value={accountName} onChange={e => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', background: 'var(--color-bg)' }} required />
               </div>
               {!isBankDetailsComplete && (
-                <p style={{ margin: '0.5rem 0 0', fontSize: '0.7rem', color: 'var(--color-danger)' }}>
-                  ⚠️ You must fill all bank details before generating or sharing the invoice.
-                </p>
+                <p style={{ margin: '0.5rem 0 0', fontSize: '0.7rem', color: 'var(--color-danger)' }}>⚠️ You must fill all bank details before generating or sharing the invoice.</p>
               )}
             </div>
           </div>
         </div>
 
-  {/* Action Footer */}
+        {/* Action Footer */}
         <div className="no-print" style={{ padding: '1rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
           <button onClick={handleDownloadPDF} disabled={isGenerating || !isBankDetailsComplete} style={{ flex: 1, padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', fontWeight: 600, cursor: isBankDetailsComplete ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: isGenerating || !isBankDetailsComplete ? 0.6 : 1 }}>
             <InvoiceIcon name="download" size={18} stroke="var(--color-text)" /> {isGenerating ? 'Generating...' : 'Download PDF'}
@@ -342,4 +281,4 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
       </div>
     </div>
   );
-}
+                   }
