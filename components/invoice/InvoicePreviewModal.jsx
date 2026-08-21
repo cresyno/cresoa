@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-// ─── Self-contained SVGs ──────────────────────────────────
+// ─── Self-contained SVGs (No external imports) ───
 const InvoiceIcon = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     close: <path d="M18 6L6 18M6 6l12 12" />,
@@ -22,17 +22,25 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
   const invoiceRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // ─── Real Data from Props ──────────────────────────────
-  const customerName = order?.customers?.name || order?.customers?.first_name || 'Customer';
-  const businessName = business?.name || 'Your Business';
-  const businessAddress = business?.address || 'Lagos, Nigeria';
-  const businessPhone = business?.phone || '080-000-0000';
-  const businessEmail = business?.email || 'info@business.com';
-  const orderTitle = order?.title || 'Order';
+  // ─── REAL DATA ONLY (No fake fallbacks) ──────────────
+  const customerName = order?.customers?.name || order?.customers?.first_name || '';
+  const businessName = business?.name || '';
+  const businessLogo = business?.logo_url || business?.tracking_logo_url || '';
+
+  // These are the columns that now exist after your SQL ran:
+  const businessLocation = business?.location || '';
+  const businessPhone = business?.phone || '';
+  const businessWhatsapp = business?.whatsapp || '';
+  const businessEmail = business?.email || '';
+  const businessAddress = business?.address || '';
+  const bankName = business?.bank_name || '';
+  const accountNumber = business?.account_number || '';
+  const accountName = business?.account_name || '';
+
+  const orderTitle = order?.title || '';
   const orderPrice = Number(order?.price) || 0;
   const orderQuantity = Number(order?.quantity) || 1;
-  const rate = orderPrice / orderQuantity;
-  const orderId = order?.id || 'ORD-1234';
+  const orderId = order?.id || '';
   const orderDate = order?.created_at ? new Date(order.created_at) : new Date();
 
   // ─── Derived Invoice Fields ─────────────────────────────
@@ -40,17 +48,17 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
   const dueDate = new Date(orderDate);
   dueDate.setDate(dueDate.getDate() + 7); // 7 days due
 
-  // ─── Editable State ──────────────────────────────────────
+  // ─── Editable State (Pre-filled with real order data) ──
   const [itemDesc, setItemDesc] = useState(orderTitle);
   const [itemQty, setItemQty] = useState(orderQuantity);
-  const [itemRate, setItemRate] = useState(rate);
+  const [itemRate, setItemRate] = useState(orderPrice / (orderQuantity || 1));
   const [customNote, setCustomNote] = useState('Thank you for your patronage! We appreciate your business.');
   const [paymentStatus, setPaymentStatus] = useState('Balance Due');
 
   // ─── Calculated Totals ──────────────────────────────────
   const itemAmount = itemQty * itemRate;
   const subTotal = itemAmount;
-  const vat = 0; 
+  const vat = 0;
   const discount = 0;
   const grandTotal = subTotal + vat - discount;
 
@@ -131,15 +139,34 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
         {/* Scrollable Area */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', backgroundColor: 'var(--color-bg)' }}>
           
-          {/* ─── PROFESSIONAL INVOICE CANVAS (Target for PDF) ─── */}
+          {/* ─── PROFESSIONAL INVOICE CANVAS (PDF Target) ─── */}
           <div ref={invoiceRef} style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', marginBottom: '1rem', color: '#1a1a1a' }}>
             
             {/* 1. Brand Header & Contact Info */}
             <div style={{ borderBottom: '2px solid var(--color-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <h2 style={{ margin: 0, color: 'var(--color-primary)', fontSize: '1.3rem', fontWeight: 700 }}>{businessName}</h2>
-                <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>{businessAddress}</p>
-                <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>{businessPhone}  |  {businessEmail}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* ─── LOGO INTEGRATION (Rectangle) ─── */}
+                {businessLogo ? (
+                  <img 
+                    src={businessLogo} 
+                    alt={businessName} 
+                    style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '6px' }} 
+                  />
+                ) : (
+                  // Text-based logo if no image uploaded
+                  <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
+                    {businessName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <h2 style={{ margin: 0, color: 'var(--color-primary)', fontSize: '1.2rem', fontWeight: 700 }}>{businessName}</h2>
+                  <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>{businessLocation}</p>
+                  <p style={{ margin: '2px 0', fontSize: '0.8rem', color: '#666' }}>
+                    {businessPhone}
+                    {businessPhone && businessEmail ? ' | ' : ''}
+                    {businessEmail}
+                  </p>
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#333' }}>INVOICE #{invoiceNumber}</div>
@@ -203,18 +230,20 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
               </span>
             </div>
 
-            {/* 6. Payment Details (Required for 9.5/10) */}
-            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.8rem', color: '#333' }}>
-              <strong style={{ display: 'block', marginBottom: '4px' }}>PAYMENT DETAILS</strong>
-              <div>Bank: GTBank | Acct: 0123456789 | Name: {businessName}</div>
-            </div>
+            {/* 6. Payment Details (Only show if real bank data exists) */}
+            {bankName && accountNumber && (
+              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.8rem', color: '#333' }}>
+                <strong style={{ display: 'block', marginBottom: '4px' }}>PAYMENT DETAILS</strong>
+                <div>Bank: {bankName} | Acct: {accountNumber} | Name: {accountName || businessName}</div>
+              </div>
+            )}
 
             {/* 7. Footer Note */}
             <div style={{ fontSize: '0.8rem', color: '#666', fontStyle: 'italic' }}>
               {customNote}
             </div>
             <div style={{ marginTop: '8px', fontSize: '0.7rem', color: '#999', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '8px' }}>
-              For enquiries, call {businessPhone} or email {businessEmail}.
+              For enquiries, call {businessPhone || 'N/A'}.
             </div>
           </div>
 
@@ -249,7 +278,7 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
           </div>
         </div>
 
-        {/* Action Footer (Fixed at bottom) */}
+        {/* Action Footer */}
         <div className="no-print" style={{ padding: '1rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-card)', display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
           <button onClick={handleDownloadPDF} disabled={isGenerating} style={{ flex: 1, padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: isGenerating ? 0.6 : 1 }}>
             <InvoiceIcon name="download" size={18} stroke="var(--color-text)" /> {isGenerating ? 'Generating...' : 'Download PDF'}
@@ -261,4 +290,4 @@ export default function InvoicePreviewModal({ order, business, onClose }) {
       </div>
     </div>
   );
-    }
+        }
