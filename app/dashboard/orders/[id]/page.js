@@ -825,5 +825,4 @@ export default function OrderDetailPage() {
         <Navigation businessId={currentBusinessId} />
       </div>
     </div>
-  )
-}                                                                                                                                                                                                                      }
+  )                                                                                                                                                                                                   }
