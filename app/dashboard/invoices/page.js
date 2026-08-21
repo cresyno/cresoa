@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { requireBusinessAccess } from '../../../lib/requireBusinessAccess'
 import { supabase } from '../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
-// ─── SELF-CONTAINED SVG ICONS (No imports) ───
+// ─── SELF-CONTAINED SVG ICONS ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
@@ -31,47 +31,15 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState('all')
 
-  // Fetch invoices on mount
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          router.push('/login')
-          return
-        }
-
-        // 1. Try URL param / localStorage first
-        let bizId = getCurrentBusinessId()
-
-        // 2. If not found, fetch user's first business from memberships
-        if (!bizId) {
-          const { data: membership, error: membershipError } = await supabase
-            .from('business_memberships')
-            .select('business_id')
-            .eq('user_id', session.user.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-
-          if (membershipError) throw membershipError
-
-          if (membership) {
-            bizId = membership.business_id
-            // Store in localStorage for future visits
-            localStorage.setItem('selectedBusinessId', bizId)
-            // Update URL with business_id for consistency
-            router.replace(`/dashboard/invoices?business_id=${bizId}`)
-          } else {
-            // No business assigned to this user
-            router.push('/dashboard')
-            return
-          }
-        }
+        // 🔒 PROTECT: Redirect to /dashboard if no valid business access
+        const bizId = await requireBusinessAccess(router)
+        if (!bizId) return // already redirected
 
         setBusinessId(bizId)
 
-        // 3. Now fetch invoices
         const { data, error: invoicesError } = await supabase
           .from('invoices')
           .select(`
@@ -105,27 +73,22 @@ export default function InvoicesPage() {
   const filteredInvoices = invoices.filter((invoice) => {
     const customerName = invoice.customers?.name || invoice.customers?.first_name || 'Unknown'
     const invoiceNumber = invoice.invoice_number || ''
-    
     const matchesSearch =
       customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())
-
     let matchesFilter = true
     if (filter === 'paid') matchesFilter = invoice.status === 'paid' || invoice.balance_due <= 0
     if (filter === 'unpaid') matchesFilter = invoice.status !== 'paid' && invoice.balance_due > 0
     if (filter === 'overdue') matchesFilter = invoice.status === 'overdue'
-
     return matchesSearch && matchesFilter
   })
 
-  // Format money
   const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A'
     return new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
-  // Status badge color logic
   const getStatusBadge = (invoice) => {
     if (invoice.status === 'paid' || invoice.balance_due <= 0) {
       return { label: 'Paid', color: 'var(--cresoa-success)', bg: 'rgba(46,125,94,0.1)' }
@@ -160,7 +123,6 @@ export default function InvoicesPage() {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
         <Navigation businessId={businessId} />
-        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: 'var(--cresoa-text)' }}>Invoices</h1>
           <button
@@ -210,7 +172,6 @@ export default function InvoicesPage() {
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
       <Navigation businessId={businessId} />
-
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
@@ -240,7 +201,6 @@ export default function InvoicesPage() {
             style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
           />
         </div>
-
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           {[
             { key: 'all', label: 'All' },
@@ -354,4 +314,4 @@ export default function InvoicesPage() {
       )}
     </div>
   )
-    }
+}
