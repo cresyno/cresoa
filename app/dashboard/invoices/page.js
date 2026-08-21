@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
-import { Navigation } from '../../../../components/Navigation'
-import '../../../globals.css'
+import { supabase } from '../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
+import { Navigation } from '../../../components/Navigation'
+import '../../globals.css'
 
 // ─── SELF-CONTAINED SVGs (No imports) ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
