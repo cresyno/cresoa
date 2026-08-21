@@ -198,7 +198,6 @@ export default function NewInvoicePage() {
           subtotal: total,
           total,
           amount_paid: 0,
-          balance_due: total,
           custom_note: thankYouNote,
           bank_name: bankName,
           account_number: accountNumber,
