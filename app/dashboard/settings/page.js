@@ -358,11 +358,11 @@ export default function SettingsPage() {
           <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--cresoa-bg)', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Logo</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#D4A52A', border: '1px solid var(--cresoa-border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cresoa-primary)', border: '1px solid var(--cresoa-border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {logoPreview ? <img src={logoPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="building" size={24} stroke="var(--cresoa-text-muted)" />}
               </div>
               <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} id="logo-upload-branding" />
-              <label htmlFor="logo-upload-branding" style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: 'var(--cresoa-primary)', color: '#fff', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}><Icon name="upload" size={14} stroke="#fff" /> Upload</label>
+              <label htmlFor="logo-upload-branding" style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#D4A52A', color: '#fff', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}><Icon name="upload" size={14} stroke="#fff" /> Upload</label>
               {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}>Remove</button>}
             </div>
           </div>
