@@ -47,17 +47,15 @@ async function getEmbedding(text) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
-  // Use the exact static URL string structure that successfully responded with status 200
-  const url = 'https://googleapis.com' + API_KEY;
+  // ✅ THE EXACT URL THAT WORKED IN OUR DIAGNOSTIC
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=' + API_KEY;
 
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        content: { 
-          parts: [{ text: text }] 
-        }
+        content: { parts: [{ text: text }] }
       })
     });
 
