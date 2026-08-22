@@ -55,11 +55,11 @@ export default function InvoiceDetailPage() {
   const invoiceRef = useRef(null)
   const [logoDataUrl, setLogoDataUrl] = useState(null)
 
-  // Screen size detection for Quick Actions
-  const [isDesktop, setIsDesktop] = useState(false)
+  // Detect mobile for layout
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= 768)
+    const check = () => setIsMobile(window.innerWidth < 768)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
@@ -302,21 +302,22 @@ export default function InvoiceDetailPage() {
         <Svg name="back" size={16} stroke="currentColor" /> Back to Invoices
       </button>
 
-      <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns: isDesktop ? '1fr 280px' : '1fr', gap: '1.5rem' }}>
+      <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: '1.5rem' }}>
         {/* MAIN INVOICE AREA */}
         <div>
-          {/* Invoice Preview (For PDF & Print) */}
-          <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a' }}>
+          {/* ─── MOBILE-FIRST INVOICE PREVIEW ─── */}
+          <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: isMobile ? '1rem' : '1.5rem', marginBottom: '1rem', color: '#1a1a1a', overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
-                <div>
-                  <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.2rem' }}>{business?.name || 'Business'}</h2>
-                  {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.location}</p>}
+            <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: isMobile ? 'block' : 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-start' }}>
+              
+              {/* Business Info (Left) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: isMobile ? '1rem' : '0', width: isMobile ? '100%' : 'auto' }}>
+                {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: isMobile ? '50px' : '80px', height: isMobile ? '50px' : '80px', objectFit: 'contain', flexShrink: 0 }} /> : <div style={{ width: isMobile ? '50px' : '80px', height: isMobile ? '50px' : '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, flexShrink: 0 }}>{business?.name?.charAt(0) || 'B'}</div>}
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{business?.name || 'Business'}</h2>
+                  {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{business.location}</p>}
                   {business?.phone && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.phone}</p>}
-                  {business?.email && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.email}</p>}
-                  {/* TIN & CAC Below Phone/Email */}
+                  {business?.email && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{business.email}</p>}
                   {(tinNumber || cacNumber) && (
                     <div style={{ marginTop: '2px' }}>
                       {tinNumber && <p style={{ margin: '0', color: '#666', fontSize: '0.75rem' }}>TIN: {tinNumber}</p>}
@@ -325,11 +326,15 @@ export default function InvoiceDetailPage() {
                   )}
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <h3 style={{ margin: 0 }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span> #{invoice.invoice_number}</h3>
-                <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Issued: {formatDate(invoice.issue_date)}</p>
-                <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Due: {formatDate(dueDate)}</p>
-                <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: isPaid ? '#e6f4ea' : '#fff3e0', color: isPaid ? '#1e7e34' : '#e65100' }}>{isPaid ? 'PAID' : 'BALANCE DUE'}</span>
+
+              {/* Invoice Meta (Right) */}
+              <div style={{ textAlign: isMobile ? 'left' : 'right', width: isMobile ? '100%' : 'auto' }}>
+                <h3 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span> #{invoice.invoice_number}</h3>
+                <div style={{ marginTop: '4px' }}>
+                  <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Issued: {formatDate(invoice.issue_date)}</p>
+                  <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Due: {formatDate(dueDate)}</p>
+                </div>
+                <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: isPaid ? '#e6f4ea' : '#fff3e0', color: isPaid ? '#1e7e34' : '#e65100', display: 'inline-block', marginTop: '4px' }}>{isPaid ? 'PAID' : 'BALANCE DUE'}</span>
               </div>
             </div>
 
@@ -337,7 +342,7 @@ export default function InvoiceDetailPage() {
             {customer && (
               <div style={{ marginBottom: '1rem' }}>
                 <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>BILL TO</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{customer.name || customer.first_name}</p>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: isMobile ? '1rem' : '1.1rem' }}>{customer.name || customer.first_name}</p>
                 {customer.phone && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.phone}</p>}
                 {customer.email && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.email}</p>}
                 {customer.address && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.address}</p>}
@@ -345,40 +350,42 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Items Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              <thead>
-                <tr style={{ background: '#f8f9fa' }}>
-                  <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
-                  <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
-                  <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Unit Price</th>
-                  <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={i}>
-                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
-                      {item.item_name}
-                      {item.description && <div style={{ color: '#666', fontSize: '0.75rem' }}>{item.description}</div>}
-                    </td>
-                    <td style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{item.quantity}</td>
-                    <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{formatMoney(item.price)}</td>
-                    <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #eee', fontWeight: 600 }}>{formatMoney(item.total)}</td>
+            <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.75rem' : '0.85rem', minWidth: '400px' }}>
+                <thead>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <th style={{ padding: isMobile ? '6px' : '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
+                    <th style={{ padding: isMobile ? '6px' : '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
+                    <th style={{ padding: isMobile ? '6px' : '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Unit Price</th>
+                    <th style={{ padding: isMobile ? '6px' : '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {items.map((item, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: isMobile ? '6px' : '8px', borderBottom: '1px solid #eee' }}>
+                        {item.item_name}
+                        {item.description && <div style={{ color: '#666', fontSize: '0.7rem' }}>{item.description}</div>}
+                      </td>
+                      <td style={{ padding: isMobile ? '6px' : '8px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{item.quantity}</td>
+                      <td style={{ padding: isMobile ? '6px' : '8px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{formatMoney(item.price)}</td>
+                      <td style={{ padding: isMobile ? '6px' : '8px', textAlign: 'right', borderBottom: '1px solid #eee', fontWeight: 600 }}>{formatMoney(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Totals */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-              <div style={{ width: '220px' }}>
+              <div style={{ width: isMobile ? '100%' : '220px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(invoice.subtotal)}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}><span>Total</span><span>{formatMoney(invoice.total)}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'green' }}><span>Paid</span><span>{formatMoney(invoice.amount_paid)}</span></div>
               </div>
             </div>
 
-            {/* Amount Due Box */}
+                  {/* Amount Due Box */}
             <div style={{ marginBottom: '1rem', padding: '0.75rem', background: isPaid ? '#e6f4ea' : '#fff3e0', borderRadius: '8px', border: `1px solid ${isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700, color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{isPaid ? 'AMOUNT PAID' : 'AMOUNT DUE'}</span>
@@ -389,7 +396,7 @@ export default function InvoiceDetailPage() {
             {/* Payment Details */}
             <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
               <strong>PAYMENT DETAILS</strong>
-              <div>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
+              <div style={{ marginTop: '4px' }}>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
             </div>
 
             {customNote && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>}
@@ -400,16 +407,31 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* Editable Section (Hidden on print) */}
-    <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
+          <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
             <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Custom Note</label><input type="text" value={customNote} onChange={(e) => setCustomNote(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+            <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '0' : '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ marginBottom: isMobile ? '0.75rem' : '0' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Custom Note</label>
+                <input type="text" value={customNote} onChange={(e) => setCustomNote(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Bank Name</label><input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Number (10 digits)</label><input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Name</label><input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+            <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? '0' : '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ marginBottom: isMobile ? '0.75rem' : '0' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Bank Name</label>
+                <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              </div>
+              <div style={{ marginBottom: isMobile ? '0.75rem' : '0' }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Number (10 digits)</label>
+                <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Name</label>
+                <input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              </div>
             </div>
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>CAC Number (Optional)</label>
@@ -420,7 +442,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* QUICK ACTIONS SIDEBAR (Desktop only) */}
-        {isDesktop && (
+        {!isMobile && (
           <div className="no-print" style={{ position: 'sticky', top: '20px', alignSelf: 'start' }}>
             <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -442,7 +464,7 @@ export default function InvoiceDetailPage() {
       </div>
 
       {/* QUICK ACTIONS MOBILE LIST (Below page content) */}
-      {!isDesktop && (
+      {isMobile && (
         <div className="no-print" style={{ marginTop: '1rem' }}>
           <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -512,4 +534,4 @@ export default function InvoiceDetailPage() {
       )}
     </div>
   )
-}
+              }
