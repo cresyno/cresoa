@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import TessaFloatingWidget from '@/components/support/TessaFloatingWidget'
@@ -24,7 +25,14 @@ export default function ClientLayout({ children }) {
   return (
     <>
       {children}
-      {pathname?.startsWith('/dashboard') && !isTessaPage && <TessaFloatingWidget />}
+
+      {/* ✅ FIX: Wrap Tessa in Suspense because it uses useSearchParams() */}
+      {pathname?.startsWith('/dashboard') && !isTessaPage && (
+        <Suspense fallback={null}>
+          <TessaFloatingWidget />
+        </Suspense>
+      )}
+
       <style>{`
         :root {
           --color-bg: #F7F5F0;
