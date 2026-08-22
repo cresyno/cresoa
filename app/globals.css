@@ -1399,3 +1399,64 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--cresoa-text-muted);
 }
+
+/* ============================================================
+   GLOBAL MOBILE-FIRST RESPONSIVE SYSTEM (ALL DASHBOARD PAGES)
+   ============================================================ */
+
+/* Fix "Ask Tessa" floating button overlap on every page */
+.cresoa-dashboard-page {
+  padding-bottom: 120px !important;
+}
+
+/* Make all content containers responsive */
+.cresoa-dashboard-page > * {
+  max-width: 100%;
+}
+
+/* Grids that break on mobile (force single column) */
+@media (max-width: 768px) {
+  .cresoa-dashboard-page {
+    padding: 1rem !important;
+  }
+
+  /* All grid layouts inside dashboard become single column on mobile */
+  .cresoa-dashboard-page [style*="grid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Force all primary buttons to be full width and not wrap */
+  .cresoa-primary-button {
+    white-space: nowrap;
+    width: 100% !important;
+    justify-content: center;
+    padding: 0.75rem !important;
+  }
+
+  /* Prevent text overflow on cards and headers */
+  .cresoa-dashboard-page h1,
+  .cresoa-dashboard-page h2,
+  .cresoa-dashboard-page h3,
+  .cresoa-dashboard-page p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Prevent inputs from overflowing */
+  .cresoa-dashboard-page input,
+  .cresoa-dashboard-page textarea,
+  .cresoa-dashboard-page select {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* Desktop-specific tweaks (if needed) */
+@media (min-width: 769px) {
+  .cresoa-dashboard-page {
+    padding: 1.5rem !important;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+}
