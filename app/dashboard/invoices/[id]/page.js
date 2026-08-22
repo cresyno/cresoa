@@ -9,6 +9,7 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import '../../../globals.css'
 
+// ─── Self-contained SVGs ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
@@ -17,6 +18,8 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
     card: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
+    chevron: <polyline points="9 18 15 12 9 6" />,
+    edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
@@ -38,6 +41,7 @@ export default function InvoiceDetailPage() {
   const [accountNumber, setAccountNumber] = useState('')
   const [accountName, setAccountName] = useState('')
   const [cacNumber, setCacNumber] = useState('')
+  const [tinNumber, setTinNumber] = useState('')
 
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
@@ -51,6 +55,17 @@ export default function InvoiceDetailPage() {
   const invoiceRef = useRef(null)
   const [logoDataUrl, setLogoDataUrl] = useState(null)
 
+  // Screen size detection for Quick Actions
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // Print styles
   useEffect(() => {
     const style = document.createElement('style')
     style.innerHTML = `
@@ -65,6 +80,7 @@ export default function InvoiceDetailPage() {
     return () => document.head.removeChild(style)
   }, [])
 
+  // Fetch invoice
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
@@ -72,7 +88,6 @@ export default function InvoiceDetailPage() {
         if (!bizId) return
         setBusinessId(bizId)
 
-        // Fetch invoice with customer & items (NO invoice_orders)
         const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
           .select(`
@@ -89,7 +104,6 @@ export default function InvoiceDetailPage() {
         setCustomer(invoiceData.customers)
         setItems(invoiceData.invoice_items || [])
 
-        // Fetch business for logo, bank, CAC
         const { data: bizData } = await supabase
           .from('businesses')
           .select('*')
@@ -117,6 +131,7 @@ export default function InvoiceDetailPage() {
         setAccountNumber(invoiceData.account_number || bizData?.account_number || '')
         setAccountName(invoiceData.account_name || bizData?.account_name || '')
         setCacNumber(invoiceData.cac_number || bizData?.cac_number || '')
+        setTinNumber(bizData?.tin_number || '')
       } catch (err) {
         console.error(err)
         setError('Could not load invoice.')
@@ -184,7 +199,6 @@ export default function InvoiceDetailPage() {
       const newStatus = newPaid >= Number(invoice.total) ? 'paid' : 'partial'
       await supabase.from('invoices').update({ amount_paid: newPaid, status: newStatus }).eq('id', invoice.id)
 
-      // Update linked orders (via invoice_items order_id)
       const linkedOrderIds = items.map(i => i.order_id).filter(Boolean)
       for (const orderId of linkedOrderIds) {
         const { data: order } = await supabase.from('orders').select('amount_paid').eq('id', orderId).single()
@@ -282,140 +296,220 @@ export default function InvoiceDetailPage() {
   )
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '100px' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '120px' }}>
       <Navigation businessId={businessId} />
       <button onClick={() => router.push(`/dashboard/invoices?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>
         <Svg name="back" size={16} stroke="currentColor" /> Back to Invoices
       </button>
 
-      <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a' }}>
-        <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
-            <div>
-              <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.2rem' }}>{business?.name || 'Business'}</h2>
-              {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.location}</p>}
-              {business?.phone && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.phone}</p>}
-              {business?.email && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.email}</p>}
+      <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns: isDesktop ? '1fr 280px' : '1fr', gap: '1.5rem' }}>
+        {/* MAIN INVOICE AREA */}
+        <div>
+          {/* Invoice Preview (For PDF & Print) */}
+          <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a' }}>
+            {/* Header */}
+            <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
+                <div>
+                  <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.2rem' }}>{business?.name || 'Business'}</h2>
+                  {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.location}</p>}
+                  {business?.phone && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.phone}</p>}
+                  {business?.email && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.email}</p>}
+                  {/* TIN & CAC Below Phone/Email */}
+                  {(tinNumber || cacNumber) && (
+                    <div style={{ marginTop: '2px' }}>
+                      {tinNumber && <p style={{ margin: '0', color: '#666', fontSize: '0.75rem' }}>TIN: {tinNumber}</p>}
+                      {cacNumber && <p style={{ margin: '0', color: '#666', fontSize: '0.75rem' }}>CAC: {cacNumber}</p>}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <h3 style={{ margin: 0 }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span> #{invoice.invoice_number}</h3>
+                <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Issued: {formatDate(invoice.issue_date)}</p>
+                <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Due: {formatDate(dueDate)}</p>
+                <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: isPaid ? '#e6f4ea' : '#fff3e0', color: isPaid ? '#1e7e34' : '#e65100' }}>{isPaid ? 'PAID' : 'BALANCE DUE'}</span>
+              </div>
             </div>
+
+            {/* Billed To */}
+            {customer && (
+              <div style={{ marginBottom: '1rem' }}>
+                <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>BILL TO</p>
+                <p style={{ margin: 0, fontWeight: 600 }}>{customer.name || customer.first_name}</p>
+                {customer.phone && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.phone}</p>}
+                {customer.email && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.email}</p>}
+                {customer.address && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.address}</p>}
+              </div>
+            )}
+
+            {/* Items Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              <thead>
+                <tr style={{ background: '#f8f9fa' }}>
+                  <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
+                  <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
+                  <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Unit Price</th>
+                  <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
+                      {item.item_name}
+                      {item.description && <div style={{ color: '#666', fontSize: '0.75rem' }}>{item.description}</div>}
+                    </td>
+                    <td style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{item.quantity}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{formatMoney(item.price)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #eee', fontWeight: 600 }}>{formatMoney(item.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Totals */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+              <div style={{ width: '220px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(invoice.subtotal)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}><span>Total</span><span>{formatMoney(invoice.total)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'green' }}><span>Paid</span><span>{formatMoney(invoice.amount_paid)}</span></div>
+              </div>
+            </div>
+
+            {/* Amount Due Box */}
+            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: isPaid ? '#e6f4ea' : '#fff3e0', borderRadius: '8px', border: `1px solid ${isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{isPaid ? 'AMOUNT PAID' : 'AMOUNT DUE'}</span>
+                <span style={{ fontWeight: 800, fontSize: '1.2rem', color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{formatMoney(isPaid ? invoice.total : balance)}</span>
+              </div>
+            </div>
+
+            {/* Payment Details */}
+            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
+              <strong>PAYMENT DETAILS</strong>
+              <div>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
+            </div>
+
+            {customNote && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>}
+
+            <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+              Powered by Cresoa — Business management made simple.
+            </p>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <h3 style={{ margin: 0 }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span> #{invoice.invoice_number}</h3>
-            <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Issued: {formatDate(invoice.issue_date)}</p>
-            <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Due: {formatDate(dueDate)}</p>
-            <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: isPaid ? '#e6f4ea' : '#fff3e0', color: isPaid ? '#1e7e34' : '#e65100' }}>{isPaid ? 'PAID' : 'BALANCE DUE'}</span>
+
+          {/* Editable Section (Hidden on print) */}
+    <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
+            <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Custom Note</label><input type="text" value={customNote} onChange={(e) => setCustomNote(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Bank Name</label><input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Number (10 digits)</label><input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+              <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Name</label><input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+            </div>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>CAC Number (Optional)</label>
+              <input type="text" value={cacNumber} onChange={(e) => setCacNumber(e.target.value)} placeholder="e.g. RC-12345" style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+            </div>
+            <button onClick={handleSaveEdits} disabled={savingEdits} className="cresoa-primary-button" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>{savingEdits ? 'Saving...' : 'Save Changes'}</button>
           </div>
         </div>
 
-        {customer && (
-          <div style={{ marginBottom: '1rem' }}>
-            <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>BILL TO</p>
-            <p style={{ margin: 0, fontWeight: 600 }}>{customer.name || customer.first_name}</p>
-            {customer.phone && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.phone}</p>}
-            {customer.email && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.email}</p>}
-            {customer.address && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.address}</p>}
+        {/* QUICK ACTIONS SIDEBAR (Desktop only) */}
+        {isDesktop && (
+          <div className="no-print" style={{ position: 'sticky', top: '20px', alignSelf: 'start' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button onClick={handleDownloadPDF} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Svg name="download" size={16} stroke="currentColor" /> Download PDF
+              </button>
+              <button onClick={handleShareWhatsApp} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Svg name="whatsapp" size={16} stroke="currentColor" /> Send via WhatsApp
+              </button>
+              <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Svg name="printer" size={16} stroke="currentColor" /> Print
+              </button>
+              <button onClick={() => setShowPaymentModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                <Svg name="card" size={16} stroke="currentColor" /> Record Payment
+              </button>
+            </div>
           </div>
         )}
+      </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          <thead>
-            <tr style={{ background: '#f8f9fa' }}>
-              <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
-              <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
-              <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Unit Price</th>
-              <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, i) => (
-              <tr key={i}>
-                <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
-                  {item.item_name}
-                  {item.description && <div style={{ color: '#666', fontSize: '0.75rem' }}>{item.description}</div>}
-                </td>
-                <td style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{item.quantity}</td>
-                <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{formatMoney(item.price)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #eee', fontWeight: 600 }}>{formatMoney(item.total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-          <div style={{ width: '220px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(invoice.subtotal)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}><span>Total</span><span>{formatMoney(invoice.total)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'green' }}><span>Paid</span><span>{formatMoney(invoice.amount_paid)}</span></div>
+      {/* QUICK ACTIONS MOBILE LIST (Below page content) */}
+      {!isDesktop && (
+        <div className="no-print" style={{ marginTop: '1rem' }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <button onClick={handleDownloadPDF} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+              <Svg name="download" size={20} stroke="var(--cresoa-accent)" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Download PDF</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Save invoice as PDF</div>
+              </div>
+              <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+            </button>
+            <button onClick={handleShareWhatsApp} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+              <Svg name="whatsapp" size={20} stroke="var(--cresoa-accent)" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Send via WhatsApp</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Share invoice with customer</div>
+              </div>
+              <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+            </button>
+            <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+              <Svg name="printer" size={20} stroke="var(--cresoa-accent)" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Print</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Print or save as PDF</div>
+              </div>
+              <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+            </button>
+            <button onClick={() => setShowPaymentModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+              <Svg name="card" size={20} stroke="var(--cresoa-accent)" />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Record Payment</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Add a new payment</div>
+              </div>
+              <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+            </button>
           </div>
         </div>
+      )}
 
-        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: isPaid ? '#e6f4ea' : '#fff3e0', borderRadius: '8px', border: `1px solid ${isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)'}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 700, color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{isPaid ? 'AMOUNT PAID' : 'AMOUNT DUE'}</span>
-            <span style={{ fontWeight: 800, fontSize: '1.2rem', color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{formatMoney(isPaid ? invoice.total : balance)}</span>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
-          <strong>PAYMENT DETAILS</strong>
-          <div>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
-        </div>
-
-        {cacNumber && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>CAC: {cacNumber}</p>}
-        {customNote && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>}
-
-        <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-          Powered by Cresoa — Business management made simple.
-        </p>
-      </div>
-
-<div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
-        <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Custom Note</label><input type="text" value={customNote} onChange={(e) => setCustomNote(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Bank Name</label><input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Number (10 digits)</label><input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Name</label><input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
-        </div>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>CAC Number (Optional)</label>
-          <input type="text" value={cacNumber} onChange={(e) => setCacNumber(e.target.value)} placeholder="e.g. RC-12345" style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-        </div>
-        <button onClick={handleSaveEdits} disabled={savingEdits} className="cresoa-primary-button" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>{savingEdits ? 'Saving...' : 'Save Changes'}</button>
-      </div>
-
-      <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <button onClick={handleDownloadPDF} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center' }}><Svg name="download" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Download PDF</button>
-        <button onClick={handleShareWhatsApp} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: '#25D366', borderColor: '#25D366' }}><Svg name="whatsapp" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Share WhatsApp</button>
-        <button onClick={handlePrint} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}><Svg name="printer" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Print</button>
-        <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}><Svg name="card" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Record Payment</button>
-      </div>
-
+      {/* Payment Modal (Responsive) */}
       {showPaymentModal && (
-        <div className="cresoa-modal-overlay" onClick={() => setShowPaymentModal(false)}>
-          <form onClick={(e) => e.stopPropagation()} onSubmit={handleRecordPayment} style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0 }}>Record Payment</h3>
-              <button type="button" onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Svg name="x" size={20} stroke="currentColor" /></button>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }} onClick={() => setShowPaymentModal(false)}>
+          <form onClick={(e) => e.stopPropagation()} onSubmit={handleRecordPayment} style={{ background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--cresoa-text)' }}>Record Payment</h3>
+              <button type="button" onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Svg name="x" size={20} stroke="currentColor" />
+              </button>
             </div>
+
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Amount (₦)</label>
-              <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder={`Max ${formatMoney(balance)}`} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} required />
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Amount (₦)</label>
+              <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder={`Max ${formatMoney(balance)}`} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }} required />
             </div>
+
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Note (optional)</label>
-              <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Note (optional)</label>
+              <input type="text" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment" style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer' }}>Cancel</button>
-              <button type="submit" disabled={savingPayment} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem' }}>{savingPayment ? 'Recording...' : 'Save Payment'}</button>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+              <button type="submit" disabled={savingPayment} className="cresoa-primary-button" style={{ padding: '0.6rem 1.5rem', opacity: savingPayment ? '0.7' : '1' }}>{savingPayment ? 'Recording...' : 'Save Payment'}</button>
             </div>
           </form>
         </div>
       )}
     </div>
   )
-          }
+}
