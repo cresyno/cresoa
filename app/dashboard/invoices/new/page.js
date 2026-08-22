@@ -44,7 +44,7 @@ export default function NewInvoicePage() {
   const [bankName, setBankName] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [accountName, setAccountName] = useState('')
-  const [cacNumber, setCacNumber] = useState('') // Simple string, e.g., "RC-12345"
+  const [cacNumber, setCacNumber] = useState('')
 
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -149,44 +149,28 @@ export default function NewInvoicePage() {
     })
   }
 
-  const handleCreateOrder = async () => {
+  // ─── NEW ORDER (Temporary, NOT saved to DB) ───
+  const handleCreateOrder = () => {
     if (!newOrder.title.trim()) { alert('Order title is required.'); return }
     if (Number(newOrder.quantity) < 1 || Number(newOrder.price_per_unit) < 0) { alert('Quantity must be at least 1 and price >= 0.'); return }
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
 
-      const { data: created, error: createError } = await supabase
-        .from('orders')
-        .insert({
-          business_id: businessId,
-          customer_id: selectedCustomer.id,
-          title: newOrder.title,
-          description: newOrder.description || null,
-          quantity: Number(newOrder.quantity),
-          price_per_unit: Number(newOrder.price_per_unit),
-          price: Number(newOrder.price_per_unit),
-          due_date: newOrder.due_date,
-          current_status: 'Order placed',
-        })
-        .select()
-        .single()
-      if (createError) throw createError
-
-      const { data: refreshed } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('business_id', businessId)
-        .eq('customer_id', selectedCustomer.id)
-        .order('created_at', { ascending: false })
-      setOrders(refreshed || [])
-      setSelectedOrders(prev => [...prev, created])
-      setShowNewOrderModal(false)
-      setNewOrder({ title: '', description: '', quantity: 1, price_per_unit: 0, due_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] })
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create order.')
+    const tempOrder = {
+      id: `temp-${Date.now()}`, // Internal only, never shown
+      customer_id: selectedCustomer.id,
+      business_id: businessId,
+      title: newOrder.title,
+      description: newOrder.description || '',
+      quantity: Number(newOrder.quantity),
+      price_per_unit: Number(newOrder.price_per_unit),
+      price: Number(newOrder.price_per_unit),
+      due_date: newOrder.due_date,
+      current_status: 'Order placed',
+      is_temp: true
     }
+
+    setSelectedOrders(prev => [...prev, tempOrder])
+    setShowNewOrderModal(false)
+    setNewOrder({ title: '', description: '', quantity: 1, price_per_unit: 0, due_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] })
   }
 
   const handleCancel = () => {
@@ -235,32 +219,37 @@ export default function NewInvoicePage() {
 
       for (const order of selectedOrders) {
         const itemTotal = Number(order.price_per_unit || order.price) * Number(order.quantity || 1)
+        
+        // Insert into invoice_items (NO total field - DB computes it)
         const { error: itemError } = await supabase
           .from('invoice_items')
           .insert({
             invoice_id: invoice.id,
-            order_id: order.id,
+            order_id: order.is_temp ? null : order.id, // null for temp
             item_name: order.title || 'Order',
             description: order.description || '',
             quantity: order.quantity || 1,
             price: Number(order.price_per_unit || order.price),
-            total: itemTotal,
+            // NO total here - it's a generated column
           })
         if (itemError) throw itemError
 
-        const { error: linkError } = await supabase
-          .from('invoice_orders')
-          .insert({
-            invoice_id: invoice.id,
-            order_id: order.id,
-          })
-        if (linkError) console.error('Failed to link order:', linkError)
+        // ONLY link to invoice_orders if it's a REAL order (not temp)
+        if (!order.is_temp) {
+          const { error: linkError } = await supabase
+            .from('invoice_orders')
+            .insert({
+              invoice_id: invoice.id,
+              order_id: order.id,
+            })
+          if (linkError) console.error('Failed to link order:', linkError) // Non-fatal, just log
+        }
       }
 
       router.push(`/dashboard/invoices/${invoice.id}?business_id=${businessId}`)
     } catch (err) {
       console.error(err)
-      alert('Failed to create invoice.')
+      alert('Failed to create invoice. Please check your database setup.')
     } finally {
       setSaving(false)
     }
@@ -351,7 +340,7 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-     {step === 3 && (
+      {step === 3 && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 1rem' }}>Invoice Details</h3>
 
@@ -385,7 +374,7 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-      {step === 4 && (
+        {step === 4 && (
         <div>
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem' }}>
             <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -481,4 +470,4 @@ export default function NewInvoicePage() {
     </div>
   )
 }
-
+```
