@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
-import { Navigation } from '../../../../components/Navigation'
+import { supabase } from '../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../lib/getBusinessId'
+import { Navigation } from '../../../components/Navigation'
 import '../../../globals.css'
 
+// ─── Self-contained SVGs ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     search: <><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>,
@@ -14,7 +15,7 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     check: <polyline points="20 6 9 17 4 12" />,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
     back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
-    arrowRight: <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
+    trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
@@ -30,10 +31,11 @@ export default function NewInvoicePage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [customerSearch, setCustomerSearch] = useState('')
 
-  const [orders, setOrders] = useState([])
-  const [selectedOrders, setSelectedOrders] = useState([])
+  const [orders, setOrders] = useState([]) // real orders for the selected customer
+  const [selectedOrders, setSelectedOrders] = useState([]) // includes temp orders
   const [showNewOrderModal, setShowNewOrderModal] = useState(false)
 
+  // Editable fields
   const [thankYouNote, setThankYouNote] = useState('')
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState(() => {
@@ -51,11 +53,12 @@ export default function NewInvoicePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
+  // New Order Modal State (fully controlled)
   const [newOrder, setNewOrder] = useState({
     title: '',
     description: '',
-    quantity: 1,
-    price_per_unit: 0,
+    quantity: '', // empty, no default
+    price_per_unit: '', // empty, no default
     due_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
   })
 
@@ -89,15 +92,12 @@ export default function NewInvoicePage() {
         if (orderIdParam) {
           const { data: order } = await supabase
             .from('orders')
-            .select(`
-              *,
-              customers ( * )
-            `)
+            .select('*')
             .eq('id', orderIdParam)
             .eq('business_id', bizId)
             .single()
           if (order) {
-            setSelectedCustomer(order.customers)
+            setSelectedCustomer({ id: order.customer_id, name: order.customers?.name || 'Customer' })
             setSelectedOrders([order])
             setThankYouNote(order.notes || '')
             setIssueDate(order.created_at ? order.created_at.split('T')[0] : issueDate)
@@ -149,20 +149,21 @@ export default function NewInvoicePage() {
     })
   }
 
-  // ─── NEW ORDER (Temporary, NOT saved to DB) ───
+  // ─── CREATE TEMPORARY ORDER (NOT saved to DB) ───
   const handleCreateOrder = () => {
     if (!newOrder.title.trim()) { alert('Order title is required.'); return }
-    if (Number(newOrder.quantity) < 1 || Number(newOrder.price_per_unit) < 0) { alert('Quantity must be at least 1 and price >= 0.'); return }
+    if (newOrder.quantity === '' || Number(newOrder.quantity) < 1) { alert('Quantity must be at least 1.'); return }
+    if (newOrder.price_per_unit === '' || Number(newOrder.price_per_unit) < 0) { alert('Price per unit must be 0 or more.'); return }
 
     const tempOrder = {
-      id: `temp-${Date.now()}`, // Internal only, never shown
+      id: `temp-${Date.now()}`,
       customer_id: selectedCustomer.id,
       business_id: businessId,
       title: newOrder.title,
       description: newOrder.description || '',
       quantity: Number(newOrder.quantity),
       price_per_unit: Number(newOrder.price_per_unit),
-      price: Number(newOrder.price_per_unit),
+      price: Number(newOrder.price_per_unit), // legacy
       due_date: newOrder.due_date,
       current_status: 'Order placed',
       is_temp: true
@@ -170,7 +171,17 @@ export default function NewInvoicePage() {
 
     setSelectedOrders(prev => [...prev, tempOrder])
     setShowNewOrderModal(false)
-    setNewOrder({ title: '', description: '', quantity: 1, price_per_unit: 0, due_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] })
+    setNewOrder({
+      title: '',
+      description: '',
+      quantity: '',
+      price_per_unit: '',
+      due_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+    })
+  }
+
+  const handleRemoveTempOrder = (orderId) => {
+    setSelectedOrders(prev => prev.filter(o => o.id !== orderId))
   }
 
   const handleCancel = () => {
@@ -217,39 +228,25 @@ export default function NewInvoicePage() {
         .single()
       if (invError) throw invError
 
+      // Insert items (NO invoice_orders, NO total field)
       for (const order of selectedOrders) {
-        const itemTotal = Number(order.price_per_unit || order.price) * Number(order.quantity || 1)
-        
-        // Insert into invoice_items (NO total field - DB computes it)
         const { error: itemError } = await supabase
           .from('invoice_items')
           .insert({
             invoice_id: invoice.id,
-            order_id: order.is_temp ? null : order.id, // null for temp
+            order_id: order.is_temp ? null : order.id,
             item_name: order.title || 'Order',
             description: order.description || '',
             quantity: order.quantity || 1,
             price: Number(order.price_per_unit || order.price),
-            // NO total here - it's a generated column
           })
         if (itemError) throw itemError
-
-        // ONLY link to invoice_orders if it's a REAL order (not temp)
-        if (!order.is_temp) {
-          const { error: linkError } = await supabase
-            .from('invoice_orders')
-            .insert({
-              invoice_id: invoice.id,
-              order_id: order.id,
-            })
-          if (linkError) console.error('Failed to link order:', linkError) // Non-fatal, just log
-        }
       }
 
       router.push(`/dashboard/invoices/${invoice.id}?business_id=${businessId}`)
     } catch (err) {
       console.error(err)
-      alert('Failed to create invoice. Please check your database setup.')
+      alert('Failed to create invoice. ' + (err.message || 'Unknown error'))
     } finally {
       setSaving(false)
     }
@@ -278,6 +275,7 @@ export default function NewInvoicePage() {
         ))}
       </div>
 
+      {/* STEP 1: Customer */}
       {step === 1 && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 1rem' }}>Select Customer</h3>
@@ -301,6 +299,7 @@ export default function NewInvoicePage() {
         </div>
       )}
 
+      {/* STEP 2: Orders */}
       {step === 2 && selectedCustomer && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -311,9 +310,10 @@ export default function NewInvoicePage() {
           </div>
 
           {orders.length === 0 && selectedOrders.length === 0 ? (
-            <p style={{ color: 'var(--cresoa-text-muted)' }}>No orders found. Click "New Order" to create one.</p>
+            <p style={{ color: 'var(--cresoa-text-muted)' }}>No orders found. Click "New Order" to add one.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {/* Real orders */}
               {orders.map(order => {
                 const isSelected = selectedOrders.some(o => o.id === order.id)
                 return (
@@ -329,6 +329,22 @@ export default function NewInvoicePage() {
                   </div>
                 )
               })}
+              {/* Temp orders */}
+              {selectedOrders.filter(o => o.is_temp).map(order => (
+                <div key={order.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', border: '1px solid var(--cresoa-accent)', borderRadius: '8px', background: 'var(--cresoa-accent-soft)' }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--cresoa-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-accent)' }}>
+                    <Svg name="check" size={12} stroke="#fff" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <strong>{order.title}</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Qty: {order.quantity} × ₦{Number(order.price_per_unit).toLocaleString()} (Temporary)</div>
+                  </div>
+                  <div style={{ fontWeight: 600 }}>₦{(Number(order.quantity) * Number(order.price_per_unit)).toLocaleString()}</div>
+                  <button onClick={(e) => { e.stopPropagation(); handleRemoveTempOrder(order.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
+                    <Svg name="trash" size={16} stroke="currentColor" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
@@ -340,30 +356,40 @@ export default function NewInvoicePage() {
         </div>
       )}
 
+      {/* STEP 3: Details */}
       {step === 3 && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 1rem' }}>Invoice Details</h3>
 
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem' }}>Thank You Note</label>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Thank You Note</label>
           <textarea value={thankYouNote} onChange={e => setThankYouNote(e.target.value)} rows={3} placeholder="Add your business tagline (e.g., Quality you can trust)" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', marginBottom: '1rem' }} />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem' }}>Issue Date</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Issue Date</label>
               <input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due Date</label>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Due Date</label>
               <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
             </div>
           </div>
 
           <h4 style={{ margin: '1rem 0 0.5rem' }}>Bank Details (Required)</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.5rem', marginBottom: '1rem' }}>
-            <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="Bank Name" style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
-            <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Account Number (10 digits)" style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
-            {accountNumber && !/^\d{10}$/.test(accountNumber) && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.3rem 0 0' }}>Must be exactly 10 digits</p>}
-            <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Account Name" style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Bank Name</label>
+              <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. GTBank" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Account Number (10 digits)</label>
+              <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="e.g. 0123456789" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
+              {accountNumber && !/^\d{10}$/.test(accountNumber) && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.3rem 0 0' }}>Must be exactly 10 digits</p>}
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Account Name</label>
+              <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="e.g. John Doe" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
+            </div>
           </div>
 
           <h4 style={{ margin: '1rem 0 0.5rem' }}>CAC Number (Optional)</h4>
@@ -374,7 +400,8 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-        {step === 4 && (
+      {/* STEP 4: Review */}
+      {step === 4 && (
         <div>
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem' }}>
             <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -446,28 +473,71 @@ export default function NewInvoicePage() {
         </div>
       )}
 
+      {/* ─── NEW ORDER MODAL (Fully Rebuilt) ─── */}
       {showNewOrderModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }}>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '16px'
+        }} onClick={() => setShowNewOrderModal(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'var(--cresoa-surface)',
+            border: '1px solid var(--cresoa-border)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            width: '100%',
+            maxWidth: '480px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0 }}>New Order</h3>
-              <button onClick={() => setShowNewOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Svg name="x" size={20} stroke="currentColor" /></button>
+              <h3 style={{ margin: 0, color: 'var(--cresoa-text)' }}>New Order</h3>
+              <button onClick={() => setShowNewOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Svg name="x" size={20} stroke="currentColor" />
+              </button>
             </div>
-            <input type="text" placeholder="Order Title" value={newOrder.title} onChange={e => setNewOrder({ ...newOrder, title: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', marginBottom: '0.5rem' }} />
-            <input type="text" placeholder="Description (optional)" value={newOrder.description} onChange={e => setNewOrder({ ...newOrder, description: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', marginBottom: '0.5rem' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <input type="number" placeholder="Qty" value={newOrder.quantity} onChange={e => setNewOrder({ ...newOrder, quantity: Number(e.target.value) })} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)' }} />
-              <input type="number" placeholder="Price per unit (₦)" value={newOrder.price_per_unit} onChange={e => setNewOrder({ ...newOrder, price_per_unit: Number(e.target.value) })} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)' }} />
+
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Order Title</label>
+              <input type="text" value={newOrder.title} onChange={e => setNewOrder({ ...newOrder, title: e.target.value })} placeholder="e.g. Bag of rice" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
             </div>
-            <input type="date" value={newOrder.due_date} onChange={e => setNewOrder({ ...newOrder, due_date: e.target.value })} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', marginBottom: '1rem' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button onClick={() => setShowNewOrderModal(false)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleCreateOrder} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: 'none', background: 'var(--cresoa-accent)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Create</button>
+
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Description (optional)</label>
+              <input type="text" value={newOrder.description} onChange={e => setNewOrder({ ...newOrder, description: e.target.value })} placeholder="e.g. 50kg bag" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Quantity</label>
+                <input type="number" value={newOrder.quantity} onChange={e => setNewOrder({ ...newOrder, quantity: e.target.value })} placeholder="0" min="1" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Price per Unit (₦)</label>
+                <input type="number" value={newOrder.price_per_unit} onChange={e => setNewOrder({ ...newOrder, price_per_unit: e.target.value })} placeholder="0" min="0" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }}>Due Date</label>
+              <input type="date" value={newOrder.due_date} onChange={e => setNewOrder({ ...newOrder, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+
+            {newOrder.quantity && newOrder.price_per_unit && (
+              <div style={{ padding: '0.6rem', background: 'var(--cresoa-accent-soft)', borderRadius: '8px', textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', color: 'var(--cresoa-accent)', marginBottom: '1rem' }}>
+                Total: ₦{Math.round(Number(newOrder.quantity) * Number(newOrder.price_per_unit)).toLocaleString()}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button onClick={() => setShowNewOrderModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+              <button onClick={handleCreateOrder} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-accent)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Add Order</button>
             </div>
           </div>
         </div>
       )}
     </div>
   )
-}
-
+        }
