@@ -650,7 +650,10 @@ export default function DashboardLayout({ children }) {
         <div style={{ color: 'var(--color-text-muted)' }}>Loading...</div>
       </div>
     }>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      {/* WRAP THE CONTENT WITH THE GLOBAL RESPONSIVE CLASS */}
+      <div className="cresoa-dashboard-page">
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </div>
     </Suspense>
   )
               }
