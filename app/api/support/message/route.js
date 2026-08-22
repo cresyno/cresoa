@@ -66,14 +66,27 @@ async function getEmbedding(text) {
   } catch (e) { return null; }
 }
 
+// ─── GUARANTEED RETRIEVAL ─────────────────────────────────────
 async function getRelevantChunks(query) {
+  const lower = query.toLowerCase();
+
+  // 🔥 DIRECT OVERRIDE: If they ask about plans/pricing, pull the pricing section
+  if (lower.includes('pricing') || lower.includes('plan') || lower.includes('price') || lower.includes('subscription')) {
+    const pricingSection = FULL_PDF_TEXT.split('PLANS AND PRICING')[1]?.split('FEATURE AVAILABILITY')[0];
+    if (pricingSection && pricingSection.length > 50) {
+      console.log('✅ Pricing chunk manually retrieved.');
+      return [pricingSection.trim()];
+    }
+  }
+
+  // 1. Vector search
   const queryEmbedding = await getEmbedding(query);
   if (queryEmbedding) {
     const vectorString = JSON.stringify(queryEmbedding);
     const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
       query_embedding: vectorString,
-      match_threshold: 0,
-      match_count: 8 // ✅ Increased to give more context
+      match_threshold: -1, // Always returns something
+      match_count: 5
     });
 
     if (!error && data && data.length > 0) {
@@ -81,9 +94,9 @@ async function getRelevantChunks(query) {
     }
   }
 
-  // Fallback: keyword matching + full KB if needed
+  // 2. Keyword matching fallback
   const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
-  const keywords = query.toLowerCase().split(' ').filter(w => w.length >= 2);
+  const keywords = lower.split(' ').filter(w => w.length >= 2);
   const scored = chunks.map(chunk => {
     const lowerChunk = chunk.toLowerCase();
     let score = 0;
@@ -93,7 +106,9 @@ async function getRelevantChunks(query) {
   const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
   const relevant = topChunks.map(c => c.text).filter(t => t.length > 0);
   if (relevant.length > 0) return relevant;
-  return [FULL_PDF_TEXT]; // Emergency fallback
+
+  // 3. Emergency: pull a small, safe snippet from the KB (pricing or first 2000 chars)
+  return [FULL_PDF_TEXT.substring(0, 2000)];
 }
 
 async function callGroq(message, contextString, historyMessages) {
@@ -164,7 +179,7 @@ export async function POST(req) {
     // Fetch history (ignore if new conversation)
     const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, business_id);
 
-    // Get context chunks
+    // GUARANTEED context retrieval
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
@@ -197,4 +212,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-                                                             }
+    }
