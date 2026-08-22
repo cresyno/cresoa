@@ -26,6 +26,7 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
     'bell': <svg {...props}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
     'card': <svg {...props}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
     'edit': <svg {...props}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+    'shield': <svg {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
   }
   return icons[name] || <span />
 }
@@ -62,6 +63,7 @@ export default function SettingsPage() {
     bank_name: '',
     account_number: '',
     account_name: '',
+    cac_number: '',
   })
 
   const [logoFile, setLogoFile] = useState(null)
@@ -98,6 +100,7 @@ export default function SettingsPage() {
           bank_name: bizData.bank_name || '',
           account_number: bizData.account_number || '',
           account_name: bizData.account_name || '',
+          cac_number: bizData.cac_number || '',
         })
 
         if (bizData.logo_url) {
@@ -151,6 +154,13 @@ export default function SettingsPage() {
         return
       }
 
+      // Validate CAC if present (should be numbers only, 10-15 digits)
+      if (formData.cac_number && !/^\d{10,15}$/.test(formData.cac_number)) {
+        alert('CAC Number must be between 10 and 15 digits (numbers only).')
+        setSaving(false)
+        return
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
 
@@ -184,6 +194,7 @@ export default function SettingsPage() {
         bank_name: formData.bank_name || null,
         account_number: formData.account_number || null,
         account_name: formData.account_name || null,
+        cac_number: formData.cac_number || null,
       }
 
       const { error: updateError } = await supabase
@@ -247,7 +258,6 @@ export default function SettingsPage() {
       return (
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Branding & Tracking</h3>
-          {/* Logo */}
           <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--cresoa-bg)', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Logo</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -259,8 +269,6 @@ export default function SettingsPage() {
               {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 500 }}>Remove</button>}
             </div>
           </div>
-
-          {/* Colors */}
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Primary Color</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -289,8 +297,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-
-                    {/* Messages */}
           <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Welcome Message</label>
@@ -303,7 +309,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )
-    } else if (editModal === 'payments') {
+ } else if (editModal === 'payments') {
       return (
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Payment Details</h3>
@@ -323,6 +329,27 @@ export default function SettingsPage() {
           )}
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Account Name</label>
           <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="e.g. John Doe" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+        </div>
+      )
+    } else if (editModal === 'compliance') {
+      return (
+        <div>
+          <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Compliance (CAC)</h3>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>CAC Registration Number</label>
+          <input
+            type="text"
+            name="cac_number"
+            value={formData.cac_number}
+            onChange={(e) => setFormData({ ...formData, cac_number: e.target.value.replace(/\D/g, '') })}
+            placeholder="e.g. 1234567890"
+            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '0.8rem' }}
+          />
+          {formData.cac_number && !/^\d{10,15}$/.test(formData.cac_number) && (
+            <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.8rem' }}>CAC Number must be between 10 and 15 digits.</p>
+          )}
+          <p style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>
+            Adding your CAC number builds trust with customers and makes your business look more credible.
+          </p>
         </div>
       )
     }
@@ -355,6 +382,7 @@ export default function SettingsPage() {
           { id: 'contact', label: 'Contact', icon: 'phone' },
           { id: 'branding', label: 'Branding', icon: 'palette' },
           { id: 'payments', label: 'Payments', icon: 'card' },
+          { id: 'compliance', label: 'Compliance', icon: 'shield' },
           { id: 'workflow', label: 'Workflow', icon: 'layers' },
           { id: 'notifications', label: 'Notifications', icon: 'bell' },
         ].map(tab => (
@@ -448,6 +476,27 @@ export default function SettingsPage() {
           </Card>
         )}
 
+        {activeTab === 'compliance' && (
+          <Card style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Compliance (CAC)</h3>
+              <button onClick={() => setEditModal('compliance')} style={{ background: 'transparent', border: '1px solid var(--cresoa-border)', padding: '0.25rem 0.75rem', borderRadius: '6px', color: 'var(--cresoa-text)', fontSize: '0.8rem', cursor: 'pointer' }}><Icon name="edit" size={14} stroke="currentColor" style={{ marginRight: '0.3rem' }} /> Edit</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(212,165,42,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="shield" size={24} stroke="var(--cresoa-accent)" />
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, color: 'var(--cresoa-text)' }}>CAC Registration Number</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{formData.cac_number || 'Not set'}</div>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginBottom: 0 }}>
+              Adding your CAC number builds trust with customers and makes your business look more credible. It will be displayed on your invoices.
+            </p>
+          </Card>
+        )}
+
         {activeTab === 'notifications' && (
           <Card style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>
             <Icon name="bell" size={32} stroke="var(--cresoa-text-muted)" />
@@ -517,7 +566,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Bottom save bar (only if dirty) */}
+           {/* Bottom save bar */}
       <div style={{
         position: 'fixed',
         bottom: 0,
@@ -548,4 +597,4 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-                }
+}
