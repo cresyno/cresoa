@@ -6,46 +6,41 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 
 export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
+  // Start with a fresh greeting every time the sheet opens
   const [messages, setMessages] = useState([
     { role: 'assistant', text: `Hi 👋, I'm Tessa. Ask me anything about your business.` }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
-  const [sheetHeight, setSheetHeight] = useState('25vh'); // Default 1/4 page
+  const [sheetHeight, setSheetHeight] = useState('25vh');
+  const [isNewConversation, setIsNewConversation] = useState(true);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const dragStartY = useRef(null);
   const dragStartHeight = useRef(null);
+
+  // 🚨 LOCK the dashboard scroll when sheet is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   // Auto-scroll to bottom
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
-  // Fetch history on open
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!isOpen || !businessId) return;
-      try {
-        const { data, error } = await supabase
-          .from('support_messages')
-          .select('sender_type, message')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: true })
-          .limit(10);
-        if (error || !data) return;
-        if (data.length > 0) {
-          setMessages(data.map(msg => ({
-            role: msg.sender_type === 'user' ? 'user' : 'assistant',
-            text: msg.message
-          })));
-        }
-      } catch (e) {}
-    };
-    if (isOpen) fetchHistory();
-  }, [isOpen, businessId]);
+  // 🆕 New Chat button logic (starts fresh, no old history)
+  const handleNewChat = () => {
+    setMessages([{ role: 'assistant', text: `Hi 👋, I'm Tessa. Ask me anything about your business.` }]);
+    setIsNewConversation(true);
+    setInput('');
+  };
 
-  // Send message
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
     const text = input.trim();
@@ -60,11 +55,18 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
       const res = await fetch('/api/support/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ message: text, business_id: businessId })
+        body: JSON.stringify({ 
+          message: text, 
+          business_id: businessId,
+          new_conversation: isNewConversation // 🔥 Tells Tessa to ignore old history
+        })
       });
       const data = await res.json();
       if (data.answer) setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
       else setMessages(prev => [...prev, { role: 'assistant', text: "I'm having trouble connecting. Please try again." }]);
+      
+      // After the first message, future messages keep context
+      setIsNewConversation(false);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: "Oops! My server is offline. Please try again later." }]);
     } finally {
@@ -72,7 +74,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
     }
   };
 
-  // Auto-expand textarea (max 5 lines)
   const handleInputChange = (e) => {
     const textarea = e.target;
     setInput(textarea.value);
@@ -80,20 +81,22 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   };
 
-  // Resize logic (drag handle)
+  // ✅ Resize logic with preventDefault to stop dashboard scrolling
   const startDrag = (e) => {
+    e.preventDefault();
     dragStartY.current = e.clientY || e.touches[0].clientY;
     dragStartHeight.current = sheetHeight;
     document.addEventListener('mousemove', onDrag);
-    document.addEventListener('touchmove', onDrag);
+    document.addEventListener('touchmove', onDrag, { passive: false });
     document.addEventListener('mouseup', endDrag);
     document.addEventListener('touchend', endDrag);
   };
 
   const onDrag = (e) => {
+    e.preventDefault();
     if (!dragStartY.current || !dragStartHeight.current) return;
     const currentY = e.clientY || e.touches[0].clientY;
-    const delta = dragStartY.current - currentY; // Pull up = bigger
+    const delta = dragStartY.current - currentY;
     const newHeight = Math.min(Math.max(parseInt(dragStartHeight.current) + delta, 150), window.innerHeight * 0.9);
     setSheetHeight(`${newHeight}px`);
   };
@@ -111,7 +114,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      {/* Backdrop (no blur, just subtle dim) */}
+      {/* Backdrop (no blur) */}
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
 
       {/* Resizable Bottom Sheet */}
@@ -133,35 +136,26 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
         <div 
           onMouseDown={startDrag}
           onTouchStart={startDrag}
-          style={{
-            padding: '10px 0',
-            cursor: 'grab',
-            display: 'flex',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}
+          style={{ padding: '10px 0', cursor: 'grab', display: 'flex', justifyContent: 'center', flexShrink: 0, touchAction: 'none' }}
         >
           <div style={{ width: '40px', height: '4px', background: 'var(--color-border)', borderRadius: '2px' }} />
         </div>
 
-        {/* Header (Flexible height) */}
-        <div style={{
-          padding: '0 1rem 0.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
+        {/* Header with New Chat button */}
+        <div style={{ padding: '0 1rem 0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
             <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text)' }}>Tessa AI</span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button onClick={handleNewChat} style={{ background: 'none', border: '1px solid var(--color-border)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}>New Chat</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
         </div>
 
-        {/* Chat Area (Scrollable) */}
+        {/* Chat Area */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
           {messages.map((msg, idx) => (
             <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
@@ -200,4 +194,4 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
       </div>
     </div>
   );
-            }
+        }
