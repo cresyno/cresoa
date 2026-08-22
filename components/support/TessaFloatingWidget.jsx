@@ -4,51 +4,34 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA LOGO (Using Your Premium SVG) ───
-const TessaLogo = ({ size = 32 }) => {
+// ─── TESSA LOGO (Approximating your example) ───
+const TessaLogo = ({ size = 24 }) => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 512 512"
+      viewBox="0 0 64 64"
       width={size}
       height={size}
       fill="none"
     >
       <defs>
-        <linearGradient id="gold" x1="180" y1="120" x2="350" y2="410" gradientUnits="userSpaceOnUse">
+        <linearGradient id="gold" x1="20" y1="10" x2="50" y2="60" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#D9A72E" />
-          <stop offset="0.5" stopColor="#F0C75E" />
-          <stop offset="1" stopColor="#B98218" />
-        </linearGradient>
-        <linearGradient id="charcoal" x1="80" y1="150" x2="210" y2="390" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#11161D" />
-          <stop offset="1" stopColor="#252B34" />
+          <stop offset="1" stopColor="#F0C75E" />
         </linearGradient>
       </defs>
 
-      {/* Left flowing connection shape */}
-      <path
-        d="M104 176 C70 214 78 276 125 306 L177 337 C213 358 224 392 208 432 C254 390 248 333 203 302 L151 272 C116 252 102 216 104 176Z"
-        fill="url(#charcoal)"
-      />
+      {/* Star above T */}
+      <path d="M32 8 L34 14 L40 16 L34 18 L32 24 L30 18 L24 16 L30 14 Z" fill="url(#gold)" />
 
-      {/* Right flowing guidance shape */}
-      <path
-        d="M353 190 C385 251 355 309 300 340 L256 365 C225 384 211 415 216 459 C235 410 269 390 315 370 C382 341 409 275 353 190Z"
-        fill="url(#gold)"
-      />
+      {/* Central T (vertical + horizontal) */}
+      <path d="M20 22 H44 C42 26 40 28 36 28 H34 V48 C32 50 30 50 28 48 V28 H26 C22 28 20 26 20 22 Z" fill="url(#gold)" />
 
-      {/* Central stylized T */}
-      <path
-        d="M155 176 H277 C275 205 257 219 230 219 H215 C207 219 201 225 201 233 V355 C192 366 184 378 178 391 V233 C178 225 172 219 164 219 H155 C128 219 110 205 108 176 H155Z"
-        fill="url(#gold)"
-      />
+      {/* Left dark flowing shape */}
+      <path d="M16 26 C6 32 6 44 16 50 C22 54 28 52 30 48 C22 50 16 44 16 36 Z" fill="#11161D" />
 
-      {/* Intelligent sparkle / star */}
-      <path
-        d="M205 55 C208 89 215 96 249 100 C215 104 208 111 205 145 C201 111 194 104 160 100 C194 96 201 89 205 55Z"
-        fill="url(#gold)"
-      />
+      {/* Right gold flowing shape */}
+      <path d="M48 26 C58 32 58 44 48 50 C42 54 36 52 34 48 C42 50 48 44 48 36 Z" fill="url(#gold)" />
     </svg>
   );
 };
@@ -76,8 +59,17 @@ export default function TessaFloatingWidget() {
 
   return (
     <>
-      {/* Positioned top-right to avoid overlapping bottom content */}
-      <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 998, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+      {/* Fixed container – right aligned */}
+      <div style={{
+        position: 'fixed',
+        top: '80px',
+        right: '20px',
+        zIndex: 998,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        maxWidth: 'calc(100vw - 40px)'
+      }}>
         
         {/* Speech Bubble */}
         <div style={{
@@ -98,7 +90,7 @@ export default function TessaFloatingWidget() {
           </p>
         </div>
 
-        {/* Bold Floating Button with New Premium Logo */}
+        {/* Button – tightened to prevent overflow */}
         <button 
           onClick={handleClick}
           style={{
@@ -106,19 +98,22 @@ export default function TessaFloatingWidget() {
             color: '#fff',
             border: '2px solid #D4A52A',
             borderRadius: '50px',
-            padding: '14px 28px',
+            padding: '10px 16px',          // reduced padding
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '6px',                    // reduced gap
             boxShadow: '0 8px 32px rgba(15, 43, 74, 0.4)',
             cursor: 'pointer',
-            fontWeight: '800',
-            fontSize: '1rem',
-            letterSpacing: '0.5px',
+            fontWeight: '700',
+            fontSize: '0.85rem',           // smaller text
+            letterSpacing: '0.4px',
+            whiteSpace: 'nowrap',
+            maxWidth: 'calc(100vw - 40px)', // guarantee it fits
+            overflow: 'hidden',
             animation: 'tessaBoldPulse 3s ease-in-out infinite'
           }}
         >
-          <TessaLogo size={32} />
+          <TessaLogo size={22} />          // smaller logo
           <span>Ask Tessa</span>
         </button>
 
@@ -130,7 +125,7 @@ export default function TessaFloatingWidget() {
         `}</style>
       </div>
 
-      {/* Tessa Bottom Sheet (Preserved) */}
+      {/* Tessa Bottom Sheet */}
       <TessaBottomSheet 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)} 
@@ -138,4 +133,4 @@ export default function TessaFloatingWidget() {
       />
     </>
   );
-}
+      }
