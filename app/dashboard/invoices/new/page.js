@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
-import { Navigation } from '../../../components/Navigation'
-import '../../globals.css'
+import { supabase } from '../../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
+import { Navigation } from '../../../../components/Navigation'
+import '../../../globals.css'
 
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
