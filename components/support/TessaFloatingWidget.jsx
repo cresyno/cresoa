@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA LOGO (kept exactly) ───
 const TessaLogo = ({ size = 24 }) => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} fill="none">
@@ -55,26 +54,26 @@ export default function TessaFloatingWidget() {
           userSelect: 'none',
         }}
       >
-        {/* Rainbow Hexagon with smooth rotation */}
+        {/* Rainbow Circle */}
         <div style={{ position: 'relative', width: '56px', height: '56px' }}>
-          {/* Outer hexagon - rotating rainbow gradient */}
+          {/* Outer rainbow rotating */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
               background: 'conic-gradient(from 0deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
-              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              borderRadius: '50%',
               boxShadow: '0 0 12px rgba(255,255,255,0.3)',
               animation: 'tessaSpin 4s linear infinite',
             }}
           />
-          {/* Inner solid background - fixed, keeps logo steady */}
+          {/* Inner solid background */}
           <div
             style={{
               position: 'absolute',
               inset: '2px',
               background: '#0F2B4A',
-              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -109,7 +108,6 @@ export default function TessaFloatingWidget() {
         }
       `}</style>
 
-      {/* Bottom Sheet */}
       <TessaBottomSheet
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
