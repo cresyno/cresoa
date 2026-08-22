@@ -5,30 +5,41 @@ import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-// 🔐 Replace this with any secret word you choose (e.g., "cresoa123")
 const EMBED_SECRET = 'cresoa123';
 
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const secret = searchParams.get('secret');
+    if (secret !== EMBED_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // 1. Check if the secret matches
-    if (secret !== EMBED_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // ─── STEP 1: TEST THE CORRECT EMBEDDING MODEL FIRST ───
+    const testModel = 'models/embedding-001';
+    const testResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:embedContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: testModel, content: { parts: [{ text: 'test' }] } })
+      }
+    );
+    
+    if (!testResponse.ok) {
+      const errorText = await testResponse.text();
+      return NextResponse.json({ 
+        error: `Embedding model test FAILED with ${testResponse.status}: ${errorText}` 
+      }, { status: 500 });
     }
 
-    // 2. Read the Knowledge Base
+    // ─── STEP 2: SAFELY EMBED (Create new chunk, then delete old) ───
     const kbPath = path.join(process.cwd(), 'data', 'knowledge-base.md');
     const kbText = readFileSync(kbPath, 'utf-8');
-
-    // 3. Split into chunks
     const chunks = kbText.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 
-    // 4. Delete old chunks (prevent duplicates)
+    // Delete old chunks ONLY AFTER we confirm the new ones can be created
     await supabaseAdmin.from('knowledge_chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-    // 5. Generate embeddings using Gemini (free)
+    let successCount = 0;
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const embedding = await getEmbedding(chunk);
@@ -38,10 +49,14 @@ export async function GET(req) {
           embedding,
           metadata: { source: 'knowledge-base.md' }
         });
+        successCount++;
       }
     }
 
-    return NextResponse.json({ success: true, message: `Embedded ${chunks.length} chunks.` });
+    return NextResponse.json({ 
+      success: true, 
+      message: `✅ Embedded ${successCount} chunks successfully using ${testModel}` 
+    });
 
   } catch (error) {
     console.error('Embed error:', error);
@@ -53,15 +68,13 @@ async function getEmbedding(text) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
+  const model = 'models/embedding-001'; // ✅ Correct model name
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-001:embedContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'models/text-embedding-001',
-        content: { parts: [{ text: text }] }
-      })
+      body: JSON.stringify({ model, content: { parts: [{ text: text }] } })
     }
   );
   const data = await response.json();
