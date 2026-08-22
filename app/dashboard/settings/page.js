@@ -18,6 +18,7 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
     'palette': <svg {...props}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.4 0 .7 0 1-.1.5-.1 1-.5 1-1v-2.2c0-.6.4-1 1-1h1.6c4.6 0 8.4-3.8 8.4-8.4C23 5.8 18.2 2 12 2z"/></svg>,
     'layers': <svg {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
     'chevron-right': <svg {...props}><polyline points="9 18 15 12 9 6"/></svg>,
+    'chevron-down': <svg {...props}><polyline points="6 9 12 15 18 9"/></svg>,
     'check': <svg {...props}><polyline points="20 6 9 17 4 12"/></svg>,
     'upload': <svg {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
     'x': <svg {...props}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -63,12 +64,17 @@ export default function SettingsPage() {
     bank_name: '',
     account_number: '',
     account_name: '',
+    cac_prefix: 'RC',
     cac_number: '',
   })
 
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [logoUrl, setLogoUrl] = useState('')
+
+  // CAC Prefix Dropdown State
+  const [showPrefixDropdown, setShowPrefixDropdown] = useState(false)
+  const cacPrefixes = ['RC', 'BN', 'IT', 'LLP', 'LP']
 
   const brandColors = ['#D4A52A', '#0F2B4A', '#FFFFFF', '#000000', '#2E7D5E', '#D9534F', '#F8F6F2', '#C79A2B'];
 
@@ -88,6 +94,19 @@ export default function SettingsPage() {
         if (bizError) throw bizError
         setBusiness(bizData)
 
+        // Parse CAC number if stored as "RC-123456"
+        let cacPrefix = 'RC'
+        let cacNumber = ''
+        if (bizData.cac_number) {
+          const parts = bizData.cac_number.split('-')
+          if (parts.length === 2) {
+            cacPrefix = parts[0]
+            cacNumber = parts[1]
+          } else {
+            cacNumber = bizData.cac_number
+          }
+        }
+
         setFormData({
           name: bizData.name || '',
           phone: bizData.phone || '',
@@ -100,7 +119,8 @@ export default function SettingsPage() {
           bank_name: bizData.bank_name || '',
           account_number: bizData.account_number || '',
           account_name: bizData.account_name || '',
-          cac_number: bizData.cac_number || '',
+          cac_prefix: cacPrefix,
+          cac_number: cacNumber,
         })
 
         if (bizData.logo_url) {
@@ -154,12 +174,14 @@ export default function SettingsPage() {
         return
       }
 
-      // Validate CAC if present (should be numbers only, 10-15 digits)
-      if (formData.cac_number && !/^\d{10,15}$/.test(formData.cac_number)) {
-        alert('CAC Number must be between 10 and 15 digits (numbers only).')
+      // Validate CAC: prefix + number (5-7 digits)
+      if (formData.cac_number && !/^\d{5,7}$/.test(formData.cac_number)) {
+        alert('CAC Number must be between 5 and 7 digits.')
         setSaving(false)
         return
       }
+
+      const finalCac = formData.cac_number ? `${formData.cac_prefix}-${formData.cac_number}` : null
 
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
@@ -194,7 +216,7 @@ export default function SettingsPage() {
         bank_name: formData.bank_name || null,
         account_number: formData.account_number || null,
         account_name: formData.account_name || null,
-        cac_number: formData.cac_number || null,
+        cac_number: finalCac,
       }
 
       const { error: updateError } = await supabase
@@ -309,7 +331,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )
- } else if (editModal === 'payments') {
+    } else if (editModal === 'payments') {
       return (
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Payment Details</h3>
@@ -336,16 +358,82 @@ export default function SettingsPage() {
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Compliance (CAC)</h3>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>CAC Registration Number</label>
-          <input
-            type="text"
-            name="cac_number"
-            value={formData.cac_number}
-            onChange={(e) => setFormData({ ...formData, cac_number: e.target.value.replace(/\D/g, '') })}
-            placeholder="e.g. 1234567890"
-            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '0.8rem' }}
-          />
-          {formData.cac_number && !/^\d{10,15}$/.test(formData.cac_number) && (
-            <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.8rem' }}>CAC Number must be between 10 and 15 digits.</p>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem' }}>
+            {/* Prefix Dropdown */}
+            <div style={{ position: 'relative', width: '90px' }}>
+              <button
+                type="button"
+                onClick={() => setShowPrefixDropdown(!showPrefixDropdown)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--cresoa-border)',
+                  background: 'var(--cresoa-bg)',
+                  color: 'var(--cresoa-text)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{formData.cac_prefix}</span>
+                <Icon name="chevron-down" size={14} stroke="currentColor" />
+              </button>
+              {showPrefixDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--cresoa-card)',
+                  border: '1px solid var(--cresoa-border)',
+                  borderRadius: '8px',
+                  boxShadow: 'var(--shadow-lg)',
+                  zIndex: 10,
+                  marginTop: '4px',
+                  overflow: 'hidden',
+                }}>
+                  {cacPrefixes.map(prefix => (
+                    <button
+                      key={prefix}
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, cac_prefix: prefix })
+                        setShowPrefixDropdown(false)
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        background: formData.cac_prefix === prefix ? 'var(--cresoa-accent-soft)' : 'transparent',
+                        border: 'none',
+                        color: 'var(--cresoa-text)',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {prefix}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Number Input */}
+            <input
+              type="text"
+              name="cac_number"
+              value={formData.cac_number}
+              onChange={(e) => setFormData({ ...formData, cac_number: e.target.value.replace(/\D/g, '').slice(0, 7) })}
+              placeholder="12345"
+              style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }}
+            />
+          </div>
+          {formData.cac_number && !/^\d{5,7}$/.test(formData.cac_number) && (
+            <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.8rem' }}>CAC Number must be between 5 and 7 digits.</p>
           )}
           <p style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>
             Adding your CAC number builds trust with customers and makes your business look more credible.
@@ -488,7 +576,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--cresoa-text)' }}>CAC Registration Number</div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{formData.cac_number || 'Not set'}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{formData.cac_number ? `${formData.cac_prefix}-${formData.cac_number}` : 'Not set'}</div>
               </div>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginBottom: 0 }}>
@@ -505,7 +593,7 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {activeTab === 'workflow' && (
+          {activeTab === 'workflow' && (
           <Card style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -528,7 +616,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* THE NEW BEAUTIFUL MODAL */}
       {editModal && (
         <div style={{
           position: 'fixed',
@@ -536,8 +624,8 @@ export default function SettingsPage() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(6px)',
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -545,16 +633,16 @@ export default function SettingsPage() {
           padding: '1rem',
         }}>
           <div style={{
-            backgroundColor: 'var(--cresoa-card)',
-            borderRadius: '20px',
-            maxWidth: '460px',
+            backgroundColor: 'var(--cresoa-surface)',
+            borderRadius: '16px',
+            maxWidth: '480px',
             width: '100%',
-            padding: '1.75rem',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            padding: '1.5rem',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
             border: '1px solid var(--cresoa-border)',
           }}>
             {renderModalContent()}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
               <button onClick={() => setEditModal(null)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}>
                 Cancel
               </button>
@@ -566,7 +654,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-           {/* Bottom save bar */}
+      {/* Bottom save bar */}
       <div style={{
         position: 'fixed',
         bottom: 0,
@@ -597,4 +685,4 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-}
+        }
