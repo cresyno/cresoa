@@ -383,19 +383,19 @@ export default function SettingsPage() {
                 <Icon name="chevron-down" size={14} stroke="currentColor" />
               </button>
               {showPrefixDropdown && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  background: 'var(--cresoa-card)',
-                  border: '1px solid var(--cresoa-border)',
-                  borderRadius: '8px',
-                  boxShadow: 'var(--shadow-lg)',
-                  zIndex: 10,
-                  marginTop: '4px',
-                  overflow: 'hidden',
-                }}>
+  <div style={{
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    background: 'var(--cresoa-card)', 
+    border: '1px solid var(--cresoa-border)',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    zIndex: 1000,
+    marginTop: '4px',
+    overflow: 'hidden',
+  }}>
                   {cacPrefixes.map(prefix => (
                     <button
                       key={prefix}
@@ -616,44 +616,64 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* THE NEW BEAUTIFUL MODAL */}
-      {editModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem',
+{/* THE FIXED BEAUTIFUL MODAL */}
+{editModal && (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.6)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '1rem',
+  }}>
+    <div style={{
+      backgroundColor: 'var(--cresoa-card)', /* THIS IS THE FIX! */
+      borderRadius: '16px',
+      maxWidth: '480px',
+      width: '100%',
+      padding: '1.5rem',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+      border: '1px solid var(--cresoa-border)',
+      color: 'var(--cresoa-text)',
+    }}>
+      {renderModalContent()}
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+        <button onClick={() => setEditModal(null)} style={{
+          padding: '0.6rem 1.2rem',
+          borderRadius: '8px',
+          border: '1px solid var(--cresoa-border)',
+          background: 'transparent',
+          color: 'var(--cresoa-text)',
+          cursor: 'pointer',
+          fontWeight: 500,
+          fontSize: '0.9rem'
         }}>
-          <div style={{
-            backgroundColor: 'var(--cresoa-surface)',
-            borderRadius: '16px',
-            maxWidth: '480px',
-            width: '100%',
-            padding: '1.5rem',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-            border: '1px solid var(--cresoa-border)',
-          }}>
-            {renderModalContent()}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button onClick={() => setEditModal(null)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}>
-                Cancel
-              </button>
-              <button onClick={handleSave} disabled={saving} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', opacity: saving ? '0.7' : '1' }}>
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving} style={{
+          padding: '0.6rem 1.5rem',
+          borderRadius: '8px',
+          border: 'none',
+          background: 'var(--cresoa-primary)',
+          color: 'var(--cresoa-accent-contrast, #fff)', /* In case it's dark mode, your primary color is gold, so use white text */
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontSize: '0.9rem',
+          opacity: saving ? '0.7' : '1'
+        }}>
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* Bottom save bar */}
       <div style={{
         position: 'fixed',
