@@ -6,7 +6,6 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 
 export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
-  // Start with a fresh greeting every time the sheet opens
   const [messages, setMessages] = useState([
     { role: 'assistant', text: `Hi 👋, I'm Tessa. Ask me anything about your business.` }
   ]);
@@ -174,7 +173,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
+        {/* Input with Rainbow Send Button */}
         <div style={{ padding: '0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexShrink: 0 }}>
           <div style={{ flex: 1, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '24px', padding: '0.3rem 0.3rem 0.3rem 1rem', display: 'flex', alignItems: 'flex-end' }}>
             <textarea
@@ -186,12 +185,34 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
               disabled={isLoading}
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'none', minHeight: '32px', maxHeight: '100px', lineHeight: '1.4', fontFamily: 'inherit' }}
             />
-            <button onClick={handleSendMessage} disabled={!input.trim() || isLoading} style={{ background: 'var(--color-primary)', width: '32px', height: '32px', border: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: (!input.trim() || isLoading) ? '0.6' : '1' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
+            
+            {/* 🎨 ANIMATED RAINBOW SEND BUTTON */}
+            <div style={{ width: '38px', height: '38px', padding: '3px', borderRadius: '50%', background: 'conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)', animation: 'spin 3s linear infinite', flexShrink: 0 }}>
+              <button 
+                onClick={handleSendMessage} 
+                disabled={!input.trim() || isLoading} 
+                style={{ 
+                  background: 'var(--color-primary)', 
+                  width: '100%', 
+                  height: '100%', 
+                  border: 'none', 
+                  borderRadius: '50%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer', 
+                  opacity: (!input.trim() || isLoading) ? '0.6' : '1'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
-        }
+      }
