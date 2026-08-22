@@ -10,8 +10,8 @@ export async function GET() {
 
   const modelName = 'gemini-embedding-001'; 
   
-  // FIX: Added the missing '$' before {modelName} and restored the correct endpoint path
-  const url = `https://googleapis.com{modelName}:embedContent?key=${API_KEY}`;
+  // Safe string concatenation to guarantee no template literal or quote typos occur
+  const url = 'https://googleapis.com' + modelName + ':embedContent?key=' + API_KEY;
 
   try {
     const res = await fetch(url, {
