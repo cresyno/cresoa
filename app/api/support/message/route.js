@@ -25,12 +25,20 @@ You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa
 CRITICAL RULES:
 1. Be natural and conversational. You may explain, elaborate, and reason freely using the relevant context provided.
 2. Use the "Relevant Knowledge Base Context" as your **primary source of truth** for specific facts (pricing, features, limits). Never invent Cresoa-specific facts that are not in that context.
-3. **REASONING MANDATE**: If the user's question is a rephrasing or a new angle, use your general understanding of the platform to give a helpful, logical answer. Do NOT say "I don't know" just because the exact words don't appear in the context.
-4. If you are asked to "explain more" or "be more explicit," expand on the previous answer using the context you already have. Do NOT refuse.
-5. Only say you don't know when the question is completely unrelated to Cresoa or business management.
-6. Be warm, human, and direct. Use markdown (bold, lists, tables) where helpful.
-7. Remember user-provided facts and recall them directly.
-8. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Never mention AI providers.
+3. **UNDERSTAND IMPERFECT INPUT**: Users may type with typos, broken English, slang, or incomplete sentences. Decode their meaning first. Examples:
+   - "I wan know say I get 50 orders?" → "How many orders can I create on my plan?"
+   - "customerss" → "customers"
+   - "invoic" → "invoice"
+   - "wetin be my plan?" → "What is my current plan?"
+   If you can reasonably infer the intent, answer directly. If you are truly unsure, ask a clarifying question before answering.
+4. **CLARIFICATION BEHAVIOR**: If the user's question is ambiguous or could refer to multiple things, ask a short, direct question. Offer 2–3 options if possible.
+   Example: "Do you mean your customer limit or your order limit? Please clarify so I can help you exactly."
+5. **REASONING MANDATE**: If the user's question is a rephrasing or a new angle, use your general understanding of the platform to give a helpful, logical answer. Do NOT say "I don't know" just because the exact words don't appear in the context.
+6. If you are asked to "explain more" or "be more explicit," expand on the previous answer using the context you already have. Do NOT refuse.
+7. Only say you don't know when the question is completely unrelated to Cresoa or business management.
+8. Be warm, human, and direct. Use markdown (bold, lists, tables) where helpful.
+9. Remember user-provided facts and recall them directly.
+10. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Never mention AI providers.
 `;
 
 async function getConversationHistory(userId, businessId) {
@@ -66,17 +74,93 @@ async function getEmbedding(text) {
   } catch (e) { return null; }
 }
 
-async function getRelevantChunks(query) {
-  const lower = query.toLowerCase();
+// Simple Levenshtein distance for fuzzy matching
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 3) return 99; // fast reject
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[m][n];
+}
 
-  // 1. VECTOR SEARCH (lenient)
-  const queryEmbedding = await getEmbedding(query);
+// Expand common synonyms / Nigerian slang
+function expandTerms(text) {
+  const lower = text.toLowerCase();
+  const mapping = {
+    'client': 'customer',
+    'clients': 'customers',
+    'job': 'order',
+    'jobs': 'orders',
+    'staffs': 'staff',
+    'team': 'staff',
+    'money': 'price',
+    'cash': 'payment',
+    'plan': 'plan',
+    'subscription': 'plan',
+    'limit': 'limit',
+    'limits': 'limits',
+    'invoice': 'invoice',
+    'invoic': 'invoice',
+    'invoices': 'invoice',
+    'customer': 'customer',
+    'customers': 'customer',
+    'order': 'order',
+    'orders': 'order',
+    'inventory': 'inventory',
+    'stock': 'inventory',
+    'product': 'item',
+    'products': 'items',
+    'tessa': 'tessa',
+  };
+  // Replace common misspellings via fuzzy mapping
+  const words = lower.split(/\s+/);
+  const expanded = [];
+  for (const w of words) {
+    let found = w;
+    // try exact mapping
+    if (mapping[w]) found = mapping[w];
+    else {
+      // fuzzy match if length > 3 and within distance 2
+      let best = null, bestDist = 99;
+      for (const key of Object.keys(mapping)) {
+        if (key.length > 2 && Math.abs(key.length - w.length) <= 2) {
+          const dist = levenshtein(w, key);
+          if (dist < bestDist && dist <= 2) {
+            best = key;
+            bestDist = dist;
+          }
+        }
+      }
+      if (best) found = mapping[best];
+    }
+    expanded.push(found);
+  }
+  return expanded.join(' ');
+}
+
+async function getRelevantChunks(query) {
+  // Normalize query for better matching
+  const normalizedQuery = expandTerms(query);
+  const lower = normalizedQuery.toLowerCase();
+
+  // 1. VECTOR SEARCH (lenient) – use normalized query
+  const queryEmbedding = await getEmbedding(normalizedQuery);
   if (queryEmbedding) {
     const vectorString = JSON.stringify(queryEmbedding);
     const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
       query_embedding: vectorString,
-      match_threshold: -1,          // Always returns something
-      match_count: 8                // Wide net for context
+      match_threshold: -1,
+      match_count: 8
     });
 
     if (!error && data && data.length > 0) {
@@ -84,13 +168,25 @@ async function getRelevantChunks(query) {
     }
   }
 
-  // 2. KEYWORD FALLBACK (broader)
+  // 2. KEYWORD FALLBACK (broader, with fuzzy matching)
   const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
-  const keywords = lower.split(' ').filter(w => w.length >= 2);
+  const keywords = lower.split(' ').filter(w => w.length >= 3); // ignore very short words
   const scored = chunks.map(chunk => {
     const lowerChunk = chunk.toLowerCase();
     let score = 0;
-    for (const word of keywords) if (lowerChunk.includes(word)) score++;
+    for (const word of keywords) {
+      if (lowerChunk.includes(word)) score++;
+      else {
+        // fuzzy match against chunk words
+        const chunkWords = lowerChunk.split(/\s+/).slice(0, 100); // limit
+        for (const cw of chunkWords) {
+          if (cw.length > 3 && levenshtein(word, cw) <= 2) {
+            score += 0.5;
+            break;
+          }
+        }
+      }
+    }
     return { text: chunk, score };
   });
   const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 5);
@@ -150,7 +246,6 @@ async function callGemini(message, contextString, historyMessages) {
 
 function cleanResponse(text) {
   if (!text) return text;
-  // We only strip * and _ (which break UI), but KEEP # for headers
   return text.replace(/[*_`~]/g, '').trim();
 }
 
