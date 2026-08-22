@@ -334,7 +334,7 @@ export default function SettingsPage() {
               {logoPreview ? <img src={logoPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="building" size={20} stroke="var(--cresoa-text-muted)" />}
             </div>
             <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} id="logo-upload-modal" />
-            <label htmlFor="logo-upload-modal" style={{ padding: '0.25rem 0.8rem', borderRadius: '6px', background: 'var(--cresoa-primary)', color: '#D4A52A', fontSize: '0.8rem', cursor: 'pointer' }}><Icon name="upload" size={14} stroke="#fff" /> Upload</label>
+            <label htmlFor="logo-upload-modal" style={{ padding: '0.25rem 0.8rem', borderRadius: '6px', background: '#D4A52A', color: '#ffff', fontSize: '0.8rem', cursor: 'pointer' }}><Icon name="upload" size={14} stroke="#fff" /> Upload</label>
             {(logoPreview || logoUrl) && <button onClick={handleRemoveLogo} style={{ padding: '0.25rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', fontSize: '0.8rem', cursor: 'pointer' }}>Remove</button>}
           </div>
         </div>
