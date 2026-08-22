@@ -291,7 +291,6 @@ export default function NewInvoicePage() {
             description: order.description || '',
             quantity: order.quantity || 1,
             price: Number(order.price_per_unit || order.price),
-            total: itemTotal,
           })
         if (itemError) throw itemError
 
