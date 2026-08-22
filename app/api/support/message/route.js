@@ -5,7 +5,6 @@ import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-// ─── 1. SYSTEM PROMPT (No hallucination allowed) ──────
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa, a business management platform for Nigerian SMEs.
 
@@ -18,7 +17,6 @@ CRITICAL RULES:
 6. Never repeat yourself unnecessarily.
 `;
 
-// ─── 2. GET CONVERSATION HISTORY (8 messages) ──────────────
 async function getConversationHistory(userId, businessId) {
   const { data, error } = await supabaseAdmin
     .from('support_messages')
@@ -35,10 +33,12 @@ async function getConversationHistory(userId, businessId) {
   }));
 }
 
-// ─── 3. EMBED THE USER QUESTION (Using Gemini free embedding) ──────
 async function getEmbedding(text) {
+  const API_KEY = process.env.GEMINI_API_KEY;
+  if (!API_KEY) return null;
+
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-001:embedContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-001:embedContent?key=${API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -52,7 +52,6 @@ async function getEmbedding(text) {
   return data.embedding?.values || null;
 }
 
-// ─── 4. GET RELEVANT CHUNKS FROM SUPABASE ──────
 async function getRelevantChunks(query) {
   const queryEmbedding = await getEmbedding(query);
   if (!queryEmbedding) return [];
@@ -67,7 +66,6 @@ async function getRelevantChunks(query) {
   return data.map(item => item.content);
 }
 
-// ─── 5. GROQ PRIMARY CALLER ──────
 async function callGroq(message, contextString, historyMessages) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
@@ -96,7 +94,6 @@ async function callGroq(message, contextString, historyMessages) {
   } catch (e) { return null; }
 }
 
-// ─── 6. GEMINI FALLBACK CALLER ──────
 async function callGemini(message, contextString, historyMessages) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -114,7 +111,6 @@ async function callGemini(message, contextString, historyMessages) {
   } catch (e) { return null; }
 }
 
-// ─── 7. MAIN ORCHESTRATOR ──────
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('Authorization');
