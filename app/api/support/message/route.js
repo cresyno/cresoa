@@ -23,12 +23,14 @@ const SYSTEM_PROMPT = `
 You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa, a business management platform for Nigerian SMEs.
 
 CRITICAL RULES:
-1. You MUST ONLY answer using the "Relevant Knowledge Base Context" below. NEVER invent pricing, features, URLs, phone numbers, plans, or any product detail.
-2. If the Context does not contain the answer, say: "I don't have that specific information yet. Please contact support via WhatsApp or submit a ticket."
-3. Be warm, human, and direct. Use markdown (bold, lists) where helpful.
-4. Remember user-provided facts and recall them directly.
-5. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Never mention AI providers.
-6. Never repeat yourself unnecessarily.
+1. Be natural and conversational. You may explain, elaborate, and reason freely using the relevant context provided.
+2. Use the "Relevant Knowledge Base Context" as your **primary source of truth** for specific facts (pricing, features, limits). Never invent facts not in that context.
+3. If the context does not contain a specific fact, you may use your general understanding of business management to give a helpful, logical answer—as long as you don't invent Cresoa-specific features.
+4. If you are asked to "explain more" or "be more explicit," expand on the previous answer using the context you already have. Do NOT refuse—just give more detail.
+5. If you are completely unsure about a Cresoa-specific detail, say: "I don't have that specific information yet. Please contact support via WhatsApp."
+6. Be warm, human, and direct. Use markdown (bold, lists) where helpful.
+7. Remember user-provided facts and recall them directly.
+8. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Never mention AI providers.
 `;
 
 async function getConversationHistory(userId, businessId) {
@@ -47,57 +49,6 @@ async function getConversationHistory(userId, businessId) {
   }));
 }
 
-// ─── HARDCODED PRICING EXTRACTION (Guaranteed) ───
-function getPricingChunk() {
-  const start = FULL_PDF_TEXT.indexOf('PLANS AND PRICING');
-  const end = FULL_PDF_TEXT.indexOf('FEATURE AVAILABILITY', start);
-  if (start !== -1 && end !== -1) return FULL_PDF_TEXT.substring(start, end);
-  if (start !== -1) return FULL_PDF_TEXT.substring(start);
-  return '';
-}
-
-// ─── VECTOR + KEYWORD HYBRID (With Pricing Override) ───
-async function getRelevantChunks(query) {
-  const lower = query.toLowerCase();
-
-  // 🚀 GUARANTEED FIX: If the user asks about pricing/plans, return the pricing chunk directly.
-  if (lower.includes('pricing') || lower.includes('plan') || lower.includes('price') || lower.includes('subscription')) {
-    const pricingChunk = getPricingChunk();
-    if (pricingChunk) {
-      console.log('✅ Pricing chunk manually retrieved.');
-      return [pricingChunk];
-    }
-  }
-
-  // 1. Try vector search
-  const queryEmbedding = await getEmbedding(query);
-  if (queryEmbedding) {
-    const vectorString = JSON.stringify(queryEmbedding);
-    const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
-      query_embedding: vectorString,
-      match_threshold: -1, // Always return something
-      match_count: 5
-    });
-    if (!error && data && data.length > 0) return data.map(item => item.content);
-  }
-
-  // 2. Fallback: keyword matching
-  const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
-  const keywords = lower.split(' ').filter(w => w.length >= 2);
-  const scored = chunks.map(chunk => {
-    const lowerChunk = chunk.toLowerCase();
-    let score = 0;
-    for (const word of keywords) if (lowerChunk.includes(word)) score++;
-    return { text: chunk, score };
-  });
-  const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
-  const relevant = topChunks.map(c => c.text).filter(t => t.length > 0);
-  if (relevant.length > 0) return relevant;
-
-  // 3. Emergency: return a small, safe snippet (not full KB)
-  return [FULL_PDF_TEXT.substring(0, 2000)];
-}
-
 async function getEmbedding(text) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -113,6 +64,36 @@ async function getEmbedding(text) {
     const data = await response.json();
     return data.embedding?.values || null;
   } catch (e) { return null; }
+}
+
+async function getRelevantChunks(query) {
+  const queryEmbedding = await getEmbedding(query);
+  if (queryEmbedding) {
+    const vectorString = JSON.stringify(queryEmbedding);
+    const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
+      query_embedding: vectorString,
+      match_threshold: 0,
+      match_count: 8 // ✅ Increased to give more context
+    });
+
+    if (!error && data && data.length > 0) {
+      return data.map(item => item.content);
+    }
+  }
+
+  // Fallback: keyword matching + full KB if needed
+  const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
+  const keywords = query.toLowerCase().split(' ').filter(w => w.length >= 2);
+  const scored = chunks.map(chunk => {
+    const lowerChunk = chunk.toLowerCase();
+    let score = 0;
+    for (const word of keywords) if (lowerChunk.includes(word)) score++;
+    return { text: chunk, score };
+  });
+  const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
+  const relevant = topChunks.map(c => c.text).filter(t => t.length > 0);
+  if (relevant.length > 0) return relevant;
+  return [FULL_PDF_TEXT]; // Emergency fallback
 }
 
 async function callGroq(message, contextString, historyMessages) {
@@ -151,7 +132,7 @@ async function callGemini(message, contextString, historyMessages) {
     const historyString = historyMessages.map(m => 
       `${m.role === 'user' ? 'User' : 'Tessa'}: ${m.content}`
     ).join('\n');
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nConversation History:\n${historyString}\n\nPlatform Context:\n"""\n${contextString}\n"""\n\nUser Question: ${message}`;
+    const fullPrompt = `${SYSTEM_PROMPT}\n\nRelevant Knowledge Base Context:\n"""\n${contextString}\n"""\n\nConversation History:\n${historyString}\n\nUser Question: ${message}`;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${API_KEY}`;
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] }) });
     if (!res.ok) return null;
@@ -166,30 +147,28 @@ export async function POST(req) {
   try {
     const authHeader = req.headers.get('Authorization');
     const token = authHeader?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const supabase = createRouteHandlerClient({ cookies });
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { message, business_id } = await req.json();
-    if (!message || !business_id) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
+    const { message, business_id, new_conversation } = await req.json();
+    if (!message || !business_id) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
 
+    // Save user message
     await supabaseAdmin.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message }
     ]);
 
-    const historyMessages = await getConversationHistory(user.id, business_id);
+    // Fetch history (ignore if new conversation)
+    const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, business_id);
 
+    // Get context chunks
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
+    // Try Groq
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
@@ -218,4 +197,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-      }
+                                                             }
