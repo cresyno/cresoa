@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import TessaBottomSheet from 'TessaBottomSheet';
+import TessaBottomSheet from './TessaBottomSheet';
 
 export default function TessaFloatingWidget({ businessId }) {
   const [isOpen, setIsOpen] = useState(false);
