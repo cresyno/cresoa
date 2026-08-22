@@ -12,13 +12,13 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
   const [sheetHeight, setSheetHeight] = useState('25vh');
-  const [isNewConversation, setIsNewConversation] = useState(true);
+  const [isNewConversation, setIsNewConversation] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const dragStartY = useRef(null);
   const dragStartHeight = useRef(null);
 
-  // 🚨 LOCK the dashboard scroll when sheet is open
+  // 🚨 LOCK dashboard scroll when sheet is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -28,6 +28,39 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
+  // ✅ FETCH MEMORY ON OPEN (only if not a new chat)
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!isOpen || !businessId || isNewConversation) return;
+      try {
+        const { data, error } = await supabase
+          .from('support_messages')
+          .select('sender_type, message')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: true })
+          .limit(10); // Fetch last 10 messages (wider for context)
+
+        if (error || !data) return;
+        if (data.length > 0) {
+          setMessages(data.map(msg => ({
+            role: msg.sender_type === 'user' ? 'user' : 'assistant',
+            text: msg.message
+          })));
+        }
+      } catch (e) {}
+    };
+    if (isOpen && !isNewConversation) fetchHistory();
+  }, [isOpen, businessId, isNewConversation]);
+
+  // ✅ Reset the flag so memory works again on the NEXT open
+  useEffect(() => {
+    if (isOpen && isNewConversation) {
+      // This ensures the NEXT time the user opens, it fetches history
+      const timer = setTimeout(() => setIsNewConversation(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isNewConversation]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,7 +69,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
   // 🆕 New Chat button logic (starts fresh, no old history)
   const handleNewChat = () => {
     setMessages([{ role: 'assistant', text: `Hi 👋, I'm Tessa. Ask me anything about your business.` }]);
-    setIsNewConversation(true);
+    setIsNewConversation(true); // Temporarily ignore history for first message
     setInput('');
   };
 
@@ -57,14 +90,14 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
         body: JSON.stringify({ 
           message: text, 
           business_id: businessId,
-          new_conversation: isNewConversation // 🔥 Tells Tessa to ignore old history
+          new_conversation: isNewConversation // 🔥 Tells Tessa to ignore old history ONLY for first msg
         })
       });
       const data = await res.json();
       if (data.answer) setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
       else setMessages(prev => [...prev, { role: 'assistant', text: "I'm having trouble connecting. Please try again." }]);
       
-      // After the first message, future messages keep context
+      // After the first message in a new chat, flip the flag so memory works next time
       setIsNewConversation(false);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: "Oops! My server is offline. Please try again later." }]);
@@ -215,4 +248,4 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
       </div>
     </div>
   );
-      }
+                  }
