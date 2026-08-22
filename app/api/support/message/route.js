@@ -1,18 +1,32 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import { readFileSync } from 'fs';
+import path from 'path';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
+
+// ════════════════════════════════════════════════════════════════
+// 📄 LOAD KNOWLEDGE BASE (Source of truth)
+// ════════════════════════════════════════════════════════════════
+let FULL_PDF_TEXT = '';
+try {
+  const knowledgeBasePath = path.join(process.cwd(), 'data', 'knowledge-base.md');
+  FULL_PDF_TEXT = readFileSync(knowledgeBasePath, 'utf-8');
+} catch (error) {
+  console.error('⚠️ Failed to load knowledge-base.md. Please ensure the file exists in /data/');
+  FULL_PDF_TEXT = 'Knowledge base not loaded. Please contact support.';
+}
 
 const SYSTEM_PROMPT = `
 You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa, a business management platform for Nigerian SMEs.
 
 CRITICAL RULES:
-1. You MUST ONLY answer using the "Relevant Knowledge Base Context" provided below. NEVER invent pricing, features, URLs, phone numbers, plans, or any product detail.
+1. You MUST ONLY answer using the "Relevant Knowledge Base Context" below. NEVER invent pricing, features, URLs, phone numbers, plans, or any product detail.
 2. If the Context does not contain the answer, say: "I don't have that specific information yet. Please contact support via WhatsApp or submit a ticket."
 3. Be warm, human, and direct. Use markdown (bold, lists) where helpful.
-4. Remember user-provided facts (e.g., business name) and recall them directly.
+4. Remember user-provided facts and recall them directly.
 5. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Never mention AI providers.
 6. Never repeat yourself unnecessarily.
 `;
@@ -33,6 +47,7 @@ async function getConversationHistory(userId, businessId) {
   }));
 }
 
+// ─── Gemini Embedding (works for both chunks and query) ─────────
 async function getEmbedding(text) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
@@ -52,18 +67,40 @@ async function getEmbedding(text) {
   return data.embedding?.values || null;
 }
 
+// ─── VECTOR SEARCH (with fallback to keyword matching) ─────────
 async function getRelevantChunks(query) {
+  // 1. Try vector search first
   const queryEmbedding = await getEmbedding(query);
-  if (!queryEmbedding) return [];
+  if (queryEmbedding) {
+    // Postgres vector requires a stringified array like '[0.1,0.2,...]'
+    const vectorString = JSON.stringify(queryEmbedding);
 
-  const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
-    query_embedding: queryEmbedding,
-    match_threshold: 0,     // ✅ Returns top chunks no matter how close
-    match_count: 5          // ✅ Pull 5 chunks for more context
+    const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
+      query_embedding: vectorString,
+      match_threshold: 0,
+      match_count: 5
+    });
+
+    if (!error && data && data.length > 0) {
+      console.log(`✅ Vector search returned ${data.length} chunks.`);
+      return data.map(item => item.content);
+    } else {
+      console.error('❌ Vector search error or empty:', error?.message || 'No data');
+    }
+  }
+
+  // 2. Fallback: old keyword matching (guaranteed to return something)
+  console.warn('⚠️ Falling back to keyword matching...');
+  const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
+  const keywords = query.toLowerCase().split(' ').filter(w => w.length >= 2);
+  const scored = chunks.map(chunk => {
+    const lowerChunk = chunk.toLowerCase();
+    let score = 0;
+    for (const word of keywords) if (lowerChunk.includes(word)) score++;
+    return { text: chunk, score };
   });
-
-  if (error || !data) return [];
-  return data.map(item => item.content);
+  const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
+  return topChunks.map(c => c.text).filter(t => t.length > 0);
 }
 
 async function callGroq(message, contextString, historyMessages) {
@@ -130,30 +167,25 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Save user message (race condition fix)
     await supabaseAdmin.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message }
     ]);
 
-    // Get history
     const historyMessages = await getConversationHistory(user.id, business_id);
 
-    // Get vector-relevant chunks (only 3)
+    // Get relevant chunks (vector, or keyword fallback)
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
-    // Try Groq
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
-    // Fallback to Gemini
     if (!answer) {
       console.warn('Groq failed, falling back to Gemini...');
       answer = await callGemini(message, contextString, historyMessages);
       source = 'gemini';
     }
 
-    // Ultimate fallback
     if (!answer) {
       answer = "I'm currently connecting to my AI brain. Please contact support via WhatsApp if you need immediate help.";
       source = 'fallback';
