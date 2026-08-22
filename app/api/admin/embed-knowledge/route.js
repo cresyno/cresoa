@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
@@ -7,13 +9,13 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req) {
   try {
-    // 1. Security: Only allow your admin email
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.split(' ')[1];
-    if (!token) {
+    // 1. Check admin using cookies (same as your ticket system)
+    const supabase = createRouteHandlerClient({ cookies });
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user || user.email !== 'taiwoabraham640@gmail.com') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    // (We'll trust the admin check for now, but you can add full auth later)
 
     // 2. Read the Knowledge Base
     const kbPath = path.join(process.cwd(), 'data', 'knowledge-base.md');
