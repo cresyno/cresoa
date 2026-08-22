@@ -4,37 +4,27 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA LOGO (Inline, Self-contained SVG) ───
-const TessaSparkIcon = ({ size = 28 }) => {
+// ─── NEW TESSA LOGO (Hexagonal Knot) ───
+const TessaHexKnotIcon = ({ size = 32 }) => {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="tessaKnot" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0F2B4A" />
-          <stop offset="40%" stopColor="#1A3F66" />
-          <stop offset="75%" stopColor="#2E7D5E" />
-          <stop offset="100%" stopColor="#D4A52A" />
-        </linearGradient>
-        <linearGradient id="tessaSpark" x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FFD966" />
-          <stop offset="100%" stopColor="#D4A52A" />
+        <linearGradient id="gold" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#D4A017" />
+          <stop offset="1" stopColor="#B8860B" />
         </linearGradient>
       </defs>
 
-      {/* Hidden T – Vertical Stem */}
-      <path d="M32 18 L32 56" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" />
-      
-      {/* Hidden T – Horizontal Crossbar (flowing curve) */}
-      <path d="M14 22 C16 18, 20 16, 32 16 C44 16, 48 18, 50 22" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" />
-      
-      {/* Left flowing conversation curve */}
-      <path d="M14 22 C10 30, 10 38, 14 44 C18 50, 24 52, 32 52" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" opacity="0.85" />
-      
-      {/* Right flowing guidance curve */}
-      <path d="M50 22 C54 30, 54 38, 50 44 C46 50, 40 52, 32 52" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" opacity="0.65" />
-      
-      {/* Intelligent Spark at intersection */}
-      <path d="M32 14 L34.5 19.5 L40 22 L34.5 24.5 L32 30 L29.5 24.5 L24 22 L29.5 19.5 Z" fill="url(#tessaSpark)" />
+      <!-- Outer Hexagon Knot -->
+      <path d="M64 8L112 36V92L64 120L16 92V36L64 8Z" stroke="url(#gold)" strokeWidth="4" strokeLinejoin="round" fill="none" />
+      <path d="M64 16L104 39V89L64 112L24 89V39L64 16Z" stroke="url(#gold)" strokeWidth="3" strokeLinejoin="round" fill="none" />
+      <path d="M64 24L96 42.5V85.5L64 104L32 85.5V42.5L64 24Z" stroke="url(#gold)" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
+
+      <!-- Connection lines to make it feel like a knot -->
+      <path d="M48 44L36 52" stroke="url(#gold)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M80 44L92 52" stroke="url(#gold)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M48 84L36 76" stroke="url(#gold)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M80 84L92 76" stroke="url(#gold)" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 };
@@ -84,7 +74,7 @@ export default function TessaFloatingWidget() {
           </p>
         </div>
 
-        {/* BOLD Floating Button with Tessa Logo */}
+        {/* BOLD Floating Button with New Hexagon Logo */}
         <button 
           onClick={handleClick}
           style={{
@@ -104,7 +94,7 @@ export default function TessaFloatingWidget() {
             animation: 'tessaBoldPulse 3s ease-in-out infinite'
           }}
         >
-          <TessaSparkIcon size={32} />
+          <TessaHexKnotIcon size={32} />
           <span>Ask Tessa</span>
         </button>
 
@@ -124,4 +114,4 @@ export default function TessaFloatingWidget() {
       />
     </>
   );
-}
+            }
