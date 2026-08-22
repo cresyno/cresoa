@@ -38,11 +38,12 @@ function DashboardLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
+  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR (ADDED INVOICES) ───
   const baseNavItems = {
     fashion: [
       { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
       { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
+      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },  // ✅ NEW
       { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
       { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
       { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
@@ -51,13 +52,14 @@ function DashboardLayoutContent({ children }) {
     repairs: [
       { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
       { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },  // ✅ NEW
       { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
       { name: 'Parts', path: '/dashboard/inventory', icon: 'package' },
       { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
     ]
   };
 
-  // ─── Load business data ───
+  // ─── Load business data (unchanged) ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -129,7 +131,7 @@ function DashboardLayoutContent({ children }) {
           }
         }
 
-        // Beta expiry and trial logic
+        // Beta expiry and trial logic (unchanged)
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
@@ -181,7 +183,7 @@ function DashboardLayoutContent({ children }) {
     load()
   }, [router, searchParams])
 
-  // ─── 🔒 STRONG SECURITY TIES ───
+  // ─── 🔒 STRONG SECURITY TIES (unchanged) ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
@@ -580,7 +582,7 @@ function DashboardLayoutContent({ children }) {
                 <span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan
               </a>
             )}
-            {showProfile && (
+                   {showProfile && (
               <a href={baseUrl('/dashboard/profile')} className={isActive('/dashboard/profile') ? 'active' : ''} onClick={handleNavClick}>
                 <span className="icon"><Icon name="user" size={16} stroke="currentColor" /></span> Profile & Settings
               </a>
@@ -588,7 +590,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
- {/* 👑 Admin Section - Visible to super admin only */}
+        {/* 👑 Admin Section - Visible to super admin only */}
         {user?.email === 'taiwoabraham640@gmail.com' && (
           <div className="nav-section">
             <div className="section-label">Admin</div>
@@ -656,4 +658,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </Suspense>
   )
-              }
+                                              }
