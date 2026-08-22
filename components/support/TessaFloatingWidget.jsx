@@ -1,9 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-export default function TessaFloatingWidget({ businessId }) {
+export default function TessaFloatingWidget() {
+  const searchParams = useSearchParams();
+  const businessId = searchParams.get('business_id'); // ✅ Self-extracts business_id from URL
+
   const [isOpen, setIsOpen] = useState(false);
   const [showBubble, setShowBubble] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -24,6 +28,7 @@ export default function TessaFloatingWidget({ businessId }) {
   return (
     <>
       <div style={{ position: 'fixed', bottom: '90px', right: '20px', zIndex: 998, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        
         {/* Animated Speech Bubble */}
         <div style={{
           background: 'var(--color-card)',
@@ -75,7 +80,7 @@ export default function TessaFloatingWidget({ businessId }) {
         `}</style>
       </div>
 
-      {/* The Bottom Sheet */}
+      {/* The Gemini-style Bottom Sheet */}
       <TessaBottomSheet 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)} 
