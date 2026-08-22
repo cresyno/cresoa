@@ -236,15 +236,29 @@ export default function InvoiceDetailPage() {
   const generatePdfBlob = async () => {
     if (!invoiceRef.current) return null
     await new Promise(resolve => setTimeout(resolve, 100))
-    const canvas = await html2canvas(invoiceRef.current, { scale: 2, backgroundColor: '#ffffff' })
+    
+    // Temporarily force a fixed A4 width for PDF capture
+    const originalWidth = invoiceRef.current.style.width
+    invoiceRef.current.style.width = '794px' // A4 width at 96dpi
+    
+    const canvas = await html2canvas(invoiceRef.current, { 
+      scale: 2, 
+      backgroundColor: '#ffffff',
+      windowWidth: 794, // Force a 794px viewport
+      scrollX: 0,
+      scrollY: 0
+    })
+    
+    // Reset width after capture
+    invoiceRef.current.style.width = originalWidth
+    
     const imgData = canvas.toDataURL('image/png')
     const pdf = new jsPDF('p', 'mm', 'a4')
     const pdfWidth = pdf.internal.pageSize.getWidth()
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
     return pdf.output('blob')
-  }
-
+      }
   const handleDownloadPDF = async () => {
     try {
       const blob = await generatePdfBlob()
@@ -350,8 +364,8 @@ export default function InvoiceDetailPage() {
             )}
 
             {/* Items Table */}
-            <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.75rem' : '0.85rem', minWidth: '400px' }}>
+            <div style={{ overflowX: 'hidden', marginBottom: '1rem' }}>
+  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.75rem' : '0.85rem' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
                     <th style={{ padding: isMobile ? '6px' : '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
