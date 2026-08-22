@@ -78,13 +78,14 @@ export default function InvoiceDetailPage() {
         setBusinessId(bizId)
 
         const { data: invoiceData, error: invError } = await supabase
-          .from('invoices')
-          .select(`
-            *,
-            customers ( id, name, first_name, last_name, phone, email, address ),
-            orders ( id, title, price, quantity, current_status, due_date ),
-            businesses ( * )
-          `)
+  .from('invoices')
+  .select(`
+    *,
+    customers ( id, name, first_name, last_name, phone, email, address ),
+    orders ( id, title, price, quantity, current_status, due_date ),
+    businesses ( * ),
+    invoice_items ( id, item_name, description, quantity, price, total )
+  `)
           .eq('id', invoiceId)
           .eq('business_id', bizId)
           .single()
@@ -304,7 +305,7 @@ export default function InvoiceDetailPage() {
         {/* Header */}
         <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {business?.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '48px', height: '48px', objectFit: 'contain' }} /> : <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
+            {business?.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
             <div>
               <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.2rem' }}>{business?.name}</h2>
               {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.location}</p>}
