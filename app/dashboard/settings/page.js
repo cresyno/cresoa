@@ -7,6 +7,86 @@ import { Card } from '../../../components/Card'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
+// ─── Custom CSS (Cresoa Design System) ─────────────────
+const customCSS = `
+  .cresoa-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .cresoa-modal-body {
+    background: var(--cresoa-surface);
+    border: 1px solid var(--cresoa-border);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    color: var(--cresoa-text);
+    width: 100%;
+    max-width: 480px;
+    padding: 1.5rem;
+    position: relative;
+  }
+
+  .cresoa-input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--cresoa-border);
+    border-radius: 8px;
+    background: var(--cresoa-bg);
+    color: var(--cresoa-text);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .cresoa-input:focus {
+    border-color: var(--cresoa-accent);
+    box-shadow: 0 0 0 3px var(--cresoa-accent-soft);
+  }
+
+  .cresoa-prefix-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--cresoa-surface);
+    border: 1px solid var(--cresoa-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .cresoa-prefix-option {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    background: transparent;
+    border: none;
+    color: var(--cresoa-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+  }
+
+  .cresoa-prefix-option:hover {
+    background: var(--cresoa-accent-soft);
+    color: var(--cresoa-accent);
+  }
+`
+
 // ─── Self-contained SVG icons ──────────────────────
 const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
   const props = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className }
@@ -17,7 +97,6 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', className = '' }) => {
     'map-pin': <svg {...props}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
     'palette': <svg {...props}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.4 0 .7 0 1-.1.5-.1 1-.5 1-1v-2.2c0-.6.4-1 1-1h1.6c4.6 0 8.4-3.8 8.4-8.4C23 5.8 18.2 2 12 2z"/></svg>,
     'layers': <svg {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
-    'chevron-right': <svg {...props}><polyline points="9 18 15 12 9 6"/></svg>,
     'chevron-down': <svg {...props}><polyline points="6 9 12 15 18 9"/></svg>,
     'check': <svg {...props}><polyline points="20 6 9 17 4 12"/></svg>,
     'upload': <svg {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
@@ -72,11 +151,10 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState(null)
   const [logoUrl, setLogoUrl] = useState('')
 
-  // CAC Prefix Dropdown State
   const [showPrefixDropdown, setShowPrefixDropdown] = useState(false)
   const cacPrefixes = ['RC', 'BN', 'IT', 'LLP', 'LP']
 
-  const brandColors = ['#D4A52A', '#0F2B4A', '#FFFFFF', '#000000', '#2E7D5E', '#D9534F', '#F8F6F2', '#C79A2B'];
+  const brandColors = ['#D4A52A', '#0F2B4A', '#FFFFFF', '#000000', '#2E7D5E', '#D9534F', '#F8F6F2', '#C79A2B']
 
   useEffect(() => {
     const load = async () => {
@@ -94,7 +172,6 @@ export default function SettingsPage() {
         if (bizError) throw bizError
         setBusiness(bizData)
 
-        // Parse CAC number if stored as "RC-123456"
         let cacPrefix = 'RC'
         let cacNumber = ''
         if (bizData.cac_number) {
@@ -167,14 +244,12 @@ export default function SettingsPage() {
     setSuccess(false)
 
     try {
-      // Validate account number if present
       if (formData.account_number && !/^\d{10}$/.test(formData.account_number)) {
         alert('Account Number must be exactly 10 digits.')
         setSaving(false)
         return
       }
 
-      // Validate CAC: prefix + number (5-7 digits)
       if (formData.cac_number && !/^\d{5,7}$/.test(formData.cac_number)) {
         alert('CAC Number must be between 5 and 7 digits.')
         setSaving(false)
@@ -252,7 +327,7 @@ export default function SettingsPage() {
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit General Info</h3>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Business Name</label>
-          <input type="text" name="name" value={formData.name} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '1rem' }} />
+          <input type="text" name="name" value={formData.name} onChange={handleChange} className="cresoa-input" style={{ marginBottom: '1rem' }} />
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Logo</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--cresoa-bg)', border: '1px solid var(--cresoa-border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -269,14 +344,14 @@ export default function SettingsPage() {
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Contact & Location</h3>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Business Phone</label>
-          <input type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="e.g. 08012345678" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '0.8rem' }} />
+          <input type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="e.g. 08012345678" className="cresoa-input" style={{ marginBottom: '0.8rem' }} />
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>WhatsApp Number</label>
-          <input type="text" name="whatsapp" value={formData.whatsapp} onChange={handleChange} placeholder="e.g. 08012345678" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '0.8rem' }} />
+          <input type="text" name="whatsapp" value={formData.whatsapp} onChange={handleChange} placeholder="e.g. 08012345678" className="cresoa-input" style={{ marginBottom: '0.8rem' }} />
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Business Address</label>
-          <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g. Lagos, Nigeria" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+          <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g. Lagos, Nigeria" className="cresoa-input" />
         </div>
       )
-    } else if (editModal === 'branding') {
+        } else if (editModal === 'branding') {
       return (
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Branding & Tracking</h3>
@@ -301,7 +376,7 @@ export default function SettingsPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: formData.tracking_primary_color }} />
-                <input type="text" value={formData.tracking_primary_color} onChange={(e) => setFormData({ ...formData, tracking_primary_color: e.target.value })} style={{ width: '100%', maxWidth: '90px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }} />
+                <input type="text" value={formData.tracking_primary_color} onChange={(e) => setFormData({ ...formData, tracking_primary_color: e.target.value })} className="cresoa-input" style={{ width: '90px', textAlign: 'center', fontWeight: 600 }} />
               </div>
             </div>
           </div>
@@ -315,18 +390,18 @@ export default function SettingsPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: formData.tracking_bg_color }} />
-                <input type="text" value={formData.tracking_bg_color} onChange={(e) => setFormData({ ...formData, tracking_bg_color: e.target.value })} style={{ width: '100%', maxWidth: '90px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-card)', color: 'var(--cresoa-text)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }} />
+                <input type="text" value={formData.tracking_bg_color} onChange={(e) => setFormData({ ...formData, tracking_bg_color: e.target.value })} className="cresoa-input" style={{ width: '90px', textAlign: 'center', fontWeight: 600 }} />
               </div>
             </div>
           </div>
           <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Welcome Message</label>
-              <input type="text" name="tracking_welcome_message" value={formData.tracking_welcome_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              <input type="text" name="tracking_welcome_message" value={formData.tracking_welcome_message} onChange={handleChange} className="cresoa-input" />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Footer Message</label>
-              <input type="text" name="tracking_footer_message" value={formData.tracking_footer_message} onChange={handleChange} style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+              <input type="text" name="tracking_footer_message" value={formData.tracking_footer_message} onChange={handleChange} className="cresoa-input" />
             </div>
           </div>
         </div>
@@ -336,21 +411,14 @@ export default function SettingsPage() {
         <div>
           <h3 style={{ marginTop: 0, color: 'var(--cresoa-text)' }}>Edit Payment Details</h3>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Bank Name</label>
-          <input type="text" name="bank_name" value={formData.bank_name} onChange={handleChange} placeholder="e.g. GTBank" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '0.8rem' }} />
+          <input type="text" name="bank_name" value={formData.bank_name} onChange={handleChange} placeholder="e.g. GTBank" className="cresoa-input" style={{ marginBottom: '0.8rem' }} />
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Account Number (10 digits)</label>
-          <input
-            type="text"
-            name="account_number"
-            value={formData.account_number}
-            onChange={(e) => setFormData({ ...formData, account_number: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-            placeholder="e.g. 0123456789"
-            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', marginBottom: '0.8rem' }}
-          />
+          <input type="text" name="account_number" value={formData.account_number} onChange={(e) => setFormData({ ...formData, account_number: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="e.g. 0123456789" className="cresoa-input" style={{ marginBottom: '0.8rem' }} />
           {formData.account_number && !/^\d{10}$/.test(formData.account_number) && (
             <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.8rem' }}>Account number must be exactly 10 digits.</p>
           )}
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Account Name</label>
-          <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="e.g. John Doe" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+          <input type="text" name="account_name" value={formData.account_name} onChange={handleChange} placeholder="e.g. John Doe" className="cresoa-input" />
         </div>
       )
     } else if (editModal === 'compliance') {
@@ -366,8 +434,8 @@ export default function SettingsPage() {
                 onClick={() => setShowPrefixDropdown(!showPrefixDropdown)}
                 style={{
                   width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: '8px',
                   border: '1px solid var(--cresoa-border)',
                   background: 'var(--cresoa-bg)',
                   color: 'var(--cresoa-text)',
@@ -383,19 +451,7 @@ export default function SettingsPage() {
                 <Icon name="chevron-down" size={14} stroke="currentColor" />
               </button>
               {showPrefixDropdown && (
-  <div style={{
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    background: 'var(--cresoa-card)', 
-    border: '1px solid var(--cresoa-border)',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    zIndex: 1000,
-    marginTop: '4px',
-    overflow: 'hidden',
-  }}>
+                <div className="cresoa-prefix-dropdown">
                   {cacPrefixes.map(prefix => (
                     <button
                       key={prefix}
@@ -404,17 +460,7 @@ export default function SettingsPage() {
                         setFormData({ ...formData, cac_prefix: prefix })
                         setShowPrefixDropdown(false)
                       }}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        background: formData.cac_prefix === prefix ? 'var(--cresoa-accent-soft)' : 'transparent',
-                        border: 'none',
-                        color: 'var(--cresoa-text)',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
+                      className="cresoa-prefix-option"
                     >
                       {prefix}
                     </button>
@@ -429,7 +475,7 @@ export default function SettingsPage() {
               value={formData.cac_number}
               onChange={(e) => setFormData({ ...formData, cac_number: e.target.value.replace(/\D/g, '').slice(0, 7) })}
               placeholder="12345"
-              style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }}
+              className="cresoa-input"
             />
           </div>
           {formData.cac_number && !/^\d{5,7}$/.test(formData.cac_number) && (
@@ -456,6 +502,7 @@ export default function SettingsPage() {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1000px', margin: '0 auto', paddingBottom: '100px', position: 'relative' }}>
+      <style>{customCSS}</style>
       <Navigation businessId={businessId} />
 
       <div style={{ marginBottom: '1.5rem', marginTop: '0.5rem' }}>
@@ -518,7 +565,7 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {activeTab === 'branding' && (
+   {activeTab === 'branding' && (
           <Card style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--cresoa-text)' }}>Branding & Tracking</h3>
@@ -571,7 +618,7 @@ export default function SettingsPage() {
               <button onClick={() => setEditModal('compliance')} style={{ background: 'transparent', border: '1px solid var(--cresoa-border)', padding: '0.25rem 0.75rem', borderRadius: '6px', color: 'var(--cresoa-text)', fontSize: '0.8rem', cursor: 'pointer' }}><Icon name="edit" size={14} stroke="currentColor" style={{ marginRight: '0.3rem' }} /> Edit</button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(212,165,42,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="shield" size={24} stroke="var(--cresoa-accent)" />
               </div>
               <div>
@@ -593,7 +640,7 @@ export default function SettingsPage() {
           </Card>
         )}
 
-          {activeTab === 'workflow' && (
+        {activeTab === 'workflow' && (
           <Card style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -616,64 +663,42 @@ export default function SettingsPage() {
         )}
       </div>
 
-{/* THE FIXED BEAUTIFUL MODAL */}
-{editModal && (
-  <div style={{
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.6)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '1rem',
-  }}>
-    <div style={{
-      backgroundColor: 'var(--cresoa-card)', /* THIS IS THE FIX! */
-      borderRadius: '16px',
-      maxWidth: '480px',
-      width: '100%',
-      padding: '1.5rem',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-      border: '1px solid var(--cresoa-border)',
-      color: 'var(--cresoa-text)',
-    }}>
-      {renderModalContent()}
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-        <button onClick={() => setEditModal(null)} style={{
-          padding: '0.6rem 1.2rem',
-          borderRadius: '8px',
-          border: '1px solid var(--cresoa-border)',
-          background: 'transparent',
-          color: 'var(--cresoa-text)',
-          cursor: 'pointer',
-          fontWeight: 500,
-          fontSize: '0.9rem'
-        }}>
-          Cancel
-        </button>
-        <button onClick={handleSave} disabled={saving} style={{
-          padding: '0.6rem 1.5rem',
-          borderRadius: '8px',
-          border: 'none',
-          background: 'var(--cresoa-primary)',
-          color: 'var(--cresoa-accent-contrast, #fff)', /* In case it's dark mode, your primary color is gold, so use white text */
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontSize: '0.9rem',
-          opacity: saving ? '0.7' : '1'
-        }}>
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {/* THE BEAUTIFUL MODAL (Using Custom CSS) */}
+      {editModal && (
+        <div className="cresoa-modal-overlay">
+          <div className="cresoa-modal-body">
+            {renderModalContent()}
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+              <button onClick={() => setEditModal(null)} style={{
+                padding: '0.6rem 1.2rem',
+                borderRadius: '8px',
+                border: '1px solid var(--cresoa-border)',
+                background: 'transparent',
+                color: 'var(--cresoa-text)',
+                cursor: 'pointer',
+                fontWeight: 500,
+                fontSize: '0.9rem'
+              }}>
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={saving} style={{
+                padding: '0.6rem 1.5rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--cresoa-primary)',
+                color: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                opacity: saving ? '0.7' : '1'
+              }}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom save bar */}
       <div style={{
         position: 'fixed',
@@ -705,4 +730,4 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-        }
+          }
