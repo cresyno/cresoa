@@ -4,37 +4,51 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA LOGO (Conversation Knot + Hidden T + Gold Spark) ───
-const TessaSparkIcon = ({ size = 28 }) => {
+// ─── TESSA LOGO (Using Your Premium SVG) ───
+const TessaLogo = ({ size = 32 }) => {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 512 512"
+      width={size}
+      height={size}
+      fill="none"
+    >
       <defs>
-        <linearGradient id="tessaKnot" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0F2B4A" />
-          <stop offset="40%" stopColor="#1A3F66" />
-          <stop offset="75%" stopColor="#2E7D5E" />
-          <stop offset="100%" stopColor="#D4A52A" />
+        <linearGradient id="gold" x1="180" y1="120" x2="350" y2="410" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#D9A72E" />
+          <stop offset="0.5" stopColor="#F0C75E" />
+          <stop offset="1" stopColor="#B98218" />
         </linearGradient>
-        <linearGradient id="tessaSpark" x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FFD966" />
-          <stop offset="100%" stopColor="#D4A52A" />
+        <linearGradient id="charcoal" x1="80" y1="150" x2="210" y2="390" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#11161D" />
+          <stop offset="1" stopColor="#252B34" />
         </linearGradient>
       </defs>
 
-      {/* Hidden T - Vertical Stem */}
-      <path d="M32 18 L32 56" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" />
-      
-      {/* Hidden T - Horizontal Crossbar */}
-      <path d="M14 22 C16 18, 20 16, 32 16 C44 16, 48 18, 50 22" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" />
-      
-      {/* Left flowing curve */}
-      <path d="M14 22 C10 30, 10 38, 14 44 C18 50, 24 52, 32 52" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" opacity="0.85" />
-      
-      {/* Right flowing curve */}
-      <path d="M50 22 C54 30, 54 38, 50 44 C46 50, 40 52, 32 52" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" opacity="0.65" />
-      
-      {/* Gold Spark at intersection */}
-      <path d="M32 14 L34.5 19.5 L40 22 L34.5 24.5 L32 30 L29.5 24.5 L24 22 L29.5 19.5 Z" fill="url(#tessaSpark)" />
+      {/* Left flowing connection shape */}
+      <path
+        d="M104 176 C70 214 78 276 125 306 L177 337 C213 358 224 392 208 432 C254 390 248 333 203 302 L151 272 C116 252 102 216 104 176Z"
+        fill="url(#charcoal)"
+      />
+
+      {/* Right flowing guidance shape */}
+      <path
+        d="M353 190 C385 251 355 309 300 340 L256 365 C225 384 211 415 216 459 C235 410 269 390 315 370 C382 341 409 275 353 190Z"
+        fill="url(#gold)"
+      />
+
+      {/* Central stylized T */}
+      <path
+        d="M155 176 H277 C275 205 257 219 230 219 H215 C207 219 201 225 201 233 V355 C192 366 184 378 178 391 V233 C178 225 172 219 164 219 H155 C128 219 110 205 108 176 H155Z"
+        fill="url(#gold)"
+      />
+
+      {/* Intelligent sparkle / star */}
+      <path
+        d="M205 55 C208 89 215 96 249 100 C215 104 208 111 205 145 C201 111 194 104 160 100 C194 96 201 89 205 55Z"
+        fill="url(#gold)"
+      />
     </svg>
   );
 };
@@ -62,6 +76,7 @@ export default function TessaFloatingWidget() {
 
   return (
     <>
+      {/* Positioned top-right to avoid overlapping bottom content */}
       <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 998, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
         
         {/* Speech Bubble */}
@@ -83,7 +98,7 @@ export default function TessaFloatingWidget() {
           </p>
         </div>
 
-        {/* Bold Floating Button */}
+        {/* Bold Floating Button with New Premium Logo */}
         <button 
           onClick={handleClick}
           style={{
@@ -103,7 +118,7 @@ export default function TessaFloatingWidget() {
             animation: 'tessaBoldPulse 3s ease-in-out infinite'
           }}
         >
-          <TessaSparkIcon size={32} />
+          <TessaLogo size={32} />
           <span>Ask Tessa</span>
         </button>
 
@@ -115,7 +130,7 @@ export default function TessaFloatingWidget() {
         `}</style>
       </div>
 
-      {/* Tessa Bottom Sheet */}
+      {/* Tessa Bottom Sheet (Preserved) */}
       <TessaBottomSheet 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)} 
@@ -123,4 +138,4 @@ export default function TessaFloatingWidget() {
       />
     </>
   );
-      }
+}
