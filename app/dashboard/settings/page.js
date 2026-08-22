@@ -358,7 +358,7 @@ export default function SettingsPage() {
           <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--cresoa-bg)', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>Logo</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cresoa-card)', border: '1px solid var(--cresoa-border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#D4A52A', border: '1px solid var(--cresoa-border)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {logoPreview ? <img src={logoPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Icon name="building" size={24} stroke="var(--cresoa-text-muted)" />}
               </div>
               <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} id="logo-upload-branding" />
@@ -685,7 +685,7 @@ export default function SettingsPage() {
                 padding: '0.6rem 1.5rem',
                 borderRadius: '8px',
                 border: 'none',
-                background: 'var(--cresoa-primary)',
+                background: '#D4A52A',
                 color: '#fff',
                 cursor: 'pointer',
                 fontWeight: 600,
@@ -720,7 +720,7 @@ export default function SettingsPage() {
           {lastSaved ? <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)' }}>Last saved: {lastSaved}</span> : <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)' }}>Unsaved changes</span>}
           {success && <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-success)', marginLeft: '0.5rem' }}>✅ Saved</span>}
         </div>
-        <button onClick={handleSave} disabled={saving} style={{ padding: '0.6rem 1.8rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-primary)', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', opacity: saving ? '0.7' : '1' }}>
+        <button onClick={handleSave} disabled={saving} style={{ padding: '0.6rem 1.8rem', borderRadius: '8px', border: 'none', background: '#D4A52A', color: '#fff', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem', opacity: saving ? '0.7' : '1' }}>
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
