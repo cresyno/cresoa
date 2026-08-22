@@ -41,12 +41,11 @@ export default function TessaFloatingWidget() {
 
   return (
     <>
-      {/* Compact Hexagon Container - moved down to avoid date */}
       <div
         onClick={handleClick}
         style={{
           position: 'fixed',
-          top: '60px', // ✅ moved down, leaving the date visible
+          top: '60px',
           right: '20px',
           zIndex: 998,
           display: 'flex',
@@ -56,19 +55,20 @@ export default function TessaFloatingWidget() {
           userSelect: 'none',
         }}
       >
-        {/* Hexagon with subtle gold pulse */}
+        {/* Rainbow Hexagon with smooth rotation */}
         <div style={{ position: 'relative', width: '56px', height: '56px' }}>
-          {/* Outer hexagon - gold border with glow pulse */}
+          {/* Outer hexagon - rotating rainbow gradient */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(135deg, #D9A72E, #F0C75E, #D9A72E)',
+              background: 'conic-gradient(from 0deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
               clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-              animation: 'tessaPulse 2.5s ease-in-out infinite',
+              boxShadow: '0 0 12px rgba(255,255,255,0.3)',
+              animation: 'tessaSpin 4s linear infinite',
             }}
           />
-          {/* Inner solid background */}
+          {/* Inner solid background - fixed, keeps logo steady */}
           <div
             style={{
               position: 'absolute',
@@ -103,13 +103,9 @@ export default function TessaFloatingWidget() {
       </div>
 
       <style>{`
-        @keyframes tessaPulse {
-          0%, 100% {
-            box-shadow: 0 0 8px rgba(212, 165, 42, 0.3);
-          }
-          50% {
-            box-shadow: 0 0 20px rgba(212, 165, 42, 0.8);
-          }
+        @keyframes tessaSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
 
