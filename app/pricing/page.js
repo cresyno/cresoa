@@ -2,9 +2,23 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Icon } from '../../components/Icon';
 import ThemeToggle from '../../components/ThemeToggle';
 import Logo from '../../components/Logo';
+
+// ─── Self-contained SVG icons ───
+const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
+  const icons = {
+    check: <polyline points="20 6 9 17 4 12" />,
+    x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
+    menu: <><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></>,
+    arrowRight: <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      {icons[name]}
+    </svg>
+  );
+};
 
 export default function PricingPage() {
   // FAQ accordion state
@@ -45,7 +59,7 @@ export default function PricingPage() {
     },
   ];
 
-  // ─── Feature comparison data ──────────────────────────────
+  // ─── Feature comparison data (aligned with docs) ──────────────
   const features = [
     { name: 'Customer limit', free: '20', beta: '500', starter: '200', pro: 'Unlimited' },
     { name: 'Order/Job limit', free: '50', beta: '1000', starter: '500', pro: 'Unlimited' },
@@ -58,11 +72,12 @@ export default function PricingPage() {
     { name: 'Data export (CSV)', free: '✗', beta: '✓', starter: '✓', pro: '✓' },
     { name: 'Advanced analytics', free: '✗', beta: '✓', starter: '✗', pro: '✓' },
     { name: 'Production workflow (custom stages)', free: '✓', beta: '✓', starter: '✓', pro: '✓' },
+    { name: 'Priority support', free: '✗', beta: '✗', starter: '✗', pro: '✓' },
   ];
 
   const renderFeatureValue = (val) => {
-    if (val === '✓') return <Icon name="check" size={16} stroke="var(--color-success)" />;
-    if (val === '✗') return <Icon name="x" size={16} stroke="var(--color-danger)" />;
+    if (val === '✓') return <Svg name="check" size={16} stroke="var(--color-success)" />;
+    if (val === '✗') return <Svg name="x" size={16} stroke="var(--color-danger)" />;
     return <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{val}</span>;
   };
 
@@ -82,7 +97,6 @@ export default function PricingPage() {
       }}
     >
       <style jsx>{`
-        /* ─── CSS Variables (reuse global) ─── */
         :root {
           --color-bg: #F8F6F2;
           --color-card: #FFFFFF;
@@ -115,7 +129,6 @@ export default function PricingPage() {
           padding: 0 1.5rem;
         }
 
-        /* ─── Navbar ─── */
         .navbar {
           background: var(--color-card);
           border-bottom: 1px solid var(--color-border);
@@ -150,7 +163,6 @@ export default function PricingPage() {
           padding: 0.2rem 0.5rem;
         }
 
-        /* ─── Mobile overlay & drawer ─── */
         .mobile-overlay {
           display: none;
           position: fixed;
@@ -194,7 +206,6 @@ export default function PricingPage() {
           .hamburger { display: flex; align-items: center; }
         }
 
-        /* ─── Hero ─── */
         .hero {
           padding: 3rem 1.5rem 2.5rem;
           text-align: center;
@@ -222,7 +233,6 @@ export default function PricingPage() {
           .hero p { font-size: 1rem; }
         }
 
-        /* ─── Pricing Cards ─── */
         .pricing-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -335,7 +345,6 @@ export default function PricingPage() {
           align-self: flex-start;
         }
 
-        /* ─── Beta Section ─── */
         .beta-section {
           background: var(--color-card);
           border-radius: 16px;
@@ -375,7 +384,6 @@ export default function PricingPage() {
           box-shadow: var(--shadow-md);
         }
 
-        /* ─── Comparison Table ─── */
         .comparison {
           margin: 3rem 0;
         }
@@ -423,7 +431,6 @@ export default function PricingPage() {
           .comparison-table th, .comparison-table td { padding: 0.4rem 0.5rem; }
         }
 
-        /* ─── FAQ ─── */
         .faq-section {
           margin: 3rem 0;
           max-width: 720px;
@@ -479,7 +486,6 @@ export default function PricingPage() {
           padding: 0 1.2rem 1.2rem;
         }
 
-        /* ─── Final CTA ─── */
         .final-cta {
           background: linear-gradient(135deg, #0F2B4A, #1A3F66);
           border-radius: 24px;
@@ -518,7 +524,6 @@ export default function PricingPage() {
           box-shadow: 0 8px 32px rgba(212,165,42,0.4);
         }
 
-        /* ─── Footer ─── */
         .footer {
           border-top: 1px solid var(--color-border);
           padding: 2rem 1.5rem;
@@ -547,9 +552,7 @@ export default function PricingPage() {
         }
       `}</style>
 
-      {/* =========================================================
-          NAVIGATION (reused from homepage with pricing link)
-          ========================================================= */}
+      {/* NAVIGATION */}
       <nav className="navbar">
         <div className="logo-container">
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', textDecoration: 'none' }}>
@@ -580,7 +583,7 @@ export default function PricingPage() {
             Start Beta
           </Link>
           <button className="hamburger" onClick={toggleMobileMenu}>
-            <Icon name="menu" size={24} stroke="var(--color-text)" />
+            <Svg name="menu" size={24} stroke="var(--color-text)" />
           </button>
         </div>
       </nav>
@@ -588,9 +591,9 @@ export default function PricingPage() {
       <div className={`mobile-overlay ${mobileMenuOpen ? 'open' : ''}`} onClick={closeMobileMenu} />
       <div className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="close-btn" onClick={closeMobileMenu}>
-          <Icon name="x" size={24} stroke="var(--color-text)" />
+          <Svg name="x" size={24} stroke="var(--color-text)" />
         </button>
-          <Link href="/#why" onClick={closeMobileMenu}>Why Cresoa</Link>
+        <Link href="/#why" onClick={closeMobileMenu}>Why Cresoa</Link>
         <Link href="/#features" onClick={closeMobileMenu}>Features</Link>
         <Link href="/pricing" onClick={closeMobileMenu}>Pricing</Link>
         <Link href="/#faq" onClick={closeMobileMenu}>FAQ</Link>
@@ -600,9 +603,7 @@ export default function PricingPage() {
         </Link>
       </div>
 
-      {/* =========================================================
-          HERO
-          ========================================================= */}
+      {/* HERO */}
       <section className="hero">
         <div className="container">
           <h1>Choose the plan that fits your business.</h1>
@@ -610,9 +611,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* =========================================================
-          PRICING CARDS
-          ========================================================= */}
+      {/* PRICING CARDS */}
       <div className="container">
         <div className="pricing-grid">
 
@@ -622,15 +621,17 @@ export default function PricingPage() {
             <div className="tagline">For businesses getting started</div>
             <div className="price">₦0</div>
             <div className="limits">
-              <strong>20</strong> customers · <strong>50</strong> orders · <strong>20</strong> inventory items
+              <strong>20</strong> customers · <strong>50</strong> orders · <strong>20</strong> inventory items · <strong>0</strong> staff
             </div>
             <ul className="features">
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Customer &amp; order management</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Basic dashboard &amp; analytics</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Production workflow (custom stages)</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Tessa AI – 5 actions/month</li>
-              <li style={{ color: 'var(--color-text-muted)' }}><Icon name="x" size={14} stroke="var(--color-danger)" /> Staff accounts</li>
-              <li style={{ color: 'var(--color-text-muted)' }}><Icon name="x" size={14} stroke="var(--color-danger)" /> Customer tracking links</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Customer &amp; order management</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Basic dashboard &amp; analytics</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Basic inventory management</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Production workflow (custom stages)</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Tessa AI – 5 actions/month</li>
+              <li style={{ color: 'var(--color-text-muted)' }}><Svg name="x" size={14} stroke="var(--color-danger)" /> Staff accounts</li>
+              <li style={{ color: 'var(--color-text-muted)' }}><Svg name="x" size={14} stroke="var(--color-danger)" /> Customer tracking links</li>
+              <li style={{ color: 'var(--color-text-muted)' }}><Svg name="x" size={14} stroke="var(--color-danger)" /> Advanced analytics</li>
             </ul>
             <Link href="/signup" className="cta outline">Start Free</Link>
           </div>
@@ -642,15 +643,15 @@ export default function PricingPage() {
             <div className="tagline">For growing businesses</div>
             <div className="price">₦3,500 <span>/month</span></div>
             <div className="limits">
-              <strong>200</strong> customers · <strong>500</strong> orders · <strong>2</strong> staff
+              <strong>200</strong> customers · <strong>500</strong> orders · <strong>100</strong> inventory items · <strong>2</strong> staff
             </div>
             <ul className="features">
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Everything in Free</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Staff management (2 seats)</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Customer tracking links</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Bulk actions</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Data export (CSV)</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Tessa AI – 50 actions/month</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Everything in Free</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Staff management (2 seats)</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Customer tracking links</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Bulk actions</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Data export (CSV)</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Tessa AI – 50 actions/month</li>
             </ul>
             <Link href="/signup" className="cta primary">Upgrade to Starter</Link>
           </div>
@@ -664,19 +665,18 @@ export default function PricingPage() {
               <strong>Unlimited</strong> customers, orders, inventory · <strong>10</strong> staff
             </div>
             <ul className="features">
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Everything in Starter</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Unlimited capacity</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Advanced analytics</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Tessa AI – 500 actions/month</li>
-              <li><Icon name="check" size={14} stroke="var(--color-success)" /> Data export (CSV)</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Everything in Starter</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Unlimited capacity</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Advanced analytics</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Tessa AI – 500 actions/month</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Full data export</li>
+              <li><Svg name="check" size={14} stroke="var(--color-success)" /> Priority support</li>
             </ul>
             <Link href="/signup" className="cta primary">Go Pro</Link>
           </div>
         </div>
 
-        {/* =========================================================
-            BETA SECTION
-            ========================================================= */}
+        {/* BETA SECTION */}
         <div className="beta-section">
           <h2>Join the Cresoa Beta</h2>
           <p>
@@ -689,9 +689,7 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* =========================================================
-            FEATURE COMPARISON
-            ========================================================= */}
+        {/* FEATURE COMPARISON */}
         <div className="comparison">
           <h2>Compare plans</h2>
           <div style={{ overflowX: 'auto' }}>
@@ -720,9 +718,7 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* =========================================================
-            FAQ
-            ========================================================= */}
+        {/* FAQ */}
         <div className="faq-section">
           <h2>Frequently asked questions</h2>
           <div>
@@ -740,15 +736,13 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* =========================================================
-            FINAL CTA
-            ========================================================= */}
+        {/* FINAL CTA */}
         <div className="final-cta">
           <h2>Ready to grow your business?</h2>
           <p>Join hundreds of Nigerian SMEs already using Cresoa.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', justifyContent: 'center' }}>
             <Link href="/signup" className="cta">
-              Start Beta <Icon name="arrow-right" size={16} stroke="#0F2B4A" />
+              Start Beta <Svg name="arrowRight" size={16} stroke="#0F2B4A" />
             </Link>
             <Link
               href="/login"
@@ -766,16 +760,14 @@ export default function PricingPage() {
             </Link>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', flexWrap: 'wrap', marginTop: '1.2rem', color: '#A0B4C9', fontSize: '0.75rem' }}>
-            <span><Icon name="check" size={12} stroke="#A0B4C9" /> 90‑day beta</span>
-            <span><Icon name="check" size={12} stroke="#A0B4C9" /> No credit card</span>
-            <span><Icon name="check" size={12} stroke="#A0B4C9" /> Cancel anytime</span>
+            <span><Svg name="check" size={12} stroke="#A0B4C9" /> 90‑day beta</span>
+            <span><Svg name="check" size={12} stroke="#A0B4C9" /> No credit card</span>
+            <span><Svg name="check" size={12} stroke="#A0B4C9" /> Cancel anytime</span>
           </div>
         </div>
       </div>
 
-      {/* =========================================================
-          FOOTER
-          ========================================================= */}
+      {/* FOOTER */}
       <footer className="footer">
         <div className="container">
           <div className="links">
@@ -790,4 +782,4 @@ export default function PricingPage() {
       </footer>
     </div>
   );
-              }
+}
