@@ -58,9 +58,13 @@ async function getRelevantChunks(query) {
 
   const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
     query_embedding: queryEmbedding,
-    match_threshold: 0.5,
-    match_count: 3
+    match_threshold: 0,     // ✅ Returns top chunks no matter how close
+    match_count: 5          // ✅ Pull 5 chunks for more context
   });
+
+  if (error || !data) return [];
+  return data.map(item => item.content);
+}
 
   if (error || !data) return [];
   return data.map(item => item.content);
