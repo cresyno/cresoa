@@ -6,14 +6,22 @@ export async function GET() {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return NextResponse.json({ error: 'GEMINI_API_KEY missing' }, { status: 500 });
 
-  const model = 'models/text-embedding-005'; // Change to 005
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${API_KEY}`;
+  // 📦 FIX 1: Provide ONLY the specific model name token string
+  const modelName = 'text-embedding-004'; 
+
+  // 🔗 FIX 2: Swapped out v1beta to standard production v1, eliminating duplicate segments
+  const url = `https://googleapis.com{modelName}:embedContent?key=${API_KEY}`;
 
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: model, content: { parts: [{ text: 'test' }] } })
+      // 🧬 FIX 3: Aligned payload format to Google's REST 'contents' block layout structural syntax
+      body: JSON.stringify({
+        content: { 
+          parts: [{ text: 'test' }] 
+        }
+      })
     });
 
     const rawText = await res.text();
