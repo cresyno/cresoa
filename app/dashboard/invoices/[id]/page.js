@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { requireBusinessAccess } from '../../../../lib/requireBusinessAccess'
 import { supabase } from '../../../../lib/supabaseClient'
+import { requireBusinessAccess } from '../../../../lib/requireBusinessAccess'
 import { Navigation } from '../../../../components/Navigation'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -15,12 +15,11 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
     download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
     whatsapp: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
-    plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
+    printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
+    card: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
     edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
     check: <polyline points="20 6 9 17 4 12" />,
-    card: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>,
-    printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
@@ -33,8 +32,9 @@ export default function InvoiceDetailPage() {
   const [businessId, setBusinessId] = useState(null)
   const [invoice, setInvoice] = useState(null)
   const [customer, setCustomer] = useState(null)
-  const [order, setOrder] = useState(null)
+  const [orders, setOrders] = useState([]) // Multiple orders
   const [business, setBusiness] = useState(null)
+  const [items, setItems] = useState([]) // invoice_items
 
   // Editable fields
   const [customNote, setCustomNote] = useState('')
@@ -42,6 +42,7 @@ export default function InvoiceDetailPage() {
   const [bankName, setBankName] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [accountName, setAccountName] = useState('')
+  const [cacNumber, setCacNumber] = useState('') // e.g., "RC-12345"
 
   // Payment modal
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -54,8 +55,9 @@ export default function InvoiceDetailPage() {
   const [savingEdits, setSavingEdits] = useState(false)
 
   const invoiceRef = useRef(null)
+  const [logoDataUrl, setLogoDataUrl] = useState(null)
 
-  // Add print style
+  // Print styles
   useEffect(() => {
     const style = document.createElement('style')
     style.innerHTML = `
@@ -70,6 +72,7 @@ export default function InvoiceDetailPage() {
     return () => document.head.removeChild(style)
   }, [])
 
+  // Fetch invoice data
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
@@ -77,30 +80,58 @@ export default function InvoiceDetailPage() {
         if (!bizId) return
         setBusinessId(bizId)
 
-        const { data: invoiceData, error: invError } = await supabase
-  .from('invoices')
-  .select(`
-    *,
-    customers ( id, name, first_name, last_name, phone, email, address ),
-    orders ( id, title, price, quantity, current_status, due_date ),
-    businesses ( * ),
-    invoice_items ( id, item_name, description, quantity, price, total )
-  `)
+        // Fetch invoice with relations
+        const { data: invoiceData, error: invoiceError } = await supabase
+          .from('invoices')
+          .select(`
+            *,
+            customers ( id, name, first_name, last_name, phone, email, address ),
+            invoice_items ( id, item_name, description, quantity, price, total, order_id ),
+            invoice_orders ( order_id, orders ( id, title, current_status, due_date ) )
+          `)
           .eq('id', invoiceId)
           .eq('business_id', bizId)
           .single()
-        if (invError) throw invError
 
+        if (invoiceError) throw invoiceError
         setInvoice(invoiceData)
         setCustomer(invoiceData.customers)
-        setOrder(invoiceData.orders)
-        setBusiness(invoiceData.businesses)
+        setItems(invoiceData.invoice_items || [])
 
+        // Extract linked orders from invoice_orders
+        const linkedOrders = (invoiceData.invoice_orders || []).map(io => io.orders).filter(Boolean)
+        setOrders(linkedOrders)
+
+        // Fetch business for logo, bank, CAC
+        const { data: bizData } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('id', bizId)
+          .single()
+        setBusiness(bizData)
+
+        // Preload logo for PDF
+        if (bizData?.logo_url) {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.src = bizData.logo_url
+          img.onload = () => {
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(img, 0, 0)
+            setLogoDataUrl(canvas.toDataURL('image/png'))
+          }
+        }
+
+        // Populate editable fields
         setCustomNote(invoiceData.custom_note || '')
         setDueDate(invoiceData.due_date || '')
-        setBankName(invoiceData.bank_name || invoiceData.businesses?.bank_name || '')
-        setAccountNumber(invoiceData.account_number || invoiceData.businesses?.account_number || '')
-        setAccountName(invoiceData.account_name || invoiceData.businesses?.account_name || '')
+        setBankName(invoiceData.bank_name || bizData?.bank_name || '')
+        setAccountNumber(invoiceData.account_number || bizData?.account_number || '')
+        setAccountName(invoiceData.account_name || bizData?.account_name || '')
+        setCacNumber(invoiceData.cac_number || bizData?.cac_number || '')
       } catch (err) {
         console.error(err)
         setError('Could not load invoice.')
@@ -111,12 +142,14 @@ export default function InvoiceDetailPage() {
     fetchInvoice()
   }, [invoiceId, router])
 
+  // ─── Helpers ───
   const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
   const balance = invoice ? Number(invoice.total) - Number(invoice.amount_paid) : 0
   const isPaid = balance <= 0
 
+  // ─── Save Editable Fields ───
   const handleSaveEdits = async () => {
     if (!invoice) return
     setSavingEdits(true)
@@ -129,6 +162,7 @@ export default function InvoiceDetailPage() {
           bank_name: bankName,
           account_number: accountNumber,
           account_name: accountName,
+          cac_number: cacNumber,
         })
         .eq('id', invoice.id)
       if (error) throw error
@@ -141,6 +175,7 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  // ─── Payment Recording ───
   const handleRecordPayment = async (e) => {
     e.preventDefault()
     const amount = parseFloat(paymentAmount)
@@ -157,12 +192,13 @@ export default function InvoiceDetailPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
+      // Insert payment record
       const { error: payError } = await supabase
         .from('payment_records')
         .insert({
           business_id: businessId,
           customer_id: customer?.id,
-          order_id: order?.id,
+          order_id: orders[0]?.id, // optional - use first linked order
           invoice_id: invoice.id,
           amount: amount,
           note: paymentNote || 'Payment recorded',
@@ -170,6 +206,7 @@ export default function InvoiceDetailPage() {
         })
       if (payError) throw payError
 
+      // Update invoice
       const newPaid = Number(invoice.amount_paid) + amount
       const newStatus = newPaid >= Number(invoice.total) ? 'paid' : 'partial'
       await supabase
@@ -177,7 +214,8 @@ export default function InvoiceDetailPage() {
         .update({ amount_paid: newPaid, status: newStatus })
         .eq('id', invoice.id)
 
-      if (order) {
+      // Update all linked orders
+      for (const order of orders) {
         const newOrderPaid = Number(order.amount_paid || 0) + amount
         await supabase
           .from('orders')
@@ -185,18 +223,22 @@ export default function InvoiceDetailPage() {
           .eq('id', order.id)
       }
 
+      // Refresh data
       const { data: freshInvoice } = await supabase
         .from('invoices')
         .select(`
           *,
           customers ( id, name, first_name, last_name, phone, email, address ),
-          orders ( id, title, price, quantity, current_status, due_date )
+          invoice_items ( id, item_name, description, quantity, price, total, order_id ),
+          invoice_orders ( order_id, orders ( id, title, current_status, due_date ) )
         `)
         .eq('id', invoice.id)
         .single()
       setInvoice(freshInvoice)
       setCustomer(freshInvoice.customers)
-      setOrder(freshInvoice.orders)
+      setItems(freshInvoice.invoice_items || [])
+      const linkedOrders = (freshInvoice.invoice_orders || []).map(io => io.orders).filter(Boolean)
+      setOrders(linkedOrders)
 
       setShowPaymentModal(false)
       setPaymentAmount('')
@@ -210,9 +252,11 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  // Generate PDF Blob helper
+  // ─── PDF Generation (with logo fix) ───
   const generatePdfBlob = async () => {
     if (!invoiceRef.current) return null
+    // Ensure logo is loaded (wait if needed)
+    await new Promise(resolve => setTimeout(resolve, 100))
     const canvas = await html2canvas(invoiceRef.current, { scale: 2, backgroundColor: '#ffffff' })
     const imgData = canvas.toDataURL('image/png')
     const pdf = new jsPDF('p', 'mm', 'a4')
@@ -223,7 +267,6 @@ export default function InvoiceDetailPage() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!invoiceRef.current) return
     try {
       const blob = await generatePdfBlob()
       const url = URL.createObjectURL(blob)
@@ -243,12 +286,9 @@ export default function InvoiceDetailPage() {
       return
     }
     const message = `Hi ${customer.name || customer.first_name}, here is your invoice ${invoice.invoice_number}. Total: ${formatMoney(invoice.total)}. Thank you for your business!`
-
     try {
       const pdfBlob = await generatePdfBlob()
       const fileName = `${invoice.invoice_number}.pdf`
-
-      // Try native share with file (mobile)
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName)] })) {
         await navigator.share({
           title: `Invoice ${invoice.invoice_number}`,
@@ -256,7 +296,6 @@ export default function InvoiceDetailPage() {
           files: [new File([pdfBlob], fileName, { type: 'application/pdf' })]
         })
       } else {
-        // Desktop fallback: download PDF and open WhatsApp
         const url = URL.createObjectURL(pdfBlob)
         const link = document.createElement('a')
         link.href = url
@@ -268,7 +307,6 @@ export default function InvoiceDetailPage() {
         window.open(waUrl, '_blank')
       }
     } catch (err) {
-      console.error(err)
       alert('Failed to share. Please try again.')
     }
   }
@@ -277,6 +315,7 @@ export default function InvoiceDetailPage() {
     window.print()
   }
 
+  // ─── Render ───
   if (loading) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
   }
@@ -300,14 +339,14 @@ export default function InvoiceDetailPage() {
         <Svg name="back" size={16} stroke="currentColor" /> Back to Invoices
       </button>
 
-      {/* Invoice Preview (For PDF & Print) */}
+      {/* ─── Invoice Preview (For PDF & Print) ─── */}
       <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a' }}>
         {/* Header */}
         <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {business?.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
+            {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
             <div>
-              <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.2rem' }}>{business?.name}</h2>
+              <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1.2rem' }}>{business?.name || 'Business'}</h2>
               {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.location}</p>}
               {business?.phone && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.phone}</p>}
               {business?.email && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.email}</p>}
@@ -331,18 +370,28 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
+        {/* Related Orders (multi-order) */}
+        {orders.length > 0 && (
+          <div style={{ marginBottom: '1rem' }}>
+            <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>RELATED ORDERS</p>
+            {orders.map(order => (
+              <p key={order.id} style={{ margin: '2px 0', color: '#333', fontSize: '0.85rem' }}>Order #{order.id.slice(0, 8)} – {order.title}</p>
+            ))}
+          </div>
+        )}
+
         {/* Items Table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
           <thead>
             <tr style={{ background: '#f8f9fa' }}>
               <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
               <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
-              <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Price</th>
+              <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Unit Price</th>
               <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Total</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.invoice_items?.map((item, i) => (
+            {items.map((item, i) => (
               <tr key={i}>
                 <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>
                   {item.item_name}
@@ -358,7 +407,7 @@ export default function InvoiceDetailPage() {
 
         {/* Totals */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-          <div style={{ width: '200px' }}>
+          <div style={{ width: '220px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(invoice.subtotal)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Discount</span><span>{formatMoney(invoice.discount)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Tax</span><span>{formatMoney(invoice.tax)}</span></div>
@@ -375,7 +424,10 @@ export default function InvoiceDetailPage() {
           <div>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
         </div>
 
-        {/* Custom Note */}
+        {/* CAC */}
+        {cacNumber && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>CAC: {cacNumber}</p>}
+
+               {/* Custom Note */}
         <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>
 
         <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
@@ -383,7 +435,7 @@ export default function InvoiceDetailPage() {
         </p>
       </div>
 
-          {/* Editable Section (Hidden on print) */}
+      {/* ─── Editable Section (Hidden on print) ─── */}
       <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
         <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -410,12 +462,16 @@ export default function InvoiceDetailPage() {
             <input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
           </div>
         </div>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>CAC Number (Optional)</label>
+          <input type="text" value={cacNumber} onChange={(e) => setCacNumber(e.target.value)} placeholder="e.g. RC-12345" style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
+        </div>
         <button onClick={handleSaveEdits} disabled={savingEdits} className="cresoa-primary-button" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
           {savingEdits ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
-      {/* Quick Actions */}
+      {/* ─── Quick Actions ─── */}
       <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
         <button onClick={handleDownloadPDF} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center' }}>
           <Svg name="download" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Download PDF
@@ -431,10 +487,10 @@ export default function InvoiceDetailPage() {
         </button>
       </div>
 
-      {/* Payment Modal */}
+      {/* ─── Payment Modal ─── */}
       {showPaymentModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={() => setShowPaymentModal(false)}>
-          <form onSubmit={handleRecordPayment} onClick={(e) => e.stopPropagation()} style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }}>
+        <div className="cresoa-modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <form onClick={(e) => e.stopPropagation()} onSubmit={handleRecordPayment} style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0 }}>Record Payment</h3>
               <button type="button" onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Svg name="x" size={20} stroke="currentColor" /></button>
@@ -458,4 +514,4 @@ export default function InvoiceDetailPage() {
       )}
     </div>
   )
-}
+        }
