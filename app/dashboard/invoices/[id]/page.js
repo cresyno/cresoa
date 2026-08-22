@@ -32,19 +32,17 @@ export default function InvoiceDetailPage() {
   const [businessId, setBusinessId] = useState(null)
   const [invoice, setInvoice] = useState(null)
   const [customer, setCustomer] = useState(null)
-  const [orders, setOrders] = useState([]) // Multiple orders
+  const [orders, setOrders] = useState([])
   const [business, setBusiness] = useState(null)
-  const [items, setItems] = useState([]) // invoice_items
+  const [items, setItems] = useState([])
 
-  // Editable fields
   const [customNote, setCustomNote] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [bankName, setBankName] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [accountName, setAccountName] = useState('')
-  const [cacNumber, setCacNumber] = useState('') // e.g., "RC-12345"
+  const [cacNumber, setCacNumber] = useState('')
 
-  // Payment modal
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
@@ -57,7 +55,6 @@ export default function InvoiceDetailPage() {
   const invoiceRef = useRef(null)
   const [logoDataUrl, setLogoDataUrl] = useState(null)
 
-  // Print styles
   useEffect(() => {
     const style = document.createElement('style')
     style.innerHTML = `
@@ -72,7 +69,6 @@ export default function InvoiceDetailPage() {
     return () => document.head.removeChild(style)
   }, [])
 
-  // Fetch invoice data
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
@@ -80,7 +76,6 @@ export default function InvoiceDetailPage() {
         if (!bizId) return
         setBusinessId(bizId)
 
-        // Fetch invoice with relations
         const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
           .select(`
@@ -98,11 +93,9 @@ export default function InvoiceDetailPage() {
         setCustomer(invoiceData.customers)
         setItems(invoiceData.invoice_items || [])
 
-        // Extract linked orders from invoice_orders
         const linkedOrders = (invoiceData.invoice_orders || []).map(io => io.orders).filter(Boolean)
         setOrders(linkedOrders)
 
-        // Fetch business for logo, bank, CAC
         const { data: bizData } = await supabase
           .from('businesses')
           .select('*')
@@ -110,7 +103,6 @@ export default function InvoiceDetailPage() {
           .single()
         setBusiness(bizData)
 
-        // Preload logo for PDF
         if (bizData?.logo_url) {
           const img = new Image()
           img.crossOrigin = 'anonymous'
@@ -125,7 +117,6 @@ export default function InvoiceDetailPage() {
           }
         }
 
-        // Populate editable fields
         setCustomNote(invoiceData.custom_note || '')
         setDueDate(invoiceData.due_date || '')
         setBankName(invoiceData.bank_name || bizData?.bank_name || '')
@@ -142,14 +133,12 @@ export default function InvoiceDetailPage() {
     fetchInvoice()
   }, [invoiceId, router])
 
-  // ─── Helpers ───
-  const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
+  const formatMoney = (val) => `NGN ${Number(val || 0).toLocaleString('en-NG')}`
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
   const balance = invoice ? Number(invoice.total) - Number(invoice.amount_paid) : 0
   const isPaid = balance <= 0
 
-  // ─── Save Editable Fields ───
   const handleSaveEdits = async () => {
     if (!invoice) return
     setSavingEdits(true)
@@ -175,30 +164,22 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  // ─── Payment Recording ───
   const handleRecordPayment = async (e) => {
     e.preventDefault()
     const amount = parseFloat(paymentAmount)
-    if (!amount || amount <= 0) {
-      alert('Enter a valid amount.')
-      return
-    }
-    if (amount > balance) {
-      alert(`Amount exceeds balance (${formatMoney(balance)}).`)
-      return
-    }
+    if (!amount || amount <= 0) { alert('Enter a valid amount.'); return }
+    if (amount > balance) { alert(`Amount exceeds balance (${formatMoney(balance)}).`); return }
     setSavingPayment(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Insert payment record
       const { error: payError } = await supabase
         .from('payment_records')
         .insert({
           business_id: businessId,
           customer_id: customer?.id,
-          order_id: orders[0]?.id, // optional - use first linked order
+          order_id: orders[0]?.id,
           invoice_id: invoice.id,
           amount: amount,
           note: paymentNote || 'Payment recorded',
@@ -206,24 +187,15 @@ export default function InvoiceDetailPage() {
         })
       if (payError) throw payError
 
-      // Update invoice
       const newPaid = Number(invoice.amount_paid) + amount
       const newStatus = newPaid >= Number(invoice.total) ? 'paid' : 'partial'
-      await supabase
-        .from('invoices')
-        .update({ amount_paid: newPaid, status: newStatus })
-        .eq('id', invoice.id)
+      await supabase.from('invoices').update({ amount_paid: newPaid, status: newStatus }).eq('id', invoice.id)
 
-      // Update all linked orders
       for (const order of orders) {
         const newOrderPaid = Number(order.amount_paid || 0) + amount
-        await supabase
-          .from('orders')
-          .update({ amount_paid: newOrderPaid })
-          .eq('id', order.id)
+        await supabase.from('orders').update({ amount_paid: newOrderPaid }).eq('id', order.id)
       }
 
-      // Refresh data
       const { data: freshInvoice } = await supabase
         .from('invoices')
         .select(`
@@ -252,10 +224,8 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  // ─── PDF Generation (with logo fix) ───
   const generatePdfBlob = async () => {
     if (!invoiceRef.current) return null
-    // Ensure logo is loaded (wait if needed)
     await new Promise(resolve => setTimeout(resolve, 100))
     const canvas = await html2canvas(invoiceRef.current, { scale: 2, backgroundColor: '#ffffff' })
     const imgData = canvas.toDataURL('image/png')
@@ -275,16 +245,11 @@ export default function InvoiceDetailPage() {
       link.download = `${invoice.invoice_number}.pdf`
       link.click()
       URL.revokeObjectURL(url)
-    } catch (err) {
-      alert('Failed to generate PDF.')
-    }
+    } catch (err) { alert('Failed to generate PDF.') }
   }
 
   const handleShareWhatsApp = async () => {
-    if (!customer?.phone) {
-      alert('Customer has no phone number.')
-      return
-    }
+    if (!customer?.phone) { alert('Customer has no phone number.'); return }
     const message = `Hi ${customer.name || customer.first_name}, here is your invoice ${invoice.invoice_number}. Total: ${formatMoney(invoice.total)}. Thank you for your business!`
     try {
       const pdfBlob = await generatePdfBlob()
@@ -306,42 +271,30 @@ export default function InvoiceDetailPage() {
         const waUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
         window.open(waUrl, '_blank')
       }
-    } catch (err) {
-      alert('Failed to share. Please try again.')
-    }
+    } catch (err) { alert('Failed to share. Please try again.') }
   }
 
-  const handlePrint = () => {
-    window.print()
-  }
+  const handlePrint = () => { window.print() }
 
-  // ─── Render ───
-  if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
-  }
-
-  if (error || !invoice) {
-    return (
-      <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
-        <Svg name="x" size={30} stroke="var(--cresoa-danger)" />
-        <h2>Couldn't load invoice</h2>
-        <p>{error || 'Invoice not found'}</p>
-        <button onClick={() => router.push(`/dashboard/invoices?business_id=${businessId}`)} className="cresoa-primary-button">Back</button>
-      </div>
-    )
-  }
+  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
+  if (error || !invoice) return (
+    <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
+      <Svg name="x" size={30} stroke="var(--cresoa-danger)" />
+      <h2>Couldn't load invoice</h2>
+      <p>{error || 'Invoice not found'}</p>
+      <button onClick={() => router.push(`/dashboard/invoices?business_id=${businessId}`)} className="cresoa-primary-button">Back</button>
+    </div>
+  )
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '100px' }}>
       <Navigation businessId={businessId} />
-
       <button onClick={() => router.push(`/dashboard/invoices?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>
         <Svg name="back" size={16} stroke="currentColor" /> Back to Invoices
       </button>
 
-      {/* ─── Invoice Preview (For PDF & Print) ─── */}
+      {/* Invoice Preview */}
       <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a' }}>
-        {/* Header */}
         <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
@@ -367,10 +320,11 @@ export default function InvoiceDetailPage() {
             <p style={{ margin: 0, fontWeight: 600 }}>{customer.name || customer.first_name}</p>
             {customer.phone && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.phone}</p>}
             {customer.email && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.email}</p>}
+            {customer.address && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.address}</p>}
           </div>
         )}
 
-        {/* Related Orders (multi-order) */}
+        {/* Related Orders */}
         {orders.length > 0 && (
           <div style={{ marginBottom: '1rem' }}>
             <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>RELATED ORDERS</p>
@@ -424,10 +378,12 @@ export default function InvoiceDetailPage() {
           <div>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
         </div>
 
-        {/* CAC */}
+        {/* CAC & TIN */}
         {cacNumber && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>CAC: {cacNumber}</p>}
+        {business?.tin_number && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>TIN: {business.tin_number}</p>}
+        {business?.payment_terms && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>Terms: {business.payment_terms}</p>}
 
-               {/* Custom Note */}
+        {/* Custom Note */}
         <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>
 
         <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
@@ -435,59 +391,34 @@ export default function InvoiceDetailPage() {
         </p>
       </div>
 
-      {/* ─── Editable Section (Hidden on print) ─── */}
+      {/* Editable Section */}
       <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
         <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Custom Note</label>
-            <input type="text" value={customNote} onChange={(e) => setCustomNote(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-          </div>
+          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Custom Note</label><input type="text" value={customNote} onChange={(e) => setCustomNote(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Bank Name</label>
-            <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Number (10 digits)</label>
-            <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Name</label>
-            <input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
-          </div>
+          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Bank Name</label><input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Number (10 digits)</label><input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
+          <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Account Name</label><input type="text" value={accountName} onChange={(e) => setAccountName(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
         </div>
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>CAC Number (Optional)</label>
           <input type="text" value={cacNumber} onChange={(e) => setCacNumber(e.target.value)} placeholder="e.g. RC-12345" style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} />
         </div>
-        <button onClick={handleSaveEdits} disabled={savingEdits} className="cresoa-primary-button" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
-          {savingEdits ? 'Saving...' : 'Save Changes'}
-        </button>
+        <button onClick={handleSaveEdits} disabled={savingEdits} className="cresoa-primary-button" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>{savingEdits ? 'Saving...' : 'Save Changes'}</button>
       </div>
 
-      {/* ─── Quick Actions ─── */}
+      {/* Quick Actions */}
       <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <button onClick={handleDownloadPDF} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center' }}>
-          <Svg name="download" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Download PDF
-        </button>
-        <button onClick={handleShareWhatsApp} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: '#25D366', borderColor: '#25D366' }}>
-          <Svg name="whatsapp" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Share WhatsApp
-        </button>
-        <button onClick={handlePrint} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}>
-          <Svg name="printer" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Print
-        </button>
-        <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}>
-          <Svg name="card" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Record Payment
-        </button>
+        <button onClick={handleDownloadPDF} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center' }}><Svg name="download" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Download PDF</button>
+        <button onClick={handleShareWhatsApp} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: '#25D366', borderColor: '#25D366' }}><Svg name="whatsapp" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Share WhatsApp</button>
+        <button onClick={handlePrint} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}><Svg name="printer" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Print</button>
+        <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}><Svg name="card" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Record Payment</button>
       </div>
 
-      {/* ─── Payment Modal ─── */}
+      {/* Payment Modal */}
       {showPaymentModal && (
         <div className="cresoa-modal-overlay" onClick={() => setShowPaymentModal(false)}>
           <form onClick={(e) => e.stopPropagation()} onSubmit={handleRecordPayment} style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }}>
@@ -505,13 +436,11 @@ export default function InvoiceDetailPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button type="button" onClick={() => setShowPaymentModal(false)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer' }}>Cancel</button>
-              <button type="submit" disabled={savingPayment} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem' }}>
-                {savingPayment ? 'Recording...' : 'Save Payment'}
-              </button>
+              <button type="submit" disabled={savingPayment} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem' }}>{savingPayment ? 'Recording...' : 'Save Payment'}</button>
             </div>
           </form>
         </div>
       )}
     </div>
   )
-        }
+}
