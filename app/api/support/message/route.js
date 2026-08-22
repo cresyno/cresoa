@@ -66,10 +66,6 @@ async function getRelevantChunks(query) {
   return data.map(item => item.content);
 }
 
-  if (error || !data) return [];
-  return data.map(item => item.content);
-}
-
 async function callGroq(message, contextString, historyMessages) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
