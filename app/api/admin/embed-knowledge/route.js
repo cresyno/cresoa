@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
+// 🔐 Replace this with any secret word you choose (e.g., "cresoa123")
+const EMBED_SECRET = 'cresoa123';
+
 export async function GET(req) {
   try {
-    // 1. Check admin using cookies (same as your ticket system)
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user || user.email !== 'taiwoabraham640@gmail.com') {
+    const { searchParams } = new URL(req.url);
+    const secret = searchParams.get('secret');
+
+    // 1. Check if the secret matches
+    if (secret !== EMBED_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,7 +25,7 @@ export async function GET(req) {
     // 3. Split into chunks
     const chunks = kbText.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
 
-    // 4. Delete old chunks (so we don't get duplicates)
+    // 4. Delete old chunks (prevent duplicates)
     await supabaseAdmin.from('knowledge_chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
     // 5. Generate embeddings using Gemini (free)
