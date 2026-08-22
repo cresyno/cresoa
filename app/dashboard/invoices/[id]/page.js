@@ -9,7 +9,6 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import '../../../globals.css'
 
-// ─── Self-contained SVGs ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
@@ -133,7 +132,7 @@ export default function InvoiceDetailPage() {
     fetchInvoice()
   }, [invoiceId, router])
 
-  const formatMoney = (val) => `NGN ${Number(val || 0).toLocaleString('en-NG')}`
+  const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
   const balance = invoice ? Number(invoice.total) - Number(invoice.amount_paid) : 0
@@ -293,7 +292,6 @@ export default function InvoiceDetailPage() {
         <Svg name="back" size={16} stroke="currentColor" /> Back to Invoices
       </button>
 
-      {/* Invoice Preview */}
       <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a' }}>
         <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -306,14 +304,13 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h3 style={{ margin: 0 }}>INVOICE #{invoice.invoice_number}</h3>
+            <h3 style={{ margin: 0 }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span> #{invoice.invoice_number}</h3>
             <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Issued: {formatDate(invoice.issue_date)}</p>
             <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Due: {formatDate(dueDate)}</p>
             <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: isPaid ? '#e6f4ea' : '#fff3e0', color: isPaid ? '#1e7e34' : '#e65100' }}>{isPaid ? 'PAID' : 'BALANCE DUE'}</span>
           </div>
         </div>
 
-        {/* Billed To */}
         {customer && (
           <div style={{ marginBottom: '1rem' }}>
             <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>BILL TO</p>
@@ -324,7 +321,6 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        {/* Related Orders */}
         {orders.length > 0 && (
           <div style={{ marginBottom: '1rem' }}>
             <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>RELATED ORDERS</p>
@@ -334,7 +330,6 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        {/* Items Table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
           <thead>
             <tr style={{ background: '#f8f9fa' }}>
@@ -359,40 +354,35 @@ export default function InvoiceDetailPage() {
           </tbody>
         </table>
 
-        {/* Totals */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <div style={{ width: '220px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(invoice.subtotal)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Discount</span><span>{formatMoney(invoice.discount)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Tax</span><span>{formatMoney(invoice.tax)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Delivery</span><span>{formatMoney(invoice.delivery_fee)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}><span>Total</span><span>{formatMoney(invoice.total)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'green' }}><span>Paid</span><span>{formatMoney(invoice.amount_paid)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontWeight: 700, color: balance > 0 ? 'red' : 'green' }}><span>Balance</span><span>{formatMoney(balance)}</span></div>
           </div>
         </div>
 
-        {/* Payment Details */}
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: isPaid ? '#e6f4ea' : '#fff3e0', borderRadius: '8px', border: `1px solid ${isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{isPaid ? 'AMOUNT PAID' : 'AMOUNT DUE'}</span>
+            <span style={{ fontWeight: 800, fontSize: '1.2rem', color: isPaid ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{formatMoney(isPaid ? invoice.total : balance)}</span>
+          </div>
+        </div>
+
         <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
           <strong>PAYMENT DETAILS</strong>
           <div>Bank: {bankName || 'N/A'} | Acct: {accountNumber || 'N/A'} | Name: {accountName || 'N/A'}</div>
         </div>
 
-        {/* CAC & TIN */}
         {cacNumber && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>CAC: {cacNumber}</p>}
-        {business?.tin_number && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>TIN: {business.tin_number}</p>}
-        {business?.payment_terms && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>Terms: {business.payment_terms}</p>}
-
-        {/* Custom Note */}
-        <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>
+        {thankYouNote && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>}
 
         <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
           Powered by Cresoa — Business management made simple.
         </p>
       </div>
 
-      {/* Editable Section */}
-      <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
+       <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
         <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
@@ -410,7 +400,6 @@ export default function InvoiceDetailPage() {
         <button onClick={handleSaveEdits} disabled={savingEdits} className="cresoa-primary-button" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>{savingEdits ? 'Saving...' : 'Save Changes'}</button>
       </div>
 
-      {/* Quick Actions */}
       <div className="no-print" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
         <button onClick={handleDownloadPDF} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center' }}><Svg name="download" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Download PDF</button>
         <button onClick={handleShareWhatsApp} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: '#25D366', borderColor: '#25D366' }}><Svg name="whatsapp" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Share WhatsApp</button>
@@ -418,7 +407,6 @@ export default function InvoiceDetailPage() {
         <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center', background: 'var(--cresoa-accent)', borderColor: 'var(--cresoa-accent)' }}><Svg name="card" size={16} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Record Payment</button>
       </div>
 
-      {/* Payment Modal */}
       {showPaymentModal && (
         <div className="cresoa-modal-overlay" onClick={() => setShowPaymentModal(false)}>
           <form onClick={(e) => e.stopPropagation()} onSubmit={handleRecordPayment} style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '400px' }}>
@@ -443,4 +431,4 @@ export default function InvoiceDetailPage() {
       )}
     </div>
   )
-}
+            }
