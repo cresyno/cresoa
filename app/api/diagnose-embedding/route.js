@@ -8,10 +8,8 @@ export async function GET() {
     return NextResponse.json({ error: 'GEMINI_API_KEY missing' }, { status: 500 });
   }
 
-  const modelName = 'gemini-embedding-001'; 
-  
-  // Safe string concatenation to guarantee no template literal or quote typos occur
-  const url = 'https://googleapis.com' + modelName + ':embedContent?key=' + API_KEY;
+  // A completely static URL string removes any risk of variable concatenation typos
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=' + API_KEY;
 
   try {
     const res = await fetch(url, {
