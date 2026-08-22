@@ -52,15 +52,14 @@ async function getEmbedding(text) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
+  // ✅ FIXED MODEL NAME: text-embedding-004
+  const model = 'models/text-embedding-004';
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-001:embedContent?key=${API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'models/text-embedding-001',
-        content: { parts: [{ text: text }] }
-      })
+      body: JSON.stringify({ model, content: { parts: [{ text: text }] } })
     }
   );
   const data = await response.json();
