@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFileSync } from 'fs';
 import path from 'path';
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
