@@ -17,8 +17,6 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
     card: <><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
-    edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
-    check: <polyline points="20 6 9 17 4 12" />,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
@@ -31,7 +29,6 @@ export default function InvoiceDetailPage() {
   const [businessId, setBusinessId] = useState(null)
   const [invoice, setInvoice] = useState(null)
   const [customer, setCustomer] = useState(null)
-  const [orders, setOrders] = useState([])
   const [business, setBusiness] = useState(null)
   const [items, setItems] = useState([])
 
@@ -75,13 +72,13 @@ export default function InvoiceDetailPage() {
         if (!bizId) return
         setBusinessId(bizId)
 
+        // Fetch invoice with customer & items (NO invoice_orders)
         const { data: invoiceData, error: invoiceError } = await supabase
           .from('invoices')
           .select(`
             *,
             customers ( id, name, first_name, last_name, phone, email, address ),
-            invoice_items ( id, item_name, description, quantity, price, total, order_id ),
-            invoice_orders ( order_id, orders ( id, title, current_status, due_date ) )
+            invoice_items ( id, item_name, description, quantity, price, total, order_id )
           `)
           .eq('id', invoiceId)
           .eq('business_id', bizId)
@@ -92,9 +89,7 @@ export default function InvoiceDetailPage() {
         setCustomer(invoiceData.customers)
         setItems(invoiceData.invoice_items || [])
 
-        const linkedOrders = (invoiceData.invoice_orders || []).map(io => io.orders).filter(Boolean)
-        setOrders(linkedOrders)
-
+        // Fetch business for logo, bank, CAC
         const { data: bizData } = await supabase
           .from('businesses')
           .select('*')
@@ -178,7 +173,6 @@ export default function InvoiceDetailPage() {
         .insert({
           business_id: businessId,
           customer_id: customer?.id,
-          order_id: orders[0]?.id,
           invoice_id: invoice.id,
           amount: amount,
           note: paymentNote || 'Payment recorded',
@@ -190,9 +184,14 @@ export default function InvoiceDetailPage() {
       const newStatus = newPaid >= Number(invoice.total) ? 'paid' : 'partial'
       await supabase.from('invoices').update({ amount_paid: newPaid, status: newStatus }).eq('id', invoice.id)
 
-      for (const order of orders) {
-        const newOrderPaid = Number(order.amount_paid || 0) + amount
-        await supabase.from('orders').update({ amount_paid: newOrderPaid }).eq('id', order.id)
+      // Update linked orders (via invoice_items order_id)
+      const linkedOrderIds = items.map(i => i.order_id).filter(Boolean)
+      for (const orderId of linkedOrderIds) {
+        const { data: order } = await supabase.from('orders').select('amount_paid').eq('id', orderId).single()
+        if (order) {
+          const newOrderPaid = Number(order.amount_paid || 0) + amount
+          await supabase.from('orders').update({ amount_paid: newOrderPaid }).eq('id', orderId)
+        }
       }
 
       const { data: freshInvoice } = await supabase
@@ -200,16 +199,13 @@ export default function InvoiceDetailPage() {
         .select(`
           *,
           customers ( id, name, first_name, last_name, phone, email, address ),
-          invoice_items ( id, item_name, description, quantity, price, total, order_id ),
-          invoice_orders ( order_id, orders ( id, title, current_status, due_date ) )
+          invoice_items ( id, item_name, description, quantity, price, total, order_id )
         `)
         .eq('id', invoice.id)
         .single()
       setInvoice(freshInvoice)
       setCustomer(freshInvoice.customers)
       setItems(freshInvoice.invoice_items || [])
-      const linkedOrders = (freshInvoice.invoice_orders || []).map(io => io.orders).filter(Boolean)
-      setOrders(linkedOrders)
 
       setShowPaymentModal(false)
       setPaymentAmount('')
@@ -321,15 +317,6 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        {orders.length > 0 && (
-          <div style={{ marginBottom: '1rem' }}>
-            <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>RELATED ORDERS</p>
-            {orders.map(order => (
-              <p key={order.id} style={{ margin: '2px 0', color: '#333', fontSize: '0.85rem' }}>Order #{order.id.slice(0, 8)} – {order.title}</p>
-            ))}
-          </div>
-        )}
-
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
           <thead>
             <tr style={{ background: '#f8f9fa' }}>
@@ -375,14 +362,14 @@ export default function InvoiceDetailPage() {
         </div>
 
         {cacNumber && <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>CAC: {cacNumber}</p>}
-        {thankYouNote && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>}
+        {customNote && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{customNote}</p>}
 
         <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
           Powered by Cresoa — Business management made simple.
         </p>
       </div>
 
-       <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
+<div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
         <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div><label style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Due Date</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)' }} /></div>
@@ -431,4 +418,4 @@ export default function InvoiceDetailPage() {
       )}
     </div>
   )
-            }
+          }
