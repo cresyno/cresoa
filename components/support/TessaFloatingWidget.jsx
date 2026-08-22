@@ -4,31 +4,37 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA SPARK ICON (Concept 2: Abstract Conversation Knot) ───
-const TessaSparkIcon = ({ size = 32 }) => {
+// ─── TESSA LOGO (Inline, Self-contained SVG) ───
+const TessaSparkIcon = ({ size = 28 }) => {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="tessaKnotGrad" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+        <linearGradient id="tessaKnot" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#0F2B4A" />
-          <stop offset="60%" stopColor="#1A3F66" />
+          <stop offset="40%" stopColor="#1A3F66" />
+          <stop offset="75%" stopColor="#2E7D5E" />
           <stop offset="100%" stopColor="#D4A52A" />
         </linearGradient>
-        <linearGradient id="tessaSparkGradK" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+        <linearGradient id="tessaSpark" x1="16" y1="16" x2="48" y2="48" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#FFD966" />
           <stop offset="100%" stopColor="#D4A52A" />
         </linearGradient>
       </defs>
+
+      {/* Hidden T – Vertical Stem */}
+      <path d="M32 18 L32 56" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" />
       
-      {/* Abstract Conversation Knot (Two interlocking curves forming a T) */}
-      <path d="M16 26 C16 18, 24 16, 32 16 C40 16, 48 18, 48 26 C48 34, 40 36, 32 36 C24 36, 16 38, 16 46 C16 54, 24 56, 32 56" stroke="url(#tessaKnotGrad)" strokeWidth="6" strokeLinecap="round" fill="none" />
-      <path d="M32 16 C40 16, 48 18, 48 26 C48 34, 40 36, 32 36 C24 36, 16 38, 16 46 C16 54, 24 56, 32 56" stroke="#D4A52A" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.3" />
+      {/* Hidden T – Horizontal Crossbar (flowing curve) */}
+      <path d="M14 22 C16 18, 20 16, 32 16 C44 16, 48 18, 50 22" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" />
       
-      {/* Vertical T-stem */}
-      <path d="M32 36 L32 56" stroke="url(#tessaKnotGrad)" strokeWidth="6" strokeLinecap="round" />
+      {/* Left flowing conversation curve */}
+      <path d="M14 22 C10 30, 10 38, 14 44 C18 50, 24 52, 32 52" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" opacity="0.85" />
       
-      {/* Gold Spark at intersection */}
-      <path d="M32 26 L34 30 L38 32 L34 34 L32 38 L30 34 L26 32 L30 30 Z" fill="url(#tessaSparkGradK)" />
+      {/* Right flowing guidance curve */}
+      <path d="M50 22 C54 30, 54 38, 50 44 C46 50, 40 52, 32 52" stroke="url(#tessaKnot)" strokeWidth="6.5" strokeLinecap="round" fill="none" opacity="0.65" />
+      
+      {/* Intelligent Spark at intersection */}
+      <path d="M32 14 L34.5 19.5 L40 22 L34.5 24.5 L32 30 L29.5 24.5 L24 22 L29.5 19.5 Z" fill="url(#tessaSpark)" />
     </svg>
   );
 };
@@ -56,10 +62,10 @@ export default function TessaFloatingWidget() {
 
   return (
     <>
-      {/* Positioned top-right, moved down to avoid header overlap */}
+      {/* Positioned top-right to avoid overlapping bottom content */}
       <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 998, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
         
-        {/* Speech Bubble */}
+        {/* Speech Bubble (unchanged) */}
         <div style={{
           background: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -78,7 +84,7 @@ export default function TessaFloatingWidget() {
           </p>
         </div>
 
-        {/* The BOLD Floating Button */}
+        {/* BOLD Floating Button with Tessa Logo */}
         <button 
           onClick={handleClick}
           style={{
@@ -110,7 +116,7 @@ export default function TessaFloatingWidget() {
         `}</style>
       </div>
 
-      {/* The Gemini-style Bottom Sheet */}
+      {/* The Gemini-style Bottom Sheet (Preserved) */}
       <TessaBottomSheet 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)} 
