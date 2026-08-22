@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA LOGO (Kept exactly as you approved) ───
+// ─── TESSA LOGO (kept exactly) ───
 const TessaLogo = ({ size = 24 }) => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} fill="none">
@@ -41,12 +41,12 @@ export default function TessaFloatingWidget() {
 
   return (
     <>
-      {/* Compact Hexagon Container */}
+      {/* Compact Hexagon Container - moved down to avoid date */}
       <div
         onClick={handleClick}
         style={{
           position: 'fixed',
-          top: '20px', // Highest point
+          top: '60px', // ✅ moved down, leaving the date visible
           right: '20px',
           zIndex: 998,
           display: 'flex',
@@ -56,23 +56,23 @@ export default function TessaFloatingWidget() {
           userSelect: 'none',
         }}
       >
-        {/* Hexagon with Rainbow */}
+        {/* Hexagon with subtle gold pulse */}
         <div style={{ position: 'relative', width: '56px', height: '56px' }}>
-          {/* Rotating Rainbow Background */}
+          {/* Outer hexagon - gold border with glow pulse */}
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'conic-gradient(from 0deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
+              background: 'linear-gradient(135deg, #D9A72E, #F0C75E, #D9A72E)',
               clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-              animation: 'tessaSpin 3s linear infinite',
+              animation: 'tessaPulse 2.5s ease-in-out infinite',
             }}
           />
-          {/* Inner Solid Background */}
+          {/* Inner solid background */}
           <div
             style={{
               position: 'absolute',
-              inset: '2.5px', // Border thickness
+              inset: '2px',
               background: '#0F2B4A',
               clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
               display: 'flex',
@@ -88,14 +88,14 @@ export default function TessaFloatingWidget() {
         <span
           style={{
             marginTop: '4px',
-            fontSize: '0.65rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: '#fff',
             textShadow: '0 1px 4px rgba(0,0,0,0.6)',
             letterSpacing: '0.5px',
-            background: 'rgba(15, 43, 74, 0.8)',
+            background: 'rgba(15, 43, 74, 0.9)',
             padding: '2px 8px',
-            borderRadius: '12px',
+            borderRadius: '10px',
           }}
         >
           Tessa AI
@@ -103,9 +103,13 @@ export default function TessaFloatingWidget() {
       </div>
 
       <style>{`
-        @keyframes tessaSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+        @keyframes tessaPulse {
+          0%, 100% {
+            box-shadow: 0 0 8px rgba(212, 165, 42, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(212, 165, 42, 0.8);
+          }
         }
       `}</style>
 
