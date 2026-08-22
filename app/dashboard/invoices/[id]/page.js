@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { supabase } from '../../../../../lib/supabaseClient'
-import { requireBusinessAccess } from '../../../../../lib/requireBusinessAccess'
-import { Navigation } from '../../../../../components/Navigation'
+import { supabase } from '../../../../lib/supabaseClient'
+import { requireBusinessAccess } from '../../../../lib/requireBusinessAccess'
+import { Navigation } from '../../../../components/Navigation'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
