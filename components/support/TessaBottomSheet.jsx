@@ -11,17 +11,18 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
+  const [sheetHeight, setSheetHeight] = useState('25vh'); // Default 1/4 page
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const dragStartY = useRef(null);
+  const dragStartHeight = useRef(null);
 
-  // ─── Auto-scroll to bottom when messages change ───
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
-  // ─── Fetch chat history from Supabase when sheet opens ───
+  // Fetch history on open
   useEffect(() => {
     const fetchHistory = async () => {
       if (!isOpen || !businessId) return;
@@ -32,7 +33,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
           .eq('business_id', businessId)
           .order('created_at', { ascending: true })
           .limit(10);
-
         if (error || !data) return;
         if (data.length > 0) {
           setMessages(data.map(msg => ({
@@ -40,51 +40,39 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
             text: msg.message
           })));
         }
-      } catch (e) {
-        console.error('Failed to fetch history:', e);
-      }
+      } catch (e) {}
     };
-
     if (isOpen) fetchHistory();
   }, [isOpen, businessId]);
 
-  // ─── Send Message Logic ───
+  // Send message
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
     const text = input.trim();
     setInput('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setMessages(prev => [...prev, { role: 'user', text }]);
     setIsLoading(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-
       const res = await fetch('/api/support/message', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ message: text, business_id: businessId })
       });
       const data = await res.json();
-      if (data.answer) {
-        setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', text: "I'm having trouble connecting. Please try again." }]);
-      }
-    } catch (error) {
+      if (data.answer) setMessages(prev => [...prev, { role: 'assistant', text: data.answer }]);
+      else setMessages(prev => [...prev, { role: 'assistant', text: "I'm having trouble connecting. Please try again." }]);
+    } catch {
       setMessages(prev => [...prev, { role: 'assistant', text: "Oops! My server is offline. Please try again later." }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─── Auto-expand textarea (max 5 lines) ───
+  // Auto-expand textarea (max 5 lines)
   const handleInputChange = (e) => {
     const textarea = e.target;
     setInput(textarea.value);
@@ -92,95 +80,89 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   };
 
+  // Resize logic (drag handle)
+  const startDrag = (e) => {
+    dragStartY.current = e.clientY || e.touches[0].clientY;
+    dragStartHeight.current = sheetHeight;
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('touchmove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+  };
+
+  const onDrag = (e) => {
+    if (!dragStartY.current || !dragStartHeight.current) return;
+    const currentY = e.clientY || e.touches[0].clientY;
+    const delta = dragStartY.current - currentY; // Pull up = bigger
+    const newHeight = Math.min(Math.max(parseInt(dragStartHeight.current) + delta, 150), window.innerHeight * 0.9);
+    setSheetHeight(`${newHeight}px`);
+  };
+
+  const endDrag = () => {
+    dragStartY.current = null;
+    dragStartHeight.current = null;
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('touchmove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+    document.removeEventListener('touchend', endDrag);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 999,
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center'
-    }}>
-      {/* Backdrop */}
-      <div 
-        onClick={onClose}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)'
-        }}
-      />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      {/* Backdrop (no blur, just subtle dim) */}
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
 
-      {/* Bottom Sheet */}
+      {/* Resizable Bottom Sheet */}
       <div style={{
         position: 'relative',
         width: '100%',
         maxWidth: '600px',
-        height: '85vh',
-        maxHeight: '85vh',
+        height: sheetHeight,
         backgroundColor: 'var(--color-card)',
-        borderTopLeftRadius: '20px',
-        borderTopRightRadius: '20px',
-        boxShadow: '0 -8px 32px rgba(0,0,0,0.3)',
+        borderTopLeftRadius: '16px',
+        borderTopRightRadius: '16px',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.2)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+        transition: 'height 0.05s linear'
       }}>
-        <style>{`
-          @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-          }
-        `}</style>
+        {/* Drag Handle */}
+        <div 
+          onMouseDown={startDrag}
+          onTouchStart={startDrag}
+          style={{
+            padding: '10px 0',
+            cursor: 'grab',
+            display: 'flex',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}
+        >
+          <div style={{ width: '40px', height: '4px', background: 'var(--color-border)', borderRadius: '2px' }} />
+        </div>
 
-        {/* Header */}
+        {/* Header (Flexible height) */}
         <div style={{
-          padding: '1rem 1.5rem',
-          borderBottom: '1px solid var(--color-border)',
+          padding: '0 1rem 0.5rem',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }}></div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--color-text)' }}>Tessa AI</div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Online</div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text)' }}>Tessa AI</span>
           </div>
-          <button 
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--color-text)',
-              padding: '0.5rem',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
-        {/* Chat Area */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '1rem 1rem 1rem 1rem',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--color-bg)'
-        }}>
+        {/* Chat Area (Scrollable) */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)' }}>
           {messages.map((msg, idx) => (
             <ChatMessage key={idx} message={msg.text} isUser={msg.role === 'user'} />
           ))}
@@ -198,25 +180,9 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar */}
-        <div style={{
-          padding: '0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom))',
-          borderTop: '1px solid var(--color-border)',
-          background: 'var(--color-card)',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: '0.75rem',
-          flexShrink: 0
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            flex: 1,
-            background: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '24px',
-            padding: '0.4rem 0.4rem 0.4rem 1rem'
-          }}>
+        {/* Input */}
+        <div style={{ padding: '0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexShrink: 0 }}>
+          <div style={{ flex: 1, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '24px', padding: '0.3rem 0.3rem 0.3rem 1rem', display: 'flex', alignItems: 'flex-end' }}>
             <textarea
               ref={textareaRef}
               rows={1}
@@ -224,49 +190,14 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
               onChange={handleInputChange}
               placeholder="Message"
               disabled={isLoading}
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: 'var(--color-text)',
-                fontSize: '0.95rem',
-                padding: '0.5rem 0',
-                resize: 'none',
-                minHeight: '40px',
-                maxHeight: '120px',
-                lineHeight: '1.5',
-                fontFamily: 'inherit',
-                overflowY: 'hidden'
-              }}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'none', minHeight: '32px', maxHeight: '100px', lineHeight: '1.4', fontFamily: 'inherit' }}
             />
-            <div style={{ flexShrink: 0, width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <button 
-                onClick={handleSendMessage} 
-                disabled={!input.trim() || isLoading} 
-                style={{ 
-                  background: 'var(--color-primary)', 
-                  width: '36px', 
-                  height: '36px', 
-                  border: 'none', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  cursor: 'pointer', 
-                  opacity: (!input.trim() || isLoading) ? '0.6' : '1',
-                  transition: 'opacity 0.2s ease'
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
-            </div>
+            <button onClick={handleSendMessage} disabled={!input.trim() || isLoading} style={{ background: 'var(--color-primary)', width: '32px', height: '32px', border: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: (!input.trim() || isLoading) ? '0.6' : '1' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
-    }
+            }
