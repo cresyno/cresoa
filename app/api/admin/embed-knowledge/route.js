@@ -21,7 +21,7 @@ export async function GET(req) {
     // 2. Clear old chunks (prevent duplicates)
     await supabaseAdmin.from('knowledge_chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
-    // 3. Embed using the WORKING model: gemini-embedding-001
+    // 3. Embed using the WORKING model
     let successCount = 0;
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -47,16 +47,29 @@ async function getEmbedding(text) {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) return null;
 
-  // ✅ FIXED MODEL NAME: gemini-embedding-001 (the one that actually works)
-  const model = 'models/gemini-embedding-001';
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${API_KEY}`,
-    {
+  // Use the exact static URL string structure that successfully responded with status 200
+  const url = 'https://googleapis.com' + API_KEY;
+
+  try {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, content: { parts: [{ text: text }] } })
+      body: JSON.stringify({
+        content: { 
+          parts: [{ text: text }] 
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.error(`Gemini API responded with status ${response.status}`);
+      return null;
     }
-  );
-  const data = await response.json();
-  return data.embedding?.values || null;
+
+    const data = await response.json();
+    return data.embedding?.values || null;
+  } catch (e) {
+    console.error("Fetch or parsing failed for text chunk:", e);
+    return null;
+  }
 }
