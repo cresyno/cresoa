@@ -38,7 +38,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
           .select('sender_type, message')
           .eq('business_id', businessId)
           .order('created_at', { ascending: true })
-          .limit(8); // Fetch last 8 messages (wider for context)
+          .limit(0); // Fetch last 8 messages (wider for context)
 
         if (error || !data) return;
         if (data.length > 0) {
