@@ -4,30 +4,31 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
 
-// ─── TESSA SPARK ICON (Self-contained) ───
+// ─── TESSA SPARK ICON (Concept 2: Abstract Conversation Knot) ───
 const TessaSparkIcon = ({ size = 32 }) => {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="tessaRibbonBold" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
+        <linearGradient id="tessaKnotGrad" x1="0" y1="64" x2="64" y2="0" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#0F2B4A" />
-          <stop offset="35%" stopColor="#1A3F66" />
-          <stop offset="70%" stopColor="#2E7D5E" />
+          <stop offset="60%" stopColor="#1A3F66" />
           <stop offset="100%" stopColor="#D4A52A" />
         </linearGradient>
-        <linearGradient id="tessaSparkBold" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+        <linearGradient id="tessaSparkGradK" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#FFD966" />
           <stop offset="100%" stopColor="#D4A52A" />
         </linearGradient>
       </defs>
-      {/* Flowing ribbon "T" (Thicker stroke) */}
-      <path d="M14 14 H50" stroke="url(#tessaRibbonBold)" strokeWidth="8" strokeLinecap="round" />
-      <path d="M32 14 V50" stroke="url(#tessaRibbonBold)" strokeWidth="8" strokeLinecap="round" />
-      {/* Flowing tails */}
-      <path d="M50 14 C58 20, 58 32, 50 38" stroke="url(#tessaRibbonBold)" strokeWidth="8" strokeLinecap="round" fill="none" />
-      <path d="M32 50 C26 56, 16 56, 10 50" stroke="url(#tessaRibbonBold)" strokeWidth="8" strokeLinecap="round" fill="none" />
-      {/* Gold Spark */}
-      <path d="M50 4 L52 10 L58 12 L52 14 L50 20 L48 14 L42 12 L48 10 Z" fill="url(#tessaSparkBold)" />
+      
+      {/* Abstract Conversation Knot (Two interlocking curves forming a T) */}
+      <path d="M16 26 C16 18, 24 16, 32 16 C40 16, 48 18, 48 26 C48 34, 40 36, 32 36 C24 36, 16 38, 16 46 C16 54, 24 56, 32 56" stroke="url(#tessaKnotGrad)" strokeWidth="6" strokeLinecap="round" fill="none" />
+      <path d="M32 16 C40 16, 48 18, 48 26 C48 34, 40 36, 32 36 C24 36, 16 38, 16 46 C16 54, 24 56, 32 56" stroke="#D4A52A" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.3" />
+      
+      {/* Vertical T-stem */}
+      <path d="M32 36 L32 56" stroke="url(#tessaKnotGrad)" strokeWidth="6" strokeLinecap="round" />
+      
+      {/* Gold Spark at intersection */}
+      <path d="M32 26 L34 30 L38 32 L34 34 L32 38 L30 34 L26 32 L30 30 Z" fill="url(#tessaSparkGradK)" />
     </svg>
   );
 };
@@ -55,10 +56,10 @@ export default function TessaFloatingWidget() {
 
   return (
     <>
-      {/* ─── MOVED DOWN TO AVOID HEADER OVERLAP ─── */}
+      {/* Positioned top-right, moved down to avoid header overlap */}
       <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 998, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
         
-        {/* Speech Bubble (Bolder text) */}
+        {/* Speech Bubble */}
         <div style={{
           background: 'var(--color-card)',
           border: '1px solid var(--color-border)',
@@ -81,17 +82,17 @@ export default function TessaFloatingWidget() {
         <button 
           onClick={handleClick}
           style={{
-            background: 'linear-gradient(135deg, #0F2B4A 0%, #1A3F66 100%)', // Deep Navy Gradient
+            background: 'linear-gradient(135deg, #0F2B4A 0%, #1A3F66 100%)',
             color: '#fff',
-            border: '2px solid #D4A52A', // Thick Gold Border
+            border: '2px solid #D4A52A',
             borderRadius: '50px',
             padding: '14px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            boxShadow: '0 8px 32px rgba(15, 43, 74, 0.4)', // Heavy Shadow
+            boxShadow: '0 8px 32px rgba(15, 43, 74, 0.4)',
             cursor: 'pointer',
-            fontWeight: '800', // BOLD Text
+            fontWeight: '800',
             fontSize: '1rem',
             letterSpacing: '0.5px',
             animation: 'tessaBoldPulse 3s ease-in-out infinite'
@@ -109,7 +110,7 @@ export default function TessaFloatingWidget() {
         `}</style>
       </div>
 
-      {/* The Gemini-style Bottom Sheet (Preserved) */}
+      {/* The Gemini-style Bottom Sheet */}
       <TessaBottomSheet 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)} 
@@ -117,4 +118,4 @@ export default function TessaFloatingWidget() {
       />
     </>
   );
-        }
+}
