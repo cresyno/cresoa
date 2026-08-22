@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../lib/getBusinessId'
-import { Navigation } from '../../../components/Navigation'
+import { supabase } from '../../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
+import { Navigation } from '../../../../components/Navigation'
 import '../../../globals.css'
 
 // ─── Self-contained SVGs ───
