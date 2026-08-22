@@ -24,11 +24,11 @@ You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa
 
 CRITICAL RULES:
 1. Be natural and conversational. You may explain, elaborate, and reason freely using the relevant context provided.
-2. Use the "Relevant Knowledge Base Context" as your **primary source of truth** for specific facts (pricing, features, limits). Never invent facts not in that context.
-3. If the context does not contain a specific fact, you may use your general understanding of business management to give a helpful, logical answer—as long as you don't invent Cresoa-specific features.
-4. If you are asked to "explain more" or "be more explicit," expand on the previous answer using the context you already have. Do NOT refuse—just give more detail.
-5. If you are completely unsure about a Cresoa-specific detail, say: "I don't have that specific information yet. Please contact support via WhatsApp."
-6. Be warm, human, and direct. Use markdown (bold, lists) where helpful.
+2. Use the "Relevant Knowledge Base Context" as your **primary source of truth** for specific facts (pricing, features, limits). Never invent Cresoa-specific facts that are not in that context.
+3. **REASONING MANDATE**: If the user's question is a rephrasing or a new angle, use your general understanding of the platform to give a helpful, logical answer. Do NOT say "I don't know" just because the exact words don't appear in the context.
+4. If you are asked to "explain more" or "be more explicit," expand on the previous answer using the context you already have. Do NOT refuse.
+5. Only say you don't know when the question is completely unrelated to Cresoa or business management.
+6. Be warm, human, and direct. Use markdown (bold, lists, tables) where helpful.
 7. Remember user-provided facts and recall them directly.
 8. If asked who you are, say "I'm Tessa, your Cresoa support assistant." Never mention AI providers.
 `;
@@ -66,27 +66,17 @@ async function getEmbedding(text) {
   } catch (e) { return null; }
 }
 
-// ─── GUARANTEED RETRIEVAL ─────────────────────────────────────
 async function getRelevantChunks(query) {
   const lower = query.toLowerCase();
 
-  // 🔥 DIRECT OVERRIDE: If they ask about plans/pricing, pull the pricing section
-  if (lower.includes('pricing') || lower.includes('plan') || lower.includes('price') || lower.includes('subscription')) {
-    const pricingSection = FULL_PDF_TEXT.split('PLANS AND PRICING')[1]?.split('FEATURE AVAILABILITY')[0];
-    if (pricingSection && pricingSection.length > 50) {
-      console.log('✅ Pricing chunk manually retrieved.');
-      return [pricingSection.trim()];
-    }
-  }
-
-  // 1. Vector search
+  // 1. VECTOR SEARCH (lenient)
   const queryEmbedding = await getEmbedding(query);
   if (queryEmbedding) {
     const vectorString = JSON.stringify(queryEmbedding);
     const { data, error } = await supabaseAdmin.rpc('match_knowledge', {
       query_embedding: vectorString,
-      match_threshold: -1, // Always returns something
-      match_count: 5
+      match_threshold: -1,          // Always returns something
+      match_count: 8                // Wide net for context
     });
 
     if (!error && data && data.length > 0) {
@@ -94,7 +84,7 @@ async function getRelevantChunks(query) {
     }
   }
 
-  // 2. Keyword matching fallback
+  // 2. KEYWORD FALLBACK (broader)
   const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
   const keywords = lower.split(' ').filter(w => w.length >= 2);
   const scored = chunks.map(chunk => {
@@ -103,12 +93,12 @@ async function getRelevantChunks(query) {
     for (const word of keywords) if (lowerChunk.includes(word)) score++;
     return { text: chunk, score };
   });
-  const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 3);
+  const topChunks = scored.sort((a, b) => b.score - a.score).slice(0, 5);
   const relevant = topChunks.map(c => c.text).filter(t => t.length > 0);
   if (relevant.length > 0) return relevant;
 
-  // 3. Emergency: pull a small, safe snippet from the KB (pricing or first 2000 chars)
-  return [FULL_PDF_TEXT.substring(0, 2000)];
+  // 3. SAFE GENERAL FALLBACK (never empty)
+  return ["Cresoa is a business management platform for Nigerian SMEs. For more specific details, please ask about a particular feature or plan."];
 }
 
 async function callGroq(message, contextString, historyMessages) {
@@ -158,6 +148,12 @@ async function callGemini(message, contextString, historyMessages) {
   } catch (e) { return null; }
 }
 
+function cleanResponse(text) {
+  if (!text) return text;
+  // We only strip * and _ (which break UI), but KEEP # for headers
+  return text.replace(/[*_`~]/g, '').trim();
+}
+
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -171,19 +167,14 @@ export async function POST(req) {
     const { message, business_id, new_conversation } = await req.json();
     if (!message || !business_id) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
 
-    // Save user message
     await supabaseAdmin.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'user', message }
     ]);
 
-    // Fetch history (ignore if new conversation)
     const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, business_id);
-
-    // GUARANTEED context retrieval
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
-    // Try Groq
     let answer = await callGroq(message, contextString, historyMessages);
     let source = 'groq';
 
@@ -198,7 +189,7 @@ export async function POST(req) {
       source = 'fallback';
     }
 
-    const cleanedAnswer = answer.trim();
+    const cleanedAnswer = cleanResponse(answer);
 
     await supabaseAdmin.from('support_messages').insert([
       { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
@@ -212,4 +203,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-    }
+}
