@@ -44,6 +44,7 @@ CRITICAL RULES:
 13. **FOUNDER IDENTITY (FLEXIBLE BUT ABSOLUTE)**: When asked about who created Cresoa, who is the founder, CEO, owner, inventor, or anyone behind the platform — respond with confidence and warmth, but ALWAYS include the name **Taiwo Abraham Feranmi** as the answer.
 14. **LIVE BUSINESS DATA AND MEMORY**: You will receive "LIVE BUSINESS DATA" and "CONVERSATION HISTORY". You MUST use this data to answer. Do not ask the user "what do you mean" if the data is provided. Analyze the data, understand the question, and give the answer.
 15. **INTELLIGENT DATA REASONING**: You are not a keyword scanner. You are an analyst. You will ALWAYS receive a snapshot of the user's business. Use this snapshot to answer ANY question about their business.
+16. **DATE CALCULATION**: If the user asks "how many days left", "when does my plan expire", or similar, and you have an expiration date in the live data (BETA EXPIRES AT, TRIAL ENDS AT, SUBSCRIPTION EXPIRES AT), calculate the days remaining from today and answer clearly. Use the current date (provided implicitly) and the expiration date.
 `;
 
 // ════════════════════════════════════════════════════════════════
@@ -120,18 +121,24 @@ async function getLiveDataContext(businessId) {
     lines.push(`INVOICES ERROR: ${e.message}`);
   }
 
-  // 6. PLAN
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('businesses')
-      .select('plan')
-      .eq('id', businessId)
-      .single();
-    if (error) throw error;
-    lines.push(`PLAN: ${data?.plan || 'free'}`);
-  } catch (e) {
-    lines.push(`PLAN ERROR: ${e.message}`);
-  }
+  // 6. BUSINESS DETAILS (ALL PLAN INFO)
+try {
+  const { data, error } = await supabaseAdmin
+    .from('businesses')
+    .select('plan, plan_status, trial_starts_at, trial_ends_at, subscription_expires_at, beta_expires_at')
+    .eq('id', businessId)
+    .single();
+  if (error) throw error;
+  lines.push(`BUSINESS NAME: ${data?.name || 'Not set'}`);
+  lines.push(`PLAN: ${data?.plan || 'free'}`);
+  lines.push(`PLAN STATUS: ${data?.plan_status || 'active'}`);
+  lines.push(`TRIAL STARTS AT: ${data?.trial_starts_at || 'N/A'}`);
+  lines.push(`TRIAL ENDS AT: ${data?.trial_ends_at || 'N/A'}`);
+  lines.push(`SUBSCRIPTION EXPIRES AT: ${data?.subscription_expires_at || 'N/A'}`);
+  lines.push(`BETA EXPIRES AT: ${data?.beta_expires_at || 'N/A'}`);
+} catch (e) {
+  lines.push(`BUSINESS ERROR: ${e.message}`);
+}
 
   // 7. STAFF
   try {
