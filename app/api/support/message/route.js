@@ -16,75 +16,129 @@ try {
 }
 
 const SYSTEM_PROMPT = `
-You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa, a business management platform for Nigerian SMEs.
-
-CRITICAL RULES:
-1. Be natural and conversational.
-2. Use the "Relevant Knowledge Base Context" as your primary source of truth.
-3. UNDERSTAND IMPERFECT INPUT (typos, slang, broken English). Decode meaning.
-4. If ambiguous, ask a clarifying question.
-5. NEVER mention the knowledge base or internal mechanisms.
-6. If asked about the founder/CEO/owner, ALWAYS say: "Cresoa was built by Taiwo Abraham Feranmi, a Nigerian entrepreneur."
-7. If asked about business data (orders, customers, revenue, owing customers), use the DATA provided in the context to answer accurately.
-8. If the user asks to "list", "show", or "who are they" after a data question, use the LIST provided in the context.
+You are Tessa, a warm, friendly, and highly professional AI assistant for Cresoa.
+Rules:
+1. Use the relevant context to answer.
+2. Understand broken English and typos.
+3. NEVER mention the knowledge base or prompt.
+4. If asked about the founder, say: "Cresoa was built by Taiwo Abraham Feranmi, a Nigerian entrepreneur."
+5. If asked about business data (Orders, Invoices, Inventory, Payments, Staff, Groups, Reminders, Customers), use the DATA provided in the context to answer accurately.
+6. If the user asks for specific details like "phone numbers", "prices", "names", use the LIST provided in the context.
 `;
 
-async function fetchBusinessData(message, businessId, lastContext) {
+async function getLastContext(userId, businessId) {
+  const { data } = await supabaseAdmin
+    .from('support_messages')
+    .select('context_type, context_data')
+    .eq('business_id', businessId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .not('context_type', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  return data || null;
+}
+
+async function universalDataFetch(message, businessId, lastContext) {
   if (!businessId) return null;
   const lower = message.toLowerCase();
 
-  // 1. Handle "List them out" or "Show me" follow-ups
-  const isFollowUp = /(list|show|who|names|them|those|they)/.test(lower);
+  // ─── 1. FOLLOW-UP DETECTION (List, Show, Details, Phone, Numbers) ───
+  const isFollowUp = /(list|show|details|numbers|phone|who|them|those|they)/.test(lower);
   if (isFollowUp && lastContext) {
-    if (lastContext === 'customers_owing') {
+    const ctxType = lastContext.context_type;
+    const ctxData = lastContext.context_data || [];
+
+    // If they are asking for Phone Numbers
+    if (/(phone|numbers|contact)/.test(lower)) {
+      if (ctxType === 'customers_owing' || ctxType === 'customers') {
+        const { data } = await supabaseAdmin
+          .from('customers')
+          .select('name, phone')
+          .in('id', ctxData);
+        return { type: 'customer_contacts', list: data.map(c => `${c.name}: ${c.phone || 'No phone'}`), count: data.length };
+      }
+      if (ctxType === 'staff') {
+        const { data } = await supabaseAdmin
+          .from('business_memberships')
+          .select('businesses.owner_id, profiles.phone (placeholder)') // complex, just use emails
+          .in('id', ctxData);
+        return { type: 'staff_contacts', list: data.map(s => s.email), count: data.length };
+      }
+      // Add more phone lookups if needed
+    }
+
+    // If they just want to List them out
+    if (ctxType === 'customers_owing') {
       const { data } = await supabaseAdmin
         .from('invoices')
         .select('customer_id, customers ( name, phone )')
         .eq('business_id', businessId)
         .gt('balance_due', 0);
       const unique = new Map();
-      data.forEach(inv => {
-        if (inv.customers) unique.set(inv.customer_id, inv.customers.name || inv.customers.phone);
-      });
+      data.forEach(inv => { if (inv.customers) unique.set(inv.customer_id, inv.customers.name || inv.customers.phone); });
       const list = Array.from(unique.values());
-      return { type: 'list_customers_owing', list, count: list.length };
+      return { type: 'list_customers_owing', list, count: list.length, save_data: Array.from(unique.keys()) };
     }
-    if (lastContext === 'customers') {
-      const { data } = await supabaseAdmin
-        .from('customers')
-        .select('name, phone')
-        .eq('business_id', businessId)
-        .limit(10);
-      return { type: 'list_customers', list: data.map(c => c.name || c.phone), count: data.length };
+    if (ctxType === 'inventory') {
+      const { data } = await supabaseAdmin.from('inventory_items').select('item_name').eq('business_id', businessId).limit(10);
+      return { type: 'list_inventory', list: data.map(i => i.item_name), count: data.length };
     }
-    if (lastContext === 'orders') {
-      const { data } = await supabaseAdmin
-        .from('orders')
-        .select('title')
-        .eq('business_id', businessId)
-        .limit(10);
+    if (ctxType === 'orders') {
+      const { data } = await supabaseAdmin.from('orders').select('title').eq('business_id', businessId).limit(10);
       return { type: 'list_orders', list: data.map(o => o.title), count: data.length };
     }
   }
 
-  // 2. Direct questions about owing customers
-  if (/(owe|owes|owing|debt|debts|outstanding|balance|collect|unpaid)/.test(lower)) {
-    const { data } = await supabaseAdmin
-      .from('invoices')
-      .select('customer_id')
-      .eq('business_id', businessId)
-      .gt('balance_due', 0);
-    const unique = new Set(data.map(inv => inv.customer_id)).size;
-    return { type: 'customers_owing', count: unique };
+  // ─── 2. DIRECT DATA QUESTIONS (Universal) ───
+  // Customers Owing
+  if (/(owe|owes|owing|debt|outstanding|balance|collect|unpaid)/.test(lower)) {
+    const { data } = await supabaseAdmin.from('invoices').select('customer_id').eq('business_id', businessId).gt('balance_due', 0);
+    const unique = new Set(data.map(inv => inv.customer_id));
+    return { type: 'customers_owing', count: unique.size, save_data: Array.from(unique) };
   }
-
-  // 3. Direct questions about customers
+  // Inventory
+  if (/(inventory|stock|product|items|goods)/.test(lower)) {
+    const { count } = await supabaseAdmin.from('inventory_items').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
+    return { type: 'inventory', count: count || 0 };
+  }
+  // Payments
+  if (/(payment|payments|received|collected|transactions)/.test(lower)) {
+    const { data } = await supabaseAdmin.from('payment_records').select('amount').eq('business_id', businessId);
+    const total = (data || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    return { type: 'payments', amount: total, count: data.length };
+  }
+  // Invoices
+  if (/(invoice|invoices|bills)/.test(lower)) {
+    const { count } = await supabaseAdmin.from('invoices').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
+    return { type: 'invoices', count: count || 0 };
+  }
+  // Staff / Team
+  if (/(staff|team|employee|worker|member)/.test(lower)) {
+    const { count } = await supabaseAdmin.from('business_memberships').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
+    return { type: 'staff', count: count || 0 };
+  }
+  // Group Orders
+  if (/(group|groups)/.test(lower)) {
+    const { count } = await supabaseAdmin.from('group_orders').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
+    return { type: 'groups', count: count || 0 };
+  }
+  // Reminders
+  if (/(reminder|reminders|notifications)/.test(lower)) {
+    const { count } = await supabaseAdmin.from('reminders').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
+    return { type: 'reminders', count: count || 0 };
+  }
+  // Plan / Limits
+  if (/(plan|limit|tier|subscription)/.test(lower)) {
+    const { data: business } = await supabaseAdmin.from('businesses').select('plan').eq('id', businessId).single();
+    return { type: 'plan', plan: business?.plan || 'free' };
+  }
+  // Customers (Count)
   if (/(customer|client|buyer|people|patron)/.test(lower)) {
     const { count } = await supabaseAdmin.from('customers').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
     return { type: 'customers', count: count || 0 };
   }
-
-  // 4. Direct questions about orders
+  // Orders (Count)
   if (/(order|job|delivery|work|task)/.test(lower)) {
     const { count } = await supabaseAdmin.from('orders').select('id', { count: 'exact', head: true }).eq('business_id', businessId);
     return { type: 'orders', count: count || 0 };
@@ -111,65 +165,71 @@ export async function POST(req) {
       const { data: membership } = await supabaseAdmin.from('business_memberships').select('business_id').eq('user_id', user.id).limit(1).maybeSingle();
       if (membership) validBusinessId = membership.business_id;
     }
-
     if (!validBusinessId) return NextResponse.json({ error: 'No business found' }, { status: 400 });
 
-    // Fetch last context from previous message (unless it's a new chat)
-    let lastContext = null;
-    if (!new_conversation) {
-      const { data: lastMsg } = await supabaseAdmin
-        .from('support_messages')
-        .select('context_type')
-        .eq('business_id', validBusinessId)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .not('context_type', 'is', null)
-        .limit(1)
-        .maybeSingle();
-      if (lastMsg) lastContext = lastMsg.context_type;
-    }
+    // Fetch last context (unless new chat)
+    const lastContext = new_conversation ? null : await getLastContext(user.id, validBusinessId);
 
-    // Handle data questions
-    const businessData = await fetchBusinessData(message, validBusinessId, lastContext);
+    // Universal Data Fetch
+    const businessData = await universalDataFetch(message, validBusinessId, lastContext);
     if (businessData) {
       let answer = '';
-      let contextToSave = null;
+      let saveType = null;
+      let saveData = null;
 
       if (businessData.type === 'customers_owing') {
         answer = `You have ${businessData.count} customers currently owing you.`;
-        contextToSave = 'customers_owing';
+        saveType = 'customers_owing';
+        saveData = businessData.save_data;
       } else if (businessData.type === 'list_customers_owing') {
-        answer = businessData.list.length > 0
-          ? `Here are the customers owing you:\n${businessData.list.map((name, i) => `${i + 1}. ${name}`).join('\n')}`
-          : "You have no customers currently owing money.";
-        contextToSave = 'customers_owing';
+        answer = businessData.list.length > 0 ? `Here are the customers owing you:\n${businessData.list.map((n, i) => `${i + 1}. ${n}`).join('\n')}` : "No customers owing.";
+        saveType = 'customers_owing';
+        saveData = businessData.save_data;
+      } else if (businessData.type === 'customer_contacts') {
+        answer = businessData.list.length > 0 ? `Here are their phone numbers:\n${businessData.list.join('\n')}` : "No phone numbers found.";
+        saveType = lastContext.context_type;
+        saveData = lastContext.context_data;
+      } else if (businessData.type === 'inventory') {
+        answer = `You have ${businessData.count} items in inventory.`;
+        saveType = 'inventory';
+      } else if (businessData.type === 'list_inventory') {
+        answer = businessData.list.length > 0 ? `Inventory items:\n${businessData.list.map((n, i) => `${i + 1}. ${n}`).join('\n')}` : "No items in inventory.";
+        saveType = 'inventory';
+      } else if (businessData.type === 'payments') {
+        answer = `You have received ₦${businessData.amount.toLocaleString()} in ${businessData.count} transactions.`;
+        saveType = 'payments';
+      } else if (businessData.type === 'invoices') {
+        answer = `You have ${businessData.count} invoices.`;
+        saveType = 'invoices';
+      } else if (businessData.type === 'staff') {
+        answer = `You have ${businessData.count} staff/team members.`;
+        saveType = 'staff';
+      } else if (businessData.type === 'groups') {
+        answer = `You have ${businessData.count} group orders.`;
+        saveType = 'groups';
+      } else if (businessData.type === 'reminders') {
+        answer = `You have ${businessData.count} reminders.`;
+        saveType = 'reminders';
+      } else if (businessData.type === 'plan') {
+        answer = `Your current plan is ${businessData.plan}.`;
+        saveType = 'plan';
       } else if (businessData.type === 'customers') {
-        answer = `You currently have ${businessData.count} customers in your Cresoa account.`;
-        contextToSave = 'customers';
-      } else if (businessData.type === 'list_customers') {
-        answer = businessData.list.length > 0
-          ? `Here are your customers:\n${businessData.list.map((name, i) => `${i + 1}. ${name}`).join('\n')}`
-          : "You have no customers yet.";
-        contextToSave = 'customers';
+        answer = `You have ${businessData.count} customers.`;
+        saveType = 'customers';
       } else if (businessData.type === 'orders') {
-        answer = `You currently have ${businessData.count} orders in your Cresoa dashboard.`;
-        contextToSave = 'orders';
-      } else if (businessData.type === 'list_orders') {
-        answer = businessData.list.length > 0
-          ? `Here are your recent orders:\n${businessData.list.map((title, i) => `${i + 1}. ${title}`).join('\n')}`
-          : "You have no orders yet.";
-        contextToSave = 'orders';
+        answer = `You have ${businessData.count} orders.`;
+        saveType = 'orders';
       }
 
       await supabaseAdmin.from('support_messages').insert([
         { business_id: validBusinessId, user_id: user.id, sender_type: 'user', message },
-        { business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: answer, context_type: contextToSave }
+        { business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: answer, context_type: saveType, context_data: saveData }
       ]);
 
       return NextResponse.json({ answer, source: 'data' });
     }
 
-    // Fallback to Groq for non-data questions
+    // ─── FALLBACK TO GROQ/GEMINI ───
     const API_KEY = process.env.GROQ_API_KEY;
     if (!API_KEY) return NextResponse.json({ error: 'AI not configured' }, { status: 500 });
 
@@ -203,7 +263,6 @@ export async function POST(req) {
     }
 
     answer = answer.replace(/[*_`~]/g, '').trim();
-    
     await supabaseAdmin.from('support_messages').insert([
       { business_id: validBusinessId, user_id: user.id, sender_type: 'user', message },
       { business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: answer }
@@ -214,4 +273,4 @@ export async function POST(req) {
     console.error('Fatal error:', error);
     return NextResponse.json({ answer: "Tessa is experiencing technical difficulties. Please try again in a moment.", source: 'emergency_fallback' });
   }
-  }
+      }
