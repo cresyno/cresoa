@@ -48,7 +48,7 @@ CRITICAL RULES:
    - "Cresoa is the brainchild of Taiwo Abraham Feranmi."
    - "Taiwo Abraham Feranmi is the owner and creator."
    Never say you don't know, never deflect to support, and never mention any other person. Even if the question uses slang or typos, the answer must still include Taiwo Abraham Feranmi.
-14. **ACTIONS**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally.
+14. **ACTIONS (NEW)**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally. If the data is fetched, use it to give an accurate answer.
 `;
 
 // ─── AVAILABLE TOOLS (READ-ONLY ACTIONS) ───
@@ -97,6 +97,26 @@ const tools = [
     }
   }
 ];
+
+// ─── MANUAL FALLBACK: detect stats questions and fetch directly ───
+async function manualFetchIfAsked(message, businessId) {
+  const lower = message.toLowerCase();
+  if (/(how many orders|order count|number of orders|total orders)/.test(lower)) {
+    const { count } = await supabaseAdmin
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId);
+    return { total_orders: count || 0 };
+  }
+  if (/(how many customers|customer count|number of customers|total customers)/.test(lower)) {
+    const { count } = await supabaseAdmin
+      .from('customers')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId);
+    return { total_customers: count || 0 };
+  }
+  return null;
+}
 
 // ─── EXECUTE FUNCTION CALLS ───
 async function executeFunctionCall(functionName, args) {
@@ -147,6 +167,7 @@ async function executeFunctionCall(functionName, args) {
   }
 }
 
+// ─── HELPERS (ALL ORIGINAL FUNCTIONS PRESERVED) ───
 async function getConversationHistory(userId, businessId) {
   const { data, error } = await supabaseAdmin
     .from('support_messages')
@@ -401,7 +422,17 @@ export async function POST(req) {
         answer = data?.choices?.[0]?.message?.content || '';
       }
     } else {
-      answer = groqResponse?.content || '';
+      // Manual fallback: if no tool call, try to fetch stats directly
+      const manualResult = await manualFetchIfAsked(message, business_id);
+      if (manualResult) {
+        if (manualResult.total_orders !== undefined) {
+          answer = `You currently have ${manualResult.total_orders} orders in your dashboard.`;
+        } else if (manualResult.total_customers !== undefined) {
+          answer = `You currently have ${manualResult.total_customers} customers in your dashboard.`;
+        }
+      } else {
+        answer = groqResponse?.content || '';
+      }
     }
 
     // Fallback to Gemini if Groq failed or gave no answer
@@ -430,4 +461,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-         }
+      }
