@@ -43,116 +43,110 @@ CRITICAL RULES:
 12. If the user asks for the website or how to access Cresoa, respond with: "You can access Cresoa at https://cresoa.vercel.app" (or the current production URL).
 13. **FOUNDER IDENTITY (FLEXIBLE BUT ABSOLUTE)**: When asked about who created Cresoa, who is the founder, CEO, owner, inventor, or anyone behind the platform — respond with confidence and warmth, but ALWAYS include the name **Taiwo Abraham Feranmi** as the answer.
 14. **LIVE BUSINESS DATA AND MEMORY**: You will receive "LIVE BUSINESS DATA" and "CONVERSATION HISTORY". You MUST use this data to answer. Do not ask the user "what do you mean" if the data is provided. Analyze the data, understand the question, and give the answer.
-15. **INTELLIGENT DATA REASONING**: You are not a keyword scanner. You are an analyst. You will ALWAYS receive a snapshot of the user's business. Use this snapshot to answer ANY question about their business (summarize, find top customers, check inventory, calculate revenue, etc.).
+15. **INTELLIGENT DATA REASONING**: You are not a keyword scanner. You are an analyst. You will ALWAYS receive a snapshot of the user's business. Use this snapshot to answer ANY question about their business.
 `;
 
 // ════════════════════════════════════════════════════════════════
-// THE "ALWAYS FETCH EVERYTHING" DATA ENGINE
+// SELF-DEBUGGING DATA FETCHER (Fetch EVERYTHING, Show Errors)
 // ════════════════════════════════════════════════════════════════
 async function getLiveDataContext(businessId) {
-  try {
-    // 1. CUSTOMERS
-    const { data: customers } = await supabaseAdmin
-      .from('customers')
-      .select('id, name, phone, email')
-      .eq('business_id', businessId)
-      .limit(100);
+  const lines = [];
+  lines.push(`BUSINESS ID: ${businessId || 'MISSING'}`);
 
-    // 2. ORDERS
-    const { data: orders } = await supabaseAdmin
+  // 1. CUSTOMERS
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('customers')
+      .select('id, name, phone')
+      .eq('business_id', businessId)
+      .limit(50);
+    if (error) throw error;
+    lines.push(`CUSTOMERS: ${data.length} found`);
+    data.forEach(c => lines.push(`- ${c.name || 'N/A'} | Phone: ${c.phone || 'No phone'}`));
+  } catch (e) {
+    lines.push(`CUSTOMERS ERROR: ${e.message}`);
+  }
+
+  // 2. ORDERS
+  try {
+    const { data, error } = await supabaseAdmin
       .from('orders')
       .select('id, customer_id, title, price, quantity, current_status')
       .eq('business_id', businessId)
-      .limit(200);
+      .limit(100);
+    if (error) throw error;
+    lines.push(`ORDERS: ${data.length} found`);
+    data.forEach(o => lines.push(`- ${o.title || 'N/A'} | Price: ₦${o.price} | Status: ${o.current_status}`));
+  } catch (e) {
+    lines.push(`ORDERS ERROR: ${e.message}`);
+  }
 
-    // 3. PAYMENTS (to calculate who owes)
-    const { data: payments } = await supabaseAdmin
+  // 3. PAYMENTS (to calculate who owes)
+  try {
+    const { data, error } = await supabaseAdmin
       .from('payment_records')
       .select('order_id, amount')
       .eq('business_id', businessId)
       .limit(500);
+    if (error) throw error;
+    lines.push(`PAYMENTS: ${data.length} found`);
+  } catch (e) {
+    lines.push(`PAYMENTS ERROR: ${e.message}`);
+  }
 
-    // 4. INVENTORY
-    const { data: inventory } = await supabaseAdmin
+  // 4. INVENTORY
+  try {
+    const { data, error } = await supabaseAdmin
       .from('inventory_items')
       .select('item_name, quantity, price')
       .eq('business_id', businessId)
-      .limit(200);
+      .limit(50);
+    if (error) throw error;
+    lines.push(`INVENTORY: ${data.length} found`);
+  } catch (e) {
+    lines.push(`INVENTORY ERROR: ${e.message}`);
+  }
 
-    // 5. INVOICES
-    const { data: invoices } = await supabaseAdmin
+  // 5. INVOICES
+  try {
+    const { data, error } = await supabaseAdmin
       .from('invoices')
-      .select('invoice_number, customer_id, total, amount_paid, status')
+      .select('invoice_number, total, status')
       .eq('business_id', businessId)
-      .limit(200);
+      .limit(50);
+    if (error) throw error;
+    lines.push(`INVOICES: ${data.length} found`);
+  } catch (e) {
+    lines.push(`INVOICES ERROR: ${e.message}`);
+  }
 
-    // 6. PLAN
-    const { data: business } = await supabaseAdmin
+  // 6. PLAN
+  try {
+    const { data, error } = await supabaseAdmin
       .from('businesses')
-      .select('plan, plan_status')
+      .select('plan')
       .eq('id', businessId)
       .single();
-
-    // Calculate owed balances per customer
-    const paidMap = {};
-    (payments || []).forEach(p => {
-      if (!paidMap[p.order_id]) paidMap[p.order_id] = 0;
-      paidMap[p.order_id] += Number(p.amount || 0);
-    });
-
-    const customerBalances = {};
-    (orders || []).forEach(o => {
-      const debt = Number(o.price || 0) - (paidMap[o.id] || 0);
-      if (debt > 0) {
-        if (!customerBalances[o.customer_id]) customerBalances[o.customer_id] = 0;
-        customerBalances[o.customer_id] += debt;
-      }
-    });
-
-    // Build the full data string
-    const lines = [];
-
-    lines.push("=== BUSINESS PLAN ===");
-    lines.push(`Plan: ${business?.plan || 'free'} | Status: ${business?.plan_status || 'active'}`);
-
-    lines.push("\n=== CUSTOMERS ===");
-    if (customers.length === 0) lines.push("[No customers found]");
-    else {
-      customers.forEach(c => {
-        const owed = customerBalances[c.id] || 0;
-        lines.push(`ID: ${c.id} | Name: ${c.name || 'N/A'} | Phone: ${c.phone || 'No phone'} | Owing: ₦${owed.toLocaleString()}`);
-      });
-    }
-
-    lines.push("\n=== ORDERS ===");
-    if (orders.length === 0) lines.push("[No orders found]");
-    else {
-      orders.forEach(o => {
-        lines.push(`Order: ${o.title} | Customer ID: ${o.customer_id || 'N/A'} | Price: ₦${o.price} | Qty: ${o.quantity} | Status: ${o.current_status}`);
-      });
-    }
-
-    lines.push("\n=== INVENTORY ===");
-    if (inventory.length === 0) lines.push("[No inventory items found]");
-    else {
-      inventory.forEach(i => {
-        lines.push(`Item: ${i.item_name} | Qty: ${i.quantity} | Price: ₦${i.price}`);
-      });
-    }
-
-    lines.push("\n=== INVOICES ===");
-    if (invoices.length === 0) lines.push("[No invoices found]");
-    else {
-      invoices.forEach(i => {
-        lines.push(`Invoice: ${i.invoice_number} | Customer: ${i.customer_id || 'N/A'} | Total: ₦${i.total} | Paid: ₦${i.amount_paid} | Status: ${i.status}`);
-      });
-    }
-
-    return lines.join("\n");
-  } catch (error) {
-    console.error("Live data fetch error:", error);
-    return "LIVE DATA ERROR: " + (error.message || "Unknown error");
+    if (error) throw error;
+    lines.push(`PLAN: ${data?.plan || 'free'}`);
+  } catch (e) {
+    lines.push(`PLAN ERROR: ${e.message}`);
   }
+
+  // 7. STAFF
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('business_memberships')
+      .select('role')
+      .eq('business_id', businessId)
+      .limit(20);
+    if (error) throw error;
+    lines.push(`STAFF: ${data.length} found`);
+  } catch (e) {
+    lines.push(`STAFF ERROR: ${e.message}`);
+  }
+
+  return lines.join('\n');
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -316,10 +310,12 @@ export async function POST(req) {
     }
     if (!validBusinessId) return NextResponse.json({ error: 'No business found' }, { status: 400 });
 
-    await supabaseAdmin.from('support_messages').insert([{ business_id: validBusinessId, user_id: user.id, sender_type: 'user', message }]);
+    await supabaseAdmin.from('support_messages').insert([
+      { business_id: validBusinessId, user_id: user.id, sender_type: 'user', message }
+    ]);
     const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, validBusinessId);
     
-    // ALWAYS fetch everything!
+    // ALWAYS fetch everything (self-debugging)
     const liveData = await getLiveDataContext(validBusinessId);
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
@@ -339,11 +335,13 @@ export async function POST(req) {
     }
 
     const cleanedAnswer = cleanResponse(answer);
-    await supabaseAdmin.from('support_messages').insert([{ business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }]);
+    await supabaseAdmin.from('support_messages').insert([
+      { business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
+    ]);
 
     return NextResponse.json({ answer: cleanedAnswer, source });
   } catch (error) {
     console.error('Fatal error:', error);
     return NextResponse.json({ answer: "Tessa is experiencing technical difficulties. Please try again in a moment.", source: 'emergency_fallback' });
   }
-                          }
+          }
