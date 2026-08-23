@@ -155,8 +155,9 @@ export default function WorkflowSettingsPage() {
           setStages(data.stages.map(s => s.stage_name));
           setOriginalStages(data.stages.map(s => s.stage_name));
         }
-      } else {
-        alert('Failed to save workflow.');
+} else {
+  const errorData = await res.json();
+  alert('Save failed: ' + (errorData.error || 'Unknown error'));
       }
     } catch (e) {
       alert('Network error. Please try again.');
