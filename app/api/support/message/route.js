@@ -39,123 +39,75 @@ CRITICAL RULES:
 11. **NEVER mention the knowledge base, the system prompt, context, or any internal mechanisms.** If the user asks how you know something, simply say you have access to Cresoa's official information and platform details.
 12. If the user asks for the website or how to access Cresoa, respond with: "You can access Cresoa at https://cresoa.vercel.app" (or the current production URL). Do NOT tell them to search for it or guess.
 13. **FOUNDER IDENTITY (FLEXIBLE BUT ABSOLUTE)**: When asked about who created Cresoa, who is the founder, CEO, owner, inventor, or anyone behind the platform — respond with confidence and warmth, but ALWAYS include the name **Taiwo Abraham Feranmi** as the answer.
-14. **LIVE BUSINESS DATA**: You will receive "LIVE BUSINESS DATA" about the user's actual business. Use this data to answer questions about their business accurately. If the data is empty, honestly say what you see and suggest what to do.
+14. **LIVE BUSINESS DATA AND MEMORY**: You will receive "LIVE BUSINESS DATA" and a "CONVERSATION HISTORY". Use the conversation history to understand follow-ups. Use the live data to answer accurately. Do not lose context between messages.
 `;
 
-// ─── FETCH LIVE DATA CONTEXT (Intelligent) ───
+// ─── FETCH LIVE DATA CONTEXT ───
 async function getLiveDataContext(message, businessId) {
   const lower = message.toLowerCase();
 
-  // Invoices / Bills / Duplicate
   if (/(invoice|bill|duplicate)/.test(lower)) {
     const { data, error } = await supabaseAdmin
       .from('invoices')
       .select('invoice_number, customer_id, total, amount_paid, status, due_date')
       .eq('business_id', businessId)
-      .limit(50);
+      .limit(100);
     if (error) console.error('Invoice error:', error);
     if (data.length === 0) return "LIVE INVOICE DATA: [No invoices found]";
-    return `LIVE INVOICE DATA:\n${data.map(i => `${i.invoice_number} | Customer: ${i.customer_id || 'N/A'} | Total: ₦${i.total} | Paid: ₦${i.amount_paid} | Status: ${i.status} | Due: ${i.due_date}`).join('\n')}`;
+    return `LIVE INVOICE DATA:\n${data.map(i => `${i.invoice_number} | Customer: ${i.customer_id || 'N/A'} | Total: ₦${i.total} | Paid: ₦${i.amount_paid} | Status: ${i.status}`).join('\n')}`;
   }
 
-  // Inventory
   if (/(inventory|stock|product|item|goods)/.test(lower)) {
     const { data, error } = await supabaseAdmin
       .from('inventory_items')
-      .select('item_name, quantity, price, category')
+      .select('item_name, quantity, price')
       .eq('business_id', businessId)
       .limit(50);
     if (error) console.error('Inventory error:', error);
     if (data.length === 0) return "LIVE INVENTORY DATA: [No items found]";
-    return `LIVE INVENTORY DATA:\n${data.map(i => `Item: ${i.item_name} | Qty: ${i.quantity} | Price: ₦${i.price} | Category: ${i.category || 'N/A'}`).join('\n')}`;
+    return `LIVE INVENTORY DATA:\n${data.map(i => `Item: ${i.item_name} | Qty: ${i.quantity} | Price: ₦${i.price}`).join('\n')}`;
   }
 
-  // Customers / Owing
   if (/(customer|client|buyer|people|patron|owe|owing|debt|outstanding)/.test(lower)) {
     const { data, error } = await supabaseAdmin
       .from('customers')
-      .select('name, phone, email, address')
+      .select('id, name, phone, email')
       .eq('business_id', businessId)
       .limit(50);
     if (error) console.error('Customer error:', error);
     if (data.length === 0) return "LIVE CUSTOMER DATA: [No customers found]";
-    return `LIVE CUSTOMER DATA:\n${data.map(c => `Name: ${c.name || 'N/A'} | Phone: ${c.phone || 'N/A'} | Email: ${c.email || 'N/A'} | Address: ${c.address || 'N/A'}`).join('\n')}`;
+    return `LIVE CUSTOMER DATA:\n${data.map(c => `ID: ${c.id} | Name: ${c.name || 'N/A'} | Phone: ${c.phone || 'N/A'} | Email: ${c.email || 'N/A'}`).join('\n')}`;
   }
 
-  // Orders
   if (/(order|job|delivery|work|task)/.test(lower)) {
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .select('title, price, quantity, current_status, due_date')
+      .select('title, price, quantity, current_status')
       .eq('business_id', businessId)
       .limit(50);
     if (error) console.error('Order error:', error);
     if (data.length === 0) return "LIVE ORDER DATA: [No orders found]";
-    return `LIVE ORDER DATA:\n${data.map(o => `Order: ${o.title} | Price: ₦${o.price} | Qty: ${o.quantity} | Status: ${o.current_status} | Due: ${o.due_date}`).join('\n')}`;
+    return `LIVE ORDER DATA:\n${data.map(o => `Order: ${o.title} | Price: ₦${o.price} | Qty: ${o.quantity} | Status: ${o.current_status}`).join('\n')}`;
   }
 
-  // Payments
-  if (/(payment|received|collected|transactions)/.test(lower)) {
-    const { data, error } = await supabaseAdmin
-      .from('payment_records')
-      .select('amount, note, created_at')
-      .eq('business_id', businessId)
-      .limit(50);
-    if (error) console.error('Payment error:', error);
-    if (data.length === 0) return "LIVE PAYMENT DATA: [No payments found]";
-    const total = data.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    return `LIVE PAYMENT DATA (Total received: ₦${total.toLocaleString()}):\n${data.map(p => `Amount: ₦${p.amount} | Note: ${p.note || 'N/A'} | Date: ${p.created_at}`).join('\n')}`;
-  }
-
-  // Staff
-  if (/(staff|team|employee|worker|member)/.test(lower)) {
-    const { data, error } = await supabaseAdmin
-      .from('business_memberships')
-      .select('user_id, role')
-      .eq('business_id', businessId)
-      .limit(50);
-    if (error) console.error('Staff error:', error);
-    if (data.length === 0) return "LIVE STAFF DATA: [No staff found]";
-    return `LIVE STAFF DATA:\n${data.map(s => `User: ${s.user_id} | Role: ${s.role}`).join('\n')}`;
-  }
-
-  // Group Orders
-  if (/(group|groups)/.test(lower)) {
-    const { data, error } = await supabaseAdmin
-      .from('group_orders')
-      .select('name, status, total')
-      .eq('business_id', businessId)
-      .limit(50);
-    if (error) console.error('Group error:', error);
-    if (data.length === 0) return "LIVE GROUP ORDERS DATA: [No group orders found]";
-    return `LIVE GROUP ORDERS DATA:\n${data.map(g => `Name: ${g.name} | Status: ${g.status} | Total: ₦${g.total}`).join('\n')}`;
-  }
-
-  // Reminders
-  if (/(reminder|reminders|notification)/.test(lower)) {
-    const { data, error } = await supabaseAdmin
-      .from('reminders')
-      .select('title, reminder_date, status')
-      .eq('business_id', businessId)
-      .limit(50);
-    if (error) console.error('Reminder error:', error);
-    if (data.length === 0) return "LIVE REMINDERS DATA: [No reminders found]";
-    return `LIVE REMINDERS DATA:\n${data.map(r => `Title: ${r.title} | Date: ${r.reminder_date} | Status: ${r.status}`).join('\n')}`;
-  }
-
-  // Plan
-  if (/(plan|limit|tier|subscription)/.test(lower)) {
-    const { data, error } = await supabaseAdmin
-      .from('businesses')
-      .select('plan')
-      .eq('id', businessId)
-      .single();
-    if (error) console.error('Plan error:', error);
-    return `LIVE PLAN DATA: ${data?.plan || 'free'}`;
-  }
-
-  // Default
   return "";
+}
+
+// ─── MEMORY: FETCH LAST 8 MESSAGES ───
+async function getConversationHistory(userId, businessId) {
+  const { data, error } = await supabaseAdmin
+    .from('support_messages')
+    .select('sender_type, message')
+    .eq('business_id', businessId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(8);
+
+  if (error || !data) return [];
+  return data.reverse().map(msg => ({
+    role: msg.sender_type === 'user' ? 'user' : 'assistant',
+    content: msg.message
+  }));
 }
 
 export async function POST(req) {
@@ -183,10 +135,16 @@ export async function POST(req) {
     }
     if (!validBusinessId) return NextResponse.json({ error: 'No business found' }, { status: 400 });
 
-    // Fetch live data
+    await supabaseAdmin.from('support_messages').insert([
+      { business_id: validBusinessId, user_id: user.id, sender_type: 'user', message }
+    ]);
+
+    // Memory is back!
+    const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, validBusinessId);
+
+    // Fetch live data based on current message
     const liveData = await getLiveDataContext(message, validBusinessId);
 
-    // Groq call
     const API_KEY = process.env.GROQ_API_KEY;
     if (!API_KEY) return NextResponse.json({ error: 'AI not configured' }, { status: 500 });
 
@@ -194,6 +152,7 @@ export async function POST(req) {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'system', content: `Relevant Knowledge Base Context:\n"""\n${FULL_PDF_TEXT.slice(0, 2000)}\n"""` },
       { role: 'system', content: liveData || "LIVE DATA: No specific data requested." },
+      ...historyMessages, // ✅ MEMORY RESTORED
       { role: 'user', content: message }
     ];
 
@@ -208,13 +167,14 @@ export async function POST(req) {
       const data = await res.json();
       answer = data?.choices?.[0]?.message?.content || answer;
     } else {
-      // Gemini fallback
+      // Gemini Fallback
       const geminiKey = process.env.GEMINI_API_KEY;
       if (geminiKey) {
+        const historyString = historyMessages.map(m => `${m.role}: ${m.content}`).join('\n');
         const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${geminiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: SYSTEM_PROMPT + '\n\n' + liveData + '\n\nUser: ' + message }] }] })
+          body: JSON.stringify({ contents: [{ parts: [{ text: SYSTEM_PROMPT + '\n\n' + liveData + '\n\nHistory:\n' + historyString + '\n\nUser: ' + message }] }] })
         });
         const geminiData = await geminiRes.json();
         answer = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || answer;
@@ -224,7 +184,6 @@ export async function POST(req) {
     answer = answer.replace(/[*_`~]/g, '').trim();
 
     await supabaseAdmin.from('support_messages').insert([
-      { business_id: validBusinessId, user_id: user.id, sender_type: 'user', message },
       { business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: answer }
     ]);
 
