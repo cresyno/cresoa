@@ -5,6 +5,16 @@ import { supabase } from '../../lib/supabaseClient';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 
+// 🎤 Mic Icon (self-contained)
+const MicIcon = ({ size = 20, stroke = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8" y1="23" x2="16" y2="23" />
+  </svg>
+);
+
 export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
   const [messages, setMessages] = useState([
     { role: 'assistant', text: `Hi 👋, I'm Tessa. Ask me anything about your business.` }
@@ -13,6 +23,10 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
   const [input, setInput] = useState('');
   const [sheetHeight, setSheetHeight] = useState('25vh');
   const [isNewConversation, setIsNewConversation] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  
+  // Voice recognition ref
+  const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const dragStartY = useRef(null);
@@ -55,7 +69,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
   // ✅ Reset the flag so memory works again on the NEXT open
   useEffect(() => {
     if (isOpen && isNewConversation) {
-      // This ensures the NEXT time the user opens, it fetches history
       const timer = setTimeout(() => setIsNewConversation(false), 100);
       return () => clearTimeout(timer);
     }
@@ -73,9 +86,59 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
     setInput('');
   };
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-    const text = input.trim();
+  // 🎤 VOICE RECOGNITION SETUP
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-NG'; // Nigerian English support
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onend = () => setIsRecording(false);
+      recognition.onerror = (event) => {
+        console.error('Voice error:', event.error);
+        setIsRecording(false);
+        if (event.error === 'not-allowed') {
+          alert('Microphone permission denied. Please enable it in your browser settings.');
+        }
+      };
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        // Auto-send after voice capture
+        handleSendMessage(transcript);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []); // Empty deps – setup once
+
+  // Toggle recording
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      alert('Voice input is not supported on this device. Please type instead.');
+      return;
+    }
+    if (isRecording) {
+      recognitionRef.current.stop();
+    } else {
+      // Clear previous input? Optional – we can keep it or clear.
+      setInput('');
+      recognitionRef.current.start();
+    }
+  };
+
+  const handleSendMessage = async (forcedText) => {
+    const text = forcedText || input;
+    if (!text.trim() || isLoading) return;
+    
+    // If recording, stop it (will auto-send via onresult, but we already have text)
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setMessages(prev => [...prev, { role: 'user', text }]);
@@ -206,7 +269,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input with Rainbow Send Button */}
+        {/* Input with Mic + Rainbow Send Button */}
         <div style={{ padding: '0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexShrink: 0 }}>
           <div style={{ flex: 1, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '24px', padding: '0.3rem 0.3rem 0.3rem 1rem', display: 'flex', alignItems: 'flex-end' }}>
             <textarea
@@ -219,10 +282,32 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
               style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--color-text)', fontSize: '0.9rem', resize: 'none', minHeight: '32px', maxHeight: '100px', lineHeight: '1.4', fontFamily: 'inherit' }}
             />
             
+            {/* 🎤 Mic Button */}
+            <button 
+              onClick={toggleRecording}
+              disabled={isLoading}
+              style={{
+                background: isRecording ? 'var(--color-danger)' : 'transparent',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                marginRight: '4px',
+                transition: 'background 0.2s'
+              }}
+              aria-label="Voice input"
+            >
+              <MicIcon size={20} stroke={isRecording ? '#fff' : 'var(--color-text-muted)'} />
+            </button>
+
             {/* 🎨 ANIMATED RAINBOW SEND BUTTON */}
             <div style={{ width: '38px', height: '38px', padding: '3px', borderRadius: '50%', background: 'conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)', animation: 'spin 3s linear infinite', flexShrink: 0 }}>
               <button 
-                onClick={handleSendMessage} 
+                onClick={() => handleSendMessage()} 
                 disabled={!input.trim() || isLoading} 
                 style={{ 
                   background: 'var(--color-primary)', 
@@ -248,4 +333,4 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId }) {
       </div>
     </div>
   );
-                  }
+                                }
