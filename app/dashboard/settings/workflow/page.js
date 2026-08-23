@@ -70,12 +70,16 @@ export default function WorkflowSettingsPage() {
   // ─── Fetch current stages ───
   useEffect(() => {
     const fetchStages = async () => {
-      if (!businessId) return;
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/settings/workflow?business_id=${businessId}`);
-        const data = await res.json();
-
+  if (!businessId) return;
+  setLoading(true);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    
+    const res = await fetch(`/api/settings/workflow?business_id=${businessId}`, {
+      headers: { 'Authorization': `Bearer ${token}` } // ✅ ADD THIS
+    });
+    // ... rest of the code
         let fetchedStages = [];
         if (data.stages && data.stages.length > 0) {
           fetchedStages = data.stages.map(s => s.stage_name);
@@ -126,23 +130,21 @@ export default function WorkflowSettingsPage() {
   };
 
   const handleSave = async () => {
-    const filledStages = stages.map(s => s.trim()).filter(Boolean);
-    if (filledStages.length < 2) {
-      alert('Please provide at least 2 stages.');
-      return;
-    }
+  // ... validation ...
+  setSaving(true);
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
 
-    setSaving(true);
-    try {
-      const res = await fetch('/api/settings/workflow', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          business_id: businessId,
-          stages: filledStages,
-          // This flag tells the API to update existing orders that have old stage names
-          update_orders: true,
-        })
+    const res = await fetch('/api/settings/workflow', {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // ✅ ADD THIS
+      },
+      body: JSON.stringify({ business_id: businessId, stages: filledStages, update_orders: true })
+    });
+    // ... rest of the code
       });
 
       if (res.ok) {
