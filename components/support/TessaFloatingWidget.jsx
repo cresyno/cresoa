@@ -23,18 +23,19 @@ const TessaLogo = ({ size = 24 }) => {
 
 export default function TessaFloatingWidget() {
   const searchParams = useSearchParams();
-  const businessId = searchParams.get('business_id');
-
+  const [businessId, setBusinessId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Fallback: URL first, then localStorage
+    const urlBiz = searchParams.get('business_id');
+    const storedBiz = localStorage.getItem('selectedBusinessId');
+    setBusinessId(urlBiz || storedBiz || null);
+  }, [searchParams]);
 
-  const handleClick = () => {
-    setIsOpen(true);
-  };
+  const handleClick = () => setIsOpen(true);
 
   if (!mounted) return null;
 
@@ -54,9 +55,7 @@ export default function TessaFloatingWidget() {
           userSelect: 'none',
         }}
       >
-        {/* Rainbow Circle */}
         <div style={{ position: 'relative', width: '56px', height: '56px' }}>
-          {/* Outer rainbow rotating */}
           <div
             style={{
               position: 'absolute',
@@ -67,7 +66,6 @@ export default function TessaFloatingWidget() {
               animation: 'tessaSpin 4s linear infinite',
             }}
           />
-          {/* Inner solid background */}
           <div
             style={{
               position: 'absolute',
@@ -82,8 +80,6 @@ export default function TessaFloatingWidget() {
             <TessaLogo size={24} />
           </div>
         </div>
-
-        {/* Small Label */}
         <span
           style={{
             marginTop: '4px',
@@ -115,4 +111,4 @@ export default function TessaFloatingWidget() {
       />
     </>
   );
-          }
+}
