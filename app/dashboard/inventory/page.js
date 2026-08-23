@@ -254,7 +254,7 @@ export default function InventoryPage() {
             {/* Header + Close */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, color: 'var(--cresoa-text)' }}>Add Item</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+              <button onClick={() => setShowAddModal(false)} style={{ background: '#D4A52A', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
                 <Svg name="x" size={20} stroke="currentColor" />
               </button>
             </div>
