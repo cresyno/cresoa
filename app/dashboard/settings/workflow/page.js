@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { supabase } from '../../../../lib/supabaseClient';
 import { Card } from '../../../../components/Card';
 import { Navigation } from '../../../../components/Navigation';
 
-// ─── Self-contained SVG Icons (No external imports) ───
+// ─── Self-contained SVG icons (No external imports) ───
 const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
@@ -19,7 +20,7 @@ const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>;
 };
 
-// ─── Gold / White Button Styles (Hardcoded to avoid CSS issues) ───
+// ─── Button Styles (Hardcoded Gold/White) ───
 const goldBtn = {
   background: '#D4A52A',
   color: '#fff',
@@ -67,25 +68,26 @@ export default function WorkflowSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // ─── Fetch current stages ───
+  // ─── Fetch current stages (with auth token) ───
   useEffect(() => {
     const fetchStages = async () => {
-  if (!businessId) return;
-  setLoading(true);
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    
-    const res = await fetch(`/api/settings/workflow?business_id=${businessId}`, {
-      headers: { 'Authorization': `Bearer ${token}` } // ✅ ADD THIS
-    });
-    // ... rest of the code
+      if (!businessId) return;
+      setLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        const res = await fetch(`/api/settings/workflow?business_id=${businessId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+
         let fetchedStages = [];
         if (data.stages && data.stages.length > 0) {
           fetchedStages = data.stages.map(s => s.stage_name);
         }
 
-        // If empty, use intelligent defaults based on industry
+        // If empty, use intelligent defaults
         if (fetchedStages.length === 0) {
           fetchedStages = ['Order Placed', 'Cutting', 'Sewing', 'Ready for Pickup', 'Delivered'];
         }
@@ -130,36 +132,45 @@ export default function WorkflowSettingsPage() {
   };
 
   const handleSave = async () => {
-  // ... validation ...
-  setSaving(true);
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    const filledStages = stages.map(s => s.trim()).filter(Boolean);
+    if (filledStages.length < 2) {
+      alert('Please provide at least 2 stages.');
+      return;
+    }
 
-    const res = await fetch('/api/settings/workflow', {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` // ✅ ADD THIS
-      },
-      body: JSON.stringify({ business_id: businessId, stages: filledStages, update_orders: true })
-    });
-    // ... rest of the code
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch('/api/settings/workflow', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          business_id: businessId,
+          stages: filledStages,
+          update_orders: true,
+        }),
       });
 
       if (res.ok) {
         alert('Workflow updated successfully! All existing orders have been updated.');
         setIsEditing(false);
         // Refresh the view
-        const updatedRes = await fetch(`/api/settings/workflow?business_id=${businessId}`);
+        const updatedRes = await fetch(`/api/settings/workflow?business_id=${businessId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
         const data = await updatedRes.json();
         if (data.stages && data.stages.length > 0) {
           setStages(data.stages.map(s => s.stage_name));
           setOriginalStages(data.stages.map(s => s.stage_name));
         }
-} else {
-  const errorData = await res.json();
-  alert('Save failed: ' + (errorData.error || 'Unknown error'));
+      } else {
+        const errorData = await res.json();
+        alert('Save failed: ' + (errorData.error || 'Unknown error'));
       }
     } catch (e) {
       alert('Network error. Please try again.');
@@ -327,4 +338,4 @@ export default function WorkflowSettingsPage() {
       </div>
     </div>
   );
-      }
+    }
