@@ -118,38 +118,61 @@ export default function InventoryPage() {
   }
 
   const handleSaveItem = async () => {
-    if (!formData.item_name || !formData.selling_price) return
-    setSaving(true)
-    try {
-      const { error } = await supabase
-        .from('inventory_items')
-        .insert({
-          business_id: businessId,
-          item_name: formData.item_name,
-          category: formData.category || null,
-          description: formData.description || null,
-          selling_price: Number(formData.selling_price) || 0,
-          cost_price: Number(formData.cost_price) || 0,
-          quantity_on_hand: Number(formData.quantity_on_hand) || 0,
-          reorder_level: Number(formData.reorder_level) || 0,
-        })
-      if (!error) {
-        const { data } = await supabase
-          .from('inventory_items')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('item_name', { ascending: true })
-        if (data) setItems(data)
-        setShowAddModal(false)
-        setStep(1)
-        setFormData({ item_name: '', category: '', description: '', selling_price: '', cost_price: '', quantity_on_hand: '', reorder_level: '' })
-      }
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setSaving(false)
-    }
+  if (!formData.item_name || !formData.selling_price) {
+    alert('Please fill in Item Name and Selling Price.');
+    return;
   }
+  setSaving(true);
+  try {
+    // Fallback to localStorage if businessId is missing
+    let validBusinessId = businessId;
+    if (!validBusinessId && typeof window !== 'undefined') {
+      validBusinessId = localStorage.getItem('selectedBusinessId');
+    }
+    if (!validBusinessId) {
+      alert('Business ID missing. Please reload the page.');
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .insert({
+        business_id: validBusinessId,
+        item_name: formData.item_name,
+        category: formData.category || null,
+        description: formData.description || null,
+        selling_price: Number(formData.selling_price) || 0,
+        cost_price: Number(formData.cost_price) || 0,
+        quantity_on_hand: Number(formData.quantity_on_hand) || 0,
+        reorder_level: Number(formData.reorder_level) || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      alert('Failed to save: ' + error.message);
+      return;
+    }
+
+    // Refresh items
+    const { data } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('business_id', validBusinessId)
+      .order('item_name', { ascending: true });
+    if (data) setItems(data);
+    setShowAddModal(false);
+    setStep(1);
+    setFormData({ item_name: '', category: '', description: '', selling_price: '', cost_price: '', quantity_on_hand: '', reorder_level: '' });
+  } catch (e) {
+    console.error('Unexpected error:', e);
+    alert('Unexpected error: ' + e.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (loading) return <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}><Navigation businessId={businessId} /><p>Loading inventory...</p></div>
 
