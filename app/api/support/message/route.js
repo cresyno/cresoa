@@ -43,136 +43,112 @@ CRITICAL RULES:
 12. If the user asks for the website or how to access Cresoa, respond with: "You can access Cresoa at https://cresoa.vercel.app" (or the current production URL).
 13. **FOUNDER IDENTITY (FLEXIBLE BUT ABSOLUTE)**: When asked about who created Cresoa, who is the founder, CEO, owner, inventor, or anyone behind the platform — respond with confidence and warmth, but ALWAYS include the name **Taiwo Abraham Feranmi** as the answer.
 14. **LIVE BUSINESS DATA AND MEMORY**: You will receive "LIVE BUSINESS DATA" and "CONVERSATION HISTORY". You MUST use this data to answer. Do not ask the user "what do you mean" if the data is provided. Analyze the data, understand the question, and give the answer.
-15. **INTELLIGENT DATA REASONING**: You are not a keyword scanner. You are an analyst. If the user asks about "customers wey owe me", look at the LIVE DATA, find the customers with outstanding balances, and list them. If they ask about "duplicate invoices", find the duplicates. If they ask for "low stock", find the items with low quantities. Use your intelligence to parse the user's intent and extract the correct answer from the data.
+15. **INTELLIGENT DATA REASONING**: You are not a keyword scanner. You are an analyst. You will ALWAYS receive a snapshot of the user's business. Use this snapshot to answer ANY question about their business (summarize, find top customers, check inventory, calculate revenue, etc.).
 `;
 
 // ════════════════════════════════════════════════════════════════
-// THE SAFE, BROAD-DATASET DATA ENGINE (No crashes)
+// THE "ALWAYS FETCH EVERYTHING" DATA ENGINE
 // ════════════════════════════════════════════════════════════════
-async function getLiveDataContext(message, businessId) {
-  const lower = message.toLowerCase();
-
+async function getLiveDataContext(businessId) {
   try {
-    // 1. MONEY / DEBT (SAFE VERSION: Uses payment_records to sum payments)
-    if (/(owe|owing|debt|outstanding|unpaid|collect|balance|money)/.test(lower)) {
-      // Fetch all orders (no amount_paid dependency)
-      const { data: orders, error: orderError } = await supabaseAdmin
-        .from('orders')
-        .select('customer_id, price')
-        .eq('business_id', businessId);
-      if (orderError) return "LIVE DATA ERROR: " + orderError.message;
+    // 1. CUSTOMERS
+    const { data: customers } = await supabaseAdmin
+      .from('customers')
+      .select('id, name, phone, email')
+      .eq('business_id', businessId)
+      .limit(100);
 
-      // Fetch all payments for this business
-      const { data: payments } = await supabaseAdmin
-        .from('payment_records')
-        .select('order_id, amount')
-        .eq('business_id', businessId);
+    // 2. ORDERS
+    const { data: orders } = await supabaseAdmin
+      .from('orders')
+      .select('id, customer_id, title, price, quantity, current_status')
+      .eq('business_id', businessId)
+      .limit(200);
 
-      // Calculate total paid per order
-      const paidMap = {};
-      (payments || []).forEach(p => {
-        if (!paidMap[p.order_id]) paidMap[p.order_id] = 0;
-        paidMap[p.order_id] += Number(p.amount || 0);
+    // 3. PAYMENTS (to calculate who owes)
+    const { data: payments } = await supabaseAdmin
+      .from('payment_records')
+      .select('order_id, amount')
+      .eq('business_id', businessId)
+      .limit(500);
+
+    // 4. INVENTORY
+    const { data: inventory } = await supabaseAdmin
+      .from('inventory_items')
+      .select('item_name, quantity, price')
+      .eq('business_id', businessId)
+      .limit(200);
+
+    // 5. INVOICES
+    const { data: invoices } = await supabaseAdmin
+      .from('invoices')
+      .select('invoice_number, customer_id, total, amount_paid, status')
+      .eq('business_id', businessId)
+      .limit(200);
+
+    // 6. PLAN
+    const { data: business } = await supabaseAdmin
+      .from('businesses')
+      .select('plan, plan_status')
+      .eq('id', businessId)
+      .single();
+
+    // Calculate owed balances per customer
+    const paidMap = {};
+    (payments || []).forEach(p => {
+      if (!paidMap[p.order_id]) paidMap[p.order_id] = 0;
+      paidMap[p.order_id] += Number(p.amount || 0);
+    });
+
+    const customerBalances = {};
+    (orders || []).forEach(o => {
+      const debt = Number(o.price || 0) - (paidMap[o.id] || 0);
+      if (debt > 0) {
+        if (!customerBalances[o.customer_id]) customerBalances[o.customer_id] = 0;
+        customerBalances[o.customer_id] += debt;
+      }
+    });
+
+    // Build the full data string
+    const lines = [];
+
+    lines.push("=== BUSINESS PLAN ===");
+    lines.push(`Plan: ${business?.plan || 'free'} | Status: ${business?.plan_status || 'active'}`);
+
+    lines.push("\n=== CUSTOMERS ===");
+    if (customers.length === 0) lines.push("[No customers found]");
+    else {
+      customers.forEach(c => {
+        const owed = customerBalances[c.id] || 0;
+        lines.push(`ID: ${c.id} | Name: ${c.name || 'N/A'} | Phone: ${c.phone || 'No phone'} | Owing: ₦${owed.toLocaleString()}`);
       });
+    }
 
-      // Calculate customer balances
-      const customerBalances = {};
+    lines.push("\n=== ORDERS ===");
+    if (orders.length === 0) lines.push("[No orders found]");
+    else {
       orders.forEach(o => {
-        const totalPrice = Number(o.price || 0);
-        const totalPaid = paidMap[o.id] || 0;
-        const debt = totalPrice - totalPaid;
-        if (debt > 0) {
-          if (!customerBalances[o.customer_id]) customerBalances[o.customer_id] = 0;
-          customerBalances[o.customer_id] += debt;
-        }
+        lines.push(`Order: ${o.title} | Customer ID: ${o.customer_id || 'N/A'} | Price: ₦${o.price} | Qty: ${o.quantity} | Status: ${o.current_status}`);
       });
-
-      const customerIds = Object.keys(customerBalances);
-      if (customerIds.length === 0) return "LIVE DATA: [No customers currently owe you]";
-
-      const { data: customers } = await supabaseAdmin
-        .from('customers')
-        .select('name, phone')
-        .in('id', customerIds);
-
-      const formatted = customers.map(c => {
-        const debt = customerBalances[c.id];
-        return `${c.name || 'Customer'} | Phone: ${c.phone || 'No phone'} | Owing: ₦${debt.toLocaleString()}`;
-      }).join('\n');
-
-      return `LIVE CUSTOMER OWING DATA:\n${formatted}`;
     }
 
-    // 2. INVENTORY
-    if (/(inventory|stock|product|item|goods)/.test(lower)) {
-      const { data } = await supabaseAdmin
-        .from('inventory_items')
-        .select('item_name, quantity, price, category')
-        .eq('business_id', businessId);
-      if (data.length === 0) return "LIVE INVENTORY DATA: [No items found]";
-      return `LIVE INVENTORY DATA:\n${data.map(i => `Item: ${i.item_name} | Qty: ${i.quantity} | Price: ₦${i.price} | Category: ${i.category || 'N/A'}`).join('\n')}`;
+    lines.push("\n=== INVENTORY ===");
+    if (inventory.length === 0) lines.push("[No inventory items found]");
+    else {
+      inventory.forEach(i => {
+        lines.push(`Item: ${i.item_name} | Qty: ${i.quantity} | Price: ₦${i.price}`);
+      });
     }
 
-    // 3. ORDERS / JOBS
-    if (/(order|job|delivery|work|task)/.test(lower)) {
-      const { data } = await supabaseAdmin
-        .from('orders')
-        .select('title, price, quantity, current_status')
-        .eq('business_id', businessId);
-      if (data.length === 0) return "LIVE ORDER DATA: [No orders found]";
-      return `LIVE ORDER DATA:\n${data.map(o => `Order: ${o.title} | Price: ₦${o.price} | Qty: ${o.quantity} | Status: ${o.current_status}`).join('\n')}`;
+    lines.push("\n=== INVOICES ===");
+    if (invoices.length === 0) lines.push("[No invoices found]");
+    else {
+      invoices.forEach(i => {
+        lines.push(`Invoice: ${i.invoice_number} | Customer: ${i.customer_id || 'N/A'} | Total: ₦${i.total} | Paid: ₦${i.amount_paid} | Status: ${i.status}`);
+      });
     }
 
-    // 4. INVOICES
-    if (/(invoice|bill|duplicate)/.test(lower)) {
-      const { data } = await supabaseAdmin
-        .from('invoices')
-        .select('invoice_number, customer_id, total, amount_paid, status')
-        .eq('business_id', businessId);
-      if (data.length === 0) return "LIVE INVOICE DATA: [No invoices found]";
-      return `LIVE INVOICE DATA:\n${data.map(i => `${i.invoice_number} | Customer: ${i.customer_id || 'N/A'} | Total: ₦${i.total} | Paid: ₦${i.amount_paid} | Status: ${i.status}`).join('\n')}`;
-    }
-
-    // 5. PLAN / SUBSCRIPTION
-    if (/(plan|limit|tier|subscription|status)/.test(lower)) {
-      const { data } = await supabaseAdmin
-        .from('businesses')
-        .select('plan, plan_status')
-        .eq('id', businessId)
-        .single();
-      const plan = data?.plan || 'free';
-      const limits = {
-        free: { customers: 20, orders: 50, staff: 0, inventory: 20 },
-        starter: { customers: 200, orders: 500, staff: 2, inventory: 100 },
-        pro: { customers: Infinity, orders: Infinity, staff: 10, inventory: Infinity },
-        beta: { customers: 500, orders: 1000, staff: 10, inventory: 500 }
-      };
-      const p = limits[plan] || limits.free;
-      return `LIVE PLAN DATA: Plan is "${plan}". Limits: ${p.customers} customers, ${p.orders} orders, ${p.staff} staff, ${p.inventory} inventory. Status: ${data?.plan_status || 'active'}.`;
-    }
-
-    // 6. PAYMENTS
-    if (/(payment|received|collected|transactions)/.test(lower)) {
-      const { data } = await supabaseAdmin
-        .from('payment_records')
-        .select('amount, note, created_at')
-        .eq('business_id', businessId);
-      if (data.length === 0) return "LIVE PAYMENT DATA: [No payments found]";
-      const total = data.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      return `LIVE PAYMENT DATA (Total: ₦${total.toLocaleString()}):\n${data.map(p => `Amount: ₦${p.amount} | Note: ${p.note || 'N/A'}`).join('\n')}`;
-    }
-
-    // 7. STAFF
-    if (/(staff|team|employee|worker|member)/.test(lower)) {
-      const { data } = await supabaseAdmin
-        .from('business_memberships')
-        .select('role')
-        .eq('business_id', businessId);
-      if (data.length === 0) return "LIVE STAFF DATA: [No staff found]";
-      return `LIVE STAFF DATA:\n${data.map(s => `Role: ${s.role}`).join('\n')}`;
-    }
-
-    return "";
+    return lines.join("\n");
   } catch (error) {
     console.error("Live data fetch error:", error);
     return "LIVE DATA ERROR: " + (error.message || "Unknown error");
@@ -342,7 +318,9 @@ export async function POST(req) {
 
     await supabaseAdmin.from('support_messages').insert([{ business_id: validBusinessId, user_id: user.id, sender_type: 'user', message }]);
     const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, validBusinessId);
-    const liveData = await getLiveDataContext(message, validBusinessId);
+    
+    // ALWAYS fetch everything!
+    const liveData = await getLiveDataContext(validBusinessId);
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
@@ -368,4 +346,4 @@ export async function POST(req) {
     console.error('Fatal error:', error);
     return NextResponse.json({ answer: "Tessa is experiencing technical difficulties. Please try again in a moment.", source: 'emergency_fallback' });
   }
-                                                                  }
+                          }
