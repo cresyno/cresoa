@@ -48,7 +48,105 @@ CRITICAL RULES:
    - "Cresoa is the brainchild of Taiwo Abraham Feranmi."
    - "Taiwo Abraham Feranmi is the owner and creator."
    Never say you don't know, never deflect to support, and never mention any other person. Even if the question uses slang or typos, the answer must still include Taiwo Abraham Feranmi.
+14. **ACTIONS**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally.
 `;
+
+// ─── AVAILABLE TOOLS (READ-ONLY ACTIONS) ───
+const tools = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_business_stats',
+      description: 'Get business stats (total orders, total customers, total revenue, outstanding balance).',
+      parameters: {
+        type: 'object',
+        properties: {
+          business_id: { type: 'string', description: 'The business ID' }
+        },
+        required: ['business_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_plan_limits',
+      description: 'Get the business plan limits (customer limit, order limit, staff limit, inventory limit).',
+      parameters: {
+        type: 'object',
+        properties: {
+          business_id: { type: 'string', description: 'The business ID' }
+        },
+        required: ['business_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_customer_info',
+      description: 'Search for a customer by name or phone.',
+      parameters: {
+        type: 'object',
+        properties: {
+          business_id: { type: 'string', description: 'The business ID' },
+          query: { type: 'string', description: 'Customer name or phone to search' }
+        },
+        required: ['business_id', 'query']
+      }
+    }
+  }
+];
+
+// ─── EXECUTE FUNCTION CALLS ───
+async function executeFunctionCall(functionName, args) {
+  const { business_id } = args;
+  if (!business_id) return { error: 'business_id is required' };
+
+  switch (functionName) {
+    case 'get_business_stats': {
+      const [ordersCount, customersCount, revenueData, outstandingData] = await Promise.all([
+        supabaseAdmin.from('orders').select('id', { count: 'exact', head: true }).eq('business_id', business_id),
+        supabaseAdmin.from('customers').select('id', { count: 'exact', head: true }).eq('business_id', business_id),
+        supabaseAdmin.from('orders').select('price').eq('business_id', business_id),
+        supabaseAdmin.from('invoices').select('total, amount_paid').eq('business_id', business_id)
+      ]);
+
+      const totalRevenue = (revenueData.data || []).reduce((sum, o) => sum + Number(o.price || 0), 0);
+      const outstanding = (outstandingData.data || []).reduce((sum, inv) => sum + (Number(inv.total) - Number(inv.amount_paid) || 0), 0);
+
+      return {
+        total_orders: ordersCount.count || 0,
+        total_customers: customersCount.count || 0,
+        total_revenue: totalRevenue,
+        outstanding_balance: outstanding
+      };
+    }
+    case 'get_plan_limits': {
+      const { data: business } = await supabaseAdmin.from('businesses').select('plan').eq('id', business_id).single();
+      const plan = business?.plan || 'free';
+      const limits = {
+        free: { customers: 20, orders: 50, staff: 0, inventory: 20 },
+        starter: { customers: 200, orders: 500, staff: 2, inventory: 100 },
+        pro: { customers: Infinity, orders: Infinity, staff: 10, inventory: Infinity },
+        beta: { customers: 500, orders: 1000, staff: 10, inventory: 500 }
+      };
+      return { plan, limits: limits[plan] || limits.free };
+    }
+    case 'get_customer_info': {
+      const { data } = await supabaseAdmin
+        .from('customers')
+        .select('*')
+        .eq('business_id', business_id)
+        .or(`name.ilike.%${args.query}%,phone.ilike.%${args.query}%`)
+        .limit(3);
+      return data || [];
+    }
+    default:
+      return { error: 'Unknown function' };
+  }
+}
+
 async function getConversationHistory(userId, businessId) {
   const { data, error } = await supabaseAdmin
     .from('support_messages')
@@ -130,15 +228,12 @@ function expandTerms(text) {
     'products': 'items',
     'tessa': 'tessa',
   };
-  // Replace common misspellings via fuzzy mapping
   const words = lower.split(/\s+/);
   const expanded = [];
   for (const w of words) {
     let found = w;
-    // try exact mapping
     if (mapping[w]) found = mapping[w];
     else {
-      // fuzzy match if length > 3 and within distance 2
       let best = null, bestDist = 99;
       for (const key of Object.keys(mapping)) {
         if (key.length > 2 && Math.abs(key.length - w.length) <= 2) {
@@ -157,11 +252,9 @@ function expandTerms(text) {
 }
 
 async function getRelevantChunks(query) {
-  // Normalize query for better matching
   const normalizedQuery = expandTerms(query);
   const lower = normalizedQuery.toLowerCase();
 
-  // 1. VECTOR SEARCH (lenient) – use normalized query
   const queryEmbedding = await getEmbedding(normalizedQuery);
   if (queryEmbedding) {
     const vectorString = JSON.stringify(queryEmbedding);
@@ -176,17 +269,15 @@ async function getRelevantChunks(query) {
     }
   }
 
-  // 2. KEYWORD FALLBACK (broader, with fuzzy matching)
   const chunks = FULL_PDF_TEXT.split(/\n\s*\n|##\s*/).filter(chunk => chunk.trim().length > 50);
-  const keywords = lower.split(' ').filter(w => w.length >= 3); // ignore very short words
+  const keywords = lower.split(' ').filter(w => w.length >= 3);
   const scored = chunks.map(chunk => {
     const lowerChunk = chunk.toLowerCase();
     let score = 0;
     for (const word of keywords) {
       if (lowerChunk.includes(word)) score++;
       else {
-        // fuzzy match against chunk words
-        const chunkWords = lowerChunk.split(/\s+/).slice(0, 100); // limit
+        const chunkWords = lowerChunk.split(/\s+/).slice(0, 100);
         for (const cw of chunkWords) {
           if (cw.length > 3 && levenshtein(word, cw) <= 2) {
             score += 0.5;
@@ -201,11 +292,10 @@ async function getRelevantChunks(query) {
   const relevant = topChunks.map(c => c.text).filter(t => t.length > 0);
   if (relevant.length > 0) return relevant;
 
-  // 3. SAFE GENERAL FALLBACK (never empty)
   return ["Cresoa is a business management platform for Nigerian SMEs. For more specific details, please ask about a particular feature or plan."];
 }
 
-async function callGroq(message, contextString, historyMessages) {
+async function callGroq(message, contextString, historyMessages, tools) {
   const API_KEY = process.env.GROQ_API_KEY;
   if (!API_KEY) return null;
 
@@ -223,13 +313,14 @@ async function callGroq(message, contextString, historyMessages) {
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b',
         messages,
+        tools,
         temperature: 0.2
       })
     });
 
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.choices?.[0]?.message?.content || null;
+    return data?.choices?.[0]?.message || null;
   } catch (e) { return null; }
 }
 
@@ -278,9 +369,42 @@ export async function POST(req) {
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
-    let answer = await callGroq(message, contextString, historyMessages);
+    let answer = '';
     let source = 'groq';
 
+    // Call Groq with tools
+    const groqResponse = await callGroq(message, contextString, historyMessages, tools);
+    if (groqResponse?.tool_calls) {
+      // Execute function calls
+      const toolResults = [];
+      for (const toolCall of groqResponse.tool_calls) {
+        const args = JSON.parse(toolCall.function.arguments);
+        const result = await executeFunctionCall(toolCall.function.name, args);
+        toolResults.push({ role: 'tool', tool_call_id: toolCall.id, content: JSON.stringify(result) });
+      }
+      // Send back to Groq for final answer
+      const finalMessages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: `Relevant Knowledge Base Context:\n"""\n${contextString}\n"""` },
+        ...historyMessages,
+        { role: 'user', content: message },
+        ...groqResponse.tool_calls.map(tc => ({ role: 'assistant', content: null, tool_calls: [tc] })),
+        ...toolResults
+      ];
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'openai/gpt-oss-20b', messages: finalMessages, temperature: 0.2 })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        answer = data?.choices?.[0]?.message?.content || '';
+      }
+    } else {
+      answer = groqResponse?.content || '';
+    }
+
+    // Fallback to Gemini if Groq failed or gave no answer
     if (!answer) {
       console.warn('Groq failed, falling back to Gemini...');
       answer = await callGemini(message, contextString, historyMessages);
@@ -306,4 +430,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-}
+         }
