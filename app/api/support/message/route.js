@@ -48,7 +48,7 @@ CRITICAL RULES:
    - "Cresoa is the brainchild of Taiwo Abraham Feranmi."
    - "Taiwo Abraham Feranmi is the owner and creator."
    Never say you don't know, never deflect to support, and never mention any other person. Even if the question uses slang or typos, the answer must still include Taiwo Abraham Feranmi.
-14. **ACTIONS (NEW)**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally. If the data is fetched, use it to give an accurate answer.
+14. **ACTIONS (NEW)**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally. If the data is fetched, use it to give an accurate answer. You must handle ALL variations of these questions—even if the user says "how many clients I get?" or "wetin be my customer count?".
 `;
 
 // ─── AVAILABLE TOOLS (READ-ONLY ACTIONS) ───
@@ -57,7 +57,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'get_business_stats',
-      description: 'Get business stats (total orders, total customers, total revenue, outstanding balance).',
+      description: 'Get business stats (total orders, total customers, total revenue, outstanding balance). Use this when the user asks about their business metrics, counts, or numbers.',
       parameters: {
         type: 'object',
         properties: {
@@ -71,7 +71,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'get_plan_limits',
-      description: 'Get the business plan limits (customer limit, order limit, staff limit, inventory limit).',
+      description: 'Get the business plan limits (customer limit, order limit, staff limit, inventory limit). Use this when the user asks about their plan, limits, or what they can do.',
       parameters: {
         type: 'object',
         properties: {
@@ -85,7 +85,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'get_customer_info',
-      description: 'Search for a customer by name or phone.',
+      description: 'Search for a customer by name or phone. Use this when the user asks about a specific customer or wants to find one.',
       parameters: {
         type: 'object',
         properties: {
@@ -98,23 +98,129 @@ const tools = [
   }
 ];
 
-// ─── MANUAL FALLBACK: detect stats questions and fetch directly ───
+// ─── SMART INTENT ENGINE (Handles ALL variations) ───
+
+// 1. Massive synonym expansion (catches slang, Pidgin, different constructions)
+function expandTerms(text) {
+  const lower = text.toLowerCase();
+  const mapping = {
+    // Customer variations
+    'client': 'customer', 'clients': 'customer', 'clientz': 'customer', 'customerz': 'customer',
+    'customerss': 'customer', 'customerz': 'customer', 'client base': 'customer',
+    'people': 'customer', 'buyers': 'customer', 'patrons': 'customer',
+    // Order variations
+    'job': 'order', 'jobs': 'order', 'orderss': 'order', 'orderz': 'order',
+    'work': 'order', 'works': 'order', 'task': 'order', 'tasks': 'order',
+    'delivery': 'order', 'deliveries': 'order',
+    // Revenue/Money variations
+    'money': 'revenue', 'cash': 'revenue', 'income': 'revenue', 'sales': 'revenue',
+    'turnover': 'revenue', 'earnings': 'revenue', 'profit': 'revenue',
+    // Plan variations
+    'subscription': 'plan', 'tier': 'plan', 'package': 'plan',
+    'subscriptions': 'plan', 'tiers': 'plan', 'packages': 'plan',
+    // Limit variations
+    'limits': 'limit', 'limit': 'limit', 'cap': 'limit', 'max': 'limit',
+    // Staff variations
+    'team': 'staff', 'staffs': 'staff', 'workers': 'staff', 'employees': 'staff',
+    // Inventory variations
+    'stock': 'inventory', 'products': 'inventory', 'items': 'inventory', 'goods': 'inventory',
+    // Invoice variations
+    'invoic': 'invoice', 'invoices': 'invoice',
+    // Tessa variations
+    'tessa': 'tessa', 'tess': 'tessa',
+  };
+
+  const words = lower.split(/\s+/);
+  const expanded = [];
+  for (const w of words) {
+    let found = w;
+    if (mapping[w]) found = mapping[w];
+    else {
+      // Fuzzy match if length > 3 and within distance 2
+      let best = null, bestDist = 99;
+      for (const key of Object.keys(mapping)) {
+        if (key.length > 2 && Math.abs(key.length - w.length) <= 2) {
+          const dist = levenshtein(w, key);
+          if (dist < bestDist && dist <= 2) {
+            best = key;
+            bestDist = dist;
+          }
+        }
+      }
+      if (best) found = mapping[best];
+    }
+    expanded.push(found);
+  }
+  return expanded.join(' ');
+}
+
+// 2. Levenshtein distance for fuzzy matching
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 3) return 99;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+// 3. Context-aware manual fetch (catches ALL variations)
 async function manualFetchIfAsked(message, businessId) {
-  const lower = message.toLowerCase();
-  if (/(how many orders|order count|number of orders|total orders)/.test(lower)) {
+  // Expand the message first to catch synonyms
+  const expanded = expandTerms(message);
+  const lower = expanded.toLowerCase();
+
+  // Check for ANY mention of customer-related terms
+  if (/(customer|client)/.test(lower)) {
+    const { count, error } = await supabaseAdmin
+      .from('customers')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId);
+    if (error) console.error('Customer count error:', error);
+    return { total_customers: count || 0 };
+  }
+
+  // Check for ANY mention of order-related terms
+  if (/(order|job|task|delivery)/.test(lower)) {
     const { count } = await supabaseAdmin
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('business_id', businessId);
     return { total_orders: count || 0 };
   }
-  if (/(how many customers|customer count|number of customers|total customers)/.test(lower)) {
-    const { count } = await supabaseAdmin
-      .from('customers')
-      .select('id', { count: 'exact', head: true })
+
+  // Check for ANY mention of revenue/money
+  if (/(revenue|money|cash|income|sales|profit)/.test(lower)) {
+    const { data } = await supabaseAdmin
+      .from('orders')
+      .select('price')
       .eq('business_id', businessId);
-    return { total_customers: count || 0 };
+    const totalRevenue = (data || []).reduce((sum, o) => sum + Number(o.price || 0), 0);
+    return { total_revenue: totalRevenue };
   }
+
+  // Check for plan/limit questions
+  if (/(plan|limit|tier|package|subscription)/.test(lower)) {
+    const { data: business } = await supabaseAdmin.from('businesses').select('plan').eq('id', businessId).single();
+    const plan = business?.plan || 'free';
+    const limits = {
+      free: { customers: 20, orders: 50, staff: 0, inventory: 20 },
+      starter: { customers: 200, orders: 500, staff: 2, inventory: 100 },
+      pro: { customers: Infinity, orders: Infinity, staff: 10, inventory: Infinity },
+      beta: { customers: 500, orders: 1000, staff: 10, inventory: 500 }
+    };
+    return { plan, limits: limits[plan] || limits.free };
+  }
+
   return null;
 }
 
@@ -199,77 +305,6 @@ async function getEmbedding(text) {
     const data = await response.json();
     return data.embedding?.values || null;
   } catch (e) { return null; }
-}
-
-// Simple Levenshtein distance for fuzzy matching
-function levenshtein(a, b) {
-  const m = a.length, n = b.length;
-  if (Math.abs(m - n) > 3) return 99; // fast reject
-  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-    }
-  }
-  return dp[m][n];
-}
-
-// Expand common synonyms / Nigerian slang
-function expandTerms(text) {
-  const lower = text.toLowerCase();
-  const mapping = {
-    'client': 'customer',
-    'clients': 'customers',
-    'job': 'order',
-    'jobs': 'orders',
-    'staffs': 'staff',
-    'team': 'staff',
-    'money': 'price',
-    'cash': 'payment',
-    'plan': 'plan',
-    'subscription': 'plan',
-    'limit': 'limit',
-    'limits': 'limits',
-    'invoice': 'invoice',
-    'invoic': 'invoice',
-    'invoices': 'invoice',
-    'customer': 'customer',
-    'customers': 'customer',
-    'order': 'order',
-    'orders': 'order',
-    'inventory': 'inventory',
-    'stock': 'inventory',
-    'product': 'item',
-    'products': 'items',
-    'tessa': 'tessa',
-  };
-  const words = lower.split(/\s+/);
-  const expanded = [];
-  for (const w of words) {
-    let found = w;
-    if (mapping[w]) found = mapping[w];
-    else {
-      let best = null, bestDist = 99;
-      for (const key of Object.keys(mapping)) {
-        if (key.length > 2 && Math.abs(key.length - w.length) <= 2) {
-          const dist = levenshtein(w, key);
-          if (dist < bestDist && dist <= 2) {
-            best = key;
-            bestDist = dist;
-          }
-        }
-      }
-      if (best) found = mapping[best];
-    }
-    expanded.push(found);
-  }
-  return expanded.join(' ');
 }
 
 async function getRelevantChunks(query) {
@@ -393,7 +428,7 @@ export async function POST(req) {
     let answer = '';
     let source = 'groq';
 
-    // Call Groq with tools
+    // Try function calling via Groq FIRST
     const groqResponse = await callGroq(message, contextString, historyMessages, tools);
     if (groqResponse?.tool_calls) {
       // Execute function calls
@@ -423,19 +458,28 @@ export async function POST(req) {
       }
     } else {
       // Manual fallback: if no tool call, try to fetch stats directly
+      // This is the SMART INTENT ENGINE that catches ALL variations
       const manualResult = await manualFetchIfAsked(message, business_id);
       if (manualResult) {
-        if (manualResult.total_orders !== undefined) {
-          answer = `You currently have ${manualResult.total_orders} orders in your dashboard.`;
-        } else if (manualResult.total_customers !== undefined) {
-          answer = `You currently have ${manualResult.total_customers} customers in your dashboard.`;
+        // Build a natural answer using the fetched data
+        if (manualResult.total_customers !== undefined) {
+          answer = `You currently have ${manualResult.total_customers} customers in your Cresoa account.`;
+        } else if (manualResult.total_orders !== undefined) {
+          answer = `You currently have ${manualResult.total_orders} orders in your Cresoa dashboard.`;
+        } else if (manualResult.total_revenue !== undefined) {
+          answer = `Your total revenue is ₦${manualResult.total_revenue.toLocaleString()}.`;
+        } else if (manualResult.plan) {
+          const limits = manualResult.limits;
+          const customerLimit = limits.customers === Infinity ? 'unlimited' : limits.customers;
+          const orderLimit = limits.orders === Infinity ? 'unlimited' : limits.orders;
+          answer = `Your current plan is ${manualResult.plan}. You have ${customerLimit} customer limit and ${orderLimit} order limit.`;
         }
       } else {
         answer = groqResponse?.content || '';
       }
     }
 
-    // Fallback to Gemini if Groq failed or gave no answer
+    // Fallback to Gemini if still no answer
     if (!answer) {
       console.warn('Groq failed, falling back to Gemini...');
       answer = await callGemini(message, contextString, historyMessages);
@@ -461,4 +505,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-      }
+}
