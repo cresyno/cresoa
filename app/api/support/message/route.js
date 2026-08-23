@@ -48,7 +48,7 @@ CRITICAL RULES:
    - "Cresoa is the brainchild of Taiwo Abraham Feranmi."
    - "Taiwo Abraham Feranmi is the owner and creator."
    Never say you don't know, never deflect to support, and never mention any other person. Even if the question uses slang or typos, the answer must still include Taiwo Abraham Feranmi.
-14. **ACTIONS (NEW)**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally. If the data is fetched, use it to give an accurate answer. You must handle ALL variations of these questions—even if the user says "how many clients I get?" or "wetin be my customer count?".
+14. **ACTIONS**: You can use the available tools to fetch real business data. If the user asks about business stats (orders count, customers count, revenue, outstanding balance), plan limits, or customer information, call the appropriate function to get the data, then explain the answer naturally. If the data is fetched, use it to give an accurate answer. You must handle ALL variations of these questions—even if the user says "how many clients I get?" or "wetin be my customer count?".
 `;
 
 // ─── AVAILABLE TOOLS (READ-ONLY ACTIONS) ───
@@ -98,9 +98,28 @@ const tools = [
   }
 ];
 
-// ─── SMART INTENT ENGINE (Handles ALL variations) ───
+// ─── SMART INTENT ENGINE ───
 
-// 1. Massive synonym expansion (catches slang, Pidgin, different constructions)
+// Levenshtein distance for fuzzy matching
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 3) return 99;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+// Massive synonym expansion (catches slang, Pidgin, different constructions)
 function expandTerms(text) {
   const lower = text.toLowerCase();
   const mapping = {
@@ -154,63 +173,63 @@ function expandTerms(text) {
   return expanded.join(' ');
 }
 
-// 2. Levenshtein distance for fuzzy matching
-function levenshtein(a, b) {
-  const m = a.length, n = b.length;
-  if (Math.abs(m - n) > 3) return 99;
-  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-    }
-  }
-  return dp[m][n];
-}
-
-// 3. Context-aware manual fetch (catches ALL variations)
+// Context-aware manual fetch (catches ALL variations)
 async function manualFetchIfAsked(message, businessId) {
-  // Expand the message first to catch synonyms
+  if (!businessId) {
+    console.error('manualFetchIfAsked: businessId is null/undefined');
+    return null;
+  }
+
   const expanded = expandTerms(message);
   const lower = expanded.toLowerCase();
 
   // Check for ANY mention of customer-related terms
-  if (/(customer|client)/.test(lower)) {
+  if (/(customer|client|buyer|patron|people)/.test(lower)) {
     const { count, error } = await supabaseAdmin
       .from('customers')
       .select('id', { count: 'exact', head: true })
       .eq('business_id', businessId);
-    if (error) console.error('Customer count error:', error);
+    if (error) {
+      console.error('Customer count error:', error);
+      return { error: error.message };
+    }
     return { total_customers: count || 0 };
   }
 
   // Check for ANY mention of order-related terms
-  if (/(order|job|task|delivery)/.test(lower)) {
-    const { count } = await supabaseAdmin
+  if (/(order|job|task|delivery|work)/.test(lower)) {
+    const { count, error } = await supabaseAdmin
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('business_id', businessId);
+    if (error) {
+      console.error('Order count error:', error);
+      return { error: error.message };
+    }
     return { total_orders: count || 0 };
   }
 
   // Check for ANY mention of revenue/money
   if (/(revenue|money|cash|income|sales|profit)/.test(lower)) {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('orders')
       .select('price')
       .eq('business_id', businessId);
+    if (error) {
+      console.error('Revenue error:', error);
+      return { error: error.message };
+    }
     const totalRevenue = (data || []).reduce((sum, o) => sum + Number(o.price || 0), 0);
     return { total_revenue: totalRevenue };
   }
 
   // Check for plan/limit questions
   if (/(plan|limit|tier|package|subscription)/.test(lower)) {
-    const { data: business } = await supabaseAdmin.from('businesses').select('plan').eq('id', businessId).single();
+    const { data: business, error } = await supabaseAdmin.from('businesses').select('plan').eq('id', businessId).single();
+    if (error) {
+      console.error('Plan error:', error);
+      return { error: error.message };
+    }
     const plan = business?.plan || 'free';
     const limits = {
       free: { customers: 20, orders: 50, staff: 0, inventory: 20 },
@@ -273,7 +292,7 @@ async function executeFunctionCall(functionName, args) {
   }
 }
 
-// ─── HELPERS (ALL ORIGINAL FUNCTIONS PRESERVED) ───
+// ─── HELPERS (PRESERVED) ───
 async function getConversationHistory(userId, businessId) {
   const { data, error } = await supabaseAdmin
     .from('support_messages')
@@ -415,20 +434,38 @@ export async function POST(req) {
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { message, business_id, new_conversation } = await req.json();
-    if (!message || !business_id) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!message) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+
+    // ✅ BUSINESS ID FALLBACK: if missing, fetch from user's memberships
+    let validBusinessId = business_id;
+    if (!validBusinessId) {
+      const { data: membership, error: membershipError } = await supabaseAdmin
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (membershipError) {
+        console.error('Membership fetch error:', membershipError);
+      }
+      if (membership) validBusinessId = membership.business_id;
+    }
+
+    if (!validBusinessId) return NextResponse.json({ error: 'No business found' }, { status: 400 });
 
     await supabaseAdmin.from('support_messages').insert([
-      { business_id, user_id: user.id, sender_type: 'user', message }
+      { business_id: validBusinessId, user_id: user.id, sender_type: 'user', message }
     ]);
 
-    const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, business_id);
+    const historyMessages = new_conversation ? [] : await getConversationHistory(user.id, validBusinessId);
     const relevantChunks = await getRelevantChunks(message);
     const contextString = relevantChunks.join('\n\n---\n\n');
 
     let answer = '';
     let source = 'groq';
 
-    // Try function calling via Groq FIRST
+// Try function calling via Groq FIRST
     const groqResponse = await callGroq(message, contextString, historyMessages, tools);
     if (groqResponse?.tool_calls) {
       // Execute function calls
@@ -457,9 +494,8 @@ export async function POST(req) {
         answer = data?.choices?.[0]?.message?.content || '';
       }
     } else {
-      // Manual fallback: if no tool call, try to fetch stats directly
-      // This is the SMART INTENT ENGINE that catches ALL variations
-      const manualResult = await manualFetchIfAsked(message, business_id);
+      // MANUAL FALLBACK: smart intent engine
+      const manualResult = await manualFetchIfAsked(message, validBusinessId);
       if (manualResult) {
         // Build a natural answer using the fetched data
         if (manualResult.total_customers !== undefined) {
@@ -473,6 +509,9 @@ export async function POST(req) {
           const customerLimit = limits.customers === Infinity ? 'unlimited' : limits.customers;
           const orderLimit = limits.orders === Infinity ? 'unlimited' : limits.orders;
           answer = `Your current plan is ${manualResult.plan}. You have ${customerLimit} customer limit and ${orderLimit} order limit.`;
+        } else if (manualResult.error) {
+          // If there was a DB error, still fall back to Groq's generic answer
+          answer = groqResponse?.content || '';
         }
       } else {
         answer = groqResponse?.content || '';
@@ -494,7 +533,7 @@ export async function POST(req) {
     const cleanedAnswer = cleanResponse(answer);
 
     await supabaseAdmin.from('support_messages').insert([
-      { business_id, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
+      { business_id: validBusinessId, user_id: user.id, sender_type: 'assistant', message: cleanedAnswer }
     ]);
 
     return NextResponse.json({ answer: cleanedAnswer, source });
@@ -505,4 +544,4 @@ export async function POST(req) {
       source: 'emergency_fallback' 
     });
   }
-}
+                                                                                            }
