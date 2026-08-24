@@ -173,6 +173,12 @@ function DashboardLayoutContent({ children }) {
         }
 
         setBusiness(businessData)
+        // Add this right after `setBusiness(businessData)` or `setBusiness(business)`:
+if (!businessIdFromUrl && businessData) {
+  const url = new URL(window.location.href)
+  url.searchParams.set('business_id', businessData.id)
+  window.history.replaceState({}, '', url.toString())
+}
       } catch (error) {
         console.error('Dashboard layout error:', error)
         router.push('/onboarding')
