@@ -13,11 +13,46 @@ export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
 
+  // ─── SMART REDIRECT FUNCTION ───
+  // This finds your business and pushes you to the correct dashboard
+  const redirectToDashboard = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    // 1. Try to find business where you are the Owner
+    let { data: ownedBiz } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle()
+
+    // 2. If not owner, check if you are a Staff/Member
+    if (!ownedBiz) {
+      const { data: memberBiz } = await supabase
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+      if (memberBiz) ownedBiz = { id: memberBiz.business_id }
+    }
+
+    // 3. Redirect with the correct business_id
+    if (ownedBiz) {
+      router.push(`/dashboard?business_id=${ownedBiz.id}`)
+    } else {
+      router.push('/onboarding')
+    }
+  }
+
   useEffect(() => {
-    // Check if already logged in
+    // Check if already logged in, then use the smart redirect
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) router.push('/dashboard')
+      if (session) redirectToDashboard()
     }
     checkSession()
   }, [router])
@@ -38,7 +73,8 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    // Success: use the smart redirect
+    await redirectToDashboard()
   }
 
   const eyeIcon = (visible) => (
@@ -177,4 +213,4 @@ export default function LoginPage() {
       </div>
     </main>
   )
-}
+    }
