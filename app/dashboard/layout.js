@@ -7,7 +7,9 @@ import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
+import BirthdaySurprise from '../../components/BirthdaySurprise'
 import Banner from '../../components/Banner';
+
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
@@ -638,9 +640,9 @@ function DashboardLayoutContent({ children }) {
         </div>
 
         <Banner />
-
-        {children}
-      </div>
+{children}
+<BirthdaySurprise />
+</div>
     </div>
   )
 }
