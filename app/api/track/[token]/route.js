@@ -27,7 +27,7 @@ export async function GET(req, { params }) {
       .eq('id', orderData.business_id)
       .single();
 
-    // ✅ FETCH CUSTOM WORKFLOW STAGES HERE (Public, via Admin)
+    // Fetch custom workflow stages
     const { data: workflowData } = await supabaseAdmin
       .from('business_workflows')
       .select('stage_name')
@@ -36,8 +36,13 @@ export async function GET(req, { params }) {
 
     const stages = workflowData?.map(w => w.stage_name) || [];
 
-    // Return stages in the response so the client doesn't need a protected API
-    return NextResponse.json({ order: orderData, business: businessData, stages });
+    return NextResponse.json({ order: orderData, business: businessData, stages }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (err) {
     console.error('Track API error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
