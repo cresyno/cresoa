@@ -27,7 +27,6 @@ export async function GET(req, { params }) {
       .eq('id', orderData.business_id)
       .single();
 
-    // Fetch custom workflow stages
     const { data: workflowData } = await supabaseAdmin
       .from('business_workflows')
       .select('stage_name')
@@ -41,6 +40,7 @@ export async function GET(req, { params }) {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
+        'Surrogate-Control': 'no-store'
       }
     });
   } catch (err) {
