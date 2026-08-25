@@ -23,17 +23,17 @@ const INITIAL_FORM = {
   customer_name: '',
   customer_phone: '',
   customer_email: '',
-  title: '',            // e.g. "iPhone 13 Screen"
-  category: '',         // e.g. "Phone", "Laptop"
-  serial_number: '',    // e.g. IMEI / Serial
-  description: '',      // Fault description
-  notes: '',            // Internal notes
+  title: '',
+  category: '',
+  serial_number: '',
+  description: '',
+  notes: '',
   price: '',
   amount_paid: '',
   current_status: 'In Progress',
   due_date: '',
-  fitting_date: '',     // Diagnosis date
-  delivery_date: '',    // Expected collection date
+  fitting_date: '',
+  delivery_date: '',
 }
 
 export default function NewRepairJobPage() {
@@ -80,8 +80,6 @@ export default function NewRepairJobPage() {
     return Math.max((Number(formData.price) || 0) - (Number(formData.amount_paid) || 0), 0)
   }, [formData.price, formData.amount_paid])
 
-  const progress = ((step - 1) / (STEPS.length - 1)) * 100
-
   // ─── Data loading ──────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
@@ -92,9 +90,9 @@ export default function NewRepairJobPage() {
       try {
         const { data: customerData, error: custError } = await supabase
           .from('customers')
-          .select('id, first_name, last_name, name, phone, email')
+          .select('id, first_name, last_name, name, phone, email, sector')
           .eq('business_id', businessId)
-          .eq('sector', 'repairs') // Strict sector isolation
+          .eq('sector', 'repairs')
           .order('created_at', { ascending: false })
         if (custError) throw custError
         setCustomers((customerData || []).map(c => ({
@@ -162,7 +160,7 @@ export default function NewRepairJobPage() {
         .from('customers')
         .insert({
           business_id: businessId,
-          sector: 'repairs', // Strict sector isolation
+          sector: 'repairs',
           first_name: firstName,
           last_name: lastName,
           name: name,
@@ -177,9 +175,10 @@ export default function NewRepairJobPage() {
       setShowNewCustomerModal(false)
       setIsNewCustomer(false)
     } catch (err) {
-  console.error(err)
-  alert('Failed to create customer: ' + err.message) // Shows exact error
+      console.error(err)
+      alert('Failed to create customer: ' + err.message)
     }
+  }
 
   // ─── CRITICAL VALIDATION (Customer is MANDATORY) ───
   const validateStep = () => {
@@ -301,7 +300,7 @@ export default function NewRepairJobPage() {
     }
   }
 
-  // ─── Loading skeleton (Matches Fashion) ────────────────────
+  // ─── Loading skeleton ────────────────────────────────────
   if (loading) {
     return (
       <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
@@ -445,7 +444,7 @@ export default function NewRepairJobPage() {
                 </button>
               )}
 
-               {isNewCustomer && (
+                       {isNewCustomer && (
                 <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--cresoa-border)' }}>
                   <div style={{ display: 'grid', gap: '0.8rem' }}>
                     <div>
