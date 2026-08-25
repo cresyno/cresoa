@@ -27,22 +27,19 @@ export async function GET(req, { params }) {
       .eq('id', orderData.business_id)
       .single();
 
+    // ✅ CRITICAL: Fetch the workflow stages
     const { data: workflowData } = await supabaseAdmin
       .from('business_workflows')
       .select('stage_name')
       .eq('business_id', orderData.business_id)
       .order('stage_order', { ascending: true });
 
+    console.log('API WORKFLOW RAW DATA:', JSON.stringify(workflowData));
+
     const stages = workflowData?.map(w => w.stage_name) || [];
 
-    return NextResponse.json({ order: orderData, business: businessData, stages }, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'Surrogate-Control': 'no-store'
-      }
-    });
+    // ✅ Return the correct stages (no cache headers as a test!)
+    return NextResponse.json({ order: orderData, business: businessData, stages });
   } catch (err) {
     console.error('Track API error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
