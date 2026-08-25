@@ -10,7 +10,7 @@ import { Card } from '../../../../../components/Card'
 import { SectionHeader } from '../../../../../components/SectionHeader'
 import { Navigation } from '../../../../../components/Navigation'
 import InvoicePreviewModal from '../../../../../components/invoice/InvoicePreviewModal'
-import '../../../../../globals.css'
+import '../../../../globals.css'
 
 const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const paths = {
