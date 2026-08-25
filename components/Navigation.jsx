@@ -27,10 +27,9 @@ export function Navigation({ businessId, sector }) {
   const router = useRouter()
   const [isDesktop, setIsDesktop] = useState(false)
 
-  // ─── Sector state (default to fashion if not provided) ───
+  // ─── Sector state ───
   const [currentSector, setCurrentSector] = useState(sector || 'fashion')
 
-  // Detect screen size
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768)
     check()
@@ -38,7 +37,6 @@ export function Navigation({ businessId, sector }) {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Update sector when prop changes or from localStorage
   useEffect(() => {
     if (sector) {
       setCurrentSector(sector)
@@ -54,17 +52,20 @@ export function Navigation({ businessId, sector }) {
       return [
         { icon: 'bar-chart-2', label: 'Dashboard', path: '/dashboard/repairs' },
         { icon: 'tool', label: 'Jobs', path: '/dashboard/repairs/jobs' },
-        { icon: 'users', label: 'Customers', path: '/dashboard/repairs/customers' },
-        { icon: 'package', label: 'Parts', path: '/dashboard/repairs/inventory' },
-        { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' },
+        { icon: 'users', label: 'Customers', path: '/dashboard/customers' }, // shared
+        { icon: 'package', label: 'Parts', path: '/dashboard/inventory' }, // shared
+        { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' }, // shared
+        { icon: 'layers', label: 'Reminders', path: '/dashboard/reminders' }, // shared
       ]
     }
+    // Fashion (default)
     return [
       { icon: 'home', label: 'Home', path: '/dashboard/fashion' },
       { icon: 'file-text', label: 'Orders', path: '/dashboard/orders' },
       { icon: 'layers', label: 'Production', path: '/dashboard/production' },
       { icon: 'users', label: 'Customers', path: '/dashboard/customers' },
       { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' },
+      { icon: 'layers', label: 'Reminders', path: '/dashboard/reminders' },
     ]
   }
 
@@ -79,7 +80,7 @@ export function Navigation({ businessId, sector }) {
     router.push(`${path}${separator}business_id=${businessId}`)
   }
 
-  // Desktop: horizontal bar
+  // Desktop
   if (isDesktop) {
     return (
       <nav style={{ display: 'flex', gap: 16, padding: '8px 0', borderBottom: '1px solid var(--cresoa-border)', marginBottom: 16 }}>
@@ -111,7 +112,7 @@ export function Navigation({ businessId, sector }) {
     )
   }
 
-  // Mobile: bottom navigation
+  // Mobile
   return (
     <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', zIndex: 100 }}>
       {navItems.map(item => {
@@ -140,4 +141,4 @@ export function Navigation({ businessId, sector }) {
       })}
     </nav>
   )
-      }
+        }
