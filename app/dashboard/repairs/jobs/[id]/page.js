@@ -2,16 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { supabase } from '../../../../../lib/supabaseClient'
-import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
-import { useWorkflowStages } from '../../../../../lib/useWorkflowStages'
-import { isFeatureAvailable } from '../../../../../lib/planLimits'
-import { Card } from '../../../../../components/Card'
-import { SectionHeader } from '../../../../../components/SectionHeader'
-import { Navigation } from '../../../../../components/Navigation'
-import InvoicePreviewModal from '../../../../../components/invoice/InvoicePreviewModal'
+import { supabase } from '../../../../lib/supabaseClient'
+import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
+import { useWorkflowStages } from '../../../../lib/useWorkflowStages'
+import { isFeatureAvailable } from '../../../../lib/planLimits'
+import { Card } from '../../../../components/Card'
+import { SectionHeader } from '../../../../components/SectionHeader'
+import { Navigation } from '../../../../components/Navigation'
+import InvoicePreviewModal from '../../../../components/invoice/InvoicePreviewModal'
 import '../../../../globals.css'
-
 // ─── Self-contained SVG Icons (Complete set) ───
 const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const paths = {
