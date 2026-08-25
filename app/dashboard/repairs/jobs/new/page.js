@@ -180,7 +180,7 @@ export default function NewRepairJobPage() {
   console.error(err)
   alert('Failed to create customer: ' + err.message) // Shows exact error
     }
-)
+
   // ─── CRITICAL VALIDATION (Customer is MANDATORY) ───
   const validateStep = () => {
     if (step === 1) {
