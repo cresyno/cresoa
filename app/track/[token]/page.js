@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { useWorkflowStages } from '../../../lib/useWorkflowStages'
 import { Icon } from '../../../components/Icon'
 import '../../globals.css'
@@ -32,40 +31,33 @@ export default function TrackPage() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Safe URL state (prevents "window is not defined" crash)
+  const [shareUrl, setShareUrl] = useState('')
+
+  // Get custom workflow stages
   const fallbackStages = STAGES_BY_INDUSTRY[industry] || STAGES_BY_INDUSTRY.default
   const { stages: dynamicStages } = useWorkflowStages(business?.id, fallbackStages)
 
+  // Fetch data from server-side API
   useEffect(() => {
     if (!token) { setError(true); setLoading(false); return }
 
     const load = async () => {
       try {
-        // Use supabaseAdmin (bypasses RLS for public tracking links)
-        const { data: orderData, error: orderError } = await supabaseAdmin
-          .from('orders')
-          .select('*, customers(name, phone, email)')
-          .eq('tracking_token', token)
-          .single()
+        const response = await fetch(`/api/track/${token}`)
+        const data = await response.json()
 
-        if (orderError || !orderData) {
-          console.error('Order error:', orderError)
+        if (data.error) {
           setError(true); setLoading(false); return
         }
 
-        setOrder(orderData)
-        if (orderData.customers) setCustomer(orderData.customers)
-
-        const { data: businessData } = await supabaseAdmin
-          .from('businesses')
-          .select('*')
-          .eq('id', orderData.business_id)
-          .single()
-
-        setBusiness(businessData)
+        setOrder(data.order)
+        setCustomer(data.order.customers)
+        setBusiness(data.business)
 
         let detectedIndustry = 'default'
-        if (businessData) {
-          const sector = businessData.sector || ''
+        if (data.business) {
+          const sector = data.business.sector || ''
           if (sector.toLowerCase().includes('fashion') || sector.toLowerCase().includes('wear')) detectedIndustry = 'fashion'
           else if (sector.toLowerCase().includes('repair') || sector.toLowerCase().includes('technical')) detectedIndustry = 'repairs'
         }
@@ -79,6 +71,11 @@ export default function TrackPage() {
 
     load()
   }, [token])
+
+  // Safely set the URL
+  useEffect(() => {
+    setShareUrl(window.location.href)
+  }, [])
 
   const getStatusInfo = (status) => {
     const map = {
@@ -105,7 +102,7 @@ export default function TrackPage() {
   const bgColor = business?.tracking_bg_color || (darkMode ? '#12121A' : '#F8F6F2')
   const logoUrl = business?.tracking_logo_url || null
   const welcomeMsg = business?.tracking_welcome_message || 'Track your order status'
-  const footerMsg = business?.tracking_footer_message || ''
+  const footerMsg = business?.tracking_footer_message || 'Thank you for choosing us!'
   const isRepairs = industry === 'repairs'
 
   const currentStages = dynamicStages.length > 0 ? dynamicStages : fallbackStages
@@ -117,7 +114,7 @@ export default function TrackPage() {
   // Share modal functions
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href)
+      await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch (_) {
@@ -126,7 +123,7 @@ export default function TrackPage() {
   }
 
   const shareWhatsApp = () => {
-    const message = `Hi! You can track your ${isRepairs ? 'repair' : 'order'} here: ${window.location.href}`
+    const message = `Hi! You can track your ${isRepairs ? 'repair' : 'order'} here: ${shareUrl}`
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
   }
 
@@ -173,10 +170,8 @@ export default function TrackPage() {
         .btn-call { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 8px; background: ${primaryColor}; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; }
         .footer { text-align: center; font-size: 0.7rem; padding-top: 0.5rem; color: ${darkMode ? '#aaa' : '#8A8A8A'}; }
         .footer strong { color: ${primaryColor}; }
-        /* Share Modal */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .modal-content { background: ${darkMode ? '#1E1E2A' : '#fff'}; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 400px; }
-        /* Toggle */
         .dark-toggle { position: fixed; top: 1rem; right: 1rem; z-index: 999; background: ${darkMode ? '#2A2A3A' : '#fff'}; border: 1px solid ${darkMode ? '#3A3A4A' : '#E5E0D8'}; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: ${primaryColor}; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
       `}</style>
 
@@ -289,7 +284,7 @@ export default function TrackPage() {
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem', borderRadius: '8px', background: darkMode ? '#2A2A3A' : '#F8F6F2', marginBottom: '1rem' }}>
-              <span style={{ flex: 1, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: darkMode ? '#fff' : '#1A1A1A' }}>{window.location.href}</span>
+              <span style={{ flex: 1, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: darkMode ? '#fff' : '#1A1A1A' }}>{shareUrl}</span>
               <button onClick={copyLink} style={{ background: 'none', border: 'none', cursor: 'pointer', color: primaryColor }}>
                 <Icon name={copied ? 'check' : 'copy'} size={16} stroke="currentColor" /> {copied ? 'Copied!' : 'Copy'}
               </button>
@@ -302,4 +297,4 @@ export default function TrackPage() {
       )}
     </div>
   )
-    }
+}
