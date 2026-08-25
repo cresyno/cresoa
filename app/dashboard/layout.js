@@ -38,7 +38,7 @@ function DashboardLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
+  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR (for non-repairs sectors) ───
   const getNavItems = (sector) => {
     const defaultItems = [
       { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
@@ -50,6 +50,7 @@ function DashboardLayoutContent({ children }) {
     ]
 
     if (sector === 'repairs') {
+      // Repairs will use its own layout, so we don't need these here, but keep them as fallback.
       return [
         { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
         { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
@@ -180,7 +181,7 @@ function DashboardLayoutContent({ children }) {
     load()
   }, [router, searchParams])
 
-  // ─── 🔒 HARD SECTOR ISOLATION ───
+  // ─── 🔒 HARD SECTOR ISOLATION (unchanged but enhanced) ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
@@ -230,6 +231,19 @@ function DashboardLayoutContent({ children }) {
     if (sector === 'repairs') return '🔧 Repairs'
     if (sector === 'fashion') return '👗 Fashion'
     return ''
+  }
+
+  // Detect if we're on a repairs path (so we let the repairs layout handle the sidebar)
+  const isRepairsPath = pathname?.startsWith('/dashboard/repairs')
+
+  // If repairs path, skip rendering the global sidebar/header entirely (Repairs has its own layout)
+  if (!loading && business && isRepairsPath) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <Banner />
+        {children}
+      </div>
+    )
   }
 
   const currentSector = business?.sector || 'fashion'
@@ -377,7 +391,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
-        <div className="bottom">
+         <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}><span className="icon"><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} stroke="currentColor" /></span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</button>
           <a href={baseUrl('/dashboard/support')} className="support-link" onClick={handleNavClick}><span className="icon"><Icon name="message-circle" size={16} stroke="currentColor" /></span> Support Hub</a>
           <button className="logout" onClick={handleLogout}><span className="icon"><Icon name="log-out" size={16} stroke="currentColor" /></span> Logout</button>
@@ -411,4 +425,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </Suspense>
   )
-          }
+              }
