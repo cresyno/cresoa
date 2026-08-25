@@ -9,6 +9,14 @@ import BusinessSwitcher from '../../components/BusinessSwitcher'
 import { Icon } from '../../../components/Icon'
 import Banner from '../../../components/Banner'
 
+const normalizeSector = (sector) => {
+  if (!sector) return 'fashion'
+  const s = sector.toLowerCase()
+  if (s.includes('repair')) return 'repairs'
+  if (s.includes('fashion')) return 'fashion'
+  return s
+}
+
 function RepairsLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -92,7 +100,8 @@ function RepairsLayoutContent({ children }) {
           return
         }
 
-        if (businessData.sector !== 'repairs') {
+        // 🔑 Normalize before check – fix the mismatch
+        if (normalizeSector(businessData.sector) !== 'repairs') {
           router.push(`/dashboard?business_id=${businessData.id}`)
           return
         }
@@ -109,7 +118,7 @@ function RepairsLayoutContent({ children }) {
           else setUserRole('Staff')
         }
 
-        // Beta/trial logic
+        // Beta/trial logic (same)
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
