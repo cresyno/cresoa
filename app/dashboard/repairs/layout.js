@@ -20,6 +20,7 @@ function RepairsLayoutContent({ children }) {
   const [theme, setTheme] = useState('light')
   const [userRole, setUserRole] = useState(null)
 
+  // Theme toggle
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
@@ -38,7 +39,7 @@ function RepairsLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── Load business data (same logic, but for repairs) ───
+  // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -88,12 +89,20 @@ function RepairsLayoutContent({ children }) {
           }
         }
 
+        // If no business at all → go to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
         }
 
-        if (businessData && !userRole) {
+        // If business is not repairs → redirect to fashion dashboard
+        if (businessData.sector !== 'repairs') {
+          router.push(`/dashboard?business_id=${businessData.id}`)
+          return
+        }
+
+        // Role assignment
+        if (!userRole) {
           const { data: roleData } = await supabase
             .from('business_memberships')
             .select('role')
@@ -105,35 +114,47 @@ function RepairsLayoutContent({ children }) {
           else setUserRole('Staff')
         }
 
-        // Beta expiry and trial logic
-        if (businessData) {
-          if (businessData.plan === 'beta' && businessData.beta_expires_at) {
-            const betaExpiry = new Date(businessData.beta_expires_at)
-            const now = new Date()
-            if (betaExpiry < now) {
-              await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
-              businessData.plan = 'free'
-              businessData.plan_status = 'expired'
-            }
-          }
-          if (!businessData.trial_ends_at) {
-            const trialEndsAt = new Date()
-            trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
-            await supabase.from('businesses').update({ trial_ends_at: trialEndsAt.toISOString(), trial_starts_at: new Date().toISOString() }).eq('id', businessData.id)
-            businessData.trial_ends_at = trialEndsAt.toISOString()
-          }
+        // Beta / trial expiry logic (same as global)
+        if (businessData.plan === 'beta' && businessData.beta_expires_at) {
+          const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
-          if (businessData.plan !== 'free' && businessData.plan !== 'beta' && businessData.subscription_expires_at) {
-            const expiresAt = new Date(businessData.subscription_expires_at)
-            if (expiresAt < now) {
-              await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
-              businessData.plan = 'free'
-              businessData.plan_status = 'expired'
-            }
+          if (betaExpiry < now) {
+            await supabase
+              .from('businesses')
+              .update({ plan: 'free', plan_status: 'expired' })
+              .eq('id', businessData.id)
+            businessData.plan = 'free'
+            businessData.plan_status = 'expired'
           }
         }
 
+        if (!businessData.trial_ends_at) {
+          const trialEndsAt = new Date()
+          trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
+          await supabase
+            .from('businesses')
+            .update({ trial_ends_at: trialEndsAt.toISOString(), trial_starts_at: new Date().toISOString() })
+            .eq('id', businessData.id)
+          businessData.trial_ends_at = trialEndsAt.toISOString()
+        }
+
+        const now = new Date()
+        if (businessData.plan !== 'free' && businessData.plan !== 'beta' && businessData.subscription_expires_at) {
+          const expiresAt = new Date(businessData.subscription_expires_at)
+          if (expiresAt < now) {
+            await supabase
+              .from('businesses')
+              .update({ plan: 'free', plan_status: 'expired' })
+              .eq('id', businessData.id)
+            businessData.plan = 'free'
+            businessData.plan_status = 'expired'
+          }
+        }
+
+        // Set the business state
         setBusiness(businessData)
+
+        // Ensure business_id in URL
         if (!businessIdFromUrl && businessData) {
           const url = new URL(window.location.href)
           url.searchParams.set('business_id', businessData.id)
@@ -141,31 +162,24 @@ function RepairsLayoutContent({ children }) {
         }
       } catch (error) {
         console.error('Repairs layout error:', error)
+        // If an error occurs, still redirect to onboarding (or dashboard) to avoid infinite spinner
         router.push('/onboarding')
       } finally {
-        setLoading(false)
+        setLoading(false) // ALWAYS stop loading, even on error
       }
     }
 
     load()
   }, [router, searchParams])
 
-  // ─── 🔒 HARD SECTOR ISOLATION ───
+  // ─── Hard sector guard (redundant, but safe) ───
   useEffect(() => {
     if (!loading && business) {
-      const urlBusinessId = searchParams.get('business_id')
-      if (urlBusinessId && urlBusinessId !== business.id) {
-        window.location.reload()
-        return
-      }
-
-      // If the business is not repairs, redirect away immediately
       if (business.sector !== 'repairs') {
-        router.push('/dashboard?business_id=' + business.id)
-        return
+        router.push(`/dashboard?business_id=${business.id}`)
       }
     }
-  }, [loading, business, pathname, router, searchParams])
+  }, [loading, business, router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -181,7 +195,6 @@ function RepairsLayoutContent({ children }) {
 
   const baseUrl = (path) => business?.id ? `${path}?business_id=${business.id}` : path
 
-  // Repairs specific navigation items
   const navItems = [
     { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
     { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
@@ -193,12 +206,12 @@ function RepairsLayoutContent({ children }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner { width: 40px; height: 40px; border: 4px solid var(--color-border); border-top: 4px solid var(--color-accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
         `}</style>
-        <div className="spinner" style={{ margin: 'auto', marginTop: '40vh' }} />
+        <div className="spinner" />
       </div>
     )
   }
@@ -270,14 +283,13 @@ function RepairsLayoutContent({ children }) {
         .main-content { flex: 1; min-width: 0; padding: 0; }
         .dashboard-header { display: flex; justify-content: flex-end; align-items: center; padding: 0.4rem 1.2rem; background: var(--color-card); border-bottom: 1px solid var(--color-border); }
         .dashboard-header .date { font-size: 0.7rem; color: var(--color-text-muted); }
-        .beta-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.7rem; border-radius: 16px; background: linear-gradient(135deg, #D4A52A, #C79A2B); color: #0F2B4A; font-weight: 700; font-size: 0.65rem; text-decoration: none; box-shadow: 0 2px 8px rgba(212,165,42,0.2); transition: transform 0.1s ease; }
-        .beta-btn:hover { transform: scale(1.02); }
         @media (min-width: 769px) { .hamburger { display: none !important; } .sidebar { transform: translateX(0) !important; } .overlay { display: none !important; } }
         @media (max-width: 768px) { .hamburger { display: block; } .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; } .sidebar.open { transform: translateX(0); } .overlay.open { display: block; } .main-content { padding-top: 3rem; } }
       `}</style>
 
       <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? '✕' : '☰'}</button>
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
+
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo variant="dark-bg" size="small" />
@@ -363,4 +375,4 @@ export default function RepairsLayout({ children }) {
       </div>
     </Suspense>
   )
-            }
+}
