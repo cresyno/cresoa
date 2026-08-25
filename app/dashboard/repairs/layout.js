@@ -20,7 +20,6 @@ function RepairsLayoutContent({ children }) {
   const [theme, setTheme] = useState('light')
   const [userRole, setUserRole] = useState(null)
 
-  // Theme toggle
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
@@ -39,7 +38,6 @@ function RepairsLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -89,19 +87,16 @@ function RepairsLayoutContent({ children }) {
           }
         }
 
-        // If no business at all → go to onboarding
         if (!businessData) {
           router.push('/onboarding')
           return
         }
 
-        // If business is not repairs → redirect to fashion dashboard
         if (businessData.sector !== 'repairs') {
           router.push(`/dashboard?business_id=${businessData.id}`)
           return
         }
 
-        // Role assignment
         if (!userRole) {
           const { data: roleData } = await supabase
             .from('business_memberships')
@@ -114,15 +109,12 @@ function RepairsLayoutContent({ children }) {
           else setUserRole('Staff')
         }
 
-        // Beta / trial expiry logic (same as global)
+        // Beta/trial logic
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
           if (betaExpiry < now) {
-            await supabase
-              .from('businesses')
-              .update({ plan: 'free', plan_status: 'expired' })
-              .eq('id', businessData.id)
+            await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
             businessData.plan = 'free'
             businessData.plan_status = 'expired'
           }
@@ -131,30 +123,12 @@ function RepairsLayoutContent({ children }) {
         if (!businessData.trial_ends_at) {
           const trialEndsAt = new Date()
           trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
-          await supabase
-            .from('businesses')
-            .update({ trial_ends_at: trialEndsAt.toISOString(), trial_starts_at: new Date().toISOString() })
-            .eq('id', businessData.id)
+          await supabase.from('businesses').update({ trial_ends_at: trialEndsAt.toISOString(), trial_starts_at: new Date().toISOString() }).eq('id', businessData.id)
           businessData.trial_ends_at = trialEndsAt.toISOString()
         }
 
-        const now = new Date()
-        if (businessData.plan !== 'free' && businessData.plan !== 'beta' && businessData.subscription_expires_at) {
-          const expiresAt = new Date(businessData.subscription_expires_at)
-          if (expiresAt < now) {
-            await supabase
-              .from('businesses')
-              .update({ plan: 'free', plan_status: 'expired' })
-              .eq('id', businessData.id)
-            businessData.plan = 'free'
-            businessData.plan_status = 'expired'
-          }
-        }
-
-        // Set the business state
         setBusiness(businessData)
 
-        // Ensure business_id in URL
         if (!businessIdFromUrl && businessData) {
           const url = new URL(window.location.href)
           url.searchParams.set('business_id', businessData.id)
@@ -162,24 +136,14 @@ function RepairsLayoutContent({ children }) {
         }
       } catch (error) {
         console.error('Repairs layout error:', error)
-        // If an error occurs, still redirect to onboarding (or dashboard) to avoid infinite spinner
         router.push('/onboarding')
       } finally {
-        setLoading(false) // ALWAYS stop loading, even on error
+        setLoading(false)
       }
     }
 
     load()
   }, [router, searchParams])
-
-  // ─── Hard sector guard (redundant, but safe) ───
-  useEffect(() => {
-    if (!loading && business) {
-      if (business.sector !== 'repairs') {
-        router.push(`/dashboard?business_id=${business.id}`)
-      }
-    }
-  }, [loading, business, router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -289,7 +253,6 @@ function RepairsLayoutContent({ children }) {
 
       <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? '✕' : '☰'}</button>
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
-
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo variant="dark-bg" size="small" />
@@ -375,4 +338,4 @@ export default function RepairsLayout({ children }) {
       </div>
     </Suspense>
   )
-}
+            }
