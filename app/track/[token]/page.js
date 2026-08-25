@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { useWorkflowStages } from '../../../lib/useWorkflowStages'
 import { Icon } from '../../../components/Icon'
 import '../../globals.css'
 
-// Default stages per industry (only used if no custom stages exist)
+// Default stages per industry (ONLY used if no custom stages exist)
 const STAGES_BY_INDUSTRY = {
   fashion: ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered'],
   repairs: ['Received', 'Diagnosing', 'Awaiting Parts', 'Repairing', 'Testing', 'Ready', 'Delivered'],
@@ -20,25 +19,16 @@ export default function TrackPage() {
   const [order, setOrder] = useState(null)
   const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
+  const [customStages, setCustomStages] = useState([]) // ✅ NEW STATE
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [industry, setIndustry] = useState('default')
 
-  // Dark/Light mode toggle
   const [darkMode, setDarkMode] = useState(false)
-
-  // Share modal
   const [showShareModal, setShowShareModal] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  // Safe URL state (prevents "window is not defined" crash)
   const [shareUrl, setShareUrl] = useState('')
 
-  // Get custom workflow stages
-  const fallbackStages = STAGES_BY_INDUSTRY[industry] || STAGES_BY_INDUSTRY.default
-  const { stages: dynamicStages } = useWorkflowStages(business?.id, fallbackStages)
-
-  // Fetch data from server-side API
   useEffect(() => {
     if (!token) { setError(true); setLoading(false); return }
 
@@ -54,6 +44,7 @@ export default function TrackPage() {
         setOrder(data.order)
         setCustomer(data.order.customers)
         setBusiness(data.business)
+        setCustomStages(data.stages || []) // ✅ LOAD CUSTOM WORKFLOW STAGES
 
         let detectedIndustry = 'default'
         if (data.business) {
@@ -72,7 +63,6 @@ export default function TrackPage() {
     load()
   }, [token])
 
-  // Safely set the URL
   useEffect(() => {
     setShareUrl(window.location.href)
   }, [])
@@ -105,13 +95,15 @@ export default function TrackPage() {
   const footerMsg = business?.tracking_footer_message || 'Thank you for choosing us!'
   const isRepairs = industry === 'repairs'
 
-  const currentStages = dynamicStages.length > 0 ? dynamicStages : fallbackStages
+  // ✅ USE CUSTOM STAGES IF THEY EXIST, OTHERWISE USE FALLBACK
+  const fallbackStages = STAGES_BY_INDUSTRY[industry] || STAGES_BY_INDUSTRY.default
+  const currentStages = customStages.length > 0 ? customStages : fallbackStages
+
   const currentStatus = order?.current_status || 'Order placed'
   const currentIndex = currentStages.indexOf(currentStatus)
   const statusInfo = getStatusInfo(currentStatus)
   const balance = (order?.price || 0) - (order?.amount_paid || 0)
 
-  // Share modal functions
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl)
@@ -175,13 +167,11 @@ export default function TrackPage() {
         .dark-toggle { position: fixed; top: 1rem; right: 1rem; z-index: 999; background: ${darkMode ? '#2A2A3A' : '#fff'}; border: 1px solid ${darkMode ? '#3A3A4A' : '#E5E0D8'}; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: ${primaryColor}; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
       `}</style>
 
-      {/* Dark Mode Toggle */}
       <button className="dark-toggle" onClick={() => setDarkMode(!darkMode)}>
         {darkMode ? '☀️' : '🌙'}
       </button>
 
       <div className="track-container">
-        {/* Header */}
         <div className="track-card track-card-header">
           {logoUrl && <img src={logoUrl} alt="Business logo" style={{ maxHeight: '60px', marginBottom: '0.5rem', borderRadius: '8px' }} />}
           <h1 className="business-name">{business?.name || 'Business'} <span>✦</span></h1>
@@ -190,7 +180,6 @@ export default function TrackPage() {
           {business?.location && <p className="business-location">📍 {business.location}</p>}
         </div>
 
-        {/* Order Summary */}
         <div className="track-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.3rem' }}>
             <div>
@@ -217,7 +206,7 @@ export default function TrackPage() {
           )}
         </div>
 
-        {/* Stepper */}
+        {/* STEPPER - NOW USES CUSTOM STAGES */}
         <div className="track-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
             <div style={{ position: 'absolute', top: '16px', left: '5%', right: '5%', height: '2px', background: darkMode ? '#2A2A3A' : '#E5E0D8', zIndex: 0 }} />
@@ -240,7 +229,6 @@ export default function TrackPage() {
           </div>
         </div>
 
-        {/* Details */}
         <div className="track-card">
           <div className="detail-row"><span className="detail-label">Order</span><span className="detail-value">{order.title || '—'}</span></div>
           <div className="detail-row"><span className="detail-label">Status</span><span className="detail-value" style={{ color: primaryColor }}>{statusInfo.label}</span></div>
@@ -250,14 +238,12 @@ export default function TrackPage() {
           <div className="detail-row"><span className="detail-label">Balance</span><span className="detail-value" style={{ color: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>{balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid'}</span></div>
         </div>
 
-        {/* Share Button (opens modal) */}
         <div className="track-card" style={{ textAlign: 'center' }}>
           <button onClick={() => setShowShareModal(true)} style={{ background: 'transparent', border: 'none', color: primaryColor, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
             <Icon name="link" size={16} stroke="currentColor" /> Share this tracking link
           </button>
         </div>
 
-        {/* Support Actions */}
         {business?.whatsapp && (
           <div className="track-card" style={{ textAlign: 'center' }}>
             <p style={{ fontSize: '0.85rem', margin: '0 0 0.8rem', color: darkMode ? '#aaa' : '#8A8A8A' }}>Have questions? Contact us</p>
@@ -268,12 +254,10 @@ export default function TrackPage() {
           </div>
         )}
 
-        {/* Footer */}
         {footerMsg && <div className="track-card" style={{ textAlign: 'center', padding: '1rem' }}><p style={{ fontSize: '0.8rem', margin: 0, color: darkMode ? '#aaa' : '#8A8A8A' }}>{footerMsg}</p></div>}
         <div className="footer">Powered by <a href="/" style={{ color: primaryColor, fontWeight: '600', textDecoration: 'none' }}>Cresoa</a> · Built for Nigerian businesses</div>
       </div>
 
-      {/* Share Modal */}
       {showShareModal && (
         <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -297,4 +281,4 @@ export default function TrackPage() {
       )}
     </div>
   )
-}
+    }
