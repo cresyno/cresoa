@@ -9,7 +9,6 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner';
 
-
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -39,7 +38,7 @@ function DashboardLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── Load business data (unchanged) ───
+  // ─── ROBUST BUSINESS LOADING ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -50,52 +49,72 @@ function DashboardLayoutContent({ children }) {
         }
         setUser(authUser)
 
-        const businessIdFromUrl = searchParams.get('business_id')
-        let businessData = null
+        // Get all businesses the user owns or is a member of
+        const { data: ownedBusinesses, error: ownedError } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('owner_id', authUser.id)
 
-        if (businessIdFromUrl) {
-          const { data: business, error } = await supabase
-            .from('businesses')
-            .select('*')
-            .eq('id', businessIdFromUrl)
-            .maybeSingle()
-          if (business && !error) businessData = business
-        }
+        if (ownedError) console.error('Error fetching owned businesses:', ownedError)
 
-        if (!businessData) {
-          const { data: ownedBusiness } = await supabase
-            .from('businesses')
-            .select('*')
-            .eq('owner_id', authUser.id)
-            .maybeSingle()
-          if (ownedBusiness) {
-            businessData = ownedBusiness
-          } else {
-            const { data: membershipData } = await supabase
-              .from('business_memberships')
-              .select('business_id, role')
-              .eq('user_id', authUser.id)
-              .maybeSingle()
-            if (membershipData) {
-              const { data: memberBusiness } = await supabase
+        const { data: memberships, error: memberError } = await supabase
+          .from('business_memberships')
+          .select('business_id, role')
+          .eq('user_id', authUser.id)
+
+        if (memberError) console.error('Error fetching memberships:', memberError)
+
+        // Build a unique list of all businesses (owned + member)
+        let allBusinesses = [...(ownedBusinesses || [])]
+
+        if (memberships && memberships.length > 0) {
+          // For each membership, fetch the business
+          for (const m of memberships) {
+            // Avoid duplicate if already owned
+            if (!allBusinesses.some(b => b.id === m.business_id)) {
+              const { data: memberBusiness, error: memberBizError } = await supabase
                 .from('businesses')
                 .select('*')
-                .eq('id', membershipData.business_id)
+                .eq('id', m.business_id)
                 .maybeSingle()
+              if (memberBizError) console.error('Error fetching member business:', memberBizError)
               if (memberBusiness) {
-                businessData = memberBusiness
-                setUserRole(membershipData.role)
+                // Add the role to the business object for later
+                memberBusiness.user_role_in_business = m.role
+                allBusinesses.push(memberBusiness)
               }
             }
           }
         }
 
-        if (!businessData) {
+        if (allBusinesses.length === 0) {
+          // No business at all → go to onboarding
           router.push('/onboarding')
           return
         }
 
-        if (!userRole) {
+        // Determine which business to use
+        const businessIdFromUrl = searchParams?.get('business_id')
+        let businessData = null
+
+        if (businessIdFromUrl) {
+          // Try to find it in the list
+          businessData = allBusinesses.find(b => b.id === businessIdFromUrl) || null
+        }
+
+        // If not found or no ID, use the first owned business (or first member)
+        if (!businessData) {
+          // Prefer owned businesses first
+          businessData = ownedBusinesses?.[0] || allBusinesses[0]
+        }
+
+        // If we got a business from memberships, extract the role
+        if (businessData && businessData.user_role_in_business) {
+          setUserRole(businessData.user_role_in_business)
+        } else if (businessData && businessData.owner_id === authUser.id) {
+          setUserRole('Owner')
+        } else {
+          // Fallback: try to fetch role from memberships
           const { data: roleData } = await supabase
             .from('business_memberships')
             .select('role')
@@ -104,8 +123,6 @@ function DashboardLayoutContent({ children }) {
             .maybeSingle()
           if (roleData) {
             setUserRole(roleData.role)
-          } else if (businessData.owner_id === authUser.id) {
-            setUserRole('Owner')
           } else {
             setUserRole('Staff')
           }
@@ -152,7 +169,7 @@ function DashboardLayoutContent({ children }) {
         }
 
         setBusiness(businessData)
-        // Add this right after `setBusiness(businessData)` or `setBusiness(business)`:
+        // Ensure the business_id is set in the URL
         if (!businessIdFromUrl && businessData) {
           const url = new URL(window.location.href)
           url.searchParams.set('business_id', businessData.id)
@@ -160,6 +177,8 @@ function DashboardLayoutContent({ children }) {
         }
       } catch (error) {
         console.error('Dashboard layout error:', error)
+        // If there's a serious error, go to onboarding only if we truly have no business
+        // But avoid infinite loop - we'll check one more time
         router.push('/onboarding')
       } finally {
         setLoading(false)
@@ -169,27 +188,28 @@ function DashboardLayoutContent({ children }) {
     load()
   }, [router, searchParams])
 
-  // ─── 🔒 STRONG SECURITY TIES ───
+  // ─── 🔒 STRONG SECURITY TIES (unchanged) ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
       if (urlBusinessId && urlBusinessId !== business.id) {
+        // Mismatch: force reload to sync URL
         window.location.reload()
         return
       }
 
-      const currentSector = business.sector || 'fashion';
+      const currentSector = business.sector || 'fashion'
 
       // Block repairs users from accessing fashion paths
       if (currentSector === 'repairs' && (pathname?.startsWith('/dashboard/orders') || pathname?.startsWith('/dashboard/groups') || pathname?.startsWith('/dashboard/fashion'))) {
-        router.push('/dashboard/repairs?business_id=' + business.id);
-        return;
+        router.push('/dashboard/repairs?business_id=' + business.id)
+        return
       }
 
       // Block fashion users from accessing repairs paths
       if (currentSector === 'fashion' && pathname?.startsWith('/dashboard/repairs')) {
-        router.push('/dashboard/fashion?business_id=' + business.id);
-        return;
+        router.push('/dashboard/fashion?business_id=' + business.id)
+        return
       }
     }
   }, [loading, business, pathname, router, searchParams])
@@ -209,15 +229,15 @@ function DashboardLayoutContent({ children }) {
   const handleNavClick = () => setSidebarOpen(false)
 
   const getIndustryBadge = () => {
-    const sector = business?.sector || 'fashion';
-    if (sector === 'repairs') return '🔧 Repairs';
-    if (sector === 'fashion') return '👗 Fashion';
+    const sector = business?.sector || 'fashion'
+    if (sector === 'repairs') return '🔧 Repairs'
+    if (sector === 'fashion') return '👗 Fashion'
     return ''
   }
 
-  const currentSector = business?.sector || 'fashion';
+  const currentSector = business?.sector || 'fashion'
 
-  // Get navigation items based on sector
+  // ─── SECTOR-BASED NAVIGATION (extensible) ───
   const getNavItems = (sector) => {
     const navMap = {
       fashion: [
@@ -236,11 +256,11 @@ function DashboardLayoutContent({ children }) {
         { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
         { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: 'bell' },
       ]
-    };
-    return navMap[sector] || navMap.fashion; // fallback for unknown sectors
-  };
+    }
+    return navMap[sector] || navMap.fashion
+  }
 
-  const currentNavItems = getNavItems(currentSector);
+  const currentNavItems = getNavItems(currentSector)
 
   if (loading) {
     return (
@@ -569,7 +589,7 @@ function DashboardLayoutContent({ children }) {
           ))}
         </div>
 
-        {showTeamActivity && (
+               {showTeamActivity && (
           <div className="nav-section">
             <div className="section-label">Team & Activity</div>
             <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}>
@@ -589,7 +609,7 @@ function DashboardLayoutContent({ children }) {
                 <span className="icon"><Icon name="settings" size={16} stroke="currentColor" /></span> Business Settings
               </a>
             )}
-                {showBilling && (
+            {showBilling && (
               <a href={baseUrl('/dashboard/subscription')} className={isActive('/dashboard/subscription') ? 'active' : ''} onClick={handleNavClick}>
                 <span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan
               </a>
@@ -650,8 +670,8 @@ function DashboardLayoutContent({ children }) {
         </div>
 
         <Banner />
-{children}
-</div>
+        {children}
+      </div>
     </div>
   )
 }
@@ -663,10 +683,9 @@ export default function DashboardLayout({ children }) {
         <div style={{ color: 'var(--color-text-muted)' }}>Loading...</div>
       </div>
     }>
-      {/* WRAP THE CONTENT WITH THE GLOBAL RESPONSIVE CLASS */}
       <div className="cresoa-dashboard-page">
         <DashboardLayoutContent>{children}</DashboardLayoutContent>
       </div>
     </Suspense>
   )
-                }
+              }
