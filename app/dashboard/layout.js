@@ -9,7 +9,6 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner';
 
-
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -39,28 +38,32 @@ function DashboardLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR (ADDED INVOICES) ───
-  const baseNavItems = {
-    fashion: [
+  // ─── DYNAMIC NAVIGATION BASED ON INDUSTRY SECTOR ───
+  const getNavItems = (sector) => {
+    const defaultItems = [
       { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
       { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
-      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },  // ✅ NEW
       { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-      { name: 'Group Orders', path: '/dashboard/groups', icon: 'layers' },
       { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
-      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-    ],
-    repairs: [
-      { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-      { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },  // ✅ NEW
-      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-      { name: 'Parts', path: '/dashboard/inventory', icon: 'package' },
+      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
       { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
     ]
-  };
 
-  // ─── Load business data (unchanged) ───
+    if (sector === 'repairs') {
+      return [
+        { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
+        { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+        { name: 'Customers', path: '/dashboard/repairs/customers', icon: 'users' },
+        { name: 'Parts', path: '/dashboard/repairs/inventory', icon: 'package' },
+        { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
+        { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: 'bell' },
+      ]
+    }
+
+    return defaultItems
+  }
+
+  // ─── Load business data ───
   useEffect(() => {
     const load = async () => {
       try {
@@ -132,7 +135,7 @@ function DashboardLayoutContent({ children }) {
           }
         }
 
-        // Beta expiry and trial logic (unchanged)
+        // Beta expiry and trial logic
         if (businessData.plan === 'beta' && businessData.beta_expires_at) {
           const betaExpiry = new Date(businessData.beta_expires_at)
           const now = new Date()
@@ -173,12 +176,6 @@ function DashboardLayoutContent({ children }) {
         }
 
         setBusiness(businessData)
-        // Add this right after `setBusiness(businessData)` or `setBusiness(business)`:
-if (!businessIdFromUrl && businessData) {
-  const url = new URL(window.location.href)
-  url.searchParams.set('business_id', businessData.id)
-  window.history.replaceState({}, '', url.toString())
-}
       } catch (error) {
         console.error('Dashboard layout error:', error)
         router.push('/onboarding')
@@ -190,7 +187,7 @@ if (!businessIdFromUrl && businessData) {
     load()
   }, [router, searchParams])
 
-  // ─── 🔒 STRONG SECURITY TIES (unchanged) ───
+  // ─── 🔒 STRONG SECURITY TIES ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
@@ -200,15 +197,17 @@ if (!businessIdFromUrl && businessData) {
       }
 
       const currentSector = business.sector || 'fashion';
-      
+
+      // If user is REPAIRS, block them from FASHION paths
+      if (currentSector === 'repairs' && (pathname?.startsWith('/dashboard/orders') || pathname?.startsWith('/dashboard/groups') || pathname?.startsWith('/dashboard/fashion'))) {
+        router.push('/dashboard/repairs?business_id=' + business.id);
+        return;
+      }
+
+      // If user is FASHION, block them from REPAIRS paths
       if (currentSector === 'fashion' && pathname?.startsWith('/dashboard/repairs')) {
         router.push('/dashboard/fashion?business_id=' + business.id);
-      }
-      
-      if (currentSector === 'repairs') {
-        if (pathname?.startsWith('/dashboard/orders') || pathname?.startsWith('/dashboard/groups')) {
-          router.push('/dashboard/repairs?business_id=' + business.id);
-        }
+        return;
       }
     }
   }, [loading, business, pathname, router, searchParams])
@@ -235,7 +234,7 @@ if (!businessIdFromUrl && businessData) {
   }
 
   const currentSector = business?.sector || 'fashion';
-  const currentNavItems = baseNavItems[currentSector] || baseNavItems.fashion;
+  const currentNavItems = getNavItems(currentSector);
 
   if (loading) {
     return (
@@ -589,7 +588,7 @@ if (!businessIdFromUrl && businessData) {
                 <span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan
               </a>
             )}
-                   {showProfile && (
+                 {showProfile && (
               <a href={baseUrl('/dashboard/profile')} className={isActive('/dashboard/profile') ? 'active' : ''} onClick={handleNavClick}>
                 <span className="icon"><Icon name="user" size={16} stroke="currentColor" /></span> Profile & Settings
               </a>
@@ -645,8 +644,9 @@ if (!businessIdFromUrl && businessData) {
         </div>
 
         <Banner />
-{children}
-</div>
+
+        {children}
+      </div>
     </div>
   )
 }
@@ -664,4 +664,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </Suspense>
   )
-                                              }
+              }
