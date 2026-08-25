@@ -34,7 +34,10 @@ export default function TrackPage() {
 
     const load = async () => {
       try {
-        const response = await fetch(`/api/track/${token}`)
+        // Add cache: 'no-store' to stop the browser from caching old data
+const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
+  cache: 'no-store'
+})
         const data = await response.json()
 
         if (data.error) {
