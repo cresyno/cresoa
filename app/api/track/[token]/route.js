@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req, { params }) {
   const { token } = params;
@@ -27,19 +28,33 @@ export async function GET(req, { params }) {
       .eq('id', orderData.business_id)
       .single();
 
-    // ✅ CRITICAL: Fetch the workflow stages
-    const { data: workflowData } = await supabaseAdmin
+    // 🔍 DEBUG: Fetch the RAW workflow data directly
+    const { data: rawWorkflowData, error: wfError } = await supabaseAdmin
       .from('business_workflows')
-      .select('stage_name')
+      .select('*')
       .eq('business_id', orderData.business_id)
       .order('stage_order', { ascending: true });
 
-    console.log('API WORKFLOW RAW DATA:', JSON.stringify(workflowData));
+    console.log('RAW WORKFLOW DATA:', JSON.stringify(rawWorkflowData));
+    console.log('WORKFLOW ERROR:', wfError ? JSON.stringify(wfError) : 'none');
 
-    const stages = workflowData?.map(w => w.stage_name) || [];
+    // Convert to array of stage names
+    const databaseStages = rawWorkflowData?.map(w => w.stage_name) || [];
 
-    // ✅ Return the correct stages (no cache headers as a test!)
-    return NextResponse.json({ order: orderData, business: businessData, stages });
+    // Default fallback (only used if databaseStages is empty)
+    const fallbackStages = ['Order Placed', 'Cutting', 'Sewing', 'Ready for Pickup', 'Delivered'];
+
+    // Final stages = databaseStages if not empty, else fallback
+    const stages = databaseStages.length > 0 ? databaseStages : fallbackStages;
+
+    // ⚠️ NEW DEBUG FIELD
+    return NextResponse.json({
+      debugVersion: 'v3',
+      order: orderData,
+      business: businessData,
+      databaseStages,   // What the database actually returned
+      stages,           // What the tracking page will display
+    });
   } catch (err) {
     console.error('Track API error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
