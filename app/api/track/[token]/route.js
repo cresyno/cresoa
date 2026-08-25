@@ -46,7 +46,7 @@ export async function GET(req, { params }) {
 
     // Final stages = databaseStages if not empty, else fallback
     const stages = databaseStages.length > 0 ? databaseStages : fallbackStages;
-
+ const logoUrl = business?.logo_url || business?.tracking_logo_url;
     // ⚠️ NEW DEBUG FIELD
     return NextResponse.json({
       debugVersion: 'v3',
