@@ -10,8 +10,8 @@ import { Card } from '../../../../../components/Card'
 import { SectionHeader } from '../../../../../components/SectionHeader'
 import { Navigation } from '../../../../../components/Navigation'
 import InvoicePreviewModal from '../../../../../components/invoice/InvoicePreviewModal'
-import '../../../../globals.css'
-// ─── Self-contained SVG Icons (Complete set) ───
+import '../../../../../globals.css'
+
 const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const paths = {
     'tool': <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
@@ -49,6 +49,7 @@ export default function RepairJobDetailPage() {
   const [payments, setPayments] = useState([])
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
   const [businessPlan, setBusinessPlan] = useState('free')
+  const [userRole, setUserRole] = useState(null)
 
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
@@ -72,7 +73,6 @@ export default function RepairJobDetailPage() {
   const [isEditingMessage, setIsEditingMessage] = useState(false)
   const [whatsAppMessage, setWhatsAppMessage] = useState('')
 
-  // ─── DYNAMIC WORKFLOW STAGES ───
   const { stages: customStages } = useWorkflowStages(currentBusinessId, [
     'Diagnosis', 'In Progress', 'Awaiting Parts', 'Ready', 'Delivered'
   ])
@@ -92,14 +92,28 @@ export default function RepairJobDetailPage() {
         .select(`*, customers (id, name, first_name, last_name, phone, email, address)`)
         .eq('id', jobId)
         .eq('business_id', bizId)
-        .eq('sector', 'repairs')
-        .single()
-      if (jobError) throw jobError
+        .maybeSingle()
 
-      setJob(jobData)
-      setCustomer(jobData.customers)
-      setNotes(jobData.notes || '')
-      setEditForm({ title: jobData.title || '', price: jobData.price || '', due_date: jobData.due_date || '' })
+      if (jobError) throw jobError
+      if (!jobData) {
+        const { data: jobData2, error: jobError2 } = await supabase
+          .from('orders')
+          .select(`*, customers (id, name, first_name, last_name, phone, email, address)`)
+          .eq('id', jobId)
+          .eq('business_id', bizId)
+          .eq('sector', 'repairs')
+          .maybeSingle()
+        if (jobError2 || !jobData2) throw new Error('Job not found in this business')
+        setJob(jobData2)
+        setCustomer(jobData2.customers)
+        setNotes(jobData2.notes || '')
+        setEditForm({ title: jobData2.title || '', price: jobData2.price || '', due_date: jobData2.due_date || '' })
+      } else {
+        setJob(jobData)
+        setCustomer(jobData.customers)
+        setNotes(jobData.notes || '')
+        setEditForm({ title: jobData.title || '', price: jobData.price || '', due_date: jobData.due_date || '' })
+      }
 
       const { data: bizData } = await supabase.from('businesses').select('*').eq('id', bizId).single()
       if (bizData) setBusiness(bizData)
@@ -115,7 +129,7 @@ export default function RepairJobDetailPage() {
       setPayments(paymentData || [])
     } catch (err) {
       console.error('Error loading job:', err)
-      setError('We could not load this repair job.')
+      setError(err.message || 'We could not load this repair job.')
     } finally { setLoading(false) }
   }
 
@@ -264,7 +278,6 @@ export default function RepairJobDetailPage() {
         </div>
       </div>
 
-      {/* Progress Stepper (Dynamic Stages) */}
       <div style={{ display: 'flex', alignItems: 'flex-start', margin: '20px 0 16px' }}>
         {customStages.map((status, index) => {
           const completed = index <= statusIndex
@@ -281,7 +294,6 @@ export default function RepairJobDetailPage() {
         })}
       </div>
 
-      {/* Status Action Row */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '1.5rem' }}>
         <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button" style={{ flex: '1 1 200px', justifyContent: 'center', padding: '0.6rem 1rem', minHeight: '48px' }}>
           <Icon name="arrow-right-circle" size={16} stroke="#fff" style={{ marginRight: '0.4rem' }} /> Update Job
@@ -291,7 +303,6 @@ export default function RepairJobDetailPage() {
         </button>
       </div>
 
-         {/* Money Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatMoney(job.price)}</div></Card>
         <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Paid</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-success)' }}>{formatMoney(job.amount_paid)}</div></Card>
@@ -299,7 +310,6 @@ export default function RepairJobDetailPage() {
         <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: isOverdue ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Due date</div><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatDate(job.due_date)}</div>{isOverdue && <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-danger)', fontWeight: 700 }}>Overdue</div>}</Card>
       </div>
 
-      {/* Next Action Card */}
       <Card style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(212,165,42,0.1)', flexShrink: 0 }}>
           <Icon name={isFullyPaid ? 'check-circle' : 'credit-card'} size={22} stroke={isFullyPaid ? 'var(--cresoa-success)' : 'var(--cresoa-accent)'} />
@@ -312,7 +322,6 @@ export default function RepairJobDetailPage() {
         {!isFullyPaid && <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button"><Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Record payment</button>}
       </Card>
 
-      {/* Customer & Tracking */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
         <Card style={{ padding: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -347,7 +356,6 @@ export default function RepairJobDetailPage() {
         </Card>
       </div>
 
-      {/* Job Details Grid */}
       <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
         <SectionHeader title="Device & Fault Details" subtitle="Job information" />
         <div style={{ marginTop: '0.8rem' }}>
@@ -367,7 +375,6 @@ export default function RepairJobDetailPage() {
         </div>
       </Card>
 
-      {/* Notes Card */}
       <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
         <SectionHeader title="Private Notes" subtitle="Notes for you and your team" />
         <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>These notes are private. The customer will not see them.</p>
@@ -378,7 +385,6 @@ export default function RepairJobDetailPage() {
         </div>
       </Card>
 
-      {/* Payments Card */}
       <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <SectionHeader title="Payments" subtitle="Payment history" />
@@ -400,7 +406,6 @@ export default function RepairJobDetailPage() {
         )}
       </Card>
 
-      {/* Duplicate & Delete */}
       <Card style={{ padding: '0.8rem 1rem', marginBottom: '1rem' }}>
         <button onClick={handleDuplicate} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '0.6rem 0', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
           <Icon name="copy" size={18} stroke="var(--cresoa-text-muted)" />
@@ -412,7 +417,7 @@ export default function RepairJobDetailPage() {
         </button>
       </Card>
 
-      {/* Status Modal (Dynamic) */}
+      {/* Modals */}
       {showStatusModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => !updatingStatus && setShowStatusModal(false)}>
           <div style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: '80dvh', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
@@ -443,7 +448,6 @@ export default function RepairJobDetailPage() {
         </div>
       )}
 
-     {/* WhatsApp Modal */}
       {isWhatsAppModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.6)' }} onMouseDown={() => setIsWhatsAppModalOpen(false)}>
           <div style={{ width: 'min(480px, calc(100% - 32px))', maxHeight: '80dvh', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
@@ -465,7 +469,6 @@ export default function RepairJobDetailPage() {
         </div>
       )}
 
-      {/* Payment Modal */}
       {showPaymentModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => !recordingPayment && setShowPaymentModal(false)}>
           <form style={{ width: 'min(480px, calc(100% - 32px))', maxHeight: '80dvh', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onSubmit={handleRecordPayment} onMouseDown={e => e.stopPropagation()}>
@@ -490,7 +493,6 @@ export default function RepairJobDetailPage() {
         </div>
       )}
 
-      {/* Edit Modal */}
       {showEditModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => !editing && setShowEditModal(false)}>
           <form style={{ width: 'min(480px, calc(100% - 32px))', maxHeight: '80dvh', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onSubmit={handleEditSubmit} onMouseDown={e => e.stopPropagation()}>
@@ -519,7 +521,6 @@ export default function RepairJobDetailPage() {
         </div>
       )}
 
-      {/* Invoice Modal (Optional) */}
       {isInvoiceOpen && business && (
         <InvoicePreviewModal order={job} business={business} onClose={() => setIsInvoiceOpen(false)} />
       )}
