@@ -25,8 +25,7 @@ export const metadata = {
   // ✅ FAVICON ADDED HERE
   icons: {
     icon: '/favicon.png',
-    // Optional: Apple touch icon for iOS devices
-    apple: '/favicon.png',
+    apple: '/apple-touch-icon.png',
   },
   openGraph: {
     title: 'Cresoa | Business OS for Nigerian SMEs',
@@ -84,7 +83,6 @@ export default function RootLayout({ children }) {
             })
           }}
         />
-          <link rel="icon" href="/favicon.png" type="image/png" />
       </head>
       <body className={inter.className}>
         <ClientLayout>{children}</ClientLayout>
