@@ -8,6 +8,7 @@ import { FREE_TRIAL_DAYS } from '../../../lib/planLimits'
 import BusinessSwitcher from '../../components/BusinessSwitcher'
 import { Icon } from '../../../components/Icon'
 import Banner from '../../../components/Banner'
+import { RepairsNavigation } from '../../../components/RepairsNavigation' // Add import
 
 const normalizeSector = (sector) => {
   if (!sector) return 'fashion'
@@ -331,6 +332,7 @@ function RepairsLayoutContent({ children }) {
         <Banner />
         {children}
       </div>
+          <RepairsNavigation businessId={business?.id} />
     </div>
   )
 }
