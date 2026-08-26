@@ -13,6 +13,7 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     'alert-circle': <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
     'phone': <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />,
     'mail': <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></>,
+    'user': <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
@@ -61,6 +62,7 @@ export default function RepairsNewCustomerPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
+  const [createdCustomerId, setCreatedCustomerId] = useState(null)
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(INITIAL_FORM)
   const [resolvedBusinessId, setResolvedBusinessId] = useState(null)
@@ -201,13 +203,9 @@ export default function RepairsNewCustomerPage() {
         details: { name: `${form.first_name} ${form.last_name}` },
       })
 
-      setSuccessMessage('✅ Customer created successfully! Redirecting...')
+      setCreatedCustomerId(customer.id)
+      setSuccessMessage('✅ Customer created successfully!')
       setSaving(false)
-
-      setTimeout(() => {
-        router.push(`/dashboard/repairs/customers/${customer.id}?business_id=${resolvedBusinessId}`)
-      }, 1500)
-
     } catch (err) {
       console.error('Create repair customer error:', err)
       setError(err.message || 'Something went wrong. Please try again.')
@@ -270,6 +268,22 @@ export default function RepairsNewCustomerPage() {
       {error && (
         <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Svg name="alert-circle" size={16} stroke="var(--cresoa-danger)" /> {error}
+        </div>
+      )}
+
+      {/* Success banner */}
+      {successMessage && !error && (
+        <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-success-soft)', color: 'var(--cresoa-success)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Svg name="check-circle" size={16} stroke="var(--cresoa-success)" /> {successMessage}
+          {createdCustomerId && (
+            <button
+              onClick={() => router.push(`/dashboard/repairs/customers/${createdCustomerId}?business_id=${resolvedBusinessId}`)}
+              className="cresoa-primary-button"
+              style={{ marginLeft: 'auto', padding: '0.2rem 0.8rem', fontSize: '0.75rem' }}
+            >
+              View Customer
+            </button>
+          )}
         </div>
       )}
 
@@ -340,32 +354,23 @@ export default function RepairsNewCustomerPage() {
                   <p className="cresoa-section-header-subtitle">Check the details before creating the customer</p>
                 </div>
               </div>
-              <div className="cresoa-card" style={{ padding: '0.8rem', background: successMessage ? 'var(--cresoa-success-soft)' : 'var(--cresoa-surface-soft)' }}>
-                {successMessage ? (
-                  <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                    <Svg name="check-circle" size={32} stroke="var(--cresoa-success)" />
-                    <p style={{ margin: '0.5rem 0 0', fontWeight: 600, color: 'var(--cresoa-success)' }}>{successMessage}</p>
+              <div className="cresoa-card" style={{ padding: '0.8rem', background: 'var(--cresoa-surface-soft)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <span className="cresoa-avatar" style={{ width: '40px', height: '40px', fontSize: '16px' }}>
+                    {(form.first_name?.charAt(0) || '') + (form.last_name?.charAt(0) || '') || '?'}
+                  </span>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{fullName}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{form.phone || 'No phone'}</div>
                   </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                      <span className="cresoa-avatar" style={{ width: '40px', height: '40px', fontSize: '16px' }}>
-                        {(form.first_name?.charAt(0) || '') + (form.last_name?.charAt(0) || '') || '?'}
-                      </span>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{fullName}</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{form.phone || 'No phone'}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                      <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Email:</span> <strong>{form.email || '—'}</strong></div>
-                      <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Address:</span> <strong>{form.address || '—'}</strong></div>
-                      {form.notes && (
-                        <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--cresoa-text-muted)' }}>Notes:</span> <strong> {form.notes}</strong></div>
-                      )}
-                    </div>
-                  </>
-                )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                  <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Email:</span> <strong>{form.email || '—'}</strong></div>
+                  <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Address:</span> <strong>{form.address || '—'}</strong></div>
+                  {form.notes && (
+                    <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--cresoa-text-muted)' }}>Notes:</span> <strong> {form.notes}</strong></div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -408,4 +413,4 @@ export default function RepairsNewCustomerPage() {
       </form>
     </div>
   )
-}
+      }
