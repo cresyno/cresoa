@@ -22,6 +22,12 @@ export const metadata = {
     'Cresoa Beta',
     'Manage orders and customers'
   ],
+  // ✅ FAVICON ADDED HERE
+  icons: {
+    icon: '/favicon.png',
+    // Optional: Apple touch icon for iOS devices
+    apple: '/favicon.png',
+  },
   openGraph: {
     title: 'Cresoa | Business OS for Nigerian SMEs',
     description: 'Manage customers, orders, inventory, workflows and your business from one place with Cresoa. Built for Fashion, Repairs, Traders, and Logistics.',
