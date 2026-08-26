@@ -18,6 +18,15 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
 
+// ─── Normalize sector ───
+const normalizeSector = (sector) => {
+  if (!sector) return 'fashion'
+  const s = sector.toLowerCase()
+  if (s.includes('repair')) return 'repairs'
+  if (s.includes('fashion')) return 'fashion'
+  return s
+}
+
 // ─── Constants & helpers ───
 const STEPS = [
   { id: 1, label: 'Personal Info' },
@@ -61,13 +70,11 @@ export default function RepairsNewCustomerPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [createdCustomerId, setCreatedCustomerId] = useState(null)
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(INITIAL_FORM)
   const [resolvedBusinessId, setResolvedBusinessId] = useState(null)
 
-  // ─── Resolve business ID (sector-scoped) ───
+  // ─── Resolve business ID (normalized sector check) ───
   useEffect(() => {
     const resolveBusiness = async () => {
       try {
@@ -102,13 +109,13 @@ export default function RepairsNewCustomerPage() {
           return
         }
 
-        // Verify business sector is repairs
+        // Verify business sector is repairs (normalized)
         const { data: bizData } = await supabase
           .from('businesses')
           .select('sector')
           .eq('id', bizId)
           .maybeSingle()
-        if (bizData && bizData.sector !== 'repairs') {
+        if (bizData && normalizeSector(bizData.sector) !== 'repairs') {
           router.push(`/dashboard?business_id=${bizId}`)
           return
         }
@@ -148,10 +155,9 @@ export default function RepairsNewCustomerPage() {
   const handleBack = () => {
     setStep(prev => Math.max(prev - 1, 1))
     setError(null)
-    setSuccessMessage('')
   }
 
-  // ─── Submit ───
+  // ─── Submit (manual save → redirect) ───
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -171,7 +177,6 @@ export default function RepairsNewCustomerPage() {
     if (saving) return
     setSaving(true)
     setError(null)
-    setSuccessMessage('')
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -203,9 +208,8 @@ export default function RepairsNewCustomerPage() {
         details: { name: `${form.first_name} ${form.last_name}` },
       })
 
-      setCreatedCustomerId(customer.id)
-      setSuccessMessage('✅ Customer created successfully!')
-      setSaving(false)
+      // ✅ Manual save successful → redirect immediately to customer detail
+      router.push(`/dashboard/repairs/customers/${customer.id}?business_id=${resolvedBusinessId}`)
     } catch (err) {
       console.error('Create repair customer error:', err)
       setError(err.message || 'Something went wrong. Please try again.')
@@ -268,22 +272,6 @@ export default function RepairsNewCustomerPage() {
       {error && (
         <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Svg name="alert-circle" size={16} stroke="var(--cresoa-danger)" /> {error}
-        </div>
-      )}
-
-      {/* Success banner */}
-      {successMessage && !error && (
-        <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-success-soft)', color: 'var(--cresoa-success)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Svg name="check-circle" size={16} stroke="var(--cresoa-success)" /> {successMessage}
-          {createdCustomerId && (
-            <button
-              onClick={() => router.push(`/dashboard/repairs/customers/${createdCustomerId}?business_id=${resolvedBusinessId}`)}
-              className="cresoa-primary-button"
-              style={{ marginLeft: 'auto', padding: '0.2rem 0.8rem', fontSize: '0.75rem' }}
-            >
-              View Customer
-            </button>
-          )}
         </div>
       )}
 
@@ -382,7 +370,7 @@ export default function RepairsNewCustomerPage() {
             <button
               type="button"
               onClick={handleBack}
-              disabled={saving || !!successMessage}
+              disabled={saving}
               style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text)', fontWeight: 500 }}
             >
               <Svg name="arrow-left" size={14} stroke="currentColor" style={{ marginRight: '0.3rem' }} /> Back
@@ -402,15 +390,15 @@ export default function RepairsNewCustomerPage() {
           ) : (
             <button
               type="submit"
-              disabled={saving || !!successMessage}
+              disabled={saving}
               className="cresoa-primary-button"
               style={{ padding: '0.6rem 1.5rem', marginLeft: 'auto' }}
             >
-              {saving ? 'Saving...' : successMessage ? 'Saved ✓' : 'Save Customer'}
+              {saving ? 'Saving...' : 'Save Customer'}
             </button>
           )}
         </div>
       </form>
     </div>
   )
-      }
+  }
