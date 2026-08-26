@@ -422,7 +422,7 @@ export default function RepairsNewInvoicePage() {
         </div>
       )}
 
-      {/* STEP 3: Details */}
+        {/* STEP 3: Details */}
       {step === 3 && (
         <div className="cresoa-card" style={{ padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 1rem' }}>Invoice Details</h3>
@@ -433,4 +433,186 @@ export default function RepairsNewInvoicePage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
             <div>
               <label style={labelStyle}>Issue Date</label>
-              <input type="date" value={issueDate} onCh
+              <input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Due Date</label>
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+
+          <h4 style={{ margin: '1rem 0 0.5rem' }}>Bank Details (Required)</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div>
+              <label style={labelStyle}>Bank Name</label>
+              <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. GTBank" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Account Number (10 digits)</label>
+              <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="e.g. 0123456789" style={inputStyle} />
+              {accountNumber && !/^\d{10}$/.test(accountNumber) && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.3rem 0 0' }}>Must be exactly 10 digits</p>}
+            </div>
+            <div>
+              <label style={labelStyle}>Account Name</label>
+              <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="e.g. John Doe" style={inputStyle} />
+            </div>
+          </div>
+
+          <h4 style={{ margin: '1rem 0 0.5rem' }}>CAC Number (Optional)</h4>
+          <input type="text" value={cacNumber} onChange={e => setCacNumber(e.target.value)} placeholder="e.g. RC-12345" style={inputStyle} />
+          {cacNumber && !/^[A-Z]{2,3}-\d{5,7}$/.test(cacNumber) && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.5rem' }}>Format: RC-12345 (5-7 digits)</p>}
+
+          <button onClick={() => setStep(4)} className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center' }}>Review Invoice</button>
+        </div>
+      )}
+
+      {/* STEP 4: Editable Review */}
+      {step === 4 && (
+        <div>
+          <div className="cresoa-card" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
+            <h3 style={{ margin: '0 0 1rem' }}>Review & Confirm</h3>
+
+            {/* Selected Customer */}
+            <div style={{ marginBottom: '1rem', padding: '0.8rem', background: 'var(--cresoa-surface-soft)', borderRadius: '8px' }}>
+              <label style={labelStyle}>Customer</label>
+              <div style={{ fontWeight: 600 }}>{selectedCustomer?.name || selectedCustomer?.first_name}</div>
+              {selectedCustomer?.phone && <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{selectedCustomer.phone}</div>}
+            </div>
+
+            {/* Selected Orders */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={labelStyle}>Selected Jobs</label>
+              {selectedOrders.length === 0 ? <p style={{ color: 'var(--cresoa-danger)' }}>No jobs selected!</p> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {selectedOrders.map(order => (
+                    <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', border: '1px solid var(--cresoa-border)', borderRadius: '6px' }}>
+                      <div>
+                        <strong>{order.title}</strong>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Qty: {order.quantity} × {formatMoney(order.price_per_unit || order.price)}</div>
+                      </div>
+                      <div style={{ fontWeight: 600 }}>{formatMoney((Number(order.quantity) || 1) * (Number(order.price_per_unit) || 0))}</div>
+                      {order.is_temp && <button onClick={() => handleRemoveTempOrder(order.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-danger)' }}><Svg name="trash" size={16} stroke="currentColor" /></button>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Editable fields with inline errors */}
+            <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={labelStyle}>Issue Date</label>
+                <input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Due Date</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Bank Name *</label>
+                <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} style={{ ...inputStyle, borderColor: formErrors.bankName ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }} />
+                {formErrors.bankName && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '0.2rem 0 0' }}>{formErrors.bankName}</p>}
+              </div>
+              <div>
+                <label style={labelStyle}>Account Number *</label>
+                <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ ...inputStyle, borderColor: formErrors.accountNumber ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }} />
+                {formErrors.accountNumber && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '0.2rem 0 0' }}>{formErrors.accountNumber}</p>}
+              </div>
+              <div>
+                <label style={labelStyle}>Account Name *</label>
+                <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} style={{ ...inputStyle, borderColor: formErrors.accountName ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }} />
+                {formErrors.accountName && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '0.2rem 0 0' }}>{formErrors.accountName}</p>}
+              </div>
+              <div>
+                <label style={labelStyle}>CAC Number (Optional)</label>
+                <input type="text" value={cacNumber} onChange={e => setCacNumber(e.target.value)} style={{ ...inputStyle, borderColor: formErrors.cacNumber ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }} />
+                {formErrors.cacNumber && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '0.2rem 0 0' }}>{formErrors.cacNumber}</p>}
+              </div>
+              <div>
+                <label style={labelStyle}>Thank You Note</label>
+                <textarea value={thankYouNote} onChange={e => setThankYouNote(e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+              </div>
+            </div>
+
+            {/* Totals */}
+            <div style={{ borderTop: '2px solid var(--cresoa-border)', paddingTop: '1rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Subtotal</span><span>{formatMoney(subtotal)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>Total</span><span>{formatMoney(total)}</span></div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button onClick={handleCancel} style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="cresoa-primary-button" style={{ flex: 1, justifyContent: 'center' }}>{saving ? 'Saving...' : 'Save Invoice'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── NEW ORDER MODAL ─── */}
+      {showNewOrderModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '16px'
+        }} onClick={() => setShowNewOrderModal(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'var(--cresoa-surface)',
+            border: '1px solid var(--cresoa-border)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            width: '100%',
+            maxWidth: '480px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--cresoa-text)' }}>New Order</h3>
+              <button onClick={() => setShowNewOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Svg name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={labelStyle}>Order Title</label>
+              <input type="text" value={newOrder.title} onChange={e => setNewOrder({ ...newOrder, title: e.target.value })} placeholder="e.g. Screen replacement" style={inputStyle} />
+            </div>
+
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={labelStyle}>Description (optional)</label>
+              <input type="text" value={newOrder.description} onChange={e => setNewOrder({ ...newOrder, description: e.target.value })} placeholder="e.g. iPhone 13" style={inputStyle} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div>
+                <label style={labelStyle}>Quantity</label>
+                <input type="number" value={newOrder.quantity} onChange={e => setNewOrder({ ...newOrder, quantity: e.target.value })} placeholder="0" min="1" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Price per Unit (₦)</label>
+                <input type="number" value={newOrder.price_per_unit} onChange={e => setNewOrder({ ...newOrder, price_per_unit: e.target.value })} placeholder="0" min="0" style={inputStyle} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={labelStyle}>Due Date</label>
+              <input type="date" value={newOrder.due_date} onChange={e => setNewOrder({ ...newOrder, due_date: e.target.value })} style={inputStyle} />
+            </div>
+
+            {newOrder.quantity && newOrder.price_per_unit && (
+              <div style={{ padding: '0.6rem', background: 'var(--cresoa-accent-soft)', borderRadius: '8px', textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', color: 'var(--cresoa-accent)', marginBottom: '1rem' }}>
+                Total: ₦{Math.round(Number(newOrder.quantity) * Number(newOrder.price_per_unit)).toLocaleString()}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button onClick={() => setShowNewOrderModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+              <button onClick={handleCreateOrder} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-accent)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Add Order</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+        }
