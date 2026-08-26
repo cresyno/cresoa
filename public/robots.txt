@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
+Allow: /blog
+Allow: /fashion
+Allow: /repairs
+Allow: /pricing
+Allow: /learn
+Allow: /login
+Allow: /signup
+
+Disallow: /admin
+Disallow: /api
+Disallow: /dashboard
+Disallow: /dashboard/repairs
 
 Sitemap: https://cresoa.com.ng/sitemap.xml
