@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -56,9 +56,13 @@ const labelStyle = {
 export default function RepairsInvoiceDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const invoiceId = params.id
 
-  const [businessId, setBusinessId] = useState(null)
+  // Extract businessId at the top level to avoid dependency array issues
+  const businessIdFromUrl = searchParams?.get('business_id')
+
+  const [businessId, setBusinessId] = useState(businessIdFromUrl)
   const [invoice, setInvoice] = useState(null)
   const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
@@ -110,25 +114,28 @@ export default function RepairsInvoiceDetailPage() {
     return () => document.head.removeChild(style)
   }, [])
 
-  // Fetch invoice (sector-scoped)
+  // Fetch invoice (sector-scoped) - Fixed dependency array
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
+        if (!businessIdFromUrl) {
+          router.push('/dashboard')
+          return
+        }
+
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) { router.push('/login'); return }
 
-        const bizId = searchParams.get('business_id')
-        if (!bizId) { router.push('/dashboard'); return }
-        setBusinessId(bizId)
-
         // Verify business sector is repairs
-        const { data: bizData } = await supabase
+        const { data: bizData, error: bizError } = await supabase
           .from('businesses')
           .select('*')
-          .eq('id', bizId)
+          .eq('id', businessIdFromUrl)
           .maybeSingle()
+
+        if (bizError) throw bizError
         if (!bizData || normalizeSector(bizData.sector) !== 'repairs') {
-          router.push(`/dashboard?business_id=${bizId}`)
+          router.push(`/dashboard?business_id=${businessIdFromUrl}`)
           return
         }
         setBusiness(bizData)
@@ -141,7 +148,7 @@ export default function RepairsInvoiceDetailPage() {
             invoice_items ( id, item_name, description, quantity, price, total, order_id )
           `)
           .eq('id', invoiceId)
-          .eq('business_id', bizId)
+          .eq('business_id', businessIdFromUrl)
           .eq('sector', 'repairs')
           .single()
 
@@ -179,7 +186,7 @@ export default function RepairsInvoiceDetailPage() {
       }
     }
     fetchInvoice()
-  }, [invoiceId, router, searchParams])
+  }, [invoiceId, businessIdFromUrl, router])
 
   const balance = invoice ? Number(invoice.total) - Number(invoice.amount_paid) : 0
   const isPaid = balance <= 0
@@ -188,7 +195,6 @@ export default function RepairsInvoiceDetailPage() {
   const handleSaveEdits = async () => {
     if (!invoice) return
 
-    // Validate
     if (accountNumber && !/^\d{10}$/.test(accountNumber)) {
       setSuccessMessage('Account number must be exactly 10 digits.')
       setTimeout(() => setSuccessMessage(''), 3000)
@@ -214,7 +220,7 @@ export default function RepairsInvoiceDetailPage() {
           cac_number: cacNumber,
         })
         .eq('id', invoice.id)
-        .eq('business_id', businessId)
+        .eq('business_id', businessIdFromUrl)
         .eq('sector', 'repairs')
       if (error) throw error
       setSuccessMessage('✅ Invoice updated successfully.')
@@ -242,7 +248,7 @@ export default function RepairsInvoiceDetailPage() {
       const { error: payError } = await supabase
         .from('payment_records')
         .insert({
-          business_id: businessId,
+          business_id: businessIdFromUrl,
           customer_id: customer?.id,
           invoice_id: invoice.id,
           amount: amount,
@@ -295,9 +301,8 @@ export default function RepairsInvoiceDetailPage() {
     setPdfLoading(true)
     await new Promise(resolve => setTimeout(resolve, 100))
 
-    // Temporarily force a fixed A4 width for PDF capture
     const originalWidth = invoiceRef.current.style.width
-    invoiceRef.current.style.width = '794px' // A4 width at 96dpi
+    invoiceRef.current.style.width = '794px'
 
     const canvas = await html2canvas(invoiceRef.current, {
       scale: 2,
@@ -307,7 +312,6 @@ export default function RepairsInvoiceDetailPage() {
       scrollY: 0,
     })
 
-    // Reset width after capture
     invoiceRef.current.style.width = originalWidth
     setPdfLoading(false)
 
@@ -371,25 +375,23 @@ export default function RepairsInvoiceDetailPage() {
       <Svg name="x" size={30} stroke="var(--cresoa-danger)" />
       <h2>Couldn't load invoice</h2>
       <p>{error || 'Invoice not found'}</p>
-      <button onClick={() => router.push(`/dashboard/repairs/invoices?business_id=${businessId}`)} className="cresoa-primary-button">Back</button>
+      <button onClick={() => router.push(`/dashboard/repairs/invoices?business_id=${businessIdFromUrl}`)} className="cresoa-primary-button">Back</button>
     </div>
   )
 
   return (
     <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '120px', background: 'var(--cresoa-bg)', minHeight: '100vh' }}>
-      <button onClick={() => router.push(`/dashboard/repairs/invoices?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>
+      <button onClick={() => router.push(`/dashboard/repairs/invoices?business_id=${businessIdFromUrl}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>
         <Svg name="back" size={16} stroke="currentColor" /> Back to Invoices
       </button>
 
       <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: '1.5rem' }}>
         {/* MAIN INVOICE AREA */}
         <div>
-          {/* ─── INVOICE PREVIEW (Always White) ─── */}
           <div id="invoice-print-area" ref={invoiceRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: isMobile ? '1rem' : '1.5rem', marginBottom: '1rem', color: '#1a1a1a', overflow: 'hidden' }}>
             {/* Header */}
             <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: isMobile ? 'block' : 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: isMobile ? 'flex-start' : 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-start' }}>
               
-              {/* Business Info (Left) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: isMobile ? '1rem' : '0', width: isMobile ? '100%' : 'auto' }}>
                 {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: isMobile ? '50px' : '80px', height: isMobile ? '50px' : '80px', objectFit: 'contain', flexShrink: 0 }} /> : <div style={{ width: isMobile ? '50px' : '80px', height: isMobile ? '50px' : '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, flexShrink: 0 }}>{business?.name?.charAt(0) || 'B'}</div>}
                 <div style={{ minWidth: 0 }}>
@@ -406,7 +408,6 @@ export default function RepairsInvoiceDetailPage() {
                 </div>
               </div>
 
-              {/* Invoice Meta (Right) */}
               <div style={{ textAlign: isMobile ? 'left' : 'right', width: isMobile ? '100%' : 'auto' }}>
                 <h3 style={{ margin: 0, fontSize: isMobile ? '1rem' : '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span> #{invoice.invoice_number}</h3>
                 <div style={{ marginTop: '4px' }}>
@@ -417,7 +418,6 @@ export default function RepairsInvoiceDetailPage() {
               </div>
             </div>
 
-            {/* Billed To */}
             {customer && (
               <div style={{ marginBottom: '1rem' }}>
                 <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>BILL TO</p>
@@ -428,7 +428,7 @@ export default function RepairsInvoiceDetailPage() {
               </div>
             )}
 
-             {/* Items Table */}
+                {/* Items Table */}
             <div style={{ overflowX: 'hidden', marginBottom: '1rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: isMobile ? '0.75rem' : '0.85rem' }}>
                 <thead>
@@ -485,7 +485,7 @@ export default function RepairsInvoiceDetailPage() {
             </p>
           </div>
 
-          {/* Editable Section (Hidden on print) */}
+          {/* Editable Section */}
           <div className="no-print" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', marginBottom: '1rem' }}>
             <h3 style={{ margin: '0 0 0.75rem', color: 'var(--cresoa-text)', fontSize: '1rem' }}>Edit Invoice Details</h3>
             {successMessage && (
@@ -547,7 +547,7 @@ export default function RepairsInvoiceDetailPage() {
         )}
       </div>
 
-      {/* QUICK ACTIONS MOBILE LIST (Below page content) */}
+      {/* QUICK ACTIONS MOBILE LIST */}
       {isMobile && (
         <div className="no-print" style={{ marginTop: '1rem' }}>
           <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
@@ -588,7 +588,7 @@ export default function RepairsInvoiceDetailPage() {
         </div>
       )}
 
-      {/* Payment Modal (Responsive) */}
+      {/* Payment Modal */}
       {showPaymentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }} onClick={() => setShowPaymentModal(false)}>
           <form onClick={(e) => e.stopPropagation()} onSubmit={handleRecordPayment} style={{ background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
@@ -618,4 +618,4 @@ export default function RepairsInvoiceDetailPage() {
       )}
     </div>
   )
-                             }
+            }
