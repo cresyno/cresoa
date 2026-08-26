@@ -5,13 +5,9 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
 import { useWorkflowStages } from '../../../../../lib/useWorkflowStages'
-import { isFeatureAvailable } from '../../../../../lib/planLimits'
-import { Card } from '../../../../../components/Card'
-import { SectionHeader } from '../../../../../components/SectionHeader'
-import { Navigation } from '../../../../../components/Navigation'
 import InvoicePreviewModal from '../../../../../components/invoice/InvoicePreviewModal'
-import '../../../../globals.css'
 
+// ─── Self-contained SVG icons ───
 const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const paths = {
     'tool': <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
@@ -36,6 +32,43 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{paths[name]}</svg>
 }
 
+// ─── Reusable styles ───
+const formatMoney = (value) => `₦${Number(value || 0).toLocaleString('en-NG')}`
+const formatDate = (value) => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.6rem',
+  borderRadius: '8px',
+  border: '1px solid var(--cresoa-border)',
+  background: 'var(--cresoa-surface)',
+  color: 'var(--cresoa-text)',
+  fontSize: '0.9rem',
+  boxSizing: 'border-box',
+}
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.8rem',
+  fontWeight: 500,
+  marginBottom: '0.2rem',
+  color: 'var(--cresoa-text-muted)',
+}
+
+const secondaryButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.3rem',
+  padding: '0.4rem 1rem',
+  borderRadius: '8px',
+  border: '1px solid var(--cresoa-border)',
+  background: 'var(--cresoa-surface)',
+  cursor: 'pointer',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  color: 'var(--cresoa-text)',
+}
+
 export default function RepairJobDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -48,7 +81,6 @@ export default function RepairJobDetailPage() {
   const [business, setBusiness] = useState(null)
   const [payments, setPayments] = useState([])
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
-  const [businessPlan, setBusinessPlan] = useState('free')
   const [userRole, setUserRole] = useState(null)
 
   const [notes, setNotes] = useState('')
@@ -87,39 +119,25 @@ export default function RepairJobDetailPage() {
       if (!bizId) { router.push('/dashboard'); return }
       setCurrentBusinessId(bizId)
 
+      // Simplified fetch – remove duplicate query
       const { data: jobData, error: jobError } = await supabase
         .from('orders')
         .select(`*, customers (id, name, first_name, last_name, phone, email, address)`)
         .eq('id', jobId)
         .eq('business_id', bizId)
+        .eq('sector', 'repairs')
         .maybeSingle()
 
       if (jobError) throw jobError
-      if (!jobData) {
-        const { data: jobData2, error: jobError2 } = await supabase
-          .from('orders')
-          .select(`*, customers (id, name, first_name, last_name, phone, email, address)`)
-          .eq('id', jobId)
-          .eq('business_id', bizId)
-          .eq('sector', 'repairs')
-          .maybeSingle()
-        if (jobError2 || !jobData2) throw new Error('Job not found in this business')
-        setJob(jobData2)
-        setCustomer(jobData2.customers)
-        setNotes(jobData2.notes || '')
-        setEditForm({ title: jobData2.title || '', price: jobData2.price || '', due_date: jobData2.due_date || '' })
-      } else {
-        setJob(jobData)
-        setCustomer(jobData.customers)
-        setNotes(jobData.notes || '')
-        setEditForm({ title: jobData.title || '', price: jobData.price || '', due_date: jobData.due_date || '' })
-      }
+      if (!jobData) throw new Error('Job not found in this business')
+
+      setJob(jobData)
+      setCustomer(jobData.customers)
+      setNotes(jobData.notes || '')
+      setEditForm({ title: jobData.title || '', price: jobData.price || '', due_date: jobData.due_date || '' })
 
       const { data: bizData } = await supabase.from('businesses').select('*').eq('id', bizId).single()
       if (bizData) setBusiness(bizData)
-
-      const { data: bizPlanData } = await supabase.from('businesses').select('plan').eq('id', bizId).single()
-      if (bizPlanData) setBusinessPlan(bizPlanData.plan || 'free')
 
       const { data: roleData } = await supabase.from('business_memberships').select('role').eq('business_id', bizId).eq('user_id', session.user.id).maybeSingle()
       if (roleData) setUserRole(roleData.role)
@@ -143,7 +161,6 @@ export default function RepairJobDetailPage() {
 
   const balance = useMemo(() => Math.max(0, Number(job?.price || 0) - Number(job?.amount_paid || 0)), [job])
   const isFullyPaid = balance <= 0
-  const canWhatsApp = isFeatureAvailable(businessPlan, 'whatsapp_reminders')
 
   const saveNotes = async () => {
     setSavingNotes(true)
@@ -204,6 +221,10 @@ export default function RepairJobDetailPage() {
     window.open(url, '_blank'); setIsWhatsAppModalOpen(false)
   }
 
+  const handleCopyMessage = async () => {
+    try { await navigator.clipboard.writeText(whatsAppMessage); alert('Message copied!') } catch (err) { alert('Could not copy.') }
+  }
+
   const getTrackingLink = () => {
     if (typeof window === 'undefined' || !job?.tracking_token) return ''
     return `${window.location.origin}/track/${job.tracking_token}`
@@ -245,72 +266,86 @@ export default function RepairJobDetailPage() {
   }
 
   const currentStatusInfo = customStages.find(item => item === (job?.current_status || customStages[0])) || customStages[0]
-  const selectedStatusInfo = selectedStatus
   const isOverdue = job?.due_date && new Date(job.due_date) < new Date() && job?.current_status !== 'Delivered'
-  const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
-  const formatDate = value => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
   const customerName = customer?.first_name || customer?.name || 'Customer'
 
   if (loading) return <div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="cresoa-loading-spinner" /></div>
   if (error || !job) return <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}><Icon name="alert-circle" size={30} stroke="var(--cresoa-danger)" /><h2 style={{ margin: '14px 0 7px', color: 'var(--cresoa-text)' }}>Couldn't load job</h2><p style={{ maxWidth: '360px', margin: '0 0 18px', color: 'var(--cresoa-text-muted)' }}>{error || 'Job not found'}</p><button onClick={loadJob} className="cresoa-primary-button">Try again</button></div>
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
-      <Navigation businessId={currentBusinessId} />
-
+    <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+      {/* Back button */}
       <button onClick={() => router.push(`/dashboard/repairs/jobs?business_id=${currentBusinessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
         <Icon name="arrow-left" size={16} stroke="currentColor" /> Jobs
       </button>
 
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>JOB DETAILS</p>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0.2rem 0 0', color: 'var(--cresoa-text)' }}>{job.title || 'Untitled job'}</h1>
           <p style={{ color: 'var(--cresoa-text-muted)', margin: '0.1rem 0 0' }}>#{jobId.slice(0, 8)} · {customerName}</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${jobId}&business_id=${currentBusinessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-accent)', background: 'rgba(212,165,42,0.08)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--cresoa-accent)' }}>
-            <Icon name="file-text" size={14} stroke="currentColor" /> Generate Invoice
+          <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${jobId}&business_id=${currentBusinessId}`)} style={secondaryButtonStyle}>
+            <Icon name="file-text" size={14} stroke="var(--cresoa-accent)" /> Generate Invoice
           </button>
-          <button onClick={() => setShowEditModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+          <button onClick={() => setShowEditModal(true)} style={secondaryButtonStyle}>
             <Icon name="edit-2" size={14} stroke="currentColor" /> Edit
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', margin: '20px 0 16px' }}>
+      {/* Progress Timeline */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', margin: '20px 0 16px', overflowX: 'auto' }}>
         {customStages.map((status, index) => {
           const completed = index <= statusIndex
           const active = index === statusIndex
           return (
-            <div key={status} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+            <div key={status} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '80px' }}>
               <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: `2px solid ${completed ? 'var(--cresoa-success)' : 'var(--cresoa-border)'}`, background: completed ? 'var(--cresoa-success)' : 'var(--cresoa-surface)', color: completed ? '#fff' : 'var(--cresoa-text-muted)', boxShadow: active ? '0 0 0 4px rgba(212,165,42,0.15)' : 'none', marginBottom: '6px' }}>
                 {completed && <Icon name="check" size={13} stroke="currentColor" />}
               </div>
-              <span style={{ fontSize: '8px', fontWeight: 700, textAlign: 'center', color: active ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)', whiteSpace: 'nowrap', minWidth: '32px' }}>{status}</span>
+              <span style={{ fontSize: '8px', fontWeight: 700, textAlign: 'center', color: active ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)', whiteSpace: 'nowrap' }}>{status}</span>
               {index < customStages.length - 1 && <div style={{ flex: 1, height: '2px', marginTop: '-18px', background: index < statusIndex ? 'var(--cresoa-success)' : 'var(--cresoa-border)', marginLeft: '4px' }} />}
             </div>
           )
         })}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '1.5rem' }}>
-        <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button" style={{ flex: '1 1 200px', justifyContent: 'center', padding: '0.6rem 1rem', minHeight: '48px' }}>
+      {/* Action Buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem' }}>
+        <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center', padding: '0.6rem 1rem', minHeight: '48px' }}>
           <Icon name="arrow-right-circle" size={16} stroke="#fff" style={{ marginRight: '0.4rem' }} /> Update Job
         </button>
-        <button onClick={openWhatsAppModal} disabled={!canWhatsApp} style={{ flex: '1 1 200px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer', fontWeight: 600, minHeight: '48px', opacity: canWhatsApp ? 1 : 0.5 }}>
+        <button onClick={openWhatsAppModal} style={{ ...secondaryButtonStyle, width: '100%', justifyContent: 'center', minHeight: '48px' }}>
           <Icon name="message-circle" size={16} stroke="var(--cresoa-accent)" /> Update {customerName} on WhatsApp
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatMoney(job.price)}</div></Card>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Paid</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-success)' }}>{formatMoney(job.amount_paid)}</div></Card>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Balance</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>{balance > 0 ? formatMoney(balance) : '✓ Paid'}</div></Card>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: isOverdue ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }}><div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Due date</div><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatDate(job.due_date)}</div>{isOverdue && <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-danger)', fontWeight: 700 }}>Overdue</div>}</Card>
+      {/* Metrics Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="cresoa-card" style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatMoney(job.price)}</div>
+        </div>
+        <div className="cresoa-card" style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Paid</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-success)' }}>{formatMoney(job.amount_paid)}</div>
+        </div>
+        <div className="cresoa-card" style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Balance</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>{balance > 0 ? formatMoney(balance) : '✓ Paid'}</div>
+        </div>
+        <div className="cresoa-card" style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: isOverdue ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Due date</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{formatDate(job.due_date)}</div>
+          {isOverdue && <div style={{ fontSize: '0.6rem', color: 'var(--cresoa-danger)', fontWeight: 700 }}>Overdue</div>}
+        </div>
       </div>
 
-      <Card style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+      {/* Payment Status Card */}
+      <div className="cresoa-card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(212,165,42,0.1)', flexShrink: 0 }}>
           <Icon name={isFullyPaid ? 'check-circle' : 'credit-card'} size={22} stroke={isFullyPaid ? 'var(--cresoa-success)' : 'var(--cresoa-accent)'} />
         </div>
@@ -320,10 +355,11 @@ export default function RepairJobDetailPage() {
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem', margin: 0 }}>{isFullyPaid ? 'No further payment is required for this job.' : 'Record a payment whenever the customer makes another payment.'}</p>
         </div>
         {!isFullyPaid && <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button"><Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Record payment</button>}
-      </Card>
+      </div>
 
+      {/* Customer + Tracking Link */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-        <Card style={{ padding: '1rem' }}>
+        <div className="cresoa-card" style={{ padding: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span className="cresoa-avatar" style={{ width: '48px', height: '48px', fontSize: '18px' }}>{customerName.charAt(0).toUpperCase()}</span>
             <div style={{ flex: 1 }}>
@@ -334,12 +370,12 @@ export default function RepairJobDetailPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.8rem' }}>
-            {customer?.phone && <a href={`tel:${customer.phone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', textDecoration: 'none', color: 'var(--cresoa-text)', fontSize: '0.8rem', fontWeight: 600 }}><Icon name="phone" size={14} stroke="currentColor" /> Call</a>}
-            {customer?.phone && <button onClick={openWhatsAppModal} disabled={!canWhatsApp} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--cresoa-text)', opacity: canWhatsApp ? 1 : 0.5 }}><Icon name="message-circle" size={14} stroke="currentColor" /> WhatsApp</button>}
+            {customer?.phone && <a href={`tel:${customer.phone}`} style={{ ...secondaryButtonStyle, textDecoration: 'none' }}><Icon name="phone" size={14} stroke="currentColor" /> Call</a>}
+            <button onClick={openWhatsAppModal} style={secondaryButtonStyle}><Icon name="message-circle" size={14} stroke="var(--cresoa-accent)" /> WhatsApp</button>
           </div>
-        </Card>
+        </div>
 
-        <Card style={{ padding: '1rem', borderColor: 'var(--cresoa-accent)', borderWidth: '1px' }}>
+        <div className="cresoa-card" style={{ padding: '1rem', borderColor: 'var(--cresoa-accent)', borderWidth: '1px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '0.8rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(212,165,42,0.1)' }}><Icon name="link" size={20} stroke="var(--cresoa-accent)" /></div>
             <div><span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>TRACKING LINK</span><h3 style={{ margin: '0.1rem 0', fontSize: '1rem' }}>Share with customer</h3></div>
@@ -350,14 +386,20 @@ export default function RepairJobDetailPage() {
             <button onClick={copyTrackingLink} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><Icon name={copied ? 'check' : 'copy'} size={16} stroke="currentColor" /></button>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.8rem' }}>
-            <button onClick={copyTrackingLink} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}><Icon name={copied ? 'check' : 'copy'} size={14} stroke="currentColor" /> {copied ? 'Copied!' : 'Copy link'}</button>
-            {customer?.phone && <button onClick={sendTrackingLink} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}><Icon name="send" size={14} stroke="currentColor" /> Share with customer</button>}
+            <button onClick={copyTrackingLink} style={secondaryButtonStyle}><Icon name={copied ? 'check' : 'copy'} size={14} stroke="currentColor" /> {copied ? 'Copied!' : 'Copy link'}</button>
+            {customer?.phone && <button onClick={sendTrackingLink} style={secondaryButtonStyle}><Icon name="send" size={14} stroke="currentColor" /> Share with customer</button>}
           </div>
-        </Card>
+        </div>
       </div>
 
-      <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
-        <SectionHeader title="Device & Fault Details" subtitle="Job information" />
+      {/* Device & Fault Details */}
+      <div className="cresoa-card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <div className="cresoa-section-header">
+          <div>
+            <h3 className="cresoa-section-header-title">Device & Fault Details</h3>
+            <p className="cresoa-section-header-subtitle">Job information</p>
+          </div>
+        </div>
         <div style={{ marginTop: '0.8rem' }}>
           {[
             { label: 'Job title', value: job.title || 'Not specified' },
@@ -373,21 +415,33 @@ export default function RepairJobDetailPage() {
             </div>
           ))}
         </div>
-      </Card>
+      </div>
 
-      <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
-        <SectionHeader title="Private Notes" subtitle="Notes for you and your team" />
+      {/* Private Notes */}
+      <div className="cresoa-card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <div className="cresoa-section-header">
+          <div>
+            <h3 className="cresoa-section-header-title">Private Notes</h3>
+            <p className="cresoa-section-header-subtitle">Notes for you and your team</p>
+          </div>
+        </div>
         <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 0.8rem' }}>These notes are private. The customer will not see them.</p>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add technical details, parts needed, or anything your team needs to remember..." rows={5} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.85rem', boxSizing: 'border-box', resize: 'vertical' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
           <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>Private to your business</span>
           <button onClick={saveNotes} disabled={savingNotes} className="cresoa-primary-button" style={{ padding: '0.3rem 1rem' }}>{savingNotes ? 'Saving...' : 'Save notes'}</button>
         </div>
-      </Card>
+      </div>
 
-      <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
+      {/* Payments History */}
+      <div className="cresoa-card" style={{ padding: '1rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <SectionHeader title="Payments" subtitle="Payment history" />
+          <div className="cresoa-section-header">
+            <div>
+              <h3 className="cresoa-section-header-title">Payments</h3>
+              <p className="cresoa-section-header-subtitle">Payment history</p>
+            </div>
+          </div>
           <button onClick={() => setShowPaymentModal(true)} disabled={isFullyPaid} className="cresoa-primary-button" style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem' }}><Icon name="plus" size={12} stroke="#fff" style={{ marginRight: '0.2rem' }} /> Add payment</button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>Total paid</span><span style={{ fontWeight: 600 }}>{formatMoney(job.amount_paid)}</span></div>
@@ -404,9 +458,10 @@ export default function RepairJobDetailPage() {
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
-      <Card style={{ padding: '0.8rem 1rem', marginBottom: '1rem' }}>
+      {/* Duplicate/Delete */}
+      <div className="cresoa-card" style={{ padding: '0.8rem 1rem', marginBottom: '1rem' }}>
         <button onClick={handleDuplicate} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '0.6rem 0', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
           <Icon name="copy" size={18} stroke="var(--cresoa-text-muted)" />
           <div><div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Duplicate job</div><div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>Create another job using these details</div></div>
@@ -415,12 +470,13 @@ export default function RepairJobDetailPage() {
           <Icon name="trash-2" size={18} stroke="var(--cresoa-danger)" />
           <div><div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Delete job</div><div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>Permanently remove this job</div></div>
         </button>
-      </Card>
+      </div>
 
-      {/* Modals */}
+      {/* Modals (same as before but polished) */}
       {showStatusModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.5)' }} onMouseDown={() => !updatingStatus && setShowStatusModal(false)}>
           <div style={{ width: 'min(560px, calc(100% - 32px))', maxHeight: '80dvh', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
+            {/* Status modal content */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div><span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>JOB PROGRESS</span><h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>Where is this job now?</h2></div>
               <button onClick={() => setShowStatusModal(false)} disabled={updatingStatus} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><Icon name="x" size={20} stroke="currentColor" /></button>
@@ -448,7 +504,7 @@ export default function RepairJobDetailPage() {
         </div>
       )}
 
-      {isWhatsAppModalOpen && (
+   {isWhatsAppModalOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'rgba(10,22,40,0.6)' }} onMouseDown={() => setIsWhatsAppModalOpen(false)}>
           <div style={{ width: 'min(480px, calc(100% - 32px))', maxHeight: '80dvh', overflowY: 'auto', padding: '20px', background: 'var(--cresoa-surface)', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
@@ -457,13 +513,17 @@ export default function RepairJobDetailPage() {
             </div>
             <div style={{ marginBottom: '0.8rem', padding: '0.6rem', borderRadius: '8px', background: 'var(--cresoa-bg)', border: '1px solid var(--cresoa-border)' }}><span style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>Current Status:</span><span style={{ marginLeft: '0.4rem', fontWeight: 600, color: 'var(--cresoa-accent)' }}>{currentStatusInfo}</span></div>
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Message</label>
+              <label style={labelStyle}>Message</label>
               {!isEditingMessage ? <div style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--cresoa-text)', whiteSpace: 'pre-wrap' }}>{whatsAppMessage}</div> : <textarea value={whatsAppMessage} onChange={e => setWhatsAppMessage(e.target.value)} rows={4} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', fontSize: '0.85rem', boxSizing: 'border-box', resize: 'vertical' }} />}
               <button onClick={() => setIsEditingMessage(!isEditingMessage)} style={{ marginTop: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-accent)', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'underline' }}>{isEditingMessage ? 'Cancel edit' : '✎ Edit message'}</button>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button onClick={() => setIsWhatsAppModalOpen(false)} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
-              <button onClick={handleSendWhatsApp} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}><Icon name="send" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Send via WhatsApp</button>
+              {customer?.phone ? (
+                <button onClick={handleSendWhatsApp} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}><Icon name="send" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Send via WhatsApp</button>
+              ) : (
+                <button onClick={handleCopyMessage} className="cresoa-primary-button" style={{ padding: '0.4rem 1.5rem', fontSize: '0.8rem' }}><Icon name="copy" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Copy message</button>
+              )}
             </div>
           </div>
         </div>
@@ -478,12 +538,12 @@ export default function RepairJobDetailPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem', borderRadius: '8px', background: 'rgba(212,165,42,0.08)', marginBottom: '1rem' }}><span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>Remaining balance</span><strong>{formatMoney(balance)}</strong></div>
             <div style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Amount received</label>
+              <label style={labelStyle}>Amount received</label>
               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--cresoa-border)', borderRadius: '8px', background: 'var(--cresoa-surface)', overflow: 'hidden' }}><span style={{ paddingLeft: '0.8rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>₦</span><input type="number" min="1" max={balance} step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} placeholder="0" required style={{ flex: 1, border: 'none', padding: '0.6rem', outline: 'none', background: 'transparent', color: 'var(--cresoa-text)' }} /></div>
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Payment note</label>
-              <input type="text" value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment, transfer" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
+              <label style={labelStyle}>Payment note</label>
+              <input type="text" value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment, transfer" style={inputStyle} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button type="button" onClick={() => setShowPaymentModal(false)} disabled={recordingPayment} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
@@ -502,16 +562,16 @@ export default function RepairJobDetailPage() {
             </div>
             <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem', fontSize: '0.85rem' }}>Update the basic information for this job. Production status and payments are managed separately.</p>
             <div style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Job name</label>
-              <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="e.g. iPhone 13 screen replacement" required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
+              <label style={labelStyle}>Job name</label>
+              <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="e.g. iPhone 13 screen replacement" required style={inputStyle} />
             </div>
             <div style={{ marginBottom: '0.8rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Total price</label>
+              <label style={labelStyle}>Total price</label>
               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--cresoa-border)', borderRadius: '8px', background: 'var(--cresoa-surface)', overflow: 'hidden' }}><span style={{ paddingLeft: '0.8rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>₦</span><input type="number" min="0" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} placeholder="0" required style={{ flex: 1, border: 'none', padding: '0.6rem', outline: 'none', background: 'transparent', color: 'var(--cresoa-text)' }} /></div>
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due date</label>
-              <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
+              <label style={labelStyle}>Due date</label>
+              <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={inputStyle} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button type="button" onClick={() => setShowEditModal(false)} disabled={editing} style={{ padding: '0.4rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.8rem' }}>Cancel</button>
@@ -524,10 +584,6 @@ export default function RepairJobDetailPage() {
       {isInvoiceOpen && business && (
         <InvoicePreviewModal order={job} business={business} onClose={() => setIsInvoiceOpen(false)} />
       )}
-
-      <div style={{ marginTop: '2rem' }}>
-        <Navigation businessId={currentBusinessId} />
-      </div>
     </div>
   )
-              }
+     }
