@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
-import { Navigation } from '../../../../components/Navigation'
 
 // ─── Self-contained SVG icons ───
 const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
@@ -16,18 +15,25 @@ const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
     naira: <><path d="M6 3v18M18 3v18M6 8h12M6 16h12" /><path d="M6 3l6 9 6-9M6 21l6-9 6 9" /></>,
     arrowRight: <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
     filter: <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />,
+    user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
 }
 
-const goldBtn = {
-  background: '#D4A52A', color: '#fff', border: 'none', padding: '0.6rem 1.2rem',
-  borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-  boxShadow: '0 2px 8px rgba(212,165,42,0.3)',
-}
-
+// ─── NAIRA MONEY FORMATTER ───
 const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
+
+// ─── Status helper ───
+const getStatusInfo = (job) => {
+  const status = (job.current_status || '').toLowerCase()
+  const overdue = job.due_date && new Date(job.due_date) < new Date() && !['delivered', 'completed', 'cancelled'].includes(status)
+  
+  if (overdue) return { label: 'Overdue', type: 'danger' }
+  if (['delivered', 'completed'].includes(status)) return { label: 'Completed', type: 'success' }
+  if (['ready', 'ready for pickup', 'ready for collection'].includes(status)) return { label: 'Ready', type: 'warning' }
+  if (['awaiting parts', 'waiting parts', 'in progress'].includes(status)) return { label: 'In Progress', type: 'info' }
+  return { label: 'Active', type: 'info' }
+}
 
 export default function RepairsJobsPage() {
   const router = useRouter()
@@ -35,102 +41,199 @@ export default function RepairsJobsPage() {
   const businessId = searchParams.get('business_id')
 
   const [jobs, setJobs] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState('all')
 
+  // Fetch jobs + customers
   useEffect(() => {
-    const fetchJobs = async () => {
+    const fetchData = async () => {
       if (!businessId) return
       setLoading(true)
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('business_id', businessId)
-        .eq('sector', 'repairs')
-        .order('created_at', { ascending: false })
+      try {
+        const { data: jobsData, error: jobsError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('business_id', businessId)
+          .eq('sector', 'repairs')
+          .order('created_at', { ascending: false })
 
-      if (!error) setJobs(data || [])
-      setLoading(false)
+        if (jobsError) throw jobsError
+
+        const { data: customersData, error: customersError } = await supabase
+          .from('customers')
+          .select('id, name')
+          .eq('business_id', businessId)
+          .eq('sector', 'repairs')
+
+        if (customersError) throw customersError
+
+        setJobs(jobsData || [])
+        setCustomers(customersData || [])
+      } catch (error) {
+        console.error('Error fetching jobs:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-    fetchJobs()
+    fetchData()
   }, [businessId])
 
-  const filteredJobs = jobs.filter(job => {
-    const matchesSearch = (job.title || '').toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter =
-      filter === 'all' ? true :
-      filter === 'active' ? !['Delivered', 'Cancelled'].includes(job.current_status) :
-      filter === 'overdue' ? (job.due_date && new Date(job.due_date) < new Date() && job.current_status !== 'Delivered') :
-      filter === 'ready' ? ['Ready', 'Ready for Pickup', 'Ready for Collection'].includes(job.current_status) :
-      filter === 'awaiting' ? ['Awaiting Parts', 'Waiting Parts', 'In Progress'].includes(job.current_status) : true
-    return matchesSearch && matchesFilter
-  })
+  // Filter logic
+  const filteredJobs = useMemo(() => {
+    return jobs.filter(job => {
+      const matchesSearch = (job.title || '').toLowerCase().includes(searchTerm.toLowerCase())
+      const status = (job.current_status || '').toLowerCase()
+      const isOverdue = job.due_date && new Date(job.due_date) < new Date() && !['delivered', 'completed', 'cancelled'].includes(status)
+
+      const matchesFilter =
+        filter === 'all' ? true :
+        filter === 'active' ? !['delivered', 'completed', 'cancelled'].includes(status) :
+        filter === 'overdue' ? isOverdue :
+        filter === 'ready' ? ['ready', 'ready for pickup', 'ready for collection'].includes(status) :
+        filter === 'awaiting' ? ['awaiting parts', 'waiting parts', 'in progress'].includes(status) : true
+
+      return matchesSearch && matchesFilter
+    })
+  }, [jobs, searchTerm, filter])
 
   const navigateTo = (path) => router.push(`${path}?business_id=${businessId}`)
 
-  if (loading) return <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', background: '#F8F6F2' }}><Navigation businessId={businessId} /><p style={{ color: '#8A8A8A' }}>Loading jobs...</p></div>
-
-  return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', background: '#F8F6F2', minHeight: '100vh' }}>
-      <Navigation businessId={businessId} />
-
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <p style={{ color: '#8A8A8A', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Repairs</p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: '#1A1A1A' }}>All Jobs</h1>
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh' }}>
+        {/* Skeleton header */}
+        <div className="cresoa-skeleton-card" style={{ marginBottom: '1.5rem' }}>
+          <div className="cresoa-skeleton medium" />
+          <div className="cresoa-skeleton short" />
         </div>
-        <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} style={goldBtn}><Svg name="plus" size={16} stroke="#fff" /> New Job</button>
-      </div>
-
-      {/* Search & Filters */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #E5E0D8', borderRadius: '8px', padding: '0.4rem 0.8rem' }}>
-          <Svg name="search" size={16} stroke="#8A8A8A" style={{ marginRight: '0.5rem' }} />
-          <input type="text" placeholder="Search jobs..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', color: '#1A1A1A', fontSize: '0.85rem' }} />
+        {/* Skeleton search */}
+        <div className="cresoa-skeleton-card" style={{ marginBottom: '1.5rem' }}>
+          <div className="cresoa-skeleton long" />
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {['all', 'active', 'overdue', 'ready', 'awaiting'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{ padding: '0.3rem 0.8rem', borderRadius: '20px', border: `1px solid ${filter === f ? '#D4A52A' : '#E5E0D8'}`, background: filter === f ? '#D4A52A' : '#fff', color: filter === f ? '#fff' : '#1A1A1A', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
+        {/* Skeleton job cards */}
+        <div className="cresoa-loading-grid">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="cresoa-skeleton-card">
+              <div className="cresoa-skeleton medium" />
+              <div className="cresoa-skeleton short" />
+              <div className="cresoa-skeleton long" />
+            </div>
           ))}
         </div>
       </div>
+    )
+  }
 
-      {/* Jobs List */}
+  return (
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh' }}>
+      {/* ─── PAGE HEADER ─── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Repairs</p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>All Jobs</h1>
+        </div>
+        <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} className="cresoa-primary-button">
+          <Svg name="plus" size={16} stroke="#fff" /> New Job
+        </button>
+      </div>
+
+      {/* ─── SEARCH BAR ─── */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', borderRadius: '12px', padding: '0.5rem 0.8rem' }}>
+          <Svg name="search" size={18} stroke="var(--cresoa-text-muted)" style={{ marginRight: '0.5rem' }} />
+          <input
+            type="text"
+            placeholder="Search jobs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', color: 'var(--cresoa-text)', fontSize: '0.9rem' }}
+          />
+        </div>
+      </div>
+
+      {/* ─── FILTER CHIPS ─── */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'active', label: 'Active' },
+          { key: 'overdue', label: 'Overdue' },
+          { key: 'ready', label: 'Ready' },
+          { key: 'awaiting', label: 'Awaiting' },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            style={{
+              padding: '0.35rem 0.9rem',
+              borderRadius: '20px',
+              border: `1px solid ${filter === f.key ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`,
+              background: filter === f.key ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
+              color: filter === f.key ? '#fff' : 'var(--cresoa-text-muted)',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── JOBS LIST ─── */}
       {filteredJobs.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#8A8A8A' }}>
-          <Svg name="tool" size={40} stroke="#D4A52A" />
-          <p style={{ marginTop: '1rem' }}>No jobs found.</p>
-          <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} style={goldBtn}>Create First Job</button>
+        <div className="cresoa-empty-state">
+          <Svg name="tool" size={40} stroke="var(--cresoa-accent)" />
+          <span className="cresoa-empty-state-title">No jobs found</span>
+          <span className="cresoa-empty-state-message">Start by creating your first repair job.</span>
+          <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>
+            <Svg name="plus" size={16} stroke="#fff" /> Create First Job
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {filteredJobs.map(job => {
-            const overdue = job.due_date && new Date(job.due_date) < new Date() && !['Delivered'].includes(job.current_status)
-            const statusColor = job.current_status === 'Delivered' ? '#2E7D5E' : overdue ? '#D9534F' : '#D4A52A'
+            const customerName = customers.find(c => c.id === job.customer_id)?.name || 'Customer'
+            const statusInfo = getStatusInfo(job)
+            const statusClass = `cresoa-status-${statusInfo.type}`
+            const overdue = statusInfo.type === 'danger'
             return (
-              <div key={job.id} onClick={() => navigateTo(`/dashboard/repairs/jobs/${job.id}`)} style={{ background: '#fff', borderRadius: '12px', padding: '1rem', border: '1px solid #E5E0D8', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#1A1A1A' }}>{job.title || 'Repair Job'}</div>
-                    {job.description && <div style={{ fontSize: '0.8rem', color: '#8A8A8A' }}>{job.description}</div>}
+              <div
+                key={job.id}
+                onClick={() => navigateTo(`/dashboard/repairs/jobs/${job.id}`)}
+                className="cresoa-card"
+                style={{ cursor: 'pointer', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              >
+                {/* Top row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--cresoa-text)', fontSize: '1rem' }}>{job.title || 'Repair Job'}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+                      <Svg name="user" size={12} stroke="var(--cresoa-text-muted)" />
+                      {customerName}
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 700, color: '#D4A52A' }}>{formatMoney(job.price)}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--cresoa-accent)', fontSize: '0.95rem', flexShrink: 0 }}>{formatMoney(job.price)}</div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, background: statusColor === '#D9534F' ? '#FCEAEA' : '#FBF3E0', color: statusColor }}>{job.current_status || 'Pending'}</span>
-                  {job.due_date && <span style={{ fontSize: '0.8rem', color: overdue ? '#D9534F' : '#8A8A8A' }}>Due {new Date(job.due_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</span>}
+
+                {/* Bottom row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--cresoa-border)', paddingTop: '0.5rem' }}>
+                  <span className={`cresoa-status ${statusClass}`}>{statusInfo.label}</span>
+                  {job.due_date ? (
+                    <span style={{ fontSize: '0.8rem', color: overdue ? 'var(--cresoa-danger)' : 'var(--cresoa-text-muted)' }}>
+                      Due {new Date(job.due_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             )
           })}
         </div>
       )}
-
-      <div style={{ marginTop: '2rem' }}><Navigation businessId={businessId} /></div>
     </div>
   )
-    }
+      }
