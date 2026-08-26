@@ -36,7 +36,7 @@ export function RepairsNavigation({ businessId }) {
     { icon: 'tool', label: 'Jobs', path: '/dashboard/repairs/jobs' },
     { icon: 'users', label: 'Customers', path: '/dashboard/repairs/customers' },
     { icon: 'package', label: 'Parts', path: '/dashboard/repairs/parts' },
-    { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' },
+    { icon: 'invoice', label: 'Invoices', path: '/dashboard/repairs/invoices' },
   ]
 
   const navigate = (path, idx) => {
