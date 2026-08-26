@@ -35,7 +35,7 @@ export function RepairsNavigation({ businessId }) {
     { icon: 'bar-chart-2', label: 'Dashboard', path: '/dashboard/repairs' },
     { icon: 'tool', label: 'Jobs', path: '/dashboard/repairs/jobs' },
     { icon: 'users', label: 'Customers', path: '/dashboard/repairs/customers' },
-    { icon: 'package', label: 'Parts', path: '/dashboard/repairs/inventory' },
+    { icon: 'package', label: 'Parts', path: '/dashboard/repairs/parts' },
     { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' },
   ]
 
