@@ -1,8 +1,65 @@
 import Link from 'next/link'
+import { Metadata } from 'next'
+
+export const metadata = {
+  title: 'How to Create Professional Invoices in 2 Minutes from Your Phone | Cresoa',
+  description: 'Learn how to create professional invoices on your phone in 2 minutes. Step-by-step guide for Nigerian SMEs, with Cresoa as the simplest solution.',
+  keywords: [
+    'create invoice Nigeria',
+    'invoice app for small business',
+    'professional invoice Nigeria',
+    'invoicing software Nigeria',
+    'business management Nigeria',
+    'Cresoa invoice',
+  ],
+  openGraph: {
+    title: 'How to Create Professional Invoices in 2 Minutes from Your Phone',
+    description: 'A practical guide for Nigerian small business owners to create clear, professional invoices directly from their phones.',
+    type: 'article',
+    url: 'https://cresoa.com.ng/blog/how-to-create-professional-invoices-nigeria',
+    siteName: 'Cresoa',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'How to Create Professional Invoices in 2 Minutes from Your Phone',
+    description: 'A practical guide for Nigerian small business owners to create clear, professional invoices directly from their phones.',
+  },
+  alternates: {
+    canonical: '/blog/how-to-create-professional-invoices-nigeria',
+  },
+  robots: { index: true, follow: true },
+}
 
 export default function BlogPostPage() {
   return (
     <article style={articleStyle}>
+      {/* BlogPosting Schema for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            headline: 'How to Create Professional Invoices in 2 Minutes from Your Phone',
+            description: 'Learn how to create professional invoices on your phone in 2 minutes. Step-by-step guide for Nigerian SMEs, with Cresoa as the simplest solution.',
+            author: {
+              '@type': 'Organization',
+              name: 'Cresoa',
+              url: 'https://cresoa.com.ng'
+            },
+            publisher: {
+              '@type': 'Organization',
+              name: 'Cresoa',
+              url: 'https://cresoa.com.ng'
+            },
+            datePublished: '2026-08-26',
+            dateModified: '2026-08-26',
+            mainEntityOfPage: 'https://cresoa.com.ng/blog/how-to-create-professional-invoices-nigeria',
+            image: 'https://cresoa.com.ng/og-image.jpg',
+          })
+        }}
+      />
+
       {/* Header */}
       <header style={headerStyle}>
         <p style={categoryStyle}>Business Tips</p>
@@ -12,18 +69,12 @@ export default function BlogPostPage() {
 
       {/* Content */}
       <div style={contentStyle}>
-        <p>
-          If you run a business in Nigeria, you probably already know how important it is to send a customer something that clearly shows what they are paying for.
-        </p>
+        <p>If you run a business in Nigeria, you probably already know how important it is to send a customer something that clearly shows what they are paying for.</p>
         <p>But let's be honest.</p>
         <p>Not every business has a laptop sitting around in the shop.</p>
-        <p>
-          Sometimes you're in your store. Sometimes you're at a customer's location. Sometimes you're inside a workshop. Sometimes you're even on your way somewhere when a customer suddenly says:
-        </p>
+        <p>Sometimes you're in your store. Sometimes you're at a customer's location. Sometimes you're inside a workshop. Sometimes you're even on your way somewhere when a customer suddenly says:</p>
         <p style={quoteStyle}>“Oga, abeg send me invoice.”</p>
-        <p>
-          And now you're looking for your old invoice template, opening Word or Canva, changing the customer's name, calculating everything again and trying to make sure you didn't make a mistake.
-        </p>
+        <p>And now you're looking for your old invoice template, opening Word or Canva, changing the customer's name, calculating everything again and trying to make sure you didn't make a mistake.</p>
         <p>There is an easier way.</p>
 
         <h2 style={h2Style}>What exactly is a professional invoice?</h2>
@@ -40,9 +91,7 @@ export default function BlogPostPage() {
           <li>How much they still owe</li>
           <li>How they can make payment</li>
         </ul>
-        <p>
-          If your business is registered, you can also include details such as your CAC and TIN, alongside your business contact information.
-        </p>
+        <p>If your business is registered, you can also include details such as your CAC and TIN, alongside your business contact information.</p>
         <p>The goal is simple:</p>
         <p style={quoteStyle}>Your customer shouldn't have to call you just to understand your invoice.</p>
 
@@ -137,9 +186,9 @@ export default function BlogPostPage() {
         </ul>
         <p>Nobody should have to start calculating it with their calculator.</p>
 
-        <h2 style={h2Style}>How CRESOA makes this easier</h2>
-        <p>This is one of the things we built into CRESOA.</p>
-        <p>Instead of creating an invoice from scratch every time, CRESOA can pull the business and customer information you already have in the system.</p>
+        <h2 style={h2Style}>How Cresoa makes this easier</h2>
+        <p>This is one of the things we built into <Link href="https://cresoa.com.ng" style={linkStyle}>Cresoa</Link>.</p>
+        <p>Instead of creating an invoice from scratch every time, <Link href="https://cresoa.com.ng" style={linkStyle}>Cresoa</Link> can pull the business and customer information you already have in the system.</p>
         <p>Your business details can appear automatically.</p>
         <p>Your customer's information can appear automatically.</p>
         <p>You can add multiple items to the same invoice, set quantities and prices, and let the system calculate the totals.</p>
@@ -149,7 +198,7 @@ export default function BlogPostPage() {
         <h2 style={h2Style}>You can also record the payment</h2>
         <p>Let's say your customer has paid part of the invoice.</p>
         <p>You don't have to leave the invoice showing the original amount as though nothing has been paid.</p>
-        <p>With CRESOA, you can record the payment from the invoice and keep the payment information connected to the relevant records.</p>
+        <p>With <Link href="https://cresoa.com.ng" style={linkStyle}>Cresoa</Link>, you can record the payment from the invoice and keep the payment information connected to the relevant records.</p>
         <p>That makes it easier to know what has been paid and what is still outstanding.</p>
 
         <h2 style={h2Style}>Then send it straight to WhatsApp</h2>
@@ -159,7 +208,7 @@ export default function BlogPostPage() {
         <p>They ask for prices there.</p>
         <p>They send payment confirmations there.</p>
         <p>So your invoice should fit into that workflow.</p>
-        <p>With CRESOA, you can generate the invoice, download it as a PDF and share it with the customer through WhatsApp.</p>
+        <p>With <Link href="https://cresoa.com.ng" style={linkStyle}>Cresoa</Link>, you can generate the invoice, download it as a PDF and share it with the customer through WhatsApp.</p>
         <p>No need to tell the customer:</p>
         <p style={quoteStyle}>“I'll send it when I get home and open my laptop.”</p>
         <p>You can do it from your phone.</p>
@@ -190,16 +239,21 @@ export default function BlogPostPage() {
 
         <h2 style={h2Style}>Create your next invoice from your phone</h2>
         <p>If you've been creating invoices manually, switching between different apps or simply sending customers your bank details and a handwritten calculation, you don't necessarily need a complicated setup.</p>
-        <p>
-          <Link href="https://cresoa.com.ng" style={linkStyle}>CRESOA</Link> gives Nigerian businesses a simpler way to manage their day-to-day operations, including professional invoicing.
-        </p>
+        <p><Link href="https://cresoa.com.ng" style={linkStyle}>Cresoa</Link> gives Nigerian businesses a simpler way to manage their day-to-day operations, including professional invoicing.</p>
         <p>You can manage your business records, customers, orders, inventory and other operations from one place — and create invoices that are clear enough for your customers to understand at a glance.</p>
         <p>Whether you're sending an invoice for one item or combining several products or services into one document, the goal is the same:</p>
         <p style={quoteStyle}>Make business easier to manage.</p>
         <p>Ready to try it?</p>
-        <p>
-          <Link href="https://cresoa.com.ng" style={ctaStyle}>Start your free Cresoa account today</Link> and see how easy it is to run your business from your phone.
-        </p>
+
+        {/* Internal Links */}
+        <div style={ctaSectionStyle}>
+          <p>
+            👉 <Link href="https://cresoa.com.ng" style={ctaStyle}>Start your free Cresoa account</Link> today and see how easy it is to run your business from your phone.
+          </p>
+          <p>
+            Or explore our <Link href="/pricing" style={linkStyle}>plans</Link> to find the right fit for your business.
+          </p>
+        </div>
       </div>
     </article>
   )
@@ -303,6 +357,14 @@ const linkStyle = {
   textDecoration: 'underline',
 }
 
+const ctaSectionStyle = {
+  marginTop: '2rem',
+  padding: '1rem',
+  background: 'var(--cresoa-surface-soft)',
+  borderRadius: '8px',
+  border: '1px solid var(--cresoa-border)',
+}
+
 const ctaStyle = {
   display: 'inline-block',
   background: 'var(--cresoa-accent)',
@@ -312,4 +374,4 @@ const ctaStyle = {
   fontWeight: 700,
   textDecoration: 'none',
   marginTop: '0.5rem',
-    }
+        }
