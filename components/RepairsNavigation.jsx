@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-// ─── Self-contained SVG icons ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     'bar-chart-2': <><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>,
@@ -23,6 +22,7 @@ export function RepairsNavigation({ businessId }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isDesktop, setIsDesktop] = useState(false)
+  const [tapBounce, setTapBounce] = useState(null)
 
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768)
@@ -31,7 +31,6 @@ export function RepairsNavigation({ businessId }) {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Navigation items (5)
   const navItems = [
     { icon: 'bar-chart-2', label: 'Dashboard', path: '/dashboard/repairs' },
     { icon: 'tool', label: 'Jobs', path: '/dashboard/repairs/jobs' },
@@ -40,57 +39,92 @@ export function RepairsNavigation({ businessId }) {
     { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' },
   ]
 
-  const navigate = (path) => {
+  const navigate = (path, idx) => {
     if (!businessId) return
     const separator = path.includes('?') ? '&' : '?'
     router.push(`${path}${separator}business_id=${businessId}`)
+    // Trigger bounce animation
+    setTapBounce(idx)
+    setTimeout(() => setTapBounce(null), 300)
   }
 
-  // Determine active index
-  const activeIndex = navItems.findIndex(item => pathname?.startsWith(item.path))
+  // Find active index with better matching:
+  const activeIndex = (() => {
+    if (!pathname) return -1
+    if (pathname === '/dashboard/repairs') return 0
+    if (pathname.startsWith('/dashboard/repairs/jobs')) return 1
+    if (pathname.startsWith('/dashboard/repairs/customers')) return 2
+    if (pathname.startsWith('/dashboard/repairs/inventory')) return 3
+    if (pathname.startsWith('/dashboard/invoices')) return 4
+    return -1
+  })()
 
-  if (isDesktop) return null // Sidebar handles desktop
+  if (isDesktop) return null
 
   return (
-    <nav style={navContainer}>
-      {/* Sliding indicator */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 4,
-          left: 0,
-          width: `${100 / navItems.length}%`,
-          height: 3,
-          background: 'var(--cresoa-accent)',
-          borderRadius: '999px',
-          transition: 'transform 0.3s ease',
-          transform: `translateX(${activeIndex * 100}%)`,
-          pointerEvents: 'none',
-        }}
-      />
-
-      {navItems.map((item, idx) => {
-        const isActive = idx === activeIndex
-        return (
-          <button
-            key={item.path}
-            onClick={() => navigate(item.path)}
-            style={{
-              ...navButton,
-              color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)',
-              transform: isActive ? 'scale(1.1)' : 'scale(1)',
-            }}
-          >
-            <Svg name={item.icon} size={24} stroke={isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)'} />
-            <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
-          </button>
-        )
-      })}
-    </nav>
+    <>
+      <style>{`
+        @keyframes navBounce {
+          0% { transform: scale(1); }
+          30% { transform: scale(1.3); }
+          60% { transform: scale(0.9); }
+          100% { transform: scale(1); }
+        }
+        .nav-bounce {
+          animation: navBounce 0.3s ease;
+        }
+      `}</style>
+      <nav style={navContainer}>
+        {/* Sliding indicator */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 2,
+            left: 0,
+            width: `${100 / navItems.length}%`,
+            height: 3,
+            background: 'linear-gradient(90deg, var(--cresoa-accent), var(--cresoa-accent-dark))',
+            borderRadius: '999px',
+            boxShadow: '0 -2px 6px rgba(212,165,42,0.4)',
+            transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: `translateX(${Math.max(activeIndex, 0) * 100}%)`,
+            pointerEvents: 'none',
+          }}
+        />
+        {navItems.map((item, idx) => {
+          const isActive = idx === activeIndex
+          const isTapped = tapBounce === idx
+          return (
+            <button
+              key={item.path}
+              onClick={() => navigate(item.path, idx)}
+              style={{
+                ...navButton,
+                color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)',
+              }}
+            >
+              <div
+                className={isTapped ? 'nav-bounce' : ''}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                  transform: isActive ? 'scale(1.1)' : 'scale(1)',
+                  transition: 'transform 0.2s ease',
+                }}
+              >
+                <Svg name={item.icon} size={24} stroke={isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)'} />
+                <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
+              </div>
+            </button>
+          )
+        })}
+      </nav>
+    </>
   )
 }
 
-// ─── Styles ───
 const navContainer = {
   position: 'fixed',
   bottom: 0,
@@ -116,7 +150,7 @@ const navButton = {
   alignItems: 'center',
   gap: 2,
   justifyContent: 'center',
-  transition: 'transform 0.2s ease, color 0.2s ease',
+  transition: 'color 0.2s ease',
   minWidth: 0,
   flex: 1,
-    }
+                }
