@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 
-// ─── SELF-CONTAINED ICONS (INCLUDING NAIRA ICON) ───
+// ─── SELF-CONTAINED ICONS ───
 const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
@@ -22,8 +22,19 @@ const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
 }
 
-// ─── NAIRA MONEY FORMATTER (Only Naira) ───
+// ─── NAIRA MONEY FORMATTER ───
 const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
+
+// ─── RELATIVE DATE FORMATTER ───
+const relativeDate = (dateStr) => {
+  const date = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
+}
 
 export default function RepairsDashboardPage() {
   const router = useRouter()
@@ -31,9 +42,11 @@ export default function RepairsDashboardPage() {
   const businessId = searchParams.get('business_id')
 
   const [loading, setLoading] = useState(true)
+  const [businessName, setBusinessName] = useState('')
   const [orders, setOrders] = useState([])
   const [payments, setPayments] = useState([])
   const [inventory, setInventory] = useState([])
+  const [customers, setCustomers] = useState([])
   const [timeframe, setTimeframe] = useState('30D')
 
   // Fetch all data
@@ -42,6 +55,15 @@ export default function RepairsDashboardPage() {
       if (!businessId) return
       setLoading(true)
       try {
+        // Fetch business name
+        const { data: businessData } = await supabase
+          .from('businesses')
+          .select('name')
+          .eq('id', businessId)
+          .maybeSingle()
+        setBusinessName(businessData?.name || 'Your Business')
+
+        // Fetch orders
         const { data: ordersData } = await supabase
           .from('orders')
           .select('*')
@@ -49,20 +71,30 @@ export default function RepairsDashboardPage() {
           .eq('sector', 'repairs')
           .order('created_at', { ascending: false })
 
+        // Fetch payments
         const { data: paymentsData } = await supabase
           .from('payment_records')
           .select('order_id, amount')
           .eq('business_id', businessId)
 
+        // Fetch inventory
         const { data: inventoryData } = await supabase
           .from('inventory_items')
           .select('*')
           .eq('business_id', businessId)
           .eq('sector', 'repairs')
 
+        // Fetch customers
+        const { data: customersData } = await supabase
+          .from('customers')
+          .select('id, name')
+          .eq('business_id', businessId)
+          .eq('sector', 'repairs')
+
         setOrders(ordersData || [])
         setPayments(paymentsData || [])
         setInventory(inventoryData || [])
+        setCustomers(customersData || [])
       } catch (e) {
         console.error('Error fetching dashboard:', e)
       } finally {
@@ -105,7 +137,39 @@ export default function RepairsDashboardPage() {
 
     const lowStock = inventory.filter(i => Number(i.quantity_on_hand || 0) <= Number(i.reorder_level || 0)).length
 
-    return { active, overdue, ready, awaiting, revenue, outstanding, lowStock }
+    // Time-segmented stats
+    const now = new Date()
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+    const weekStart = new Date(now)
+    weekStart.setDate(weekStart.getDate() - 7)
+    const monthStart = new Date(now)
+    monthStart.setDate(monthStart.getDate() - 30)
+
+    const getStatsForRange = (startDate) => {
+      let jobsCreated = 0, completed = 0, revenueInRange = 0, outstandingInRange = 0, collectedInRange = 0
+      orders.forEach(o => {
+        const created = new Date(o.created_at)
+        if (created >= startDate) {
+          jobsCreated++
+          const price = Number(o.price || 0)
+          const paid = paidMap[o.id] || Number(o.amount_paid || 0)
+          revenueInRange += price
+          const due = price - paid
+          if (due > 0) outstandingInRange += due
+          collectedInRange += paid
+          if (['delivered', 'completed'].includes((o.current_status || '').toLowerCase())) completed++
+        }
+      })
+      return { jobsCreated, completed, revenueInRange, outstandingInRange, collectedInRange }
+    }
+
+    return {
+      active, overdue, ready, awaiting, revenue, outstanding, lowStock,
+      today: getStatsForRange(todayStart),
+      week: getStatsForRange(weekStart),
+      month: getStatsForRange(monthStart),
+    }
   }, [orders, payments, inventory])
 
   // ─── REVENUE CHART DATA (7D / 30D / 90D) ───
@@ -135,9 +199,9 @@ export default function RepairsDashboardPage() {
     return daily
   }, [orders, timeframe])
 
-  // Find max value for chart scaling
   const maxVal = Math.max(...chartData.map(d => d.value), 1)
   const chartHeight = 120
+  const hasRevenueData = chartData.some(d => d.value > 0)
 
   const navigateTo = (path) => {
     router.push(`${path}?business_id=${businessId}`)
@@ -151,13 +215,20 @@ export default function RepairsDashboardPage() {
     )
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return `Good morning, ${businessName}`
+    if (hour < 17) return `Good afternoon, ${businessName}`
+    return `Good evening, ${businessName}`
+  }
+
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh' }}>
       {/* ─── HEADER ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Repairs</p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Good morning, Engineer 👋</h1>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>{getGreeting()}</h1>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
         <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} className="cresoa-primary-button">
@@ -165,26 +236,20 @@ export default function RepairsDashboardPage() {
         </button>
       </div>
 
-      {/* ─── TESSA CONTEXTUAL INTELLIGENCE CARD (The "Employee") ─── */}
+      {/* ─── TESSA CONTEXTUAL CARD (Static – not controlled by dashboard) ─── */}
       <div className="cresoa-card" style={{ background: 'var(--gradient-primary)', color: '#fff', display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Svg name="sparkles" size={24} stroke="var(--cresoa-accent)" />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>Tessa's Business Check</div>
-          {stats.overdue > 0 || stats.outstanding > 0 ? (
-            <div style={{ fontSize: '0.85rem', color: '#C8D4E3' }}>
-              Tessa flagged <strong style={{ color: '#FFD966' }}>{stats.overdue} overdue job{stats.overdue !== 1 ? 's' : ''}</strong> and <strong style={{ color: '#FFD966' }}>{formatMoney(stats.outstanding)}</strong> in outstanding payments.
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.85rem', color: '#C8D4E3' }}>
-              Your workload is healthy! No overdue jobs or outstanding payments right now.
-            </div>
-          )}
+          <div style={{ fontSize: '0.85rem', color: '#C8D4E3' }}>
+            Ask Tessa about your business health, revenue, or outstanding payments.
+          </div>
         </div>
       </div>
 
-      {/* ─── BUSINESS HEALTH (Dense & Actionable) ─── */}
+      {/* ─── BUSINESS HEALTH ─── */}
       <div className="cresoa-card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
           <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Business Health</h3>
@@ -204,102 +269,117 @@ export default function RepairsDashboardPage() {
           <div className="cresoa-snapshot-item">
             <span>Revenue</span>
             <strong style={{ color: 'var(--cresoa-accent)' }}>{formatMoney(stats.revenue)}</strong>
+            <small style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>Last 30 days</small>
           </div>
           <div className="cresoa-snapshot-item">
             <span>Owed</span>
             <strong style={{ color: stats.outstanding > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-text)' }}>{formatMoney(stats.outstanding)}</strong>
+            <small style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem' }}>Outstanding</small>
           </div>
         </div>
       </div>
 
-      {/* ─── REVENUE TREND CHART (Pure SVG) ─── */}
+      {/* ─── TRACEABLE ANALYTICS TIMELINE ─── */}
+      <div className="cresoa-card" style={{ marginBottom: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Business Timeline</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <TimelineRow
+            label="Today"
+            jobsCreated={stats.today.jobsCreated}
+            billed={stats.today.revenueInRange}
+            collected={stats.today.collectedInRange}
+            outstanding={stats.today.outstandingInRange}
+          />
+          <TimelineRow
+            label="This Week"
+            jobsCreated={stats.week.jobsCreated}
+            completed={stats.week.completed}
+            billed={stats.week.revenueInRange}
+            outstanding={stats.week.outstandingInRange}
+          />
+          <TimelineRow
+            label="This Month"
+            jobsCreated={stats.month.jobsCreated}
+            completed={stats.month.completed}
+            billed={stats.month.revenueInRange}
+            outstanding={stats.month.outstandingInRange}
+          />
+        </div>
+      </div>
+
+      {/* ─── REVENUE TREND CHART ─── */}
       <div className="cresoa-card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Revenue Trend</h3>
           <div style={{ display: 'flex', gap: '0.3rem' }}>
             {['7D', '30D', '90D'].map(t => (
-              <button key={t} onClick={() => setTimeframe(t)} className="cresoa-select" style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: timeframe === t ? 'var(--cresoa-accent)' : 'transparent', color: timeframe === t ? '#fff' : 'var(--cresoa-text-muted)', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}>{t}</button>
+              <button key={t} onClick={() => setTimeframe(t)} style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: timeframe === t ? 'var(--cresoa-accent)' : 'transparent', color: timeframe === t ? '#fff' : 'var(--cresoa-text-muted)', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}>{t}</button>
             ))}
           </div>
         </div>
-        <div style={{ width: '100%', overflow: 'hidden' }}>
-          <svg viewBox={`0 0 ${chartData.length * 10} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '120px' }}>
-            <defs>
-              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--cresoa-accent)" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="var(--cresoa-accent)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            {chartData.map((d, i) => {
-              const h = (d.value / maxVal) * (chartHeight - 10)
-              const x = i * 10 + 2
-              const y = chartHeight - h
-              return <rect key={i} x={x} y={y} width="6" height={h} rx="2" fill="var(--cresoa-accent)" opacity="0.9" />
-            })}
-            {chartData.map((d, i) => {
-              const h = (d.value / maxVal) * (chartHeight - 10)
-              const x = i * 10 + 2
-              const y = chartHeight - h
-              return <circle key={i} cx={x + 3} cy={y} r="2" fill="var(--cresoa-primary)" />
-            })}
-          </svg>
-        </div>
-        <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem', textAlign: 'center', margin: '0.5rem 0 0' }}>{timeframe} revenue trend</p>
+        {hasRevenueData ? (
+          <div style={{ width: '100%', overflow: 'hidden' }}>
+            <svg viewBox={`0 0 ${chartData.length * 10} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '120px' }}>
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--cresoa-accent)" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="var(--cresoa-accent)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {chartData.map((d, i) => {
+                const h = (d.value / maxVal) * (chartHeight - 10)
+                const x = i * 10 + 2
+                const y = chartHeight - h
+                return <rect key={i} x={x} y={y} width="6" height={h} rx="2" fill="var(--cresoa-accent)" opacity="0.9" />
+              })}
+            </svg>
+          </div>
+        ) : (
+          <div className="cresoa-empty-state" style={{ padding: '1.5rem' }}>
+            <Svg name="file" size={32} stroke="var(--cresoa-text-muted)" />
+            <span className="cresoa-empty-state-title">No revenue recorded yet</span>
+            <span className="cresoa-empty-state-message">Revenue trends will appear here as you complete and receive payments for jobs.</span>
+          </div>
+        )}
       </div>
 
-      {/* ─── NEEDS YOUR ATTENTION (Actionable) ─── */}
+      {/* ─── NEEDS YOUR ATTENTION (Compact) ─── */}
+      {stats.overdue === 0 && stats.awaiting === 0 && stats.ready === 0 && stats.lowStock === 0 ? (
+        <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', background: 'var(--cresoa-success-soft)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Svg name="checkCircle" size={20} stroke="var(--cresoa-success)" />
+          <div>
+            <span style={{ fontWeight: 600, color: 'var(--cresoa-success)' }}>You're all caught up</span>
+            <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>No overdue jobs or unpaid balances need attention.</div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Needs Your Attention</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {stats.overdue > 0 && <AttentionItem type="danger" icon="alert" title={`${stats.overdue} Overdue Jobs`} subtitle="Tap to review and follow up" onClick={() => navigateTo('/dashboard/repairs/jobs')} />}
+            {stats.awaiting > 0 && <AttentionItem type="warning" icon="clock" title={`${stats.awaiting} Awaiting Parts`} subtitle="Parts need to be ordered" onClick={() => navigateTo('/dashboard/repairs/jobs')} />}
+            {stats.ready > 0 && <AttentionItem type="success" icon="checkCircle" title={`${stats.ready} Ready for Collection`} subtitle="Notify customers to pick up" onClick={() => navigateTo('/dashboard/repairs/jobs')} />}
+            {stats.lowStock > 0 && <AttentionItem type="warning" icon="package" title={`${stats.lowStock} Parts Low on Stock`} subtitle="Reorder before they run out" onClick={() => navigateTo('/dashboard/repairs/inventory')} />}
+          </div>
+        </div>
+      )}
+
+      {/* ─── QUICK ACTIONS (Restructured) ─── */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Needs Your Attention</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {stats.overdue > 0 && (
-            <button onClick={() => navigateTo('/dashboard/repairs/jobs')} className="cresoa-list-row" style={{ background: 'var(--cresoa-danger-soft)', border: '1px solid var(--cresoa-border)', borderRadius: '12px', padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><Svg name="alert" size={18} stroke="#fff" /></div>
-              <div style={{ flex: 1 }}><strong style={{ fontSize: '0.9rem', color: 'var(--cresoa-danger)' }}>{stats.overdue} Overdue Jobs</strong><div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Tap to review and follow up</div></div>
-              <Svg name="arrowRight" size={16} stroke="var(--cresoa-danger)" />
-            </button>
-          )}
-          {stats.awaiting > 0 && (
-            <button onClick={() => navigateTo('/dashboard/repairs/jobs')} className="cresoa-list-row" style={{ background: 'var(--cresoa-warning-soft)', border: '1px solid var(--cresoa-border)', borderRadius: '12px', padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--cresoa-warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><Svg name="clock" size={18} stroke="#fff" /></div>
-              <div style={{ flex: 1 }}><strong style={{ fontSize: '0.9rem', color: 'var(--cresoa-warning)' }}>{stats.awaiting} Awaiting Parts</strong><div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Parts need to be ordered</div></div>
-              <Svg name="arrowRight" size={16} stroke="var(--cresoa-warning)" />
-            </button>
-          )}
-          {stats.ready > 0 && (
-            <button onClick={() => navigateTo('/dashboard/repairs/jobs')} className="cresoa-list-row" style={{ background: 'var(--cresoa-success-soft)', border: '1px solid var(--cresoa-border)', borderRadius: '12px', padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--cresoa-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><Svg name="checkCircle" size={18} stroke="#fff" /></div>
-              <div style={{ flex: 1 }}><strong style={{ fontSize: '0.9rem', color: 'var(--cresoa-success)' }}>{stats.ready} Ready for Collection</strong><div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Notify customers to pick up</div></div>
-              <Svg name="arrowRight" size={16} stroke="var(--cresoa-success)" />
-            </button>
-          )}
-          {stats.lowStock > 0 && (
-            <button onClick={() => navigateTo('/dashboard/repairs/inventory')} className="cresoa-list-row" style={{ background: 'var(--cresoa-warning-soft)', border: '1px solid var(--cresoa-border)', borderRadius: '12px', padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--cresoa-warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}><Svg name="package" size={18} stroke="#fff" /></div>
-              <div style={{ flex: 1 }}><strong style={{ fontSize: '0.9rem', color: 'var(--cresoa-warning)' }}>{stats.lowStock} Parts Low on Stock</strong><div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Reorder before they run out</div></div>
-              <Svg name="arrowRight" size={16} stroke="var(--cresoa-warning)" />
-            </button>
-          )}
-          {stats.overdue === 0 && stats.awaiting === 0 && stats.ready === 0 && stats.lowStock === 0 && (
-            <div className="cresoa-empty-state">
-              <Svg name="checkCircle" size={24} stroke="var(--cresoa-success)" />
-              <p style={{ color: 'var(--cresoa-text-muted)' }}>Everything looks good! No pending actions.</p>
-            </div>
-          )}
+        <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} className="cresoa-primary-button" style={{ width: '100%', marginBottom: '0.5rem' }}>
+          <Svg name="plus" size={16} stroke="#fff" /> New Job
+        </button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          <button onClick={() => navigateTo('/dashboard/repairs/customers')} className="cresoa-primary-button" style={{ background: 'var(--gradient-primary)' }}>
+            <Svg name="user" size={14} stroke="#fff" /> Add Customer
+          </button>
+          <button onClick={() => navigateTo('/dashboard/repairs/inventory')} className="cresoa-primary-button" style={{ background: 'var(--gradient-success)' }}>
+            <Svg name="package" size={14} stroke="#fff" /> Parts
+          </button>
         </div>
       </div>
 
-      {/* ─── QUICK ACTIONS ─── */}
-      <div className="cresoa-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Quick Actions</h3>
-        <div className="cresoa-two-column">
-          <button onClick={() => navigateTo('/dashboard/repairs/jobs/new')} className="cresoa-primary-button"><Svg name="plus" size={14} stroke="#fff" /> New Job</button>
-          <button onClick={() => navigateTo('/dashboard/repairs/customers')} className="cresoa-primary-button" style={{ background: 'var(--gradient-primary)' }}><Svg name="user" size={14} stroke="#fff" /> Add Customer</button>
-          <button onClick={() => navigateTo('/dashboard/repairs/inventory')} className="cresoa-primary-button" style={{ background: 'var(--gradient-success)' }}><Svg name="package" size={14} stroke="#fff" /> Parts</button>
-          <button onClick={() => navigateTo('/dashboard/repairs/jobs')} className="cresoa-primary-button" style={{ background: 'var(--gradient-primary)', opacity: 0.8 }}><Svg name="file" size={14} stroke="#fff" /> All Jobs</button>
-        </div>
-      </div>
-
-      {/* ─── RECENT JOBS ─── */}
+{/* ─── RECENT JOBS ─── */}
       <div className="cresoa-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>Recent Jobs</h3>
@@ -311,22 +391,72 @@ export default function RepairsDashboardPage() {
             <p style={{ marginTop: '0.5rem' }}>No jobs yet. Start by creating your first repair job!</p>
           </div>
         ) : (
-          <div className="cresoa-list-row-container">
-            {orders.slice(0, 5).map(job => (
-              <div key={job.id} onClick={() => navigateTo(`/dashboard/repairs/jobs/${job.id}`)} className="cresoa-list-row" style={{ padding: '0.75rem', borderRadius: '8px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--cresoa-text)' }}>{job.title || 'Repair Job'}</div>
-                  <div style={{ fontWeight: 700, color: 'var(--cresoa-accent)' }}>{formatMoney(job.price)}</div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {orders.slice(0, 5).map(job => {
+              const customerName = customers.find(c => c.id === job.customer_id)?.name || 'Customer'
+              return (
+                <div key={job.id} onClick={() => navigateTo(`/dashboard/repairs/jobs/${job.id}`)} className="cresoa-list-row" style={{ padding: '0.75rem', borderRadius: '8px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--cresoa-text)' }}>{job.title || 'Repair Job'}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--cresoa-accent)' }}>{formatMoney(job.price)}</div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{customerName} • {job.current_status || 'Pending'}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>{relativeDate(job.created_at)}</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.25rem' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{job.current_status || 'Pending'}</div>
-                  {job.due_date && <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-danger)' }}>Due {new Date(job.due_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</div>}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
     </div>
   )
-      }
+}
+
+// ─── HELPER COMPONENTS ───
+
+function TimelineRow({ label, jobsCreated, completed, billed, collected, outstanding }) {
+  return (
+    <div style={{ padding: '0.75rem', background: 'var(--cresoa-surface-soft)', borderRadius: '8px' }}>
+      <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--cresoa-text)' }}>{label}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '0.5rem' }}>
+        {jobsCreated !== undefined && <TimelineMetric label="Jobs Created" value={jobsCreated} />}
+        {completed !== undefined && <TimelineMetric label="Completed" value={completed} />}
+        {billed !== undefined && <TimelineMetric label="Billed" value={formatMoney(billed)} />}
+        {collected !== undefined && <TimelineMetric label="Collected" value={formatMoney(collected)} />}
+        {outstanding !== undefined && <TimelineMetric label="Outstanding" value={formatMoney(outstanding)} />}
+      </div>
+    </div>
+  )
+}
+
+function TimelineMetric({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)' }}>{label}</div>
+      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--cresoa-text)' }}>{value}</div>
+    </div>
+  )
+}
+
+function AttentionItem({ type, icon, title, subtitle, onClick }) {
+  const colors = {
+    danger: { bg: 'var(--cresoa-danger-soft)', iconBg: 'var(--cresoa-danger)', color: 'var(--cresoa-danger)' },
+    warning: { bg: 'var(--cresoa-warning-soft)', iconBg: 'var(--cresoa-warning)', color: 'var(--cresoa-warning)' },
+    success: { bg: 'var(--cresoa-success-soft)', iconBg: 'var(--cresoa-success)', color: 'var(--cresoa-success)' },
+  }
+  const c = colors[type]
+  return (
+    <button onClick={onClick} style={{ background: c.bg, border: '1px solid var(--cresoa-border)', borderRadius: '12px', padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', textAlign: 'left' }}>
+      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+        <Svg name={icon} size={18} stroke="#fff" />
+      </div>
+      <div style={{ flex: 1 }}>
+        <strong style={{ fontSize: '0.9rem', color: c.color }}>{title}</strong>
+        <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{subtitle}</div>
+      </div>
+      <Svg name="arrowRight" size={16} stroke={c.color} />
+    </button>
+  )
+          }
