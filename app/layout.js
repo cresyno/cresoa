@@ -84,6 +84,7 @@ export default function RootLayout({ children }) {
             })
           }}
         />
+          <link rel="icon" href="/favicon.png" type="image/png" />
       </head>
       <body className={inter.className}>
         <ClientLayout>{children}</ClientLayout>
