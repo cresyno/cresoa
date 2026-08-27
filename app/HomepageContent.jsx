@@ -26,6 +26,7 @@ const ICONS = {
   barChart2: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
   package: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
   calendar: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  quote: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>,
 }
 
 export default function HomepageContent() {
@@ -90,9 +91,15 @@ export default function HomepageContent() {
     { q: 'What is Cresoa?', a: 'Cresoa is a business management platform built for Nigerian SMEs. It helps you manage customers, orders, payments, and production in one place.' },
     { q: 'Is there a free plan?', a: 'Yes! Cresoa has a Free plan that includes up to 20 customers and 50 orders. You can use it indefinitely without paying.' },
     { q: 'How much does it cost?', a: 'The Starter plan is ₦3,500/month and the Pro plan is ₦9,500/month. Both include a 90-day beta with full Pro features, no credit card required.' },
-    { q: 'What industries does Cresoa support?', a: 'Currently, Cresoa supports Fashion & Custom Wear and Repairs & Technical Services. Manufacturing is coming soon.' },
+    { q: 'What industries does Cresoa support?', a: 'Cresoa currently supports Fashion & Custom Wear and Repairs & Technical Services, with plans to expand to 10+ industries including Logistics, Trading, Manufacturing, and more.' },
     { q: 'Can I use Cresoa on my phone?', a: 'Yes! Cresoa is fully responsive and works on any device—phone, tablet, or desktop.' },
     { q: 'How do I get started?', a: 'Simply click "Start Beta", create your account, choose your business type, and start adding customers.' },
+  ]
+
+  const testimonials = [
+    { name: 'Chiamaka', business: 'Fashion Designer', text: 'I stopped losing orders. Cresoa keeps everything in one place.' },
+    { name: 'Ibrahim', business: 'Phone Repair Shop', text: 'Now I always know which customer is waiting for parts and who owes me.' },
+    { name: 'Bisi', business: 'Aso-Ebi Coordinator', text: 'Managing large group orders has never been this easy.' },
   ]
 
   return (
@@ -195,7 +202,7 @@ export default function HomepageContent() {
         .why-item .number { font-size: 2.5rem; font-weight: 700; color: var(--color-accent); display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
         .why-item .label { color: var(--color-text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
 
-        .industry-card { background: var(--color-card); border-radius: 16px; padding: 1.8rem 1.2rem; border: 1px solid var(--color-border); text-align: center; transition: all 0.3s ease; box-shadow: var(--shadow-sm); }
+        .industry-card { background: var(--color-card); border-radius: 16px; padding: 1.8rem 1.2rem; border: 1px solid var(--color-border); text-align: center; transition: all 0.3s ease; box-shadow: var(--shadow-sm); display: block; text-decoration: none; color: inherit; }
         .industry-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--color-accent); }
         .industry-card .icon-wrapper { font-size: 2.5rem; margin-bottom: 0.6rem; }
         .industry-card h3 { color: var(--color-text); font-size: 1.1rem; margin: 0 0 0.3rem; }
@@ -211,7 +218,7 @@ export default function HomepageContent() {
         .step-item p { margin: 0; color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.5; }
         .step-item .time { font-size: 0.65rem; color: var(--color-text-muted); }
 
-        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
+             .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
         .pricing-card { background: var(--color-card); border-radius: 16px; padding: 2rem 1.5rem; border: 2px solid var(--color-border); text-align: center; transition: all 0.3s ease; box-shadow: var(--shadow-sm); }
         .pricing-card:hover { border-color: var(--color-accent); box-shadow: var(--shadow-lg); }
         .pricing-card.popular { border-color: var(--color-accent); background: var(--color-card); position: relative; }
@@ -226,7 +233,7 @@ export default function HomepageContent() {
         .pricing-card ul li .check { color: var(--color-success); font-weight: 700; }
         .pricing-card ul li .cross { color: var(--color-danger); font-weight: 700; }
 
-             .faq-item { background: var(--color-card); border-radius: 12px; border: 1px solid var(--color-border); margin-bottom: 0.8rem; overflow: hidden; transition: all 0.2s ease; }
+        .faq-item { background: var(--color-card); border-radius: 12px; border: 1px solid var(--color-border); margin-bottom: 0.8rem; overflow: hidden; transition: all 0.2s ease; }
         .faq-item:hover { border-color: var(--color-accent); }
         .faq-header { padding: 1rem 1.2rem; font-weight: 600; color: var(--color-text); cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none; }
         .faq-header .arrow { color: var(--color-accent); transition: transform 0.3s ease; font-size: 1.2rem; font-weight: 300; }
@@ -237,6 +244,13 @@ export default function HomepageContent() {
         .final-cta { background: linear-gradient(135deg, #0F2B4A, #1A3F66); border-radius: 24px; max-width: 760px; margin: 0 auto 3rem; padding: 3rem 2rem; text-align: center; box-shadow: 0 8px 40px rgba(15,43,74,0.2); }
         .final-cta h2 { color: #fff; font-size: 2rem; margin: 0 0 0.8rem; }
         .final-cta p { color: #C8D4E3; font-size: 1.05rem; margin: 0 0 1.5rem; max-width: 500px; margin-inline: auto; }
+
+        .testimonial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin: 1rem auto 2rem; }
+        .testimonial-card { background: var(--color-card); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); text-align: left; }
+        .testimonial-card .quote-icon { margin-bottom: 0.5rem; }
+        .testimonial-card p { color: var(--color-text); font-style: italic; line-height: 1.6; font-size: 0.95rem; margin: 0 0 1rem; }
+        .testimonial-card .author { font-weight: 700; color: var(--color-text); font-size: 0.9rem; }
+        .testimonial-card .business { color: var(--color-text-muted); font-size: 0.8rem; }
 
         .footer { border-top: 1px solid var(--color-border); padding: 2.5rem 1.5rem; margin-top: 1rem; text-align: center; color: var(--color-text-muted); font-size: 0.8rem; }
         .footer .links { display: flex; justify-content: center; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
@@ -276,8 +290,11 @@ export default function HomepageContent() {
         </div>
         <div className="nav-links">
           <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
+          <Link href="/fashion" className="nav-btn">Fashion</Link>
+          <Link href="/repairs" className="nav-btn">Repairs</Link>
           <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
           <Link href="/pricing" className="nav-btn">Pricing</Link>
+          <Link href="/blog" className="nav-btn">Blog</Link>
           <Link href="/support" className="nav-btn">Support</Link>
           <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
         </div>
@@ -289,13 +306,16 @@ export default function HomepageContent() {
         </div>
       </nav>
 
-      {/* ─── MOBILE DRAWER ─── */}
+      {/* ─── MOBILE DRAWER (SIDEBAR) ─── */}
       <div className={`mobile-overlay ${mobileMenuOpen ? 'open' : ''}`} onClick={closeMobileMenu} />
       <div className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="close-btn" onClick={closeMobileMenu}>{ICONS.x}</button>
         <button onClick={(e) => scrollToSection(e, 'why')} className="nav-btn">Why Cresoa</button>
+        <Link href="/fashion" className="nav-btn">Fashion</Link>
+        <Link href="/repairs" className="nav-btn">Repairs</Link>
         <button onClick={(e) => scrollToSection(e, 'features')} className="nav-btn">Features</button>
         <Link href="/pricing" className="nav-btn">Pricing</Link>
+        <Link href="/blog" className="nav-btn">Blog</Link>
         <Link href="/support" className="nav-btn">Support</Link>
         <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-btn">FAQ</button>
         <Link href="/login" className="nav-btn">Log in</Link>
@@ -308,7 +328,7 @@ export default function HomepageContent() {
         <div className="container">
           <div className="content">
             <h1>Run your Nigerian business <br /><span>from one place.</span></h1>
-            <p className="subhead">Track orders, manage customers, and get paid—all in one platform. No more messy notebooks, WhatsApp chaos, or missed payments.</p>
+            <p className="subhead">Track orders, manage customers, and get paid—all in one platform. Built for fashion designers, repair shops, and other Nigerian SMEs.</p>
             <div className="cta-group">
               <Link href="/signup" className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>Start Beta {ICONS.arrowRight}</Link>
               <button onClick={(e) => scrollToSection(e, 'features')} className="btn btn-outline" style={{ fontSize: '1rem', padding: '0.9rem 2rem' }}>Learn more</button>
@@ -366,10 +386,10 @@ export default function HomepageContent() {
 
       {/* ─── INDUSTRIES ─── */}
       <section className="container" style={{ padding: '1.5rem 1.5rem 3.5rem' }}>
-        <div className="section-title"><h2>Built for the way you work</h2><p>Cresoa adapts to different types of businesses—starting with these.</p></div>
+        <div className="section-title"><h2>Built for the way you work</h2><p>Cresoa adapts to different types of businesses. Fashion and Repairs are live now, with 8 more industries coming.</p></div>
         <div className="card-grid">
-          <div className="industry-card"><div className="icon-wrapper">{ICONS.layers}</div><h3>Fashion & Custom Wear</h3><p>Tailors, fashion designers, uniform makers. Manage customers, measurements, orders, and production.</p><span className="tag tag-live">Live Now</span></div>
-          <div className="industry-card" style={{ borderColor: 'var(--color-accent)' }}><div className="icon-wrapper">{ICONS.tool}</div><h3>Repairs & Technical Services</h3><p>Phone, laptop, and electronics repair. Track devices, jobs, parts, and payments.</p><span className="tag tag-live">Live Now</span></div>
+          <Link href="/fashion" className="industry-card"><div className="icon-wrapper">{ICONS.layers}</div><h3>Fashion & Custom Wear</h3><p>Tailors, fashion designers, uniform makers. Manage customers, measurements, orders, and production.</p><span className="tag tag-live">Live Now</span></Link>
+          <Link href="/repairs" className="industry-card" style={{ borderColor: 'var(--color-accent)' }}><div className="icon-wrapper">{ICONS.tool}</div><h3>Repairs & Technical Services</h3><p>Phone, laptop, and electronics repair. Track devices, jobs, parts, and payments.</p><span className="tag tag-live">Live Now</span></Link>
           <div className="industry-card"><div className="icon-wrapper">{ICONS.building}</div><h3>Custom Manufacturing</h3><p>Furniture makers, metal fabricators, custom product creators. Manage projects and production.</p><span className="tag tag-soon">Coming Soon</span></div>
         </div>
       </section>
@@ -383,6 +403,21 @@ export default function HomepageContent() {
           <div className="step-item"><span className="number">3</span><div><h4>Run your business</h4><p>Track orders, send tracking links, record payments, and grow with confidence.</p><span className="time">{ICONS.check} Start now</span></div></div>
         </div>
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}><Link href="/signup" className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>Start Beta {ICONS.arrowRight}</Link></div>
+      </section>
+
+      {/* ─── TESTIMONIALS ─── */}
+      <section className="container" style={{ padding: '2rem 1.5rem' }}>
+        <div className="section-title"><h2>Trusted by Nigerian SMEs</h2><p>Real stories from businesses like yours.</p></div>
+        <div className="testimonial-grid">
+          {testimonials.map((t, i) => (
+            <div key={i} className="testimonial-card">
+              <div className="quote-icon">{ICONS.quote}</div>
+              <p>“{t.text}”</p>
+              <div className="author">{t.name}</div>
+              <div className="business">{t.business}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ─── PRICING ─── */}
@@ -408,7 +443,7 @@ export default function HomepageContent() {
         </div>
       </section>
 
-      {/* ─── FINAL CTA ─── */}
+        {/* ─── FINAL CTA ─── */}
       <section className="final-cta">
         <h2>Ready to take control of your business?</h2>
         <p>Join 47 Nigerian SMEs already using Cresoa.</p>
@@ -430,8 +465,9 @@ export default function HomepageContent() {
           <div className="links">
             <Link href="/login">Log in</Link>
             <Link href="/signup">Sign up</Link>
-            <button onClick={(e) => scrollToSection(e, 'why')}>Why Cresoa</button>
-            <button onClick={(e) => scrollToSection(e, 'features')}>Features</button>
+            <Link href="/fashion">Fashion</Link>
+            <Link href="/repairs">Repairs</Link>
+            <Link href="/blog">Blog</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/support">Support</Link>
             <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
@@ -441,4 +477,4 @@ export default function HomepageContent() {
       </footer>
     </main>
   )
-                                       }
+}
