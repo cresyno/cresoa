@@ -81,7 +81,7 @@ export default function HomepageContent() {
     return () => observer.disconnect()
   }, [])
 
-  // ─── Custom FAQ Accordion Logic ───────────────────────────
+  // ─── FAQ Accordion Logic ──────────────────────────────────
   const [openFaqIndex, setOpenFaqIndex] = useState(null)
   const toggleFaq = (index) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index)
@@ -96,11 +96,22 @@ export default function HomepageContent() {
     { q: 'How do I get started?', a: 'Simply click "Start Beta", create your account, choose your business type, and start adding customers.' },
   ]
 
+  // ─── Testimonials (Sliding) ───────────────────────────────
   const testimonials = [
-    { name: 'Chiamaka', business: 'Fashion Designer', text: 'I stopped losing orders. Cresoa keeps everything in one place.' },
-    { name: 'Ibrahim', business: 'Phone Repair Shop', text: 'Now I always know which customer is waiting for parts and who owes me.' },
-    { name: 'Bisi', business: 'Aso-Ebi Coordinator', text: 'Managing large group orders has never been this easy.' },
+    {
+      name: 'Chiamaka',
+      business: 'Fashion Designer',
+      text: 'Before Cresoa, my customers and orders were scattered across WhatsApp and notebooks. Now everything is in one place — I can track every order from cutting to delivery without stress.',
+    },
+    {
+      name: 'Ibrahim',
+      business: 'Phone Repair Shop',
+      text: 'When I send an invoice from Cresoa, my customers see a real business, not a hustle. It makes me look professional and they know exactly what they are paying for.',
+    },
   ]
+  const [currentTestimonial, setCurrentTestimonial] = useState(0)
+  const nextTestimonial = () => setCurrentTestimonial((prev) => (prev + 1) % testimonials.length)
+  const prevTestimonial = () => setCurrentTestimonial((prev) => (prev - 1 + testimonials.length) % testimonials.length)
 
   return (
     <main
@@ -152,12 +163,13 @@ export default function HomepageContent() {
         .btn-secondary:hover { background: #1A3F66; }
 
         .nav-btn {
-          display: inline-flex; align-items: center; justify-content: center;
-          padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500;
-          border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted);
+          display: inline-flex; align-items: center; justify-content: flex-start; gap: 0.4rem;
+          padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.9rem; font-weight: 500;
+          border: 1px solid var(--color-border); background: transparent; color: var(--color-text);
           transition: all 0.2s ease; cursor: pointer; font-family: inherit; text-decoration: none;
+          width: 100%; text-align: left;
         }
-        .nav-btn:hover { border-color: var(--color-accent); color: var(--color-text); background: rgba(212,165,42,0.03); }
+        .nav-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: rgba(212,165,42,0.05); }
         .nav-btn-primary { background: var(--color-accent); color: #0F2B4A; border: 1px solid var(--color-accent); box-shadow: 0 4px 12px rgba(212,165,42,0.2); }
         .nav-btn-primary:hover { background: #C79A2B; border-color: #C79A2B; color: #0F2B4A; }
 
@@ -172,7 +184,7 @@ export default function HomepageContent() {
         .mobile-drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; background: var(--color-card); padding: 2rem 1.5rem; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 1000; display: flex; flex-direction: column; gap: 1rem; border-right: 1px solid var(--color-border); }
         .mobile-drawer.open { transform: translateX(0); }
         .mobile-drawer .close-btn { align-self: flex-end; background: none; border: none; color: var(--color-text); font-size: 1.5rem; cursor: pointer; }
-        .mobile-drawer .nav-btn, .mobile-drawer .nav-btn-primary { display: flex; justify-content: flex-start; width: 100%; padding: 0.6rem 1rem; text-decoration: none; }
+        .mobile-drawer .nav-btn { display: flex; width: 100%; }
 
         .hero { background: linear-gradient(150deg, #0F2B4A 0%, #061A2E 100%); padding: 5rem 1.5rem 4rem; position: relative; overflow: hidden; }
         .hero::before { content: ''; position: absolute; top: -30%; right: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(212,165,42,0.08) 0%, transparent 70%); border-radius: 50%; }
@@ -202,14 +214,18 @@ export default function HomepageContent() {
         .why-item .number { font-size: 2.5rem; font-weight: 700; color: var(--color-accent); display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
         .why-item .label { color: var(--color-text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
 
-        .industry-card { background: var(--color-card); border-radius: 16px; padding: 1.8rem 1.2rem; border: 1px solid var(--color-border); text-align: center; transition: all 0.3s ease; box-shadow: var(--shadow-sm); display: block; text-decoration: none; color: inherit; }
+        .industry-card { background: var(--color-card); border-radius: 16px; padding: 1.8rem 1.2rem; border: 1px solid var(--color-border); text-align: center; transition: all 0.3s ease; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; }
         .industry-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--color-accent); }
         .industry-card .icon-wrapper { font-size: 2.5rem; margin-bottom: 0.6rem; }
         .industry-card h3 { color: var(--color-text); font-size: 1.1rem; margin: 0 0 0.3rem; }
-        .industry-card p { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; }
-        .industry-card .tag { display: inline-block; font-size: 0.55rem; font-weight: 700; padding: 0.15rem 0.6rem; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.5rem; }
+        .industry-card p { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+        .industry-card .tag { display: inline-block; font-size: 0.55rem; font-weight: 700; padding: 0.15rem 0.6rem; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
         .tag-live { background: #DCEBE2; color: #2E7D5E; }
         .tag-soon { background: #F6E9C8; color: #C79A2B; }
+        .industry-card .view-details {
+          display: inline-flex; align-items: center; gap: 0.3rem;
+          color: var(--color-accent); text-decoration: underline; font-size: 0.9rem; font-weight: 600;
+        }
 
         .step-item { display: flex; align-items: flex-start; gap: 1rem; background: var(--color-card); padding: 1.2rem 1.5rem; border-radius: 14px; border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); transition: all 0.3s ease; }
         .step-item:hover { border-color: var(--color-accent); box-shadow: var(--shadow-md); }
@@ -218,7 +234,16 @@ export default function HomepageContent() {
         .step-item p { margin: 0; color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.5; }
         .step-item .time { font-size: 0.65rem; color: var(--color-text-muted); }
 
-             .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
+             .testimonial-carousel { background: var(--color-card); border-radius: 16px; padding: 2rem; border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); max-width: 700px; margin: 0 auto; text-align: center; }
+        .testimonial-carousel .quote-icon { margin-bottom: 0.5rem; }
+        .testimonial-carousel p { color: var(--color-text); font-style: italic; line-height: 1.6; font-size: 1.1rem; margin: 0 0 1.5rem; }
+        .testimonial-carousel .author { font-weight: 700; color: var(--color-text); font-size: 1rem; }
+        .testimonial-carousel .business { color: var(--color-text-muted); font-size: 0.85rem; }
+        .testimonial-nav { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; }
+        .testimonial-nav button { background: none; border: 1px solid var(--color-border); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--color-text); transition: border-color 0.2s, color 0.2s; }
+        .testimonial-nav button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
         .pricing-card { background: var(--color-card); border-radius: 16px; padding: 2rem 1.5rem; border: 2px solid var(--color-border); text-align: center; transition: all 0.3s ease; box-shadow: var(--shadow-sm); }
         .pricing-card:hover { border-color: var(--color-accent); box-shadow: var(--shadow-lg); }
         .pricing-card.popular { border-color: var(--color-accent); background: var(--color-card); position: relative; }
@@ -245,17 +270,10 @@ export default function HomepageContent() {
         .final-cta h2 { color: #fff; font-size: 2rem; margin: 0 0 0.8rem; }
         .final-cta p { color: #C8D4E3; font-size: 1.05rem; margin: 0 0 1.5rem; max-width: 500px; margin-inline: auto; }
 
-        .testimonial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin: 1rem auto 2rem; }
-        .testimonial-card { background: var(--color-card); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); text-align: left; }
-        .testimonial-card .quote-icon { margin-bottom: 0.5rem; }
-        .testimonial-card p { color: var(--color-text); font-style: italic; line-height: 1.6; font-size: 0.95rem; margin: 0 0 1rem; }
-        .testimonial-card .author { font-weight: 700; color: var(--color-text); font-size: 0.9rem; }
-        .testimonial-card .business { color: var(--color-text-muted); font-size: 0.8rem; }
-
         .footer { border-top: 1px solid var(--color-border); padding: 2.5rem 1.5rem; margin-top: 1rem; text-align: center; color: var(--color-text-muted); font-size: 0.8rem; }
-        .footer .links { display: flex; justify-content: center; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
-        .footer .links a { color: var(--color-text); text-decoration: none; transition: color 0.2s; }
-        .footer .links a:hover { color: var(--color-accent); }
+        .footer .links { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+        .footer .links a, .footer .links button { color: var(--color-text); text-decoration: none; transition: color 0.2s; background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.5rem; }
+        .footer .links a:hover, .footer .links button:hover { color: var(--color-accent); text-decoration: underline; }
 
         @media (max-width: 768px) {
           .navbar .nav-links { display: none; }
@@ -388,9 +406,29 @@ export default function HomepageContent() {
       <section className="container" style={{ padding: '1.5rem 1.5rem 3.5rem' }}>
         <div className="section-title"><h2>Built for the way you work</h2><p>Cresoa adapts to different types of businesses. Fashion and Repairs are live now, with 8 more industries coming.</p></div>
         <div className="card-grid">
-          <Link href="/fashion" className="industry-card"><div className="icon-wrapper">{ICONS.layers}</div><h3>Fashion & Custom Wear</h3><p>Tailors, fashion designers, uniform makers. Manage customers, measurements, orders, and production.</p><span className="tag tag-live">Live Now</span></Link>
-          <Link href="/repairs" className="industry-card" style={{ borderColor: 'var(--color-accent)' }}><div className="icon-wrapper">{ICONS.tool}</div><h3>Repairs & Technical Services</h3><p>Phone, laptop, and electronics repair. Track devices, jobs, parts, and payments.</p><span className="tag tag-live">Live Now</span></Link>
-          <div className="industry-card"><div className="icon-wrapper">{ICONS.building}</div><h3>Custom Manufacturing</h3><p>Furniture makers, metal fabricators, custom product creators. Manage projects and production.</p><span className="tag tag-soon">Coming Soon</span></div>
+          {/* Fashion Card */}
+          <div className="industry-card">
+            <div className="icon-wrapper">{ICONS.layers}</div>
+            <h3>Fashion & Custom Wear</h3>
+            <p>Tailors, fashion designers, uniform makers. Manage customers, measurements, orders, and production.</p>
+            <span className="tag tag-live">Live Now</span>
+            <Link href="/fashion" className="view-details">View details →</Link>
+          </div>
+          {/* Repairs Card */}
+          <div className="industry-card" style={{ borderColor: 'var(--color-accent)' }}>
+            <div className="icon-wrapper">{ICONS.tool}</div>
+            <h3>Repairs & Technical Services</h3>
+            <p>Phone, laptop, and electronics repair. Track devices, jobs, parts, and payments.</p>
+            <span className="tag tag-live">Live Now</span>
+            <Link href="/repairs" className="view-details">View details →</Link>
+          </div>
+          {/* Manufacturing (Coming Soon) */}
+          <div className="industry-card">
+            <div className="icon-wrapper">{ICONS.building}</div>
+            <h3>Custom Manufacturing</h3>
+            <p>Furniture makers, metal fabricators, custom product creators. Manage projects and production.</p>
+            <span className="tag tag-soon">Coming Soon</span>
+          </div>
         </div>
       </section>
 
@@ -405,18 +443,18 @@ export default function HomepageContent() {
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}><Link href="/signup" className="btn" style={{ fontSize: '1rem', padding: '0.9rem 2.5rem', textDecoration: 'none' }}>Start Beta {ICONS.arrowRight}</Link></div>
       </section>
 
-      {/* ─── TESTIMONIALS ─── */}
+      {/* ─── TESTIMONIALS (Sliding) ─── */}
       <section className="container" style={{ padding: '2rem 1.5rem' }}>
         <div className="section-title"><h2>Trusted by Nigerian SMEs</h2><p>Real stories from businesses like yours.</p></div>
-        <div className="testimonial-grid">
-          {testimonials.map((t, i) => (
-            <div key={i} className="testimonial-card">
-              <div className="quote-icon">{ICONS.quote}</div>
-              <p>“{t.text}”</p>
-              <div className="author">{t.name}</div>
-              <div className="business">{t.business}</div>
-            </div>
-          ))}
+        <div className="testimonial-carousel">
+          <div className="quote-icon">{ICONS.quote}</div>
+          <p>“{testimonials[currentTestimonial].text}”</p>
+          <div className="author">{testimonials[currentTestimonial].name}</div>
+          <div className="business">{testimonials[currentTestimonial].business}</div>
+          <div className="testimonial-nav">
+            <button onClick={prevTestimonial} aria-label="Previous testimonial">{'<'}</button>
+            <button onClick={nextTestimonial} aria-label="Next testimonial">{'>'}</button>
+          </div>
         </div>
       </section>
 
@@ -443,7 +481,7 @@ export default function HomepageContent() {
         </div>
       </section>
 
-        {/* ─── FINAL CTA ─── */}
+      {/* ─── FINAL CTA ─── */}
       <section className="final-cta">
         <h2>Ready to take control of your business?</h2>
         <p>Join 47 Nigerian SMEs already using Cresoa.</p>
@@ -477,4 +515,4 @@ export default function HomepageContent() {
       </footer>
     </main>
   )
-}
+                                     }
