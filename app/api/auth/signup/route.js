@@ -1,4 +1,3 @@
-// app/api/auth/signup/route.js
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { signVerificationToken } from '../../../../lib/jwt'
@@ -42,10 +41,12 @@ export async function POST(req) {
     // 2. Generate verification token (JWT)
     const token = signVerificationToken(userId)
 
-    // 3. ✅ Build the verification link – CORRECT endpoint
-    const verificationLink = `https://cresoa.vercel.app/verify-email?token=${token}`
+    // 3. Build the verification link – using your production domain
+    //    If you ever need to change the domain, set NEXT_PUBLIC_SITE_URL in your env.
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://cresoa.com.ng'
+    const verificationLink = `${siteUrl}/verify-email?token=${token}`
 
-    // 4. Send verification email (using Gmail SMTP)
+    // 4. Send verification email
     await sendVerificationEmail(email, verificationLink)
 
     return NextResponse.json({
