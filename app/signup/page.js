@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
+import Logo from '../../components/Logo'
+import ThemeToggle from '../../components/ThemeToggle'
 
 export default function SignUpPage() {
   const router = useRouter()
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -15,10 +17,8 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
-  const [touched, setTouched] = useState({ password: false, confirm: false })
 
   useEffect(() => {
-    // Check if already logged in
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) router.push('/dashboard')
@@ -30,7 +30,7 @@ export default function SignUpPage() {
   const passwordHasNumber = /\d/.test(password)
   const passwordsMatch = password && password === confirmPassword
   const isPasswordValid = passwordHasMinLength && passwordHasNumber
-  const isFormValid = name.trim() && email.trim() && isPasswordValid && passwordsMatch && agreedToTerms
+  const isFormValid = email.trim() && isPasswordValid && passwordsMatch && agreedToTerms
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -56,41 +56,29 @@ export default function SignUpPage() {
     }
 
     try {
-      // ✅ Call our custom signup API instead of Supabase directly
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          businessName: name, // the business owner name
-        }),
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
 
       if (res.ok) {
-  setMessage(
-    '🎉 Account created! Please check your email (and spam folder) to verify your address. ' +
-    'Then log in. 💡 If you find it in spam, mark it as "Not spam" to ensure you receive future emails.'
-  )
-  setLoading(false)
-  // Do NOT auto-redirect – user stays on signup page and clicks login manually
-} else {
-  setMessage('❌ ' + (data.error || 'Signup failed. Please try again.'))
+        setMessage(
+          '🎉 Account created! Please check your email (and spam folder) to verify your address. Then log in. 💡 If you find it in spam, mark it as "Not spam" to ensure you receive future emails.'
+        )
+        setLoading(false)
+      } else {
+        setMessage('❌ ' + (data.error || 'Signup failed. Please try again.'))
+        setLoading(false)
       }
     } catch (err) {
       console.error('Signup error:', err)
       setMessage('❌ Network error. Please check your connection.')
-    } finally {
       setLoading(false)
     }
   }
-
-  // ... keep all the UI and helper functions exactly as they were (eyeIcon, etc.) ...
-
-  // I'll paste the entire return block for completeness – it's unchanged except the message handling.
-  // The rest is identical.
 
   const eyeIcon = (visible) => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -108,81 +96,94 @@ export default function SignUpPage() {
   )
 
   const inputStyle = {
-    width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box',
-    transition: 'border-color 0.2s ease',
+    width: '100%',
+    padding: '0.75rem 1rem',
+    borderRadius: '10px',
+    border: '1px solid var(--cresoa-border)',
+    background: 'var(--cresoa-bg)',
+    color: 'var(--cresoa-text)',
+    fontSize: '1rem',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
   }
 
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500' }
+  const labelStyle = {
+    display: 'block',
+    color: 'var(--cresoa-text)',
+    marginBottom: '0.4rem',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+  }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.5rem' }}>
+    <main
+      style={{
+        minHeight: '100vh',
+        background: 'var(--cresoa-bg)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+        position: 'relative',
+      }}
+    >
+      {/* Top Right Theme Toggle */}
+      <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+        <ThemeToggle />
+      </div>
+
       <style>{`
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes pulseGold {
-          0%, 100% { box-shadow: 0 4px 14px rgba(199,154,43,0.3); }
-          50% { box-shadow: 0 4px 24px rgba(199,154,43,0.5); }
-        }
         .signup-card { animation: fadeUp 0.5s ease-out; }
         .btn-primary {
-          width: 100%; padding: 0.85rem; border-radius: 8px;
-          border: none; background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F; font-size: 1rem; font-weight: 700;
-          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
-          transition: transform 0.1s ease;
+          width: 100%; padding: 0.85rem; border-radius: 10px;
+          border: none; background: linear-gradient(135deg, #D4A52A, #C79A2B);
+          color: #0F2B4A; font-size: 1rem; font-weight: 700;
+          box-shadow: 0 4px 14px rgba(212,165,42,0.3);
+          transition: transform 0.1s ease, box-shadow 0.2s ease;
+          cursor: pointer; font-family: inherit;
         }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(212,165,42,0.4); }
         .btn-primary:active { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .password-requirement {
-          font-size: 0.75rem; margin: 0.2rem 0;
+          font-size: 0.8rem; margin: 0.2rem 0;
           display: flex; align-items: center; gap: 0.4rem;
         }
-        .password-requirement.valid { color: #4C7A5E; }
-        .password-requirement.invalid { color: #6B6255; }
+        .password-requirement.valid { color: var(--cresoa-success); }
+        .password-requirement.invalid { color: var(--cresoa-text-muted); }
         .checkbox-container {
           display: flex; align-items: flex-start; gap: 0.5rem;
-          font-size: 0.8rem; color: #6B6255; cursor: pointer;
+          font-size: 0.85rem; color: var(--cresoa-text-muted); cursor: pointer;
+          margin-top: 0.5rem;
         }
         .checkbox-container input[type="checkbox"] {
-          width: 18px; height: 18px; margin-top: 1px; accent-color: #C79A2B; cursor: pointer;
+          width: 18px; height: 18px; margin-top: 2px; accent-color: #D4A52A; cursor: pointer;
           flex-shrink: 0;
         }
       `}</style>
 
-      <div className="signup-card" style={{ maxWidth: '380px', width: '100%' }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ margin: '0 auto 0.8rem', width: '52px', height: '52px' }}>
-            <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
-              <rect width="64" height="64" rx="16" fill="#1E3A5F" />
-              <line x1="44" y1="18" x2="20" y2="42" stroke="#C79A2B" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="44" cy="18" r="4.5" fill="none" stroke="#C79A2B" strokeWidth="2.5" />
-              <path d="M20 42 C 13 38, 11 29, 18 24" stroke="#C79A2B" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-            </svg>
-          </div>
-          <h1 style={{ color: '#1E3A5F', fontSize: '1.6rem', margin: 0, fontWeight: '700' }}>Start your journey</h1>
-          <p style={{ color: '#6B6255', fontSize: '0.9rem', marginTop: '0.3rem' }}>Create your Cresoa business account</p>
+      <div className="signup-card" style={{ maxWidth: '420px', width: '100%' }}>
+        {/* Real Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <Link href="/" style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Logo variant="primary" size="large" />
+          </Link>
+          <h1 style={{ color: 'var(--cresoa-primary)', fontSize: '1.8rem', margin: '1rem 0 0', fontWeight: '800' }}>
+            Start your journey
+          </h1>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.95rem', marginTop: '0.3rem' }}>
+            Create your Cresoa business account
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '1.5rem', borderRadius: '14px', border: '1px solid #e4d8c2' }}>
-          {/* Business Name */}
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={labelStyle}>Business owner name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              placeholder="e.g. Ife Jesu"
-              style={inputStyle}
-            />
-          </div>
-
+        <form onSubmit={handleSubmit} style={{ background: 'var(--cresoa-surface)', padding: '1.5rem 1.8rem', borderRadius: '16px', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-md)' }}>
           {/* Email */}
-          <div style={{ marginBottom: '0.8rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
             <label style={labelStyle}>Email</label>
             <input
               type="email"
@@ -202,17 +203,16 @@ export default function SignUpPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setTouched({ ...touched, password: true })}
                 required
                 placeholder="Create a strong password"
-                style={{ ...inputStyle, paddingRight: '2.6rem' }}
+                style={{ ...inputStyle, paddingRight: '2.8rem' }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
-                  position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer'
+                  position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer', color: 'var(--cresoa-text-muted)'
                 }}
               >
                 {eyeIcon(showPassword)}
@@ -221,7 +221,7 @@ export default function SignUpPage() {
           </div>
 
           {/* Password Requirements */}
-          <div style={{ marginBottom: '0.8rem', padding: '0.4rem 0.3rem', background: '#F8F6F2', borderRadius: '6px' }}>
+          <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: 'var(--cresoa-surface-soft)', borderRadius: '8px' }}>
             <div className={`password-requirement ${passwordHasMinLength ? 'valid' : 'invalid'}`}>
               {passwordHasMinLength ? '✓' : '○'} At least 8 characters
             </div>
@@ -231,86 +231,79 @@ export default function SignUpPage() {
           </div>
 
           {/* Confirm Password */}
-          <div style={{ marginBottom: '1rem' }}>
+          <div style={{ marginBottom: '1.2rem' }}>
             <label style={labelStyle}>Confirm password</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                onFocus={() => setTouched({ ...touched, confirm: true })}
                 required
                 placeholder="Confirm your password"
-                style={{ ...inputStyle, paddingRight: '2.6rem' }}
+                style={{ ...inputStyle, paddingRight: '2.8rem' }}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 style={{
-                  position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer'
+                  position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer', color: 'var(--cresoa-text-muted)'
                 }}
               >
                 {eyeIcon(showConfirmPassword)}
               </button>
             </div>
             {confirmPassword && (
-              <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: passwordsMatch ? '#4C7A5E' : '#AE4A34' }}>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: passwordsMatch ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>
                 {passwordsMatch ? '✓ Passwords match' : '✕ Passwords do not match'}
               </p>
             )}
           </div>
 
           {/* Terms */}
-<div style={{ marginBottom: '1.2rem' }}>
-  <label
-    className="checkbox-container"
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      cursor: 'pointer',
-    }}
-    onClick={(e) => {
-      // Prevent the click from bubbling to the input (which might cause double toggle)
-      e.preventDefault();
-      // Toggle the state directly
-      setAgreedToTerms(!agreedToTerms);
-    }}
-  >
-    <input
-      type="checkbox"
-      checked={agreedToTerms}
-      // Remove onChange – we use the label's onClick
-      onChange={() => {}} // dummy to avoid React warning
-      style={{ width: '18px', height: '18px', cursor: 'pointer', pointerEvents: 'none' }}
-    />
-    <span>
-      I agree to the <a href="/terms" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>Terms of Service</a> and <a href="/privacy" style={{ color: '#1E3A5F', fontWeight: '600', textDecoration: 'none' }}>Privacy Policy</a>
-    </span>
-  </label>
-  {/* Optional: remove debug line after fix */}
-</div>
+          <div style={{ marginBottom: '1.4rem' }}>
+            <label className="checkbox-container">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                style={{ accentColor: 'var(--cresoa-accent)' }}
+              />
+              <span>
+                I agree to the{' '}
+                <Link href="/terms" style={{ color: 'var(--cresoa-accent)', fontWeight: '600', textDecoration: 'underline' }}>
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" style={{ color: 'var(--cresoa-accent)', fontWeight: '600', textDecoration: 'underline' }}>
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
+          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary"
-          >
+          <button type="submit" disabled={loading} className="btn-primary">
             {loading ? 'Creating account...' : 'Create account'}
           </button>
 
           {message && (
-            <p style={{ marginTop: '0.8rem', color: message.startsWith('🎉') ? '#4C7A5E' : '#AE4A34', fontSize: '0.85rem', textAlign: 'center' }}>
+            <p style={{ marginTop: '0.8rem', color: message.startsWith('🎉') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.5 }}>
               {message}
             </p>
           )}
         </form>
 
-        <p style={{ textAlign: 'center', color: '#6B6255', fontSize: '0.85rem', marginTop: '1.2rem' }}>
-          Already have an account? <a href="/login" style={{ color: '#1E3A5F', fontWeight: '600' }}>Log in</a>
+        <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', marginTop: '1.5rem' }}>
+          Already have an account?{' '}
+          <Link href="/login" style={{ color: 'var(--cresoa-accent)', fontWeight: '700' }}>
+            Log in
+          </Link>
         </p>
       </div>
+
+      {/* Subtle background decoration */}
+      <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(212,165,42,0.05) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(15,43,74,0.05) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
     </main>
   )
-        }
+}
