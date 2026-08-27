@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
-import Logo from '../../components/Logo'
 import ThemeToggle from '../../components/ThemeToggle'
 
 export default function SignUpPage() {
@@ -121,17 +120,21 @@ export default function SignUpPage() {
         minHeight: '100vh',
         background: 'var(--cresoa-bg)',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1.5rem',
         position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      {/* Top Right Theme Toggle */}
-      <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+      {/* Theme toggle top right */}
+      <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 10 }}>
         <ThemeToggle />
       </div>
+
+      {/* Decorative background shapes (no layout shift) */}
+      <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(212,165,42,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(15,43,74,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
 
       <style>{`
         @keyframes fadeUp {
@@ -165,145 +168,152 @@ export default function SignUpPage() {
           width: 18px; height: 18px; margin-top: 2px; accent-color: #D4A52A; cursor: pointer;
           flex-shrink: 0;
         }
+        @media (max-width: 768px) {
+          .signup-card { flex-direction: column; }
+        }
       `}</style>
 
-      <div className="signup-card" style={{ maxWidth: '420px', width: '100%' }}>
-        {/* Real Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <Link href="/" style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Logo variant="primary" size="large" />
-          </Link>
-          <h1 style={{ color: 'var(--cresoa-primary)', fontSize: '1.8rem', margin: '1rem 0 0', fontWeight: '800' }}>
-            Start your journey
-          </h1>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.95rem', marginTop: '0.3rem' }}>
-            Create your Cresoa business account
+      <div className="signup-card" style={{ maxWidth: '960px', width: '100%', display: 'flex', flexDirection: 'row', background: 'var(--cresoa-surface)', borderRadius: '24px', overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }}>
+        {/* Left Side – Branding */}
+        <div style={{ flex: '1', background: 'linear-gradient(145deg, #0F2B4A 0%, #1A3F66 100%)', color: '#fff', padding: '3rem 2.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: '1.5rem', left: '1.5rem' }}>
+            <img src="/favicon.png" alt="Cresoa" style={{ width: '64px', height: '64px', objectFit: 'contain' }} />
+          </div>
+          <h2 style={{ fontSize: '2.2rem', fontWeight: '800', lineHeight: 1.2, margin: '2rem 0 1rem' }}>
+            Run your business<br />from one place
+          </h2>
+          <p style={{ fontSize: '1.1rem', opacity: 0.9, lineHeight: 1.7, marginBottom: '1.5rem' }}>
+            Cresoa helps Nigerian SMEs manage customers, orders, payments, production and invoices — all in one mobile-first platform.
           </p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {['No credit card required', '90-day free beta', 'Built for Nigerian businesses'].map((item) => (
+              <li key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span style={{ width: '20px', height: '20px', background: 'var(--cresoa-accent)', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ background: 'var(--cresoa-surface)', padding: '1.5rem 1.8rem', borderRadius: '16px', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-md)' }}>
-          {/* Email */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="you@example.com"
-              style={inputStyle}
-            />
+        {/* Right Side – Form */}
+        <div style={{ flex: '1', padding: '2.5rem', background: 'var(--cresoa-surface)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h1 style={{ color: 'var(--cresoa-primary)', fontSize: '1.6rem', fontWeight: '800', margin: 0 }}>
+              Start your journey
+            </h1>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', margin: '0.5rem 0 0' }}>
+              Create your free account
+            </p>
           </div>
 
-          {/* Password */}
-          <div style={{ marginBottom: '0.4rem' }}>
-            <label style={labelStyle}>Password</label>
-            <div style={{ position: 'relative' }}>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={labelStyle}>Email</label>
               <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="Create a strong password"
-                style={{ ...inputStyle, paddingRight: '2.8rem' }}
+                placeholder="you@example.com"
+                style={inputStyle}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer', color: 'var(--cresoa-text-muted)'
-                }}
-              >
-                {eyeIcon(showPassword)}
-              </button>
             </div>
-          </div>
 
-          {/* Password Requirements */}
-          <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: 'var(--cresoa-surface-soft)', borderRadius: '8px' }}>
-            <div className={`password-requirement ${passwordHasMinLength ? 'valid' : 'invalid'}`}>
-              {passwordHasMinLength ? '✓' : '○'} At least 8 characters
+            <div style={{ marginBottom: '0.4rem' }}>
+              <label style={labelStyle}>Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="Create a strong password"
+                  style={{ ...inputStyle, paddingRight: '2.8rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}
+                >
+                  {eyeIcon(showPassword)}
+                </button>
+              </div>
             </div>
-            <div className={`password-requirement ${passwordHasNumber ? 'valid' : 'invalid'}`}>
-              {passwordHasNumber ? '✓' : '○'} Contains a number
-            </div>
-          </div>
 
-          {/* Confirm Password */}
-          <div style={{ marginBottom: '1.2rem' }}>
-            <label style={labelStyle}>Confirm password</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                placeholder="Confirm your password"
-                style={{ ...inputStyle, paddingRight: '2.8rem' }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={{
-                  position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer', color: 'var(--cresoa-text-muted)'
-                }}
-              >
-                {eyeIcon(showConfirmPassword)}
-              </button>
+            <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: 'var(--cresoa-surface-soft)', borderRadius: '8px' }}>
+              <div className={`password-requirement ${passwordHasMinLength ? 'valid' : 'invalid'}`}>
+                {passwordHasMinLength ? '✓' : '○'} At least 8 characters
+              </div>
+              <div className={`password-requirement ${passwordHasNumber ? 'valid' : 'invalid'}`}>
+                {passwordHasNumber ? '✓' : '○'} Contains a number
+              </div>
             </div>
-            {confirmPassword && (
-              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: passwordsMatch ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>
-                {passwordsMatch ? '✓ Passwords match' : '✕ Passwords do not match'}
+
+            <div style={{ marginBottom: '1.2rem' }}>
+              <label style={labelStyle}>Confirm password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Confirm your password"
+                  style={{ ...inputStyle, paddingRight: '2.8rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}
+                >
+                  {eyeIcon(showConfirmPassword)}
+                </button>
+              </div>
+              {confirmPassword && (
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: passwordsMatch ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>
+                  {passwordsMatch ? '✓ Passwords match' : '✕ Passwords do not match'}
+                </p>
+              )}
+            </div>
+
+            <div style={{ marginBottom: '1.4rem' }}>
+              <label className="checkbox-container">
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                />
+                <span>
+                  I agree to the{' '}
+                  <Link href="/terms" style={{ color: 'var(--cresoa-accent)', fontWeight: '600', textDecoration: 'underline' }}>
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" style={{ color: 'var(--cresoa-accent)', fontWeight: '600', textDecoration: 'underline' }}>
+                    Privacy Policy
+                  </Link>
+                </span>
+              </label>
+            </div>
+
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? 'Creating account...' : 'Create account'}
+            </button>
+
+            {message && (
+              <p style={{ marginTop: '0.8rem', color: message.startsWith('🎉') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.5 }}>
+                {message}
               </p>
             )}
-          </div>
+          </form>
 
-          {/* Terms */}
-          <div style={{ marginBottom: '1.4rem' }}>
-            <label className="checkbox-container">
-              <input
-                type="checkbox"
-                checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                style={{ accentColor: 'var(--cresoa-accent)' }}
-              />
-              <span>
-                I agree to the{' '}
-                <Link href="/terms" style={{ color: 'var(--cresoa-accent)', fontWeight: '600', textDecoration: 'underline' }}>
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link href="/privacy" style={{ color: 'var(--cresoa-accent)', fontWeight: '600', textDecoration: 'underline' }}>
-                  Privacy Policy
-                </Link>
-              </span>
-            </label>
-          </div>
-
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
-
-          {message && (
-            <p style={{ marginTop: '0.8rem', color: message.startsWith('🎉') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.5 }}>
-              {message}
-            </p>
-          )}
-        </form>
-
-        <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', marginTop: '1.5rem' }}>
-          Already have an account?{' '}
-          <Link href="/login" style={{ color: 'var(--cresoa-accent)', fontWeight: '700' }}>
-            Log in
-          </Link>
-        </p>
+          <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', marginTop: '1.5rem' }}>
+            Already have an account?{' '}
+            <Link href="/login" style={{ color: 'var(--cresoa-accent)', fontWeight: '700' }}>
+              Log in
+            </Link>
+          </p>
+        </div>
       </div>
-
-      {/* Subtle background decoration */}
-      <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(212,165,42,0.05) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(15,43,74,0.05) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
     </main>
   )
-}
+        }
