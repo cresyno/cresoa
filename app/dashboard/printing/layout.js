@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabaseClient'
 import Logo from '../../../components/Logo'
 import BusinessSwitcher from '../../components/BusinessSwitcher'
 import { Icon } from '../../../components/Icon'
-import Banner from '../../../components/Banner'
 import { PrintingNavigation } from '../../../components/PrintingNavigation'
 
 // Normalize sector
@@ -205,7 +204,7 @@ function PrintingLayoutContent({ children }) {
           --cresoa-border: #2A2A3A;
           --cresoa-accent: #D4A52A;
         }
-        .sidebar { width: 260px; min-height: 100vh; background: #0A1628; padding: 0.8rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04); z-index: 1000; }
+        .sidebar { width: 260px; min-height: 100vh; background: #0A1628; padding: 0.8rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04); z-index: 2000; }
         .sidebar .brand { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.6rem; }
         .sidebar .nav-section { margin-bottom: 0.2rem; }
         .sidebar .nav-section a { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: all 0.15s ease; }
@@ -215,8 +214,9 @@ function PrintingLayoutContent({ children }) {
         .sidebar .bottom a, .sidebar .bottom button { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: all 0.15s ease; background: none; border: none; width: 100%; cursor: pointer; text-align: left; }
         .main-content { flex: 1; min-width: 0; padding: 0; padding-bottom: 80px; }
         .dashboard-header { display: flex; justify-content: flex-end; align-items: center; padding: 0.4rem 1.2rem; background: var(--cresoa-surface); border-bottom: 1px solid var(--cresoa-border); }
+        .hamburger { display: none; position: fixed; top: 0.8rem; left: 0.8rem; z-index: 3000; background: var(--cresoa-accent); color: #fff; border: none; font-size: 1.3rem; padding: 0.2rem 0.5rem; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
         @media (max-width: 768px) {
-          .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; }
+          .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 2000; height: 100vh; }
           .sidebar.open { transform: translateX(0); }
           .hamburger { display: block; }
         }
@@ -227,15 +227,16 @@ function PrintingLayoutContent({ children }) {
       `}</style>
 
       {/* Hamburger */}
-      <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ position: 'fixed', top: '0.8rem', left: '0.8rem', zIndex: 1001, background: 'var(--cresoa-accent)', color: '#fff', fontSize: '1.3rem', padding: '0.2rem 0.5rem', borderRadius: '6px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+      <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
         {sidebarOpen ? '✕' : '☰'}
       </button>
-      <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} style={{ display: sidebarOpen ? 'block' : 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 999 }} />
+      <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} style={{ display: sidebarOpen ? 'block' : 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 1500 }} />
 
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        {/* Brand - Logo top, close button separate */}
         <div className="brand">
           <Logo variant="dark-bg" size="small" />
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div className="logo-text">Cresoa</div>
             <div className="sub">
               {business?.name || 'Your business'}
@@ -244,6 +245,10 @@ function PrintingLayoutContent({ children }) {
               <span className="plan">{business?.plan || 'Free'}</span>
             </div>
           </div>
+          {/* Close button - placed at far right, away from logo */}
+          <button onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#8899AA', cursor: 'pointer', fontSize: '1.2rem', padding: '0.2rem', flexShrink: 0 }}>
+            ✕
+          </button>
         </div>
 
         <div style={{ marginBottom: '0.4rem' }}>
@@ -298,7 +303,7 @@ function PrintingLayoutContent({ children }) {
             <span className="date">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           </div>
         </div>
-        <Banner />
+        {/* REMOVED Banner - this was causing double display */}
         {children}
       </div>
 
@@ -315,4 +320,4 @@ export default function PrintingLayout({ children }) {
       </div>
     </Suspense>
   )
-                        }
+      }
