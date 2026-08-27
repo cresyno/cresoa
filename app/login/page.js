@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
+import ThemeToggle from '../../components/ThemeToggle'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,45 +15,44 @@ export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
 
-  // ─── SMART REDIRECT FUNCTION ───
-  // This finds your business and pushes you to the correct dashboard
+  // ─── SMART REDIRECT FUNCTION (UNCHANGED) ───
   const redirectToDashboard = async () => {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    router.push('/login')
-    return
-  }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return
+    }
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    router.push('/login')
-    return
-  }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
+    }
 
-  let { data: ownedBiz } = await supabase
-    .from('businesses')
-    .select('id')
-    .eq('owner_id', user.id)
-    .maybeSingle()
-
-  if (!ownedBiz) {
-    const { data: memberBiz } = await supabase
-      .from('business_memberships')
-      .select('business_id')
-      .eq('user_id', user.id)
-      .limit(1)
+    let { data: ownedBiz } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', user.id)
       .maybeSingle()
-    if (memberBiz) ownedBiz = { id: memberBiz.business_id }
+
+    if (!ownedBiz) {
+      const { data: memberBiz } = await supabase
+        .from('business_memberships')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+      if (memberBiz) ownedBiz = { id: memberBiz.business_id }
+    }
+
+    if (ownedBiz) {
+      router.push(`/dashboard?business_id=${ownedBiz.id}`)
+    } else {
+      router.push('/onboarding')
+    }
   }
 
-  if (ownedBiz) {
-    router.push(`/dashboard?business_id=${ownedBiz.id}`)
-  } else {
-    router.push('/onboarding')
-  }
-  }
   useEffect(() => {
-    // Check if already logged in, then use the smart redirect
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) redirectToDashboard()
@@ -95,15 +96,48 @@ export default function LoginPage() {
   )
 
   const inputStyle = {
-    width: '100%', padding: '0.7rem', borderRadius: '8px',
-    border: '1px solid #ccc', fontSize: '1rem', boxSizing: 'border-box',
-    transition: 'border-color 0.2s ease',
+    width: '100%',
+    padding: '0.75rem 1rem',
+    borderRadius: '10px',
+    border: '1px solid var(--cresoa-border)',
+    background: 'var(--cresoa-bg)',
+    color: 'var(--cresoa-text)',
+    fontSize: '1rem',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
   }
 
-  const labelStyle = { display: 'block', color: '#2B2620', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: '500' }
+  const labelStyle = {
+    display: 'block',
+    color: 'var(--cresoa-text)',
+    marginBottom: '0.4rem',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+  }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#F5EFE2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1.5rem' }}>
+    <main
+      style={{
+        minHeight: '100vh',
+        background: 'var(--cresoa-bg)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Theme toggle top right */}
+      <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 10 }}>
+        <ThemeToggle />
+      </div>
+
+      {/* Decorative background (no layout shift) */}
+      <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(212,165,42,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(15,43,74,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
       <style>{`
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
@@ -111,40 +145,41 @@ export default function LoginPage() {
         }
         .login-card { animation: fadeUp 0.5s ease-out; }
         .btn-primary {
-          width: 100%; padding: 0.85rem; border-radius: 8px;
-          border: none; background: linear-gradient(135deg, #C79A2B, #B4881E);
-          color: #1E3A5F; font-size: 1rem; font-weight: 700;
-          box-shadow: 0 4px 14px rgba(199,154,43,0.3);
-          transition: transform 0.1s ease;
+          width: 100%; padding: 0.85rem; border-radius: 10px;
+          border: none; background: linear-gradient(135deg, #D4A52A, #C79A2B);
+          color: #0F2B4A; font-size: 1rem; font-weight: 700;
+          box-shadow: 0 4px 14px rgba(212,165,42,0.3);
+          transition: transform 0.1s ease, box-shadow 0.2s ease;
+          cursor: pointer; font-family: inherit;
         }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(212,165,42,0.4); }
         .btn-primary:active { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .checkbox-container {
           display: flex; align-items: center; gap: 0.5rem;
-          font-size: 0.8rem; color: #6B6255; cursor: pointer;
+          font-size: 0.85rem; color: var(--cresoa-text-muted); cursor: pointer;
         }
         .checkbox-container input[type="checkbox"] {
-          width: 18px; height: 18px; accent-color: #C79A2B; cursor: pointer;
+          width: 18px; height: 18px; accent-color: #D4A52A; cursor: pointer;
         }
       `}</style>
 
-      <div className="login-card" style={{ maxWidth: '360px', width: '100%' }}>
+      <div className="login-card" style={{ maxWidth: '400px', width: '100%', background: 'var(--cresoa-surface)', borderRadius: '20px', padding: '2rem 1.5rem', boxShadow: 'var(--shadow-lg)', textAlign: 'center' }}>
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ margin: '0 auto 0.8rem', width: '52px', height: '52px' }}>
-            <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
-              <rect width="64" height="64" rx="16" fill="#1E3A5F" />
-              <line x1="44" y1="18" x2="20" y2="42" stroke="#C79A2B" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="44" cy="18" r="4.5" fill="none" stroke="#C79A2B" strokeWidth="2.5" />
-              <path d="M20 42 C 13 38, 11 29, 18 24" stroke="#C79A2B" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-            </svg>
-          </div>
-          <h1 style={{ color: '#1E3A5F', fontSize: '1.6rem', margin: 0, fontWeight: '700' }}>Welcome back</h1>
-          <p style={{ color: '#6B6255', fontSize: '0.9rem', marginTop: '0.3rem' }}>Log in to your Cresoa account</p>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Link href="/" style={{ display: 'inline-block' }}>
+            <img src="/favicon.png" alt="Cresoa" style={{ width: '64px', height: '64px', objectFit: 'contain' }} />
+          </Link>
+          <h1 style={{ color: 'var(--cresoa-primary)', fontSize: '1.5rem', fontWeight: '800', margin: '0.8rem 0 0' }}>
+            Welcome back
+          </h1>
+          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', margin: '0.3rem 0 0' }}>
+            Log in to your Cresoa account
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '1.5rem', borderRadius: '14px', border: '1px solid #e4d8c2' }}>
-          <div style={{ marginBottom: '1rem' }}>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem', textAlign: 'left' }}>
             <label style={labelStyle}>Email</label>
             <input
               type="email"
@@ -156,7 +191,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div style={{ marginBottom: '0.6rem' }}>
+          <div style={{ marginBottom: '0.6rem', textAlign: 'left' }}>
             <label style={labelStyle}>Password</label>
             <div style={{ position: 'relative' }}>
               <input
@@ -165,15 +200,12 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="Enter your password"
-                style={{ ...inputStyle, paddingRight: '2.6rem' }}
+                style={{ ...inputStyle, paddingRight: '2.8rem' }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute', right: '0.7rem', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', padding: 0, display: 'flex', cursor: 'pointer'
-                }}
+                style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}
               >
                 {eyeIcon(showPassword)}
               </button>
@@ -189,28 +221,27 @@ export default function LoginPage() {
               />
               Remember me
             </label>
-            <a href="/forgot-password" style={{ color: '#1E3A5F', fontSize: '0.8rem', fontWeight: '600', textDecoration: 'none' }}>
+            <Link href="/forgot-password" style={{ color: 'var(--cresoa-accent)', fontSize: '0.8rem', fontWeight: '600', textDecoration: 'none' }}>
               Forgot password?
-            </a>
+            </Link>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary"
-          >
+          <button type="submit" disabled={loading} className="btn-primary">
             {loading ? 'Logging in...' : 'Log in'}
           </button>
 
           {message && (
-            <p style={{ marginTop: '0.8rem', color: '#AE4A34', fontSize: '0.85rem', textAlign: 'center' }}>
+            <p style={{ marginTop: '0.8rem', color: message.startsWith('Error') ? 'var(--cresoa-danger)' : 'var(--cresoa-success)', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.5 }}>
               {message}
             </p>
           )}
         </form>
 
-        <p style={{ textAlign: 'center', color: '#6B6255', fontSize: '0.85rem', marginTop: '1.2rem' }}>
-          Don't have an account? <a href="/signup" style={{ color: '#1E3A5F', fontWeight: '600' }}>Sign up</a>
+        <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', marginTop: '1.5rem' }}>
+          Don't have an account?{' '}
+          <Link href="/signup" style={{ color: 'var(--cresoa-accent)', fontWeight: '700' }}>
+            Sign up
+          </Link>
         </p>
       </div>
     </main>
