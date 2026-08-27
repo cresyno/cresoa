@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import Logo from '../components/Logo'
+import Logo from './components/Logo'
 
 export default function NotFound() {
   const pathname = usePathname()
@@ -15,12 +15,10 @@ export default function NotFound() {
     const parts = pathname?.split('/') || []
     if (parts.length >= 3 && parts[1] === 'dashboard') {
       const possibleSector = parts[2]
-      // Validate it's a known sector
       if (['fashion', 'repairs', 'printing'].includes(possibleSector)) {
         return possibleSector
       }
     }
-    // If path is /dashboard/... but not sector-specific, return null
     return null
   }
 
@@ -63,10 +61,10 @@ export default function NotFound() {
       }}
     >
       <div style={{ maxWidth: '400px', width: '100%' }}>
-        {/* Logo */}
-        <div style={{ marginBottom: '2rem' }}>
+        {/* Logo using the Logo component */}
+        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center' }}>
           <Link href="/" style={{ display: 'inline-block' }}>
-            <img src="/favicon.png" alt="Cresoa" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+            <Logo variant="primary" size="large" />
           </Link>
         </div>
 
@@ -106,4 +104,4 @@ export default function NotFound() {
       </div>
     </main>
   )
-        }
+            }
