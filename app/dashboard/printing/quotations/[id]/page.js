@@ -16,7 +16,6 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     check: <polyline points="20 6 9 17 4 12" />,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
     'arrow-right': <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
-    'file-text': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
     chevron: <polyline points="9 18 15 12 9 6" />,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
@@ -43,7 +42,6 @@ export default function QuotationDetailPage() {
   const [logoDataUrl, setLogoDataUrl] = useState(null)
   const [isMobile, setIsMobile] = useState(false)
 
-  // Detect mobile
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
     check()
@@ -51,7 +49,6 @@ export default function QuotationDetailPage() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Print styles
   useEffect(() => {
     const style = document.createElement('style')
     style.innerHTML = `
@@ -66,7 +63,6 @@ export default function QuotationDetailPage() {
     return () => document.head.removeChild(style)
   }, [])
 
-  // Fetch quotation
   useEffect(() => {
     const fetchQuotation = async () => {
       try {
@@ -76,10 +72,7 @@ export default function QuotationDetailPage() {
 
         const { data: quoteData, error: quoteError } = await supabase
           .from('quotations')
-          .select(`
-            *,
-            customers ( id, name, first_name, last_name, phone, email, address )
-          `)
+          .select(`*, customers ( id, name, first_name, last_name, phone, email, address )`)
           .eq('id', quotationId)
           .eq('business_id', bizId)
           .maybeSingle()
@@ -123,7 +116,6 @@ export default function QuotationDetailPage() {
   const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
-  // PDF generation (same logic as invoice)
   const generatePdfBlob = async () => {
     if (!quotationRef.current) return null
     setPdfLoading(true)
@@ -174,7 +166,6 @@ export default function QuotationDetailPage() {
           files: [new File([pdfBlob], fileName, { type: 'application/pdf' })]
         })
       } else {
-        // Fallback: download PDF, then open WhatsApp
         const url = URL.createObjectURL(pdfBlob)
         const link = document.createElement('a')
         link.href = url
@@ -192,7 +183,6 @@ export default function QuotationDetailPage() {
 
   const handlePrint = () => { window.print() }
 
-  // Status update
   const handleUpdateStatus = async (newStatus) => {
     try {
       const { error } = await supabase
@@ -207,7 +197,6 @@ export default function QuotationDetailPage() {
     }
   }
 
-  // Convert to Job
   const handleConvertToJob = async () => {
     if (!confirm('Convert this quotation to a job? This will create a new print job.')) return
     try {
@@ -231,7 +220,6 @@ export default function QuotationDetailPage() {
 
       if (jobError) throw jobError
 
-      // Link quotation to job
       await supabase.from('quotations').update({ status: 'converted', job_id: newJob.id }).eq('id', quote.id)
 
       router.push(`/dashboard/printing/jobs/${newJob.id}?business_id=${businessId}`)
@@ -272,13 +260,10 @@ export default function QuotationDetailPage() {
         <span style={{ padding: '0.3rem 0.8rem', borderRadius: '12px', background: `${statusColors[quote.status] || '#666'}20`, color: statusColors[quote.status] || '#666', fontWeight: 700, textTransform: 'capitalize' }}>{quote.status}</span>
       </div>
 
-      {/* QUICK ACTIONS - Desktop sidebar */}
       {!isMobile && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1.5rem' }}>
           <div>
-            {/* Quotation PDF area */}
             <div id="quotation-print-area" ref={quotationRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', color: '#1a1a1a', overflow: 'hidden' }}>
-              {/* Header */}
               <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
@@ -296,7 +281,6 @@ export default function QuotationDetailPage() {
                 </div>
               </div>
 
-              {/* Billed To */}
               {customer && (
                 <div style={{ marginBottom: '1rem' }}>
                   <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>PREPARED FOR</p>
@@ -307,7 +291,6 @@ export default function QuotationDetailPage() {
                 </div>
               )}
 
-              {/* Items Table */}
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
@@ -329,7 +312,6 @@ export default function QuotationDetailPage() {
                 </tbody>
               </table>
 
-              {/* Totals */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
                 <div style={{ width: '220px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(quote.subtotal)}</span></div>
@@ -337,16 +319,10 @@ export default function QuotationDetailPage() {
                 </div>
               </div>
 
-              {/* Notes */}
               {quote.notes && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{quote.notes}</p>}
-
-              <p style={{ textAlign: 'center', color: '#999', fontSize: '0.7rem', borderTop: '1px solid #eee', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                Powered by Cresoa — Business management made simple.
-              </p>
             </div>
           </div>
 
-          {/* Sidebar Actions */}
           <div className="no-print" style={{ position: 'sticky', top: '20px', alignSelf: 'start' }}>
             <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -369,12 +345,117 @@ export default function QuotationDetailPage() {
                   <Svg name="x" size={16} stroke="var(--cresoa-danger)" /> Mark Rejected
                 </button>
               )}
-                    {quote.status === 'approved' && (
+              {quote.status === 'approved' && (
+                <button onClick={handleConvertToJob} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                  <Svg name="arrow-right" size={16} stroke="var(--cresoa-accent)" /> Convert to Job
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+          {isMobile && (
+        <>
+          <div id="quotation-print-area" ref={quotationRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1rem', color: '#1a1a1a', overflow: 'hidden', marginBottom: '1rem' }}>
+            <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '50px', height: '50px', objectFit: 'contain' }} /> : <div style={{ width: '50px', height: '50px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
+                <div>
+                  <h2 style={{ margin: 0, color: 'var(--cresoa-primary)', fontSize: '1rem' }}>{business?.name || 'Business'}</h2>
+                  {business?.phone && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.phone}</p>}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>QUOTATION</h3>
+                <p style={{ margin: '4px 0', fontSize: '0.8rem', color: '#666' }}>#{quote.quote_number}</p>
+                <p style={{ margin: '4px 0', fontSize: '0.8rem', color: '#666' }}>{formatDate(quote.created_at)}</p>
+              </div>
+            </div>
+
+            {customer && (
+              <div style={{ marginBottom: '1rem' }}>
+                <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>PREPARED FOR</p>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: '1.1rem' }}>{customer.name || customer.first_name}</p>
+                {customer.phone && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.phone}</p>}
+                {customer.email && <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>{customer.email}</p>}
+              </div>
+            )}
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', marginBottom: '1rem' }}>
+              <thead>
+                <tr style={{ background: '#f8f9fa' }}>
+                  <th style={{ padding: '6px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Item</th>
+                  <th style={{ padding: '6px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
+                  <th style={{ padding: '6px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Unit Price</th>
+                  <th style={{ padding: '6px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.description}</td>
+                    <td style={{ padding: '6px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{item.quantity}</td>
+                    <td style={{ padding: '6px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{formatMoney(item.unit_price)}</td>
+                    <td style={{ padding: '6px', textAlign: 'right', borderBottom: '1px solid #eee', fontWeight: 600 }}>{formatMoney(item.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+              <div style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(quote.subtotal)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}><span>Total</span><span>{formatMoney(quote.total)}</span></div>
+              </div>
+            </div>
+
+            {quote.notes && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{quote.notes}</p>}
+          </div>
+
+          <div className="no-print">
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cresoa-text)', margin: '0 0 0.75rem' }}>QUICK ACTIONS</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button onClick={handleDownloadPDF} disabled={pdfLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                {pdfLoading ? <Svg name="chevron" size={20} stroke="var(--cresoa-accent)" /> : <Svg name="download" size={20} stroke="var(--cresoa-accent)" />}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{pdfLoading ? 'Generating...' : 'Download PDF'}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Save quotation as PDF</div>
+                </div>
+                <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+              </button>
+              <button onClick={handleShareWhatsApp} disabled={pdfLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                {pdfLoading ? <Svg name="chevron" size={20} stroke="var(--cresoa-accent)" /> : <Svg name="whatsapp" size={20} stroke="var(--cresoa-accent)" />}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{pdfLoading ? 'Preparing...' : 'Send via WhatsApp'}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Share quotation with customer</div>
+                </div>
+                <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+              </button>
+              <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                <Svg name="printer" size={20} stroke="var(--cresoa-accent)" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Print</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>Print or save as PDF</div>
+                </div>
+                <Svg name="chevron" size={16} stroke="var(--cresoa-text-muted)" />
+              </button>
+              {quote.status !== 'approved' && quote.status !== 'rejected' && quote.status !== 'converted' && (
+                <button onClick={() => handleUpdateStatus('approved')} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                  <Svg name="check" size={20} stroke="var(--cresoa-success)" />
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Mark Approved</div></div>
+                </button>
+              )}
+              {quote.status !== 'rejected' && quote.status !== 'approved' && quote.status !== 'converted' && (
+                <button onClick={() => handleUpdateStatus('rejected')} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                  <Svg name="x" size={20} stroke="var(--cresoa-danger)" />
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Mark Rejected</div></div>
+                </button>
+              )}
+              {quote.status === 'approved' && (
                 <button onClick={handleConvertToJob} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
                   <Svg name="arrow-right" size={20} stroke="var(--cresoa-accent)" />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Convert to Job</div>
-                  </div>
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Convert to Job</div></div>
                 </button>
               )}
             </div>
@@ -383,5 +464,4 @@ export default function QuotationDetailPage() {
       )}
     </div>
   )
-}
-           
+                          }
