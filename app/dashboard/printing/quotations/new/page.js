@@ -16,10 +16,14 @@ const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
 const inputStyle = {
   width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px',
   border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)',
-  color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box'
+  color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box',
+  transition: 'border-color 0.2s',
+  outline: 'none',
 }
 
 const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }
+
+const JOB_TYPES = ['Flyers', 'Business Cards', 'Banners', 'Stickers', 'T-shirts', 'Signage', 'Wedding Programmes', 'Posters', 'Brochures', 'Invitation Cards', 'Branding', 'Design Services', 'Custom Service']
 
 function NewQuotationContent() {
   const router = useRouter()
@@ -37,6 +41,7 @@ function NewQuotationContent() {
   const [jobType, setJobType] = useState('')
   const [quantity, setQuantity] = useState('')
   const [specifications, setSpecifications] = useState('')
+  const [validTill, setValidTill] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState([{ description: '', quantity: '', unit_price: '' }])
   const [saving, setSaving] = useState(false)
@@ -79,6 +84,7 @@ function NewQuotationContent() {
   const handleSave = async () => {
     if (!selectedCustomer) { setError('Please select a customer.'); return }
     if (!title.trim()) { setError('Quotation title is required.'); return }
+    if (!jobType) { setError('Please select a job type.'); return }
     if (items.length === 0 || items.some(i => !i.description.trim() || !i.quantity || !i.unit_price)) { setError('Each item needs a description, quantity, and unit price.'); return }
 
     setSaving(true)
@@ -93,7 +99,11 @@ function NewQuotationContent() {
         items: items.map(i => ({ description: i.description, quantity: Number(i.quantity), unit_price: Number(i.unit_price), total: Number(i.quantity) * Number(i.unit_price) })),
         subtotal: subtotal,
         total: subtotal,
+        valid_till: validTill || null,
         notes: notes || null,
+        job_type: jobType,
+        quantity: Number(quantity) || null,
+        specifications: specifications || null,
       }).select().single()
 
       if (quoteError) throw quoteError
@@ -106,14 +116,23 @@ function NewQuotationContent() {
 
   return (
     <div style={{ padding: '1rem', maxWidth: '700px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh', paddingBottom: '100px' }}>
-      <button onClick={() => router.push(`/dashboard/printing/quotations?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}><Svg name="back" size={16} stroke="currentColor" /> Back</button>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>New Quotation</h1>
+      <button onClick={() => router.push(`/dashboard/printing/quotations?business_id=${businessId}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>
+        <Svg name="back" size={16} stroke="currentColor" /> Back to Quotations
+      </button>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem' }}>Create New Quotation</h1>
 
       {error && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem' }}>{error}</div>}
 
+      {/* Customer Section */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.2rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
-        <h3 style={{ marginBottom: '0.8rem' }}>Customer</h3>
-        <input type="text" placeholder="Search customers..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} style={inputStyle} />
+        <h3 style={{ marginBottom: '0.8rem', fontWeight: 700 }}>Select Customer</h3>
+        <input
+          type="text"
+          placeholder="Search by customer name or phone number..."
+          value={customerSearch}
+          onChange={(e) => setCustomerSearch(e.target.value)}
+          style={inputStyle}
+        />
         <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '0.5rem' }}>
           {customers.filter(c => (c.name || `${c.first_name || ''} ${c.last_name || ''}`).toLowerCase().includes(customerSearch.toLowerCase())).map(c => (
             <button key={c.id} onClick={() => handleCustomerSelect(c)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.5rem', border: `1px solid ${selectedCustomer?.id === c.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, borderRadius: '8px', background: selectedCustomer?.id === c.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', marginBottom: '0.3rem', cursor: 'pointer', textAlign: 'left' }}>
@@ -121,41 +140,49 @@ function NewQuotationContent() {
               {c.phone && <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>{c.phone}</span>}
             </button>
           ))}
+          {customers.length === 0 && <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '0.5rem' }}>No customers yet. Add a new one below.</p>}
         </div>
         {showNewCustomer ? (
           <div style={{ marginTop: '0.5rem', background: 'var(--cresoa-surface-soft)', padding: '0.8rem', borderRadius: '8px' }}>
-            <input type="text" placeholder="Customer name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} style={{ ...inputStyle, marginBottom: '0.5rem' }} />
-            <input type="tel" placeholder="Phone" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '0.5rem' }} />
+            <label style={labelStyle}>New Customer Name *</label>
+            <input type="text" placeholder="e.g. Iya Bisi" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} style={{ ...inputStyle, marginBottom: '0.5rem' }} />
+            <label style={labelStyle}>Phone Number</label>
+            <input type="tel" placeholder="e.g. 0803 123 4567" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '0.5rem' }} />
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={handleCreateNewCustomer} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-accent)', color: '#fff', fontWeight: 600 }}>Save</button>
+              <button onClick={handleCreateNewCustomer} style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-accent)', color: '#fff', fontWeight: 600 }}>Save Customer</button>
               <button onClick={() => setShowNewCustomer(false)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent' }}>Cancel</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => setShowNewCustomer(true)} style={{ marginTop: '0.5rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', fontWeight: 600 }}>+ New Customer</button>
+          <button onClick={() => setShowNewCustomer(true)} style={{ marginTop: '0.5rem', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px dashed var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', fontWeight: 600 }}>+ Add New Customer</button>
         )}
       </div>
 
+      {/* Job Details */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.2rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
-        <h3 style={{ marginBottom: '0.8rem' }}>Job Details</h3>
-        <label style={labelStyle}>Title</label>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Wedding Invitations" style={{ ...inputStyle, marginBottom: '0.8rem' }} />
-        <label style={labelStyle}>Job Type</label>
+        <h3 style={{ marginBottom: '0.8rem', fontWeight: 700 }}>Job Details</h3>
+        <label style={labelStyle}>Quotation Title *</label>
+        <input type="text" placeholder="e.g. Wedding Invitations, 500 Flyers" value={title} onChange={(e) => setTitle(e.target.value)} style={{ ...inputStyle, marginBottom: '0.8rem' }} />
+
+        <label style={labelStyle}>Job Type *</label>
         <select value={jobType} onChange={(e) => setJobType(e.target.value)} style={{ ...inputStyle, marginBottom: '0.8rem' }}>
-          <option value="">Select type</option>
-          {['Flyers', 'Business Cards', 'Banners', 'Stickers', 'T-shirts', 'Signage', 'Wedding Programmes', 'Posters', 'Brochures', 'Invitation Cards', 'Branding', 'Design Services', 'Custom Service'].map(t => <option key={t} value={t}>{t}</option>)}
+          <option value="">Select job type (e.g. Flyers, Banners...)</option>
+          {JOB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <label style={labelStyle}>Quantity</label>
-        <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g. 500" style={{ ...inputStyle, marginBottom: '0.8rem' }} />
-        <label style={labelStyle}>Specifications</label>
-        <textarea value={specifications} onChange={(e) => setSpecifications(e.target.value)} rows={3} placeholder="e.g. A5, full colour, 150gsm" style={{ ...inputStyle, resize: 'vertical' }} />
+
+        <label style={labelStyle}>Quantity (optional)</label>
+        <input type="number" placeholder="e.g. 500 copies" value={quantity} onChange={(e) => setQuantity(e.target.value)} style={{ ...inputStyle, marginBottom: '0.8rem' }} />
+
+        <label style={labelStyle}>Specifications (optional)</label>
+        <textarea placeholder="e.g. A5 size, full colour, 150gsm, matte finish" value={specifications} onChange={(e) => setSpecifications(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
 
+      {/* Items & Pricing */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.2rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
-        <h3 style={{ marginBottom: '0.8rem' }}>Items & Pricing</h3>
+        <h3 style={{ marginBottom: '0.8rem', fontWeight: 700 }}>Items & Pricing</h3>
         {items.map((item, index) => (
-          <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 100px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-            <input type="text" placeholder="Description" value={item.description} onChange={(e) => updateItem(index, 'description', e.target.value)} style={inputStyle} />
+          <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px 30px', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+            <input type="text" placeholder="Description (e.g. Design and printing)" value={item.description} onChange={(e) => updateItem(index, 'description', e.target.value)} style={inputStyle} />
             <input type="number" placeholder="Qty" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', e.target.value)} style={inputStyle} />
             <input type="number" placeholder="Unit ₦" value={item.unit_price} onChange={(e) => updateItem(index, 'unit_price', e.target.value)} style={inputStyle} />
             <button onClick={() => removeItem(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-danger)' }}><Svg name="trash" size={16} stroke="currentColor" /></button>
@@ -167,13 +194,21 @@ function NewQuotationContent() {
         </div>
       </div>
 
+      {/* Additional Details */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.2rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
-        <label style={labelStyle}>Notes (optional)</label>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="e.g. 50% deposit required before production." style={{ ...inputStyle, resize: 'vertical' }} />
+        <h3 style={{ marginBottom: '0.8rem', fontWeight: 700 }}>Validity & Notes</h3>
+        <label style={labelStyle}>Valid Until (optional)</label>
+        <input type="date" placeholder="Select validity date" value={validTill} onChange={(e) => setValidTill(e.target.value)} style={{ ...inputStyle, marginBottom: '0.8rem' }} />
+
+        <label style={labelStyle}>Notes / Payment Terms (optional)</label>
+        <textarea placeholder="e.g. 50% deposit required before production starts" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
 
+      {/* Sticky Save Button */}
       <div style={{ position: 'sticky', bottom: '80px', background: 'var(--cresoa-surface)', padding: '0.5rem', borderTop: '1px solid var(--cresoa-border)' }}>
-        <button onClick={handleSave} disabled={saving} className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center' }}>{saving ? 'Saving...' : 'Generate Quotation'}</button>
+        <button onClick={handleSave} disabled={saving} className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center' }}>
+          {saving ? 'Saving Quotation...' : 'Generate Quotation'}
+        </button>
       </div>
     </div>
   )
@@ -185,4 +220,4 @@ export default function NewQuotationPage() {
       <NewQuotationContent />
     </Suspense>
   )
-      }
+                      }
