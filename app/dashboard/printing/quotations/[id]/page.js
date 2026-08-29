@@ -6,18 +6,18 @@ import { supabase } from '../../../../../lib/supabaseClient'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
-// ─── Self-contained SVGs ───
+// ─── Self-contained SVGs (Match Invoice Page) ───
 const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
   const icons = {
     back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
     download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
     whatsapp: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
+    printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
     check: <polyline points="20 6 9 17 4 12" />,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
     edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
     trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
     'arrow-right': <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
-    printer: <><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
@@ -37,9 +37,7 @@ export default function QuotationDetailPage() {
 
   // Editable fields
   const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    bank_name: '', account_number: '', account_name: '', cac_number: '', tin_number: '', valid_till: '', due_date: ''
-  })
+  const [editForm, setEditForm] = useState({ bank_name: '', account_number: '', account_name: '', cac_number: '', tin_number: '', valid_till: '', due_date: '' })
   const [editItems, setEditItems] = useState([])
 
   const [loading, setLoading] = useState(true)
@@ -137,100 +135,75 @@ export default function QuotationDetailPage() {
   const formatMoney = (val) => `₦${Number(val || 0).toLocaleString('en-NG')}`
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
-  // ─── EXACT WORKING PDF LOGIC (From Invoice Page) ───
-// ─── PDF Generation (Same as Working Invoice Page) ───
-const generatePdfBlob = async () => {
-  if (!quotationRef.current) return null
-  // Force a fixed A4 width for PDF capture
-  const originalWidth = quotationRef.current.style.width
-  quotationRef.current.style.width = '794px'
-
-  const canvas = await html2canvas(quotationRef.current, {
-    scale: 2,
-    backgroundColor: '#ffffff',
-    windowWidth: 794,
-    scrollX: 0,
-    scrollY: 0,
-  })
-
-  // Reset width after capture
-  quotationRef.current.style.width = originalWidth
-
-  const imgData = canvas.toDataURL('image/png')
-  const pdf = new jsPDF('p', 'mm', 'a4')
-  const pdfWidth = pdf.internal.pageSize.getWidth()
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-  return pdf.output('blob')
-}
-
-// ─── Download PDF (Fixes blob opening issue) ───
-const handleDownloadPDF = async () => {
-  try {
-    const blob = await generatePdfBlob()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${quote.quote_number}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    // Revoke after a delay to ensure download completes
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (err) {
-    console.error(err)
-    alert('Failed to generate PDF.')
+  // ─── EXACT LOGIC FROM FASHION INVOICE PAGE ───
+  const generatePdfBlob = async () => {
+    if (!quotationRef.current) return null
+    await new Promise(resolve => setTimeout(resolve, 100))
+    const originalWidth = quotationRef.current.style.width
+    quotationRef.current.style.width = '794px'
+    const canvas = await html2canvas(quotationRef.current, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0,
+    })
+    quotationRef.current.style.width = originalWidth
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+    return pdf.output('blob')
   }
-}
 
-// ─── WhatsApp Share (Fixes blob opening issue) ───
-const handleShareWhatsApp = async () => {
-  if (!customer?.phone) { alert('Customer has no phone number.'); return }
-  const message = `Hi ${customer.name || customer.first_name}, here is your quotation ${quote.quote_number}. Total: ${formatMoney(quote.total)}. Thank you for your business!`
-  try {
-    const pdfBlob = await generatePdfBlob()
-    const fileName = `${quote.quote_number}.pdf`
-    const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
-
-    // Try Web Share API with file first
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        title: `Quotation ${quote.quote_number}`,
-        text: message,
-        files: [file],
-      })
-      return // Success, no fallback needed
-    }
-
-    // Fallback: Download the PDF, then open WhatsApp with message
-    const url = URL.createObjectURL(pdfBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-
-    // Open WhatsApp with message
-    const waUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
-    window.open(waUrl, '_blank')
-  } catch (err) {
-    console.error(err)
-    alert('Failed to share. Please try again.')
+  const handleDownloadPDF = async () => {
+    try {
+      const blob = await generatePdfBlob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${quote.quote_number}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (err) { alert('Failed to generate PDF.') }
   }
-}
+
+  const handleShareWhatsApp = async () => {
+    if (!customer?.phone) { alert('Customer has no phone number.'); return }
+    const message = `Hi ${customer.name || customer.first_name}, here is your quotation ${quote.quote_number}. Total: ${formatMoney(quote.total)}. Thank you for your business!`
+    try {
+      const pdfBlob = await generatePdfBlob()
+      const fileName = `${quote.quote_number}.pdf`
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName)] })) {
+        await navigator.share({
+          title: `Quotation ${quote.quote_number}`,
+          text: message,
+          files: [new File([pdfBlob], fileName, { type: 'application/pdf' })]
+        })
+      } else {
+        const url = URL.createObjectURL(pdfBlob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = fileName
+        link.click()
+        URL.revokeObjectURL(url)
+        alert('PDF downloaded. Please attach it to the WhatsApp chat you are about to open.')
+        const waUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+        window.open(waUrl, '_blank')
+      }
+    } catch (err) { alert('Failed to share. Please try again.') }
+  }
+  // ─── END EXACT LOGIC ───
+
   const handlePrint = () => { window.print() }
 
-  // ─── STATUS UPDATE (Approve/Reject/Convert/Delete) ───
   const handleUpdateStatus = async (newStatus) => {
     try {
       const { error } = await supabase.from('quotations').update({ status: newStatus }).eq('id', quote.id)
       if (error) throw error
       setQuote(prev => ({ ...prev, status: newStatus }))
-    } catch (err) {
-      alert('Failed to update status.')
-    }
+    } catch (err) { alert('Failed to update status.') }
   }
 
   const handleConvertToJob = async () => {
@@ -250,23 +223,18 @@ const handleShareWhatsApp = async () => {
       if (jobError) throw jobError
       await supabase.from('quotations').update({ status: 'converted', job_id: newJob.id }).eq('id', quote.id)
       router.push(`/dashboard/printing/jobs/${newJob.id}?business_id=${businessId}`)
-    } catch (err) {
-      alert('Failed to convert to job.')
-    }
+    } catch (err) { alert('Failed to convert to job.') }
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this quotation? This cannot be undone.')) return
+    if (!confirm('Delete this quotation?')) return
     try {
       const { error } = await supabase.from('quotations').delete().eq('id', quote.id)
       if (error) throw error
       router.push(`/dashboard/printing/quotations?business_id=${businessId}`)
-    } catch (err) {
-      alert('Failed to delete quotation.')
-    }
+    } catch (err) { alert('Failed to delete quotation.') }
   }
 
-  // ─── EDIT LOGIC ───
   const handleEditItem = (index, field, value) => {
     setEditItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
   }
@@ -291,7 +259,6 @@ const handleShareWhatsApp = async () => {
       }).eq('id', businessId)
       if (bizError) throw bizError
 
-      // Refresh
       const { data: freshBiz } = await supabase.from('businesses').select('*').eq('id', businessId).maybeSingle()
       setBusiness(freshBiz)
       setQuote(prev => ({ ...prev, items: editItems.map(i => ({ ...i, total: Number(i.quantity) * Number(i.unit_price) })), subtotal: editItems.reduce((s, i) => s + (Number(i.quantity) * Number(i.unit_price)), 0), total: editItems.reduce((s, i) => s + (Number(i.quantity) * Number(i.unit_price)), 0), due_date: editForm.due_date, valid_till: editForm.valid_till }))
@@ -338,6 +305,7 @@ const handleShareWhatsApp = async () => {
 
       {/* PDF Area */}
       <div id="quotation-print-area" ref={quotationRef} style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#1a1a1a', overflow: 'hidden' }}>
+        {/* Header */}
         <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {logoDataUrl ? <img src={logoDataUrl} alt={business?.name} style={{ width: '80px', height: '80px', objectFit: 'contain' }} /> : <div style={{ width: '80px', height: '80px', background: '#0F2B4A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>{business?.name?.charAt(0) || 'B'}</div>}
@@ -358,6 +326,7 @@ const handleShareWhatsApp = async () => {
           </div>
         </div>
 
+        {/* Customer */}
         {customer && (
           <div style={{ marginBottom: '1rem' }}>
             <p style={{ margin: 0, color: '#666', fontSize: '0.7rem', fontWeight: 700 }}>PREPARED FOR</p>
@@ -367,7 +336,7 @@ const handleShareWhatsApp = async () => {
           </div>
         )}
 
-            {/* Items Table */}
+          {/* Items Table */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
           <thead>
             <tr style={{ background: '#f8f9fa' }}>
@@ -397,6 +366,7 @@ const handleShareWhatsApp = async () => {
           </tbody>
         </table>
 
+        {/* Totals */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <div style={{ width: '220px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(isEditing ? editItems.reduce((s, i) => s + (Number(i.quantity) * Number(i.unit_price)), 0) : quote.subtotal)}</span></div>
@@ -428,7 +398,7 @@ const handleShareWhatsApp = async () => {
         {quote.notes && <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.85rem' }}>{quote.notes}</p>}
       </div>
 
-      {/* ACTION BUTTONS (All Buttons) */}
+      {/* ACTION BUTTONS */}
       <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
           <button onClick={handleDownloadPDF} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 600 }}><Svg name="download" size={16} stroke="currentColor" /> Download PDF</button>
@@ -445,11 +415,6 @@ const handleShareWhatsApp = async () => {
         )}
         <button onClick={handleDelete} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', cursor: 'pointer', fontWeight: 600 }}><Svg name="trash" size={16} stroke="currentColor" /> Delete Quotation</button>
       </div>
-
-      {/* Print Button (Desktop) */}
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-        <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', cursor: 'pointer' }}><Svg name="printer" size={16} stroke="currentColor" /> Print</button>
-      </div>
     </div>
   )
-                    }
+          }
