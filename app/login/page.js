@@ -15,7 +15,17 @@ export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
 
-  // ─── SMART REDIRECT FUNCTION (UNCHANGED) ───
+  // ─── Helper to normalize sector ───
+  const normalizeSector = (sector) => {
+    if (!sector) return ''
+    const s = sector.toLowerCase()
+    if (s.includes('print')) return 'printing'
+    if (s.includes('repair')) return 'repairs'
+    if (s.includes('fashion')) return 'fashion'
+    return s
+  }
+
+  // ─── SMART REDIRECT FUNCTION (Now sector-aware) ───
   const redirectToDashboard = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
@@ -29,12 +39,14 @@ export default function LoginPage() {
       return
     }
 
+    // 1. Try to find business where user is Owner
     let { data: ownedBiz } = await supabase
       .from('businesses')
-      .select('id')
+      .select('id, sector')
       .eq('owner_id', user.id)
       .maybeSingle()
 
+    // 2. If not owner, check if user is a Staff/Member
     if (!ownedBiz) {
       const { data: memberBiz } = await supabase
         .from('business_memberships')
@@ -42,11 +54,24 @@ export default function LoginPage() {
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle()
-      if (memberBiz) ownedBiz = { id: memberBiz.business_id }
+      if (memberBiz) {
+        const { data: memberBusiness } = await supabase
+          .from('businesses')
+          .select('id, sector')
+          .eq('id', memberBiz.business_id)
+          .maybeSingle()
+        if (memberBusiness) ownedBiz = memberBusiness
+      }
     }
 
+    // 3. Redirect to the sector-specific dashboard
     if (ownedBiz) {
-      router.push(`/dashboard?business_id=${ownedBiz.id}`)
+      const sector = normalizeSector(ownedBiz.sector)
+      if (sector) {
+        router.push(`/dashboard/${sector}?business_id=${ownedBiz.id}`)
+      } else {
+        router.push(`/dashboard?business_id=${ownedBiz.id}`)
+      }
     } else {
       router.push('/onboarding')
     }
@@ -134,7 +159,7 @@ export default function LoginPage() {
         <ThemeToggle />
       </div>
 
-      {/* Decorative background (no layout shift) */}
+      {/* Decorative background */}
       <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(212,165,42,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(15,43,74,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
 
@@ -246,4 +271,4 @@ export default function LoginPage() {
       </div>
     </main>
   )
-    }
+        }
