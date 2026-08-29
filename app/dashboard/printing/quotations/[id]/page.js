@@ -138,71 +138,88 @@ export default function QuotationDetailPage() {
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
 
   // ─── EXACT WORKING PDF LOGIC (From Invoice Page) ───
-  const generatePdfBlob = async () => {
-    if (!quotationRef.current) return null
-    const originalWidth = quotationRef.current.style.width
-    quotationRef.current.style.width = '794px'
-    const canvas = await html2canvas(quotationRef.current, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      windowWidth: 794,
-      scrollX: 0,
-      scrollY: 0,
-    })
-    quotationRef.current.style.width = originalWidth
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const pdfWidth = pdf.internal.pageSize.getWidth()
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-    return pdf.output('blob')
-  }
+// ─── PDF Generation (Same as Working Invoice Page) ───
+const generatePdfBlob = async () => {
+  if (!quotationRef.current) return null
+  // Force a fixed A4 width for PDF capture
+  const originalWidth = quotationRef.current.style.width
+  quotationRef.current.style.width = '794px'
 
-  // ─── EXACT WORKING DOWNLOAD & WHATSAPP LOGIC (From Invoice Page) ───
-  const handleDownloadPDF = async () => {
-    try {
-      const blob = await generatePdfBlob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${quote.quote_number}.pdf`
-      link.click()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error(err)
-      alert('Failed to generate PDF.')
+  const canvas = await html2canvas(quotationRef.current, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    windowWidth: 794,
+    scrollX: 0,
+    scrollY: 0,
+  })
+
+  // Reset width after capture
+  quotationRef.current.style.width = originalWidth
+
+  const imgData = canvas.toDataURL('image/png')
+  const pdf = new jsPDF('p', 'mm', 'a4')
+  const pdfWidth = pdf.internal.pageSize.getWidth()
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width
+  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+  return pdf.output('blob')
+}
+
+// ─── Download PDF (Fixes blob opening issue) ───
+const handleDownloadPDF = async () => {
+  try {
+    const blob = await generatePdfBlob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${quote.quote_number}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    // Revoke after a delay to ensure download completes
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (err) {
+    console.error(err)
+    alert('Failed to generate PDF.')
+  }
+}
+
+// ─── WhatsApp Share (Fixes blob opening issue) ───
+const handleShareWhatsApp = async () => {
+  if (!customer?.phone) { alert('Customer has no phone number.'); return }
+  const message = `Hi ${customer.name || customer.first_name}, here is your quotation ${quote.quote_number}. Total: ${formatMoney(quote.total)}. Thank you for your business!`
+  try {
+    const pdfBlob = await generatePdfBlob()
+    const fileName = `${quote.quote_number}.pdf`
+    const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
+
+    // Try Web Share API with file first
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: `Quotation ${quote.quote_number}`,
+        text: message,
+        files: [file],
+      })
+      return // Success, no fallback needed
     }
-  }
 
-  const handleShareWhatsApp = async () => {
-    if (!customer?.phone) { alert('Customer has no phone number.'); return }
-    const message = `Hi ${customer.name || customer.first_name}, here is your quotation ${quote.quote_number}. Total: ${formatMoney(quote.total)}. Thank you for your business!`
-    try {
-      const pdfBlob = await generatePdfBlob()
-      const fileName = `${quote.quote_number}.pdf`
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName)] })) {
-        await navigator.share({
-          title: `Quotation ${quote.quote_number}`,
-          text: message,
-          files: [new File([pdfBlob], fileName, { type: 'application/pdf' })]
-        })
-      } else {
-        // Fallback: download PDF, then open WhatsApp
-        const url = URL.createObjectURL(pdfBlob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = fileName
-        link.click()
-        URL.revokeObjectURL(url)
-        const waUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
-        window.open(waUrl, '_blank')
-      }
-    } catch (err) {
-      console.error(err)
-      alert('Failed to share. Please try again.')
-    }
-  }
+    // Fallback: Download the PDF, then open WhatsApp with message
+    const url = URL.createObjectURL(pdfBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
 
+    // Open WhatsApp with message
+    const waUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    window.open(waUrl, '_blank')
+  } catch (err) {
+    console.error(err)
+    alert('Failed to share. Please try again.')
+  }
+}
   const handlePrint = () => { window.print() }
 
   // ─── STATUS UPDATE (Approve/Reject/Convert/Delete) ───
