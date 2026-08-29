@@ -140,19 +140,16 @@ export async function POST(req) {
     });
 
     // ─── Send email (optional) ───
-    if (send_email !== false) {
-      // Fix the URL to use the correct site URL
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://cresoa.com.ng';
-      const acceptLink = `${baseUrl}/accept-invite?code=${code}`;
-      
-      try {
-        await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // We still return success because the invite was created. Email can be resent later.
-      }
-    }
-
+if (send_email !== false) {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://cresoa.com.ng';
+  const acceptLink = `${baseUrl}/accept-invite?code=${code}`;
+  
+  try {
+    await sendStaffInviteEmail(email, code, businessName, acceptLink);  // ✅ CORRECT
+  } catch (emailError) {
+    console.error('Email sending failed:', emailError);
+  }
+}
     return NextResponse.json({ success: true, invite }, { status: 200 });
   } catch (error) {
     console.error('Generate invite error:', error);
