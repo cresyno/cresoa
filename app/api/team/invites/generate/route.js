@@ -24,13 +24,13 @@ export async function POST(req) {
     }
 
     // ─── Verify user has permission (Owner or Manager) ───
-    const { data: business } = await supabaseAdmin
+    const { data: business, error: businessError } = await supabaseAdmin
       .from('businesses')
       .select('owner_id, name')
       .eq('id', business_id)
       .single();
 
-    if (!business) {
+    if (businessError || !business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 });
     }
 
@@ -74,13 +74,12 @@ export async function POST(req) {
       }
     }
 
-    // ─── Check if there's already a pending invite ───
-    const { data: existingInvite } = await supabaseAdmin
+    // ─── Check if ANY invite exists (regardless of status) for this business+email ───
+    const { data: existingInvite, error: inviteError } = await supabaseAdmin
       .from('business_invites')
-      .select('id')
+      .select('*')
       .eq('business_id', business_id)
       .eq('email', email)
-      .eq('status', 'pending')
       .maybeSingle();
 
     // Generate a new code
@@ -96,13 +95,14 @@ export async function POST(req) {
     let invite;
 
     if (existingInvite) {
-      // ─── UPDATE existing invite with new code ───
+      // ─── UPDATE existing invite (even if expired or accepted) ───
       const { data: updated, error: updateError } = await supabaseAdmin
         .from('business_invites')
         .update({
           invite_code: code,
           expires_at: expires_at.toISOString(),
-          role: role, // update role in case it changed
+          role: role,
+          status: 'pending', // Reset status to pending
           updated_at: new Date().toISOString()
         })
         .eq('id', existingInvite.id)
@@ -140,17 +140,22 @@ export async function POST(req) {
     });
 
     // ─── Send email (optional) ───
-if (send_email !== false) {
-  const acceptLink = `${process.env.NEXT_PUBLIC_APP_URL}/accept-invite?code=${code}`;
-  try {
-    await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
-  } catch (emailError) {
-    console.error('Email sending failed:', emailError);
-  }
-}
+    if (send_email !== false) {
+      // Fix the URL to use the correct site URL
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://cresoa.com.ng';
+      const acceptLink = `${baseUrl}/accept-invite?code=${code}`;
+      
+      try {
+        await sendStaffInviteEmail(email, user.email, businessName, acceptLink);
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        // We still return success because the invite was created. Email can be resent later.
+      }
+    }
+
     return NextResponse.json({ success: true, invite }, { status: 200 });
   } catch (error) {
     console.error('Generate invite error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
-      }
+        }
