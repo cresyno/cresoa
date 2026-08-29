@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 
@@ -14,12 +14,14 @@ const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
 }
 
 const inputStyle = {
-  width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box'
+  width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px',
+  border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)',
+  color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box'
 }
 
 const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem', color: 'var(--cresoa-text)' }
 
-export default function NewQuotationPage() {
+function NewQuotationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const businessId = searchParams.get('business_id')
@@ -161,7 +163,7 @@ export default function NewQuotationPage() {
         ))}
         <button onClick={addItem} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px dashed var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>+ Add Item</button>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '0.8rem', borderTop: '1px solid var(--cresoa-border)' }}>
-          <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>Subtotal: {formatMoney(subtotal)}</span>
+          <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>Subtotal: ₦{subtotal.toLocaleString()}</span>
         </div>
       </div>
 
@@ -175,4 +177,12 @@ export default function NewQuotationPage() {
       </div>
     </div>
   )
-    }
+}
+
+export default function NewQuotationPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'var(--cresoa-bg)' }}>Loading...</div>}>
+      <NewQuotationContent />
+    </Suspense>
+  )
+      }
