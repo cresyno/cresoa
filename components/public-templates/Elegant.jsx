@@ -6,48 +6,53 @@ const fonts = "'Playfair Display', 'Inter', sans-serif"
 
 export default function Elegant({ business, page, services, portfolio, reviews, onQuoteClick, onReviewClick }) {
   const [activeNav, setActiveNav] = useState('home')
+  const scrollTo = (id) => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setActiveNav(id) }
 
-  const scrollTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-    setActiveNav(id)
-  }
+  const heroStyle = page.cover_image_url ? {
+    background: `linear-gradient(rgba(219,39,119,0.3), rgba(30,41,59,0.5)), url(${page.cover_image_url}) center/cover no-repeat`,
+    color: '#fff',
+  } : { background: 'linear-gradient(180deg, #FAFAF9 0%, #FDF2F8 100%)', color: '#1E293B' }
 
   return (
     <div style={{ fontFamily: fonts, background: '#FAFAF9', color: '#1E293B', minHeight: '100vh' }}>
-      {/* Sticky Header */}
+      {/* Header */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(250,250,249,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E5E7EB', padding: '0.8rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {business.logo_url ? (
-            <img src={business.logo_url} alt={business.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
+            <img src={business.logo_url} alt={business.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain', background: '#fff', border: '1px solid #E5E7EB' }} />
           ) : (
             <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#DB2777', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>{business.name?.charAt(0) || 'B'}</div>
           )}
-          <span style={{ fontWeight: 600, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>{business.name}</span>
+          <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{business.name}</span>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', fontWeight: 500, color: '#6B7280' }}>
-          <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeNav === 'about' ? '#DB2777' : '#6B7280' }}>About</button>
-          <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeNav === 'services' ? '#DB2777' : '#6B7280' }}>Services</button>
-          <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeNav === 'portfolio' ? '#DB2777' : '#6B7280' }}>Work</button>
-          <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeNav === 'contact' ? '#DB2777' : '#6B7280' }}>Contact</button>
+        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+          <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>About</button>
+          <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>Services</button>
+          <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>Work</button>
+          <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>Contact</button>
         </div>
       </nav>
 
       {/* Hero */}
-      <section id="home" style={{ padding: '6rem 1.5rem', textAlign: 'center', borderBottom: '1px solid #E5E7EB', background: 'linear-gradient(180deg, #FAFAF9 0%, #FDF2F8 100%)' }}>
+      <section id="home" style={{ padding: '6rem 1.5rem', textAlign: 'center', ...heroStyle }}>
         <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-          <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#DB2777', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 800, color: '#fff', margin: '0 auto 1.5rem', boxShadow: '0 10px 30px rgba(219,39,119,0.2)' }}>
-            {business.name?.charAt(0) || 'B'}
-          </div>
-          <h1 style={{ fontSize: '3rem', fontWeight: 400, letterSpacing: '-0.03em', margin: '0 0 1rem' }}>{business.name}</h1>
-          <p style={{ fontSize: '1.2rem', color: '#6B7280', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto' }}>{page.description}</p>
+          {business.logo_url ? (
+            <img src={business.logo_url} alt={business.name} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: '#fff', padding: '10px', marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+          ) : (
+            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#DB2777', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 800, color: '#fff', margin: '0 auto 1.5rem' }}>{business.name?.charAt(0) || 'B'}</div>
+          )}
+          <h1 style={{ fontSize: '3rem', fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 1rem' }}>{business.name}</h1>
+          <p style={{ fontSize: '1.2rem', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto' }}>{page.description}</p>
         </div>
       </section>
 
       {/* About */}
-      <section id="about" style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', letterSpacing: '-0.01em' }}>About Us</h2>
-        <p style={{ fontSize: '1.05rem', color: '#4B5563', lineHeight: 2, textAlign: 'center' }}>{page.about}</p>
-      </section>
+      {page.about && (
+        <section id="about" style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem' }}>About Us</h2>
+          <p style={{ fontSize: '1.05rem', color: '#4B5563', lineHeight: 2, textAlign: 'center' }}>{page.about}</p>
+        </section>
+      )}
 
       {/* Services */}
       <section id="services" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
@@ -113,10 +118,9 @@ export default function Elegant({ business, page, services, portfolio, reviews, 
         {business.location && <p style={{ marginTop: '2rem', opacity: 0.7 }}>📍 {business.location}</p>}
       </section>
 
-      {/* Footer */}
       <footer style={{ background: '#111827', color: '#9CA3AF', padding: '2rem 1.5rem', textAlign: 'center', fontSize: '0.85rem' }}>
         © {new Date().getFullYear()} {business.name} · Powered by <span style={{ color: '#DB2777', fontWeight: 700 }}>Cresoa</span>
       </footer>
     </div>
   )
-                                          }
+            }
