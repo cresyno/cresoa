@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../../../lib/supabaseClient'
+import { supabase } from '../../../../lib/supabaseClient'
 
 // ─── Self-contained SVG Icons ───
 const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
