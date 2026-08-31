@@ -26,6 +26,7 @@ export default function PublicPageSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [publicUrl, setPublicUrl] = useState('')
 
   // Form state
   const [enabled, setEnabled] = useState(false)
@@ -47,11 +48,9 @@ export default function PublicPageSettings() {
     const load = async () => {
       if (!businessId) return
       try {
-        // Load business info (logo)
         const { data: biz } = await supabase.from('businesses').select('logo_url').eq('id', businessId).single()
         if (biz?.logo_url) setLogo(biz.logo_url)
 
-        // Load public page settings
         const { data, error } = await supabase
           .from('business_public_pages')
           .select('*')
@@ -69,6 +68,7 @@ export default function PublicPageSettings() {
           setPortfolio(data.portfolio_images || [])
           setShowQuoteButton(data.show_quote_button ?? true)
           setShowWhatsappButton(data.show_whatsapp_button ?? true)
+          setPublicUrl(`${window.location.origin}/${data.slug}`)
         }
       } catch (err) { console.error(err) } finally { setLoading(false) }
     }
@@ -82,7 +82,7 @@ export default function PublicPageSettings() {
       setSlugStatus('checking')
       const res = await fetch(`/api/public-page/check-slug?slug=${value}&business_id=${businessId}`)
       const data = await res.json()
-      if (data.available) { setSlugStatus('available'); setSlug(data.normalized) } else { setSlugStatus('taken') }
+      if (data.available) { setSlugStatus('available'); setSlug(data.normalized); setPublicUrl(`${window.location.origin}/${data.normalized}`) } else { setSlugStatus('taken') }
     }, 500)
   }, [businessId])
 
@@ -93,18 +93,45 @@ export default function PublicPageSettings() {
     if (biz?.name) { const s = biz.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); setSlug(s); checkSlug(s) }
   }
 
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      alert('Link copied!')
+    } catch {
+      alert('Could not copy link.')
+    }
+  }
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: businessName, text: 'Check out my business on Cresoa!', url: publicUrl })
+      } catch {}
+    } else {
+      await handleCopyLink()
+    }
+  }
+
+  const [businessName, setBusinessName] = useState('')
+
+  useEffect(() => {
+    const fetchName = async () => {
+      const { data: biz } = await supabase.from('businesses').select('name').eq('id', businessId).single()
+      if (biz?.name) setBusinessName(biz.name)
+    }
+    fetchName()
+  }, [businessId])
+
   const handleSave = async () => {
     if (!slug.trim()) { setMessage('Slug is required.'); return }
     if (slugStatus === 'taken') { setMessage('Slug is taken.'); return }
     setSaving(true)
     try {
-      // 1. Save logo to businesses table
       if (logo) {
         const { error: logoError } = await supabase.from('businesses').update({ logo_url: logo }).eq('id', businessId)
         if (logoError) throw logoError
       }
 
-      // 2. Save public page settings
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       const res = await fetch('/api/public-page/save', {
@@ -126,6 +153,7 @@ export default function PublicPageSettings() {
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Save failed')
+      setPublicUrl(`${window.location.origin}/${slug}`)
       setMessage('✅ Saved!')
     } catch (err) { setMessage('❌ ' + err.message) } finally { setSaving(false) }
   }
@@ -150,21 +178,29 @@ export default function PublicPageSettings() {
 
   return (
     <div style={{ padding: '1rem', maxWidth: '900px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh', paddingBottom: '100px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Public Page</p>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0' }}>Your Business Website</h1>
         </div>
-        <button onClick={handleSave} disabled={saving} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 700 }}>{saving ? 'Saving...' : 'Save'}</button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {publicUrl && enabled && (
+            <>
+              <button onClick={handleCopyLink} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer', fontWeight: 600 }}>📋 Copy Link</button>
+              <button onClick={handleShare} style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer', fontWeight: 600 }}>📤 Share</button>
+            </>
+          )}
+          <button onClick={handleSave} disabled={saving} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 700 }}>{saving ? 'Saving...' : 'Save'}</button>
+        </div>
       </div>
 
       {message && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', marginBottom: '1rem', background: message.startsWith('✅') ? 'var(--cresoa-success-soft)' : 'var(--cresoa-danger-soft)', color: message.startsWith('✅') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{message}</div>}
 
-      {/* Logo Upload */}
+      {/* Logo */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Business Logo</label>
         <FileUpload businessId={businessId} purpose="logo" label="Upload Logo" onUploaded={setLogo} />
-        {logo && <img src={logo} style={{ marginTop: '0.8rem', width: '80px', height: '80px', borderRadius: '12px', objectFit: 'contain', background: '#fff', padding: '8px' }} />}
+        {logo && <img src={logo} style={{ marginTop: '0.8rem', width: '80px', height: '80px', borderRadius: '12px', objectFit: 'contain', background: '#fff', padding: '8px', border: '1px solid #E5E7EB' }} />}
       </div>
 
       {/* Enable */}
@@ -183,14 +219,12 @@ export default function PublicPageSettings() {
           <input type="text" value={slug} onChange={handleSlugChange} style={{ ...inputStyle, flex: 1 }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem' }}>
-          <span style={{ color: slugStatus === 'available' ? 'green' : slugStatus === 'taken' ? 'red' : 'gray', fontSize: '0.8rem' }}>
-            {slugStatus === 'checking' ? 'Checking...' : slugStatus === 'available' ? '✅ Available' : slugStatus === 'taken' ? '❌ Taken' : ''}
-          </span>
+          <span style={{ color: slugStatus === 'available' ? 'green' : slugStatus === 'taken' ? 'red' : 'gray', fontSize: '0.8rem' }}>{slugStatus === 'checking' ? 'Checking...' : slugStatus === 'available' ? '✅ Available' : slugStatus === 'taken' ? '❌ Taken' : ''}</span>
           <button onClick={autoSuggestSlug} style={{ background: 'none', border: 'none', color: 'var(--cresoa-accent)', cursor: 'pointer', fontSize: '0.8rem' }}>Auto-suggest</button>
         </div>
       </div>
 
-      {/* Template Selector */}
+      {/* Template */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Choose Template</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
@@ -202,7 +236,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-      {/* Hero Photo */}
+      {/* Hero */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Hero Section Photo</label>
         <FileUpload businessId={businessId} purpose="cover" label="Upload Hero Photo" onUploaded={setHeroImage} />
@@ -265,7 +299,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-           {/* Live Preview */}
+      {/* Preview */}
       <div style={{ marginTop: '2rem', borderTop: '2px solid var(--cresoa-accent)', paddingTop: '1.5rem' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem' }}>Live Preview</h2>
         <div style={{ border: '1px solid var(--cresoa-border)', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
