@@ -9,15 +9,6 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner'
 
-// Helper to normalize sector to short code
-const normalizeSector = (sector) => {
-  if (!sector) return 'fashion'
-  const s = sector.toLowerCase()
-  if (s.includes('repair')) return 'repairs'
-  if (s.includes('fashion')) return 'fashion'
-  return s
-}
-
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -28,14 +19,7 @@ function DashboardLayoutContent({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState('light')
   const [userRole, setUserRole] = useState(null)
-
-  // Wait for pathname to avoid early redirects
-  const [isRepairsPath, setIsRepairsPath] = useState(null)
-  useEffect(() => {
-    if (pathname) {
-      setIsRepairsPath(pathname.startsWith('/dashboard/repairs'))
-    }
-  }, [pathname])
+  const [authChecked, setAuthChecked] = useState(false)
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -55,16 +39,20 @@ function DashboardLayoutContent({ children }) {
     }
   }, [])
 
-  // Load business only when NOT repairs path
+  // ─── SAFE AUTH + BUSINESS LOADING ───
   useEffect(() => {
-    if (isRepairsPath === null) return
-    if (isRepairsPath) {
-      setLoading(false)
-      return
-    }
-
     const load = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          const { data: { session: session2 } } = await supabase.auth.getSession()
+          if (!session2) {
+            router.push('/login')
+            return
+          }
+        }
+
         const { data: { user: authUser } } = await supabase.auth.getUser()
         if (!authUser) {
           router.push('/login')
@@ -112,15 +100,8 @@ function DashboardLayoutContent({ children }) {
         }
 
         if (!businessData) {
-          const { data: hasOnboarded } = await supabase
-            .from('businesses')
-            .select('id')
-            .eq('owner_id', authUser.id)
-            .maybeSingle()
-          if (!hasOnboarded) {
-            router.push('/onboarding')
-            return
-          }
+          router.push('/onboarding')
+          return
         }
 
         if (businessData && !userRole) {
@@ -135,7 +116,7 @@ function DashboardLayoutContent({ children }) {
           else setUserRole('Staff')
         }
 
-        // Beta/trial logic – unchanged
+        // Beta/trial logic
         if (businessData) {
           if (businessData.plan === 'beta' && businessData.beta_expires_at) {
             const betaExpiry = new Date(businessData.beta_expires_at)
@@ -164,22 +145,21 @@ function DashboardLayoutContent({ children }) {
         }
 
         setBusiness(businessData)
-        localStorage.setItem('cresoa-sector', normalizeSector(businessData?.sector))
+        localStorage.setItem('cresoa-sector', businessData?.sector || 'fashion')
       } catch (error) {
         console.error('Dashboard layout error:', error)
-        router.push('/onboarding')
+        router.push('/login')
       } finally {
         setLoading(false)
+        setAuthChecked(true)
       }
     }
 
     load()
-  }, [router, searchParams, isRepairsPath])
+  }, [router, searchParams])
 
-  // Security guards – only when NOT repairs path
+  // ─── SECURITY GUARDS ───
   useEffect(() => {
-    if (isRepairsPath === null || isRepairsPath) return
-
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
       if (urlBusinessId && urlBusinessId !== business.id) {
@@ -187,7 +167,7 @@ function DashboardLayoutContent({ children }) {
         return
       }
 
-      const currentSector = normalizeSector(business.sector)
+      const currentSector = business.sector || 'fashion'
 
       if (currentSector === 'repairs' && (
         pathname?.startsWith('/dashboard/orders') ||
@@ -205,22 +185,65 @@ function DashboardLayoutContent({ children }) {
         return
       }
     }
-  }, [loading, business, pathname, router, searchParams, isRepairsPath])
+  }, [loading, business, pathname, router, searchParams])
 
-  // If repairs path, render ONLY children (repairs layout will wrap)
-  if (isRepairsPath === true) {
-    return <>{children}</>
+  // ─── NAVIGATION ITEMS ───
+  const getNavItems = (sector) => {
+    const defaultItems = [
+      { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
+      { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
+      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
+      { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
+      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
+      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+    ]
+
+    if (sector === 'repairs') {
+      return [
+        { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
+        { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
+        { name: 'Customers', path: '/dashboard/repairs/customers', icon: 'users' },
+        { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
+        { name: 'Invoices', path: '/dashboard/repairs/invoices', icon: 'file-text' },
+        { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: 'bell' },
+      ]
+    }
+
+    return defaultItems
   }
 
-  // Show loading until pathname is known and business is loaded
-  if (isRepairsPath === null || loading) {
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const isActive = (path) => {
+    if (path === '/dashboard' || path === '/dashboard/repairs' || path === '/dashboard/fashion') {
+      return pathname === path
+    }
+    return pathname?.startsWith(path)
+  }
+
+  const handleNavClick = () => setSidebarOpen(false)
+
+  const getIndustryBadge = () => {
+    const sector = business?.sector || 'fashion'
+    if (sector === 'repairs') return '🔧 Repairs'
+    if (sector === 'fashion') return '👗 Fashion'
+    return ''
+  }
+
+  const currentSector = business?.sector || 'fashion'
+  const currentNavItems = getNavItems(currentSector)
+
+  if (loading && !authChecked) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
           .spinner { width: 40px; height: 40px; border: 4px solid var(--color-border); border-top: 4px solid var(--color-accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
         `}</style>
-        <div className="spinner" />
+        <div className="spinner" style={{ margin: 'auto', marginTop: '40vh' }} />
       </div>
     )
   }
@@ -236,51 +259,6 @@ function DashboardLayoutContent({ children }) {
   const showProfile = isOwner || isManager
 
   const baseUrl = (path) => business?.id ? `${path}?business_id=${business.id}` : path
-
-  // Navigation items (for fashion and other sectors)
-  const getNavItems = (sector) => {
-    const normalized = normalizeSector(sector)
-    if (normalized === 'repairs') {
-      return [
-        { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-        { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-        { name: 'Customers', path: '/dashboard/repairs/customers', icon: 'users' },
-        { name: 'Parts', path: '/dashboard/repairs/inventory', icon: 'package' },
-        { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
-        { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: 'bell' },
-      ]
-    }
-    return [
-      { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
-      { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
-      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-      { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
-      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
-      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-    ]
-  }
-
-  const currentNavItems = getNavItems(business?.sector)
-
-  const isActive = (path) => {
-    if (path === '/dashboard' || path === '/dashboard/repairs' || path === '/dashboard/fashion') {
-      return pathname === path
-    }
-    return pathname?.startsWith(path)
-  }
-
-  const handleNavClick = () => setSidebarOpen(false)
-
-  const getIndustryBadge = () => {
-    const sector = normalizeSector(business?.sector)
-    if (sector === 'repairs') return '🔧 Repairs'
-    return '👗 Fashion'
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -361,8 +339,9 @@ function DashboardLayoutContent({ children }) {
           </div>
         </div>
 
+        {/* ✅ UPDATED: Pass currentSector to BusinessSwitcher */}
         <div style={{ marginBottom: '0.4rem' }}>
-          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
+          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} currentSector={business?.sector} />
         </div>
 
         <div className="nav-section">
@@ -399,7 +378,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
-             <div className="bottom">
+        <div className="bottom">
           <button className="theme-btn" onClick={toggleTheme}><span className="icon"><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} stroke="currentColor" /></span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</button>
           <a href={baseUrl('/dashboard/support')} className="support-link" onClick={handleNavClick}><span className="icon"><Icon name="message-circle" size={16} stroke="currentColor" /></span> Support Hub</a>
           <button className="logout" onClick={handleLogout}><span className="icon"><Icon name="log-out" size={16} stroke="currentColor" /></span> Logout</button>
@@ -433,4 +412,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </Suspense>
   )
-              }
+          }
