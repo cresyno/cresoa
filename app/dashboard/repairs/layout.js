@@ -4,13 +4,22 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import Logo from '../../../components/Logo'
-import { FREE_TRIAL_DAYS } from '../../../lib/planLimits'
 import BusinessSwitcher from '../../components/BusinessSwitcher'
 import { Icon } from '../../../components/Icon'
 import Banner from '../../../components/Banner'
-import { RepairsNavigation } from '../../../components/RepairsNavigation'
+import { PrintingNavigation } from '../../../components/PrintingNavigation'
 
-function RepairsLayoutContent({ children }) {
+// Normalize sector
+const normalizeSector = (sector) => {
+  if (!sector) return ''
+  const s = sector.toLowerCase()
+  if (s.includes('print')) return 'printing'
+  if (s.includes('fashion')) return 'fashion'
+  if (s.includes('repair')) return 'repairs'
+  return s
+}
+
+function PrintingLayoutContent({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -40,11 +49,10 @@ function RepairsLayoutContent({ children }) {
     }
   }, [])
 
-  // ─── SAFE AUTH + BUSINESS LOADING ───
+  // Load business
   useEffect(() => {
     const load = async () => {
       try {
-        // Wait for session
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
           await new Promise(resolve => setTimeout(resolve, 500))
@@ -106,14 +114,16 @@ function RepairsLayoutContent({ children }) {
           return
         }
 
-        // Ensure sector is repairs (normalized)
-        const normalizedSector = (businessData.sector || '').toLowerCase()
-        if (!normalizedSector.includes('repair') && normalizedSector !== 'repairs') {
+        // Verify sector is printing
+        const normalized = normalizeSector(businessData.sector)
+        if (normalized !== 'printing') {
+          // Instead of redirecting, we could render SectorMismatch later.
+          // For now, redirect to the correct dashboard.
           router.push(`/dashboard?business_id=${businessData.id}`)
           return
         }
 
-        if (businessData && !userRole) {
+        if (!userRole) {
           const { data: roleData } = await supabase
             .from('business_memberships')
             .select('role')
@@ -125,44 +135,15 @@ function RepairsLayoutContent({ children }) {
           else setUserRole('Staff')
         }
 
-        // Beta/trial logic
-        if (businessData) {
-          if (businessData.plan === 'beta' && businessData.beta_expires_at) {
-            const betaExpiry = new Date(businessData.beta_expires_at)
-            const now = new Date()
-            if (betaExpiry < now) {
-              await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
-              businessData.plan = 'free'
-              businessData.plan_status = 'expired'
-            }
-          }
-          if (!businessData.trial_ends_at) {
-            const trialEndsAt = new Date()
-            trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
-            await supabase.from('businesses').update({ trial_ends_at: trialEndsAt.toISOString(), trial_starts_at: new Date().toISOString() }).eq('id', businessData.id)
-            businessData.trial_ends_at = trialEndsAt.toISOString()
-          }
-          const now = new Date()
-          if (businessData.plan !== 'free' && businessData.plan !== 'beta' && businessData.subscription_expires_at) {
-            const expiresAt = new Date(businessData.subscription_expires_at)
-            if (expiresAt < now) {
-              await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
-              businessData.plan = 'free'
-              businessData.plan_status = 'expired'
-            }
-          }
-        }
-
         setBusiness(businessData)
       } catch (error) {
-        console.error('Repairs layout error:', error)
+        console.error('Printing layout error:', error)
         router.push('/login')
       } finally {
         setLoading(false)
         setAuthChecked(true)
       }
     }
-
     load()
   }, [router, searchParams])
 
@@ -172,7 +153,7 @@ function RepairsLayoutContent({ children }) {
   }
 
   const isActive = (path) => {
-    if (path === '/dashboard/repairs') return pathname === path
+    if (path === '/dashboard/printing') return pathname === path
     return pathname?.startsWith(path)
   }
 
@@ -185,8 +166,7 @@ function RepairsLayoutContent({ children }) {
         <div className="cresoa-loading-spinner" />
         <style>{`
           .cresoa-loading-spinner {
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             border: 3px solid var(--cresoa-border);
             border-top-color: var(--cresoa-accent);
             border-radius: 50%;
@@ -211,7 +191,6 @@ function RepairsLayoutContent({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cresoa-bg)' }}>
       <style>{`
-        /* Same global CSS variables as before */
         :root {
           --cresoa-bg: #F8F6F2;
           --cresoa-surface: #FFFFFF;
@@ -228,7 +207,7 @@ function RepairsLayoutContent({ children }) {
           --cresoa-border: #2A2A3A;
           --cresoa-accent: #D4A52A;
         }
-        .sidebar { width: 260px; min-height: 100vh; background: #0A1628; padding: 0.8rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04); z-index: 1000; }
+        .sidebar { width: 260px; min-height: 100vh; background: #0A1628; padding: 0.8rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04); z-index: 2000; }
         .sidebar .brand { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.6rem; }
         .sidebar .nav-section { margin-bottom: 0.2rem; }
         .sidebar .nav-section a { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: all 0.15s ease; }
@@ -238,8 +217,9 @@ function RepairsLayoutContent({ children }) {
         .sidebar .bottom a, .sidebar .bottom button { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: all 0.15s ease; background: none; border: none; width: 100%; cursor: pointer; text-align: left; }
         .main-content { flex: 1; min-width: 0; padding: 0; padding-bottom: 80px; }
         .dashboard-header { display: flex; justify-content: flex-end; align-items: center; padding: 0.4rem 1.2rem; background: var(--cresoa-surface); border-bottom: 1px solid var(--cresoa-border); }
+        .hamburger { display: none; position: fixed; top: 0.8rem; left: 0.8rem; z-index: 3000; background: var(--cresoa-accent); color: #fff; border: none; font-size: 1.3rem; padding: 0.2rem 0.5rem; border-radius: 6px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
         @media (max-width: 768px) {
-          .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; }
+          .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 2000; height: 100vh; }
           .sidebar.open { transform: translateX(0); }
           .hamburger { display: block; }
         }
@@ -249,38 +229,40 @@ function RepairsLayoutContent({ children }) {
         }
       `}</style>
 
-      {/* Hamburger for mobile */}
-      <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ position: 'fixed', top: '0.8rem', left: '0.8rem', zIndex: 1001, background: 'var(--cresoa-accent)', color: '#fff', fontSize: '1.3rem', padding: '0.2rem 0.5rem', borderRadius: '6px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+      <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
         {sidebarOpen ? '✕' : '☰'}
       </button>
-      <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} style={{ display: sidebarOpen ? 'block' : 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 999 }} />
+      <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} style={{ display: sidebarOpen ? 'block' : 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 1500 }} />
 
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo variant="dark-bg" size="small" />
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div className="logo-text">Cresoa</div>
             <div className="sub">
               {business?.name || 'Your business'}
-              <span className="badge">🔧 Repairs</span>
+              <span className="badge">🖨️ Printing</span>
               <br />
               <span className="plan">{business?.plan || 'Free'}</span>
             </div>
           </div>
+          <button onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#8899AA', cursor: 'pointer', fontSize: '1.2rem', padding: '0.2rem', flexShrink: 0 }}>✕</button>
         </div>
 
+        {/* ✅ UPDATED: Pass currentSector to BusinessSwitcher */}
         <div style={{ marginBottom: '0.4rem' }}>
-          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
+          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} currentSector={business?.sector} />
         </div>
 
         <div className="nav-section">
           <div className="section-label">Business</div>
           {[
-            { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-            { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-            { name: 'Customers', path: '/dashboard/repairs/customers', icon: 'users' },
-            { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
-            { name: 'Invoices', path: '/dashboard/repairs/invoices', icon: 'file-text' },
+            { name: 'Dashboard', path: '/dashboard/printing', icon: 'bar-chart-2' },
+            { name: 'Jobs', path: '/dashboard/printing/jobs', icon: 'file-text' },
+            { name: 'Quotations', path: '/dashboard/printing/quotations', icon: 'file-text' },
+            { name: 'Production', path: '/dashboard/printing/production', icon: 'layers' },
+            { name: 'Customers', path: '/dashboard/printing/customers', icon: 'users' },
+            { name: 'Invoices', path: '/dashboard/printing/invoices', icon: 'file-text' },
           ].map((item) => (
             <a key={item.path} href={baseUrl(item.path)} className={isActive(item.path) ? 'active' : ''} onClick={handleNavClick}>
               <span className="icon"><Icon name={item.icon} size={16} stroke="currentColor" /></span>
@@ -320,26 +302,20 @@ function RepairsLayoutContent({ children }) {
             <span className="date">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           </div>
         </div>
-        <Banner />
         {children}
       </div>
 
-      {/* Bottom nav for mobile */}
-      <RepairsNavigation businessId={business?.id} />
+      <PrintingNavigation businessId={business?.id} />
     </div>
   )
 }
 
-export default function RepairsLayout({ children }) {
+export default function PrintingLayout({ children }) {
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'var(--cresoa-text-muted)' }}>Loading...</div>
-      </div>
-    }>
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)' }}>Loading...</div>}>
       <div className="cresoa-dashboard-page">
-        <RepairsLayoutContent>{children}</RepairsLayoutContent>
+        <PrintingLayoutContent>{children}</PrintingLayoutContent>
       </div>
     </Suspense>
   )
-}
+          }
