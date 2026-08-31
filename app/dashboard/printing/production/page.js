@@ -7,10 +7,7 @@ import { supabase } from '../../../../lib/supabaseClient'
 // ─── Self-contained SVG Icons ───
 const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
-    clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
     user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
-    alert: <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
-    'arrow-right': <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
 }
@@ -35,6 +32,7 @@ export default function ProductionBoardPage() {
   const businessId = searchParams.get('business_id')
 
   const [jobs, setJobs] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -43,15 +41,25 @@ export default function ProductionBoardPage() {
       if (!businessId) return
       setLoading(true)
       try {
-        const { data, error } = await supabase
+        // Fetch jobs (no sector filter needed – table doesn't have sector)
+        const { data: jobsData, error: jobsError } = await supabase
           .from('print_jobs')
           .select('*')
           .eq('business_id', businessId)
-          .eq('sector', 'printing')
           .order('created_at', { ascending: false })
 
-        if (error) throw error
-        setJobs(data || [])
+        if (jobsError) throw jobsError
+        setJobs(jobsData || [])
+
+        // Fetch customers to map names
+        const customerIds = jobsData?.map(j => j.customer_id).filter(Boolean) || []
+        if (customerIds.length > 0) {
+          const { data: custData } = await supabase
+            .from('customers')
+            .select('id, name, first_name, last_name')
+            .in('id', customerIds)
+          setCustomers(custData || [])
+        }
       } catch (err) {
         console.error('Error fetching production jobs:', err)
         setError('Failed to load jobs')
@@ -61,6 +69,12 @@ export default function ProductionBoardPage() {
     }
     fetchJobs()
   }, [businessId])
+
+  const getCustomerName = (customerId) => {
+    if (!customerId) return 'Customer'
+    const cust = customers.find(c => c.id === customerId)
+    return cust ? (cust.name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || 'Customer') : 'Customer'
+  }
 
   if (loading) {
     return (
@@ -88,13 +102,11 @@ export default function ProductionBoardPage() {
 
   return (
     <div style={{ padding: '1rem', minHeight: '100vh', background: 'var(--cresoa-bg)' }}>
-      {/* Header */}
       <div style={{ marginBottom: '1.5rem' }}>
         <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Printing</p>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0' }}>Production Board</h1>
       </div>
 
-      {/* Kanban Columns */}
       <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
         {STAGES.map(stage => {
           const stageJobs = jobs.filter(job => job.status === stage.key)
@@ -102,7 +114,6 @@ export default function ProductionBoardPage() {
 
           return (
             <div key={stage.key} style={{ flex: '0 0 260px', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
-              {/* Column Header */}
               <div style={{ padding: '0.8rem', borderBottom: `2px solid ${stage.color}`, background: `${stage.color}10` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: 700, color: 'var(--cresoa-text)', fontSize: '0.9rem' }}>{stage.label}</span>
@@ -110,13 +121,13 @@ export default function ProductionBoardPage() {
                 </div>
               </div>
 
-              {/* Job Cards */}
               <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {stageJobs.length === 0 ? (
                   <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>No jobs</div>
                 ) : (
                   stageJobs.map(job => {
                     const overdue = isOverdue(job)
+                    const customerName = getCustomerName(job.customer_id)
                     return (
                       <div
                         key={job.id}
@@ -132,7 +143,7 @@ export default function ProductionBoardPage() {
                       >
                         <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--cresoa-text)', marginBottom: '0.2rem' }}>{job.title}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <Svg name="user" size={12} stroke="currentColor" /> {job.customer_name || 'Customer'}
+                          <Svg name="user" size={12} stroke="currentColor" /> {customerName}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--cresoa-accent)' }}>{formatMoney(job.total)}</span>
@@ -149,4 +160,4 @@ export default function ProductionBoardPage() {
       </div>
     </div>
   )
-  }
+}
