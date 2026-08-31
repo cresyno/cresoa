@@ -8,6 +8,7 @@ import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
 import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner'
+import SectorMismatch from '../../components/SectorMismatch'
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
@@ -20,6 +21,7 @@ function DashboardLayoutContent({ children }) {
   const [theme, setTheme] = useState('light')
   const [userRole, setUserRole] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [mismatchInfo, setMismatchInfo] = useState({ sector: '', businessId: '' })
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -158,7 +160,7 @@ function DashboardLayoutContent({ children }) {
     load()
   }, [router, searchParams])
 
-  // ─── SECURITY GUARDS ───
+  // ─── SECURITY GUARDS (Now sets mismatch instead of redirect) ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
@@ -168,7 +170,15 @@ function DashboardLayoutContent({ children }) {
       }
 
       const currentSector = business.sector || 'fashion'
+      const sectorPath = pathname?.split('/')[2] // e.g., 'fashion', 'repairs', 'printing'
 
+      // If path is a sector-specific path but doesn't match the business sector
+      if (sectorPath && ['fashion', 'repairs', 'printing'].includes(sectorPath) && sectorPath !== currentSector) {
+        setMismatchInfo({ sector: currentSector, businessId: business.id })
+        return
+      }
+
+      // Repairs/fashion cross-guards (keep existing)
       if (currentSector === 'repairs' && (
         pathname?.startsWith('/dashboard/orders') ||
         pathname?.startsWith('/dashboard/customers') ||
@@ -246,6 +256,11 @@ function DashboardLayoutContent({ children }) {
         <div className="spinner" style={{ margin: 'auto', marginTop: '40vh' }} />
       </div>
     )
+  }
+
+  // ─── Show SectorMismatch if needed ───
+  if (mismatchInfo.sector) {
+    return <SectorMismatch sector={mismatchInfo.sector} businessId={mismatchInfo.businessId} />
   }
 
   const isStaff = userRole === 'Staff'
@@ -412,4 +427,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </Suspense>
   )
-          }
+              }
