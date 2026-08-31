@@ -34,7 +34,6 @@ export default function PublicPageWrapper({ business, page, services, portfolio,
         onQuoteClick={() => setQuoteOpen(true)}
         onReviewClick={() => setReviewOpen(true)}
       />
-
       <QuoteModal open={quoteOpen} onClose={() => setQuoteOpen(false)} businessId={page.business_id} businessName={business.name} />
       <ReviewForm open={reviewOpen} onClose={() => setReviewOpen(false)} businessId={page.business_id} businessName={business.name} onSubmitted={() => window.location.reload()} />
     </>
