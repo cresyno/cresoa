@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase } from '../../../lib/supabaseClient'
 import FileUpload from '../../../components/FileUpload'
 import ClassicGold from '../../../components/public-templates/ClassicGold'
 import ModernBold from '../../../components/public-templates/ModernBold'
