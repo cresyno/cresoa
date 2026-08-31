@@ -5,7 +5,7 @@ import ClientLayout from './ClientLayout'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  metadataBase: new URL('https://cresoa.com.ng'),
+  metadataBase: new URL('https://www.cresoa.com.ng'),
   title: {
     default: 'Cresoa | Business OS for Nigerian SMEs',
     template: '%s | Cresoa'
@@ -30,7 +30,7 @@ export const metadata = {
   openGraph: {
     title: 'Cresoa | Business OS for Nigerian SMEs',
     description: 'Manage customers, orders, inventory, workflows and your business from one place with Cresoa. Built for Fashion, Repairs, Traders, and Logistics.',
-    url: 'https://cresoa.com.ng',
+    url: 'https://www.cresoa.com.ng',
     siteName: 'Cresoa',
     type: 'website',
     locale: 'en_NG',
