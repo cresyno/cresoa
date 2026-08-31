@@ -18,17 +18,6 @@ const TEMPLATES = [
   { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', component: DynamicSunrise },
 ]
 
-const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
-  const icons = {
-    plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
-    trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
-  }
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
-}
-
-const inputStyle = { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
-const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
-
 export default function PublicPageSettings() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -43,6 +32,7 @@ export default function PublicPageSettings() {
   const [slug, setSlug] = useState('')
   const [slugStatus, setSlugStatus] = useState('idle')
   const [templateId, setTemplateId] = useState('elegant')
+  const [logo, setLogo] = useState('')
   const [heroImage, setHeroImage] = useState('')
   const [description, setDescription] = useState('')
   const [about, setAbout] = useState('')
@@ -57,6 +47,11 @@ export default function PublicPageSettings() {
     const load = async () => {
       if (!businessId) return
       try {
+        // Load business info (logo)
+        const { data: biz } = await supabase.from('businesses').select('logo_url').eq('id', businessId).single()
+        if (biz?.logo_url) setLogo(biz.logo_url)
+
+        // Load public page settings
         const { data, error } = await supabase
           .from('business_public_pages')
           .select('*')
@@ -103,6 +98,13 @@ export default function PublicPageSettings() {
     if (slugStatus === 'taken') { setMessage('Slug is taken.'); return }
     setSaving(true)
     try {
+      // 1. Save logo to businesses table
+      if (logo) {
+        const { error: logoError } = await supabase.from('businesses').update({ logo_url: logo }).eq('id', businessId)
+        if (logoError) throw logoError
+      }
+
+      // 2. Save public page settings
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       const res = await fetch('/api/public-page/save', {
@@ -128,18 +130,15 @@ export default function PublicPageSettings() {
     } catch (err) { setMessage('❌ ' + err.message) } finally { setSaving(false) }
   }
 
-  // Services management
   const addService = () => setServices(prev => [...prev, { name: '', price: '', description: '', image_url: '' }])
   const updateService = (idx, field, val) => setServices(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s))
   const removeService = (idx) => setServices(prev => prev.filter((_, i) => i !== idx))
 
-  // Portfolio management
   const handlePortfolioUpload = (url) => setPortfolio(prev => [...prev, { url, description: '' }])
   const updatePortfolioDescription = (idx, val) => setPortfolio(prev => prev.map((p, i) => i === idx ? { ...p, description: val } : p))
   const removePortfolio = (idx) => setPortfolio(prev => prev.filter((_, i) => i !== idx))
 
-  // For preview
-  const previewBusiness = { name: 'Your Business Name', logo_url: null, phone: '08012345678', email: 'contact@business.com', location: 'Ibadan, Nigeria' }
+  const previewBusiness = { name: 'Your Business Name', logo_url: logo || null, phone: '08012345678', email: 'contact@business.com', location: 'Ibadan, Nigeria' }
   const previewPage = { description: description || 'Welcome to our business.', about: about || '', show_quote_button: showQuoteButton, show_whatsapp_button: showWhatsappButton }
   const previewServices = services.length > 0 ? services : [{ name: 'Service 1', price: '₦5,000', description: 'Description', image_url: '' }]
   const previewPortfolio = portfolio.length > 0 ? portfolio.map(p => ({ url: p.url, description: p.description })) : []
@@ -151,7 +150,6 @@ export default function PublicPageSettings() {
 
   return (
     <div style={{ padding: '1rem', maxWidth: '900px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh', paddingBottom: '100px' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Public Page</p>
@@ -161,6 +159,13 @@ export default function PublicPageSettings() {
       </div>
 
       {message && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', marginBottom: '1rem', background: message.startsWith('✅') ? 'var(--cresoa-success-soft)' : 'var(--cresoa-danger-soft)', color: message.startsWith('✅') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{message}</div>}
+
+      {/* Logo Upload */}
+      <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
+        <label style={labelStyle}>Business Logo</label>
+        <FileUpload businessId={businessId} purpose="logo" label="Upload Logo" onUploaded={setLogo} />
+        {logo && <img src={logo} style={{ marginTop: '0.8rem', width: '80px', height: '80px', borderRadius: '12px', objectFit: 'contain', background: '#fff', padding: '8px' }} />}
+      </div>
 
       {/* Enable */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -260,7 +265,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-      {/* Live Preview */}
+           {/* Live Preview */}
       <div style={{ marginTop: '2rem', borderTop: '2px solid var(--cresoa-accent)', paddingTop: '1.5rem' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem' }}>Live Preview</h2>
         <div style={{ border: '1px solid var(--cresoa-border)', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
@@ -271,4 +276,7 @@ export default function PublicPageSettings() {
       </div>
     </div>
   )
-  }
+}
+
+const inputStyle = { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
+const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
