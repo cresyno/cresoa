@@ -401,3 +401,9 @@ export default function PublicPageSettings() {
           background: 'var(--cresoa-accent)', color: '#fff', padding: '0.8rem 2rem', borderRadius: '8px',
           border: 'none', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', boxShadow: 'var(--shadow-md)',
         }}
+      >
+        {saving ? 'Saving...' : 'Save Changes'}
+      </button>
+    </div>
+  )
+}
