@@ -71,10 +71,7 @@ export default async function PublicPage({ params }) {
         location: business.location,
       }}
       page={page}
-      services={(page.services || []).map(s => ({
-  ...s,
-  price: s.price ? Number(s.price).toLocaleString('en-NG') : 'Contact for price'
-}))}
+      services={(page.services || [])
       portfolio={page.portfolio_images || []}
       reviews={reviews || []}
       templateId={page.template_id}
