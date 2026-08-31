@@ -6,14 +6,14 @@ import { supabase } from '../../../lib/supabaseClient'
 import FileUpload from '../../../components/FileUpload'
 import ClassicGold from '../../../components/public-templates/ClassicGold'
 import ModernBold from '../../../components/public-templates/ModernBold'
-import ElegantMinimal from '../../../components/public-templates/ElegantMinimal'
+import Elegant from '../../../components/public-templates/Elegant'
 import FreshSerene from '../../../components/public-templates/FreshSerene'
 import DynamicSunrise from '../../../components/public-templates/DynamicSunrise'
 
 const TEMPLATES = [
   { id: 'classic-gold', name: 'Classic Gold', component: ClassicGold },
   { id: 'modern-bold', name: 'Modern Bold', component: ModernBold },
-  { id: 'elegant-minimal', name: 'Elegant Minimalist', component: ElegantMinimal },
+  { id: 'elegant', name: 'Elegant', component: Elegant },
   { id: 'fresh-serene', name: 'Fresh Serene', component: FreshSerene },
   { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', component: DynamicSunrise },
 ]
@@ -22,7 +22,6 @@ const Svg = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
     trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
-    save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
 }
@@ -43,11 +42,12 @@ export default function PublicPageSettings() {
   const [enabled, setEnabled] = useState(false)
   const [slug, setSlug] = useState('')
   const [slugStatus, setSlugStatus] = useState('idle')
-  const [templateId, setTemplateId] = useState('classic-gold')
+  const [templateId, setTemplateId] = useState('elegant')
   const [heroImage, setHeroImage] = useState('')
   const [description, setDescription] = useState('')
+  const [about, setAbout] = useState('')
   const [services, setServices] = useState([])
-  const [portfolioImages, setPortfolioImages] = useState([])
+  const [portfolio, setPortfolio] = useState([])
   const [showQuoteButton, setShowQuoteButton] = useState(true)
   const [showWhatsappButton, setShowWhatsappButton] = useState(true)
 
@@ -66,11 +66,12 @@ export default function PublicPageSettings() {
         if (data) {
           setEnabled(data.is_enabled || false)
           setSlug(data.slug || '')
-          setTemplateId(data.template_id || 'classic-gold')
+          setTemplateId(data.template_id || 'elegant')
           setHeroImage(data.cover_image_url || '')
           setDescription(data.description || '')
+          setAbout(data.about || '')
           setServices(data.services || [])
-          setPortfolioImages(data.portfolio_images || [])
+          setPortfolio(data.portfolio_images || [])
           setShowQuoteButton(data.show_quote_button ?? true)
           setShowWhatsappButton(data.show_whatsapp_button ?? true)
         }
@@ -107,7 +108,19 @@ export default function PublicPageSettings() {
       const res = await fetch('/api/public-page/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ business_id: businessId, slug, is_enabled: enabled, template_id: templateId, cover_image_url: heroImage, description, services, portfolio_images: portfolioImages, show_quote_button: showQuoteButton, show_whatsapp_button: showWhatsappButton }),
+        body: JSON.stringify({
+          business_id: businessId,
+          slug,
+          is_enabled: enabled,
+          template_id: templateId,
+          cover_image_url: heroImage,
+          description,
+          about,
+          services,
+          portfolio_images: portfolio,
+          show_quote_button: showQuoteButton,
+          show_whatsapp_button: showWhatsappButton,
+        }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Save failed')
@@ -115,31 +128,24 @@ export default function PublicPageSettings() {
     } catch (err) { setMessage('❌ ' + err.message) } finally { setSaving(false) }
   }
 
+  // Services management
   const addService = () => setServices(prev => [...prev, { name: '', price: '', description: '', image_url: '' }])
   const updateService = (idx, field, val) => setServices(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s))
   const removeService = (idx) => setServices(prev => prev.filter((_, i) => i !== idx))
 
-  const handlePortfolioUpload = (url) => setPortfolioImages(prev => [...prev, url])
-  const removePortfolioImage = (url) => setPortfolioImages(prev => prev.filter(u => u !== url))
+  // Portfolio management
+  const handlePortfolioUpload = (url) => setPortfolio(prev => [...prev, { url, description: '' }])
+  const updatePortfolioDescription = (idx, val) => setPortfolio(prev => prev.map((p, i) => i === idx ? { ...p, description: val } : p))
+  const removePortfolio = (idx) => setPortfolio(prev => prev.filter((_, i) => i !== idx))
 
-  // For preview: build a fake business object
-  const previewBusiness = {
-    name: 'Your Business Name',
-    logo_url: null,
-    phone: '08012345678',
-    email: 'contact@business.com',
-    location: 'Ibadan, Nigeria',
-  }
-  const previewPage = {
-    description: description || 'Welcome to our business.',
-    show_quote_button: showQuoteButton,
-    show_whatsapp_button: showWhatsappButton,
-  }
-  const previewServices = services.length > 0 ? services : [{ name: 'Service 1', price: '5000', description: 'Description' }]
-  const previewPortfolio = portfolioImages.length > 0 ? portfolioImages.map(url => ({ url })) : []
+  // For preview
+  const previewBusiness = { name: 'Your Business Name', logo_url: null, phone: '08012345678', email: 'contact@business.com', location: 'Ibadan, Nigeria' }
+  const previewPage = { description: description || 'Welcome to our business.', about: about || '', show_quote_button: showQuoteButton, show_whatsapp_button: showWhatsappButton }
+  const previewServices = services.length > 0 ? services : [{ name: 'Service 1', price: '₦5,000', description: 'Description', image_url: '' }]
+  const previewPortfolio = portfolio.length > 0 ? portfolio.map(p => ({ url: p.url, description: p.description })) : []
   const previewReviews = []
 
-  const ActiveTemplate = TEMPLATES.find(t => t.id === templateId)?.component || ClassicGold
+  const ActiveTemplate = TEMPLATES.find(t => t.id === templateId)?.component || Elegant
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
 
@@ -200,8 +206,14 @@ export default function PublicPageSettings() {
 
       {/* Description */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
-        <label style={labelStyle}>Description</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
+        <label style={labelStyle}>Short Description (Hero)</label>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+      </div>
+
+      {/* About */}
+      <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
+        <label style={labelStyle}>About Section</label>
+        <textarea value={about} onChange={(e) => setAbout(e.target.value)} rows={5} style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
 
       {/* Services */}
@@ -210,24 +222,29 @@ export default function PublicPageSettings() {
         {services.map((s, idx) => (
           <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.6rem' }}>
             <input type="text" placeholder="Name" value={s.name} onChange={e => updateService(idx, 'name', e.target.value)} style={inputStyle} />
-            <input type="text" placeholder="Price (₦)" value={s.price} onChange={e => updateService(idx, 'price', e.target.value)} style={inputStyle} />
+            <input type="text" placeholder="Price" value={s.price} onChange={e => updateService(idx, 'price', e.target.value)} style={inputStyle} />
             <input type="text" placeholder="Description" value={s.description} onChange={e => updateService(idx, 'description', e.target.value)} style={inputStyle} />
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <FileUpload businessId={businessId} purpose="service" label="Image" onUploaded={(url) => updateService(idx, 'image_url', url)} />
+              {s.image_url && <img src={s.image_url} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />}
+            </div>
             <button onClick={() => removeService(idx)} style={{ gridColumn: '3', background: 'none', border: 'none', color: 'red', cursor: 'pointer' }}>Remove</button>
           </div>
         ))}
         <button onClick={addService} style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px dashed var(--cresoa-border)', background: 'transparent', cursor: 'pointer' }}>+ Add Service</button>
       </div>
 
-      {/* Portfolio Gallery (Multiple) */}
+      {/* Portfolio */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
-        <label style={labelStyle}>Portfolio Gallery</label>
+        <label style={labelStyle}>Portfolio</label>
         <FileUpload businessId={businessId} purpose="portfolio" label="Add Image" multiple onUploaded={handlePortfolioUpload} />
-        {portfolioImages.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem', marginTop: '0.8rem' }}>
-            {portfolioImages.map((url, idx) => (
-              <div key={idx} style={{ position: 'relative' }}>
-                <img src={url} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
-                <button onClick={() => removePortfolioImage(url)} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer' }}>×</button>
+        {portfolio.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '0.8rem' }}>
+            {portfolio.map((p, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <img src={p.url} style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '8px' }} />
+                <input type="text" placeholder="Optional description" value={p.description} onChange={e => updatePortfolioDescription(idx, e.target.value)} style={{ flex: 1, ...inputStyle }} />
+                <button onClick={() => removePortfolio(idx)} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer' }}>×</button>
               </div>
             ))}
           </div>
@@ -243,7 +260,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-      {/* LIVE PREVIEW */}
+      {/* Live Preview */}
       <div style={{ marginTop: '2rem', borderTop: '2px solid var(--cresoa-accent)', paddingTop: '1.5rem' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem' }}>Live Preview</h2>
         <div style={{ border: '1px solid var(--cresoa-border)', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
@@ -254,4 +271,4 @@ export default function PublicPageSettings() {
       </div>
     </div>
   )
-    }
+  }
