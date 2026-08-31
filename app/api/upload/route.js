@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabaseClient';
-import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { createClient } from '@supabase/supabase-js';
+
+// ─── Admin client (bypasses RLS) ───
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export async function POST(req) {
   try {
@@ -10,12 +15,12 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse form data (file upload)
+    // Parse form data
     const formData = await req.formData();
     const file = formData.get('file');
     const jobId = formData.get('jobId');
@@ -26,7 +31,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing file, jobId, or businessId' }, { status: 400 });
     }
 
-    // Validate file type (allow images and PDFs)
+    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ error: 'File type not allowed. Upload JPG, PNG, WebP, or PDF.' }, { status: 400 });
@@ -45,18 +50,17 @@ export async function POST(req) {
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
+      console.error('Storage upload error:', uploadError);
       return NextResponse.json({ error: uploadError.message || 'Upload failed' }, { status: 400 });
     }
 
     // Get public URL
-    const { data: publicUrlData } = supabaseAdmin.storage
+    const { data: urlData } = supabaseAdmin.storage
       .from('job-files')
       .getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
 
-    const publicUrl = publicUrlData.publicUrl;
-
-    // Insert record into job_files table
+    // Insert record into job_files table (ADMIN client bypasses RLS)
     const { error: dbError } = await supabaseAdmin
       .from('job_files')
       .insert({
@@ -70,8 +74,15 @@ export async function POST(req) {
       });
 
     if (dbError) {
-      console.error('DB insert error:', dbError);
-      // Still return URL even if DB insert fails
+      console.error('Database insert error:', dbError);
+      // Still return URL, but tell the user it might not show immediately
+      return NextResponse.json({
+        success: false,
+        error: dbError.message || 'Failed to save file record',
+        fileUrl: publicUrl,
+        fileName: file.name,
+        filePath: filePath,
+      }, { status: 400 });
     }
 
     return NextResponse.json({
