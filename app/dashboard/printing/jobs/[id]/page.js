@@ -18,7 +18,6 @@ const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
     file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
     link: <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>,
     copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
-    upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>,
     check: <polyline points="20 6 9 17 4 12" />,
     x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
     trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
@@ -68,6 +67,9 @@ export default function PrintJobDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [copied, setCopied] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+
+  // Upload overlay state
+  const [uploadState, setUploadState] = useState({ status: '', progress: 0, message: '' })
 
   const [isMobile, setIsMobile] = useState(false)
   const quotationRef = useRef(null)
@@ -377,7 +379,7 @@ export default function PrintJobDetailPage() {
         <button onClick={() => shareWhatsApp('status')} className="cresoa-primary-button" style={{ background: '#25D366' }}><Svg name="whatsapp" size={16} stroke="#fff" /> WhatsApp</button>
       </div>
 
-      {/* Financials */}
+           {/* Financials */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '16px', padding: '1.2rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <h3 style={{ margin: '0 0 0.8rem', fontSize: '1rem', fontWeight: 800 }}>💰 Financials</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.8rem' }}>
@@ -434,7 +436,7 @@ export default function PrintJobDetailPage() {
             <button onClick={() => shareWhatsApp('tracking')} className="cresoa-primary-button" style={{ width: '100%', background: '#25D366', justifyContent: 'center' }}><Svg name="whatsapp" size={16} stroke="#fff" /> Share via WhatsApp</button>
           </>
         ) : (
-          <button onClick={generateTrackingLink} className="cresoa-primary-button" style={{ width: '100%', background: 'var(--cresoa-primary)', justifyContent: 'center' }}><Svg name="link" size={16} stroke="#fff" /> Generate Tracking Link</button>
+          <button onClick={generateTrackingLink} className="cresoa-primary-button" style={{ width: '100%', background: 'var(--cresoa-accent)', justifyContent: 'center' }}><Svg name="link" size={16} stroke="#fff" /> Generate Tracking Link</button>
         )}
       </div>
 
@@ -446,6 +448,7 @@ export default function PrintJobDetailPage() {
           businessId={businessIdFromUrl}
           sector="printing"
           label="Upload Artwork"
+          onUploadStateChange={setUploadState}
           onUploaded={async () => {
             const { data: freshFiles } = await supabase
               .from('job_files')
@@ -453,6 +456,8 @@ export default function PrintJobDetailPage() {
               .eq('job_id', jobId)
               .order('created_at', { ascending: false })
             setFiles(freshFiles || [])
+            // Clear overlay after success (slight delay to show 100%)
+            setTimeout(() => setUploadState({ status: '', progress: 0, message: '' }), 1000)
           }}
         />
         {files.length > 0 ? (
@@ -538,6 +543,35 @@ export default function PrintJobDetailPage() {
           </form>
         </div>
       )}
+
+      {/* Upload Overlay – non-dismissible */}
+      {(uploadState.status === 'compressing' || uploadState.status === 'uploading') && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem',
+        }}>
+          <div style={{
+            background: 'var(--cresoa-surface)', borderRadius: '16px', padding: '2rem',
+            maxWidth: '400px', width: '100%', textAlign: 'center',
+            boxShadow: 'var(--shadow-xl)',
+          }}>
+            <h3 style={{ margin: '0 0 0.5rem', color: 'var(--cresoa-text)' }}>
+              {uploadState.status === 'compressing' ? 'Compressing image...' : 'Uploading...'}
+            </h3>
+            <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem', fontSize: '0.9rem' }}>
+              {uploadState.message}
+            </p>
+            <div style={{ width: '100%', background: 'var(--cresoa-border)', borderRadius: '6px', height: '12px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+              <div style={{ width: `${uploadState.progress}%`, background: 'var(--cresoa-accent)', height: '100%', transition: 'width 0.3s ease' }} />
+            </div>
+            <span style={{ color: 'var(--cresoa-text)', fontWeight: 700, fontSize: '1.1rem' }}>
+              {uploadState.progress}%
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
-              }
+        }
