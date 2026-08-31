@@ -5,12 +5,13 @@ import ClientLayout from './ClientLayout'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  metadataBase: new URL('https://www.cresoa.com.ng'),
+  metadataBase: new URL('https://www.cresoa.com.ng'), // Ensure this matches your www domain!
   title: {
-    default: 'Cresoa | Business OS for Nigerian SMEs',
+    default: 'Business Management Software & Inventory Tool for Nigerian SMEs | Cresoa',
     template: '%s | Cresoa'
   },
-  description: 'Cresoa is the all-in-one business management platform built for Nigerian SMEs. Manage customers, orders, inventory, invoices, workflows, and payments in one place. Join the Cresoa Beta today.',
+  description: 'Manage customers, orders, inventory, invoices, workflows, and payments in one place. Cresoa is the all-in-one Business OS built specifically for Nigerian SMEs. Join the Beta today.',
+  // ... keep your existing keywords, icons, openGraph, alternates, robots
   keywords: [
     'Business management software Nigeria',
     'Fashion designer software Nigeria',
