@@ -1,13 +1,4 @@
 const nextConfig = {
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        destination: 'https://www.cresoa.com.ng/:path*', // Added the :path* wildcard
-        permanent: true,
-      },
-    ]
-  },
   async headers() {
     return [
       {
