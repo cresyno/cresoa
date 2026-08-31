@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
 
-export default function BusinessSwitcher({ currentBusinessId }) {
+export default function BusinessSwitcher({ currentBusinessId, currentSector }) {
   const router = useRouter();
   const [businesses, setBusinesses] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -47,7 +47,12 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       const all = [...(owned || []), ...memberBusinesses];
       const unique = all.filter((b, i, self) => self.findIndex(x => x.id === b.id) === i);
 
-      setBusinesses(unique);
+      // ─── Filter by currentSector (if provided) ───
+      const filtered = currentSector
+        ? unique.filter(b => b.sector === currentSector)
+        : unique; // If no currentSector, show all (fallback)
+
+      setBusinesses(filtered);
     } catch (e) {
       console.error('Error loading businesses:', e);
     }
@@ -55,10 +60,10 @@ export default function BusinessSwitcher({ currentBusinessId }) {
 
   useEffect(() => {
     loadBusinesses();
-    // ─── Refresh after 2 seconds to catch any late DB changes ───
+    // Refresh after 2 seconds to catch any late DB changes
     const timer = setTimeout(loadBusinesses, 2000);
     return () => clearTimeout(timer);
-  }, [currentBusinessId]);
+  }, [currentBusinessId, currentSector]);
 
   const currentBusiness = businesses.find(b => b.id === currentBusinessId) || businesses[0];
 
@@ -69,8 +74,12 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       return;
     }
     localStorage.setItem('selectedBusinessId', businessId);
-    window.location.href = `/dashboard?business_id=${businessId}`;
+    window.location.href = `/dashboard/${currentSector || 'fashion'}?business_id=${businessId}`;
   };
+
+  // If there's only one business and no "Join another business" needed,
+  // we could hide the switcher entirely, but we'll keep it visible for now
+  // so users can still click "Join another business" if they want.
 
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -113,6 +122,11 @@ export default function BusinessSwitcher({ currentBusinessId }) {
           maxHeight: '250px',
           overflowY: 'auto'
         }}>
+          {businesses.length === 0 && (
+            <div style={{ padding: '10px', color: '#888', fontSize: '13px', textAlign: 'center' }}>
+              No businesses in this sector yet.
+            </div>
+          )}
           {businesses.map((biz) => (
             <button
               key={biz.id}
@@ -157,4 +171,4 @@ export default function BusinessSwitcher({ currentBusinessId }) {
       )}
     </div>
   );
-                  }
+}
