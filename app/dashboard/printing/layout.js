@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabaseClient'
 import Logo from '../../../components/Logo'
 import BusinessSwitcher from '../../components/BusinessSwitcher'
 import { Icon } from '../../../components/Icon'
+import Banner from '../../../components/Banner'
 import { PrintingNavigation } from '../../../components/PrintingNavigation'
 
 // Normalize sector
@@ -116,6 +117,8 @@ function PrintingLayoutContent({ children }) {
         // Verify sector is printing
         const normalized = normalizeSector(businessData.sector)
         if (normalized !== 'printing') {
+          // Instead of redirecting, we could render SectorMismatch later.
+          // For now, redirect to the correct dashboard.
           router.push(`/dashboard?business_id=${businessData.id}`)
           return
         }
@@ -226,14 +229,12 @@ function PrintingLayoutContent({ children }) {
         }
       `}</style>
 
-      {/* Hamburger */}
       <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
         {sidebarOpen ? '✕' : '☰'}
       </button>
       <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} style={{ display: sidebarOpen ? 'block' : 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 1500 }} />
 
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        {/* Brand - Logo top, close button separate */}
         <div className="brand">
           <Logo variant="dark-bg" size="small" />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -245,14 +246,12 @@ function PrintingLayoutContent({ children }) {
               <span className="plan">{business?.plan || 'Free'}</span>
             </div>
           </div>
-          {/* Close button - placed at far right, away from logo */}
-          <button onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#8899AA', cursor: 'pointer', fontSize: '1.2rem', padding: '0.2rem', flexShrink: 0 }}>
-            ✕
-          </button>
+          <button onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#8899AA', cursor: 'pointer', fontSize: '1.2rem', padding: '0.2rem', flexShrink: 0 }}>✕</button>
         </div>
 
+        {/* ✅ UPDATED: Pass currentSector to BusinessSwitcher */}
         <div style={{ marginBottom: '0.4rem' }}>
-          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} />
+          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} currentSector={business?.sector} />
         </div>
 
         <div className="nav-section">
@@ -303,7 +302,6 @@ function PrintingLayoutContent({ children }) {
             <span className="date">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           </div>
         </div>
-        {/* REMOVED Banner - this was causing double display */}
         {children}
       </div>
 
@@ -320,4 +318,4 @@ export default function PrintingLayout({ children }) {
       </div>
     </Suspense>
   )
-      }
+          }
