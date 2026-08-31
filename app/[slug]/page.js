@@ -20,17 +20,23 @@ export async function generateMetadata({ params }) {
   if (!page) return {}
   const { data: business } = await supabaseAdmin
     .from('businesses')
-    .select('name, sector')
+    .select('name, sector, description, logo_url, location')
     .eq('id', page.business_id)
     .single()
   return {
     title: `${business?.name || 'Business'} - ${business?.sector || 'Services'}`,
-    description: page.description || '',
+    description: page.description || business?.description || 'Welcome to our business.',
+    openGraph: {
+      title: business?.name || 'Business',
+      description: page.description || business?.description || '',
+      images: business?.logo_url ? [business.logo_url] : [],
+    },
   }
 }
 
 export default async function PublicPage({ params }) {
   const slug = params.slug
+
   const { data: page } = await supabaseAdmin
     .from('business_public_pages')
     .select('*')
@@ -60,6 +66,9 @@ export default async function PublicPage({ params }) {
     return { url: item.url, description: item.description || '' }
   })
 
+  // Ensure `about` is available (if not set in the page, use business description)
+  const about = page.about || business?.description || ''
+
   return (
     <PublicPageWrapper
       business={{
@@ -69,7 +78,11 @@ export default async function PublicPage({ params }) {
         email: business.email,
         location: business.location,
       }}
-      page={page}
+      page={{
+        ...page,
+        about,
+        description: page.description || business?.description || '',
+      }}
       services={page.services || []}
       portfolio={portfolio}
       reviews={reviews || []}
