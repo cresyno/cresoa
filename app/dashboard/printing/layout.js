@@ -8,6 +8,7 @@ import BusinessSwitcher from '../../components/BusinessSwitcher'
 import { Icon } from '../../../components/Icon'
 import Banner from '../../../components/Banner'
 import { PrintingNavigation } from '../../../components/PrintingNavigation'
+import SectorMismatch from '../../../components/SectorMismatch'
 
 // Normalize sector
 const normalizeSector = (sector) => {
@@ -30,6 +31,7 @@ function PrintingLayoutContent({ children }) {
   const [theme, setTheme] = useState('light')
   const [userRole, setUserRole] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [mismatchInfo, setMismatchInfo] = useState({ sector: '', businessId: '' })
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
@@ -117,9 +119,8 @@ function PrintingLayoutContent({ children }) {
         // Verify sector is printing
         const normalized = normalizeSector(businessData.sector)
         if (normalized !== 'printing') {
-          // Instead of redirecting, we could render SectorMismatch later.
-          // For now, redirect to the correct dashboard.
-          router.push(`/dashboard?business_id=${businessData.id}`)
+          // Show mismatch page
+          setMismatchInfo({ sector: normalized, businessId: businessData.id })
           return
         }
 
@@ -176,6 +177,11 @@ function PrintingLayoutContent({ children }) {
         `}</style>
       </div>
     )
+  }
+
+  // ─── Show SectorMismatch if needed ───
+  if (mismatchInfo.sector) {
+    return <SectorMismatch sector={mismatchInfo.sector} businessId={mismatchInfo.businessId} />
   }
 
   const isStaff = userRole === 'Staff'
@@ -318,4 +324,4 @@ export default function PrintingLayout({ children }) {
       </div>
     </Suspense>
   )
-          }
+    }
