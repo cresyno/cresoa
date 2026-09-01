@@ -18,7 +18,7 @@ const TEMPLATES = [
   { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', component: DynamicSunrise },
 ]
 
-// ─── Self-contained SVG Icons ───
+// Self-contained SVG icons
 const Icon = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
@@ -27,13 +27,26 @@ const Icon = ({ name, size = 20, stroke = 'currentColor' }) => {
     share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></>,
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
     trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
-    check: <polyline points="20 6 9 17 4 12" />,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
 }
 
 const inputStyle = { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
 const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
+
+// ─── Safe JSON parser (never crashes) ───
+const safeParseArray = (input) => {
+  try {
+    if (Array.isArray(input)) return input
+    if (typeof input === 'string') {
+      const parsed = JSON.parse(input)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch (e) {
+    // ignore
+  }
+  return []
+}
 
 export default function PublicPageSettings() {
   const router = useRouter()
@@ -85,9 +98,9 @@ export default function PublicPageSettings() {
           setHeroImage(data.cover_image_url || '')
           setDescription(data.description || '')
           setAbout(data.about || '')
-          setServices(data.services || [])
-          setShopProducts(data.shop_products || [])
-          setPortfolio(data.portfolio_images || [])
+          setServices(safeParseArray(data.services))
+          setShopProducts(safeParseArray(data.shop_products))
+          setPortfolio(safeParseArray(data.portfolio_images))
           setShowQuoteButton(data.show_quote_button ?? true)
           setShowWhatsappButton(data.show_whatsapp_button ?? true)
           setHasServices(data.has_services ?? true)
@@ -152,7 +165,7 @@ export default function PublicPageSettings() {
           about,
           services,
           shop_products: shopProducts,
-          portfolio_images: portfolio,
+          portfolio_images: portfolio, // Send array directly (not string)
           show_quote_button: showQuoteButton,
           show_whatsapp_button: showWhatsappButton,
           has_services: hasServices,
@@ -304,7 +317,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-            {/* Services Manager (Only if hasServices) */}
+         {/* Services Manager (Only if hasServices) */}
       {hasServices && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
           <label style={labelStyle}>Services</label>
@@ -369,7 +382,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-           {/* Live Preview */}
+      {/* Live Preview */}
       <div style={{ marginTop: '2rem', borderTop: '2px solid var(--cresoa-accent)', paddingTop: '1.5rem' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem' }}>Live Preview</h2>
         <div style={{ border: '1px solid var(--cresoa-border)', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
@@ -380,4 +393,4 @@ export default function PublicPageSettings() {
       </div>
     </div>
   )
-        }
+}                                                                                                               
