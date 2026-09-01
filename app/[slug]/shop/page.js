@@ -23,7 +23,10 @@ export async function generateMetadata({ params }) {
     .select('name')
     .eq('id', page.business_id)
     .single()
-  return { title: `${business?.name || 'Business'} - Shop`, description: page.description || '' }
+  return {
+    title: `${business?.name || 'Business'} - Shop`,
+    description: page.description || '',
+  }
 }
 
 export default async function ShopPage({ params }) {
@@ -34,7 +37,9 @@ export default async function ShopPage({ params }) {
     .eq('slug', slug)
     .eq('is_enabled', true)
     .maybeSingle()
+
   if (!page) notFound()
+
   const { data: business } = await supabaseAdmin
     .from('businesses')
     .select('*')
@@ -42,14 +47,24 @@ export default async function ShopPage({ params }) {
     .single()
 
   let shop = []
-  try { shop = page.shop_products || []; if (!Array.isArray(shop)) shop = [] } catch { shop = [] }
+  try {
+    shop = page.shop_products || []
+    if (!Array.isArray(shop)) shop = []
+  } catch {
+    shop = []
+  }
 
   return (
     <ShopPageClient
-      business={{ name: business.name, logo_url: business.logo_url, phone: business.phone, email: business.email, location: business.location }}
+      business={{
+        name: business.name,
+        logo_url: business.logo_url,
+        phone: business.phone,
+        email: business.email,
+        location: business.location,
+      }}
       page={page}
       shop={shop}
-      templateId={page.template_id || 'elegant'}
     />
   )
-}
+        }
