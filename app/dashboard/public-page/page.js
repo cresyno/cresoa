@@ -18,7 +18,6 @@ const TEMPLATES = [
   { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', component: DynamicSunrise },
 ]
 
-// Self-contained SVG icons
 const Icon = ({ name, size = 20, stroke = 'currentColor' }) => {
   const icons = {
     edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
@@ -34,7 +33,6 @@ const Icon = ({ name, size = 20, stroke = 'currentColor' }) => {
 const inputStyle = { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
 const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
 
-// ─── Safe JSON parser (never crashes) ───
 const safeParseArray = (input) => {
   try {
     if (Array.isArray(input)) return input
@@ -42,9 +40,7 @@ const safeParseArray = (input) => {
       const parsed = JSON.parse(input)
       if (Array.isArray(parsed)) return parsed
     }
-  } catch (e) {
-    // ignore
-  }
+  } catch (e) {}
   return []
 }
 
@@ -59,7 +55,6 @@ export default function PublicPageSettings() {
   const [publicUrl, setPublicUrl] = useState('')
   const [isEditing, setIsEditing] = useState(false)
 
-  // Form state
   const [enabled, setEnabled] = useState(false)
   const [slug, setSlug] = useState('')
   const [slugStatus, setSlugStatus] = useState('idle')
@@ -165,7 +160,7 @@ export default function PublicPageSettings() {
           about,
           services,
           shop_products: shopProducts,
-          portfolio_images: portfolio, // Send array directly (not string)
+          portfolio_images: portfolio,
           show_quote_button: showQuoteButton,
           show_whatsapp_button: showWhatsappButton,
           has_services: hasServices,
@@ -180,17 +175,14 @@ export default function PublicPageSettings() {
     } catch (err) { setMessage('❌ ' + err.message) } finally { setSaving(false) }
   }
 
-  // Services
   const addService = () => setServices(prev => [...prev, { name: '', description: '', image_url: '' }])
   const updateService = (idx, field, val) => setServices(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s))
   const removeService = (idx) => setServices(prev => prev.filter((_, i) => i !== idx))
 
-  // Shop products
   const addProduct = () => setShopProducts(prev => [...prev, { name: '', description: '', price: '', image_url: '' }])
   const updateProduct = (idx, field, val) => setShopProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: val } : p))
   const removeProduct = (idx) => setShopProducts(prev => prev.filter((_, i) => i !== idx))
 
-  // Portfolio
   const handlePortfolioUpload = (url) => setPortfolio(prev => [...prev, { url, description: '' }])
   const updatePortfolioDescription = (idx, val) => setPortfolio(prev => prev.map((p, i) => i === idx ? { ...p, description: val } : p))
   const removePortfolio = (idx) => setPortfolio(prev => prev.filter((_, i) => i !== idx))
@@ -208,7 +200,6 @@ export default function PublicPageSettings() {
 
   return (
     <div style={{ padding: '1rem', maxWidth: '900px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh', paddingBottom: '100px' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Public Page</p>
@@ -225,7 +216,6 @@ export default function PublicPageSettings() {
 
       {message && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', marginBottom: '1rem', background: message.startsWith('✅') ? 'var(--cresoa-success-soft)' : 'var(--cresoa-danger-soft)', color: message.startsWith('✅') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{message}</div>}
 
-      {/* Logo */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Business Logo</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -234,7 +224,6 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-      {/* Enable */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Enable your public page</span>
         <button onClick={() => isEditing && setEnabled(!enabled)} disabled={!isEditing} style={{ width: '48px', height: '24px', borderRadius: '12px', border: 'none', cursor: isEditing ? 'pointer' : 'not-allowed', background: enabled ? 'var(--cresoa-success)' : 'var(--cresoa-border)', position: 'relative' }}>
@@ -242,7 +231,6 @@ export default function PublicPageSettings() {
         </button>
       </div>
 
-      {/* Slug */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Your Page URL</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -252,15 +240,11 @@ export default function PublicPageSettings() {
           ) : (
             <span style={{ fontWeight: 600, fontSize: '1rem' }}>{slug || 'your-business-name'}</span>
           )}
-          {isEditing && (
-            <button onClick={autoSuggestSlug} style={{ background: 'none', border: 'none', color: 'var(--cresoa-accent)', cursor: 'pointer', fontSize: '0.8rem' }}>Auto-suggest</button>
-          )}
+          {isEditing && <button onClick={autoSuggestSlug} style={{ background: 'none', border: 'none', color: 'var(--cresoa-accent)', cursor: 'pointer', fontSize: '0.8rem' }}>Auto-suggest</button>}
         </div>
         {isEditing && (
           <div style={{ marginTop: '0.4rem' }}>
-            <span style={{ color: slugStatus === 'available' ? 'green' : slugStatus === 'taken' ? 'red' : 'gray', fontSize: '0.8rem' }}>
-              {slugStatus === 'checking' ? 'Checking...' : slugStatus === 'available' ? '✅ Available' : slugStatus === 'taken' ? '❌ Taken' : ''}
-            </span>
+            <span style={{ color: slugStatus === 'available' ? 'green' : slugStatus === 'taken' ? 'red' : 'gray', fontSize: '0.8rem' }}>{slugStatus === 'checking' ? 'Checking...' : slugStatus === 'available' ? '✅ Available' : slugStatus === 'taken' ? '❌ Taken' : ''}</span>
           </div>
         )}
         {publicUrl && enabled && (
@@ -271,7 +255,6 @@ export default function PublicPageSettings() {
         )}
       </div>
 
-      {/* Template */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Choose Template</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
@@ -283,26 +266,22 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-      {/* Hero Photo */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Hero Section Photo</label>
         {isEditing && <FileUpload businessId={businessId} purpose="cover" label="Upload Hero Photo" onUploaded={setHeroImage} />}
         {heroImage && <img src={heroImage} alt="Hero" style={{ marginTop: '0.8rem', width: '100%', maxHeight: '250px', objectFit: 'cover', borderRadius: '8px' }} />}
       </div>
 
-      {/* Description */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Short Description (Hero)</label>
         <textarea value={description} onChange={(e) => isEditing && setDescription(e.target.value)} disabled={!isEditing} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
 
-      {/* About */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>About Section</label>
         <textarea value={about} onChange={(e) => isEditing && setAbout(e.target.value)} disabled={!isEditing} rows={5} style={{ ...inputStyle, resize: 'vertical' }} />
       </div>
 
-      {/* Services vs Shop Toggle */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Show Sections</label>
         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -317,8 +296,7 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-         {/* Services Manager (Only if hasServices) */}
-      {hasServices && (
+            {hasServices && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
           <label style={labelStyle}>Services</label>
           {services.map((s, idx) => (
@@ -336,7 +314,6 @@ export default function PublicPageSettings() {
         </div>
       )}
 
-      {/* Shop Products Manager (Only if hasShop) */}
       {hasShop && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
           <label style={labelStyle}>Shop Products</label>
@@ -356,7 +333,6 @@ export default function PublicPageSettings() {
         </div>
       )}
 
-      {/* Portfolio */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Portfolio</label>
         {isEditing && <FileUpload businessId={businessId} purpose="portfolio" label="Add Image" multiple onUploaded={handlePortfolioUpload} />}
@@ -373,7 +349,6 @@ export default function PublicPageSettings() {
         )}
       </div>
 
-      {/* Toggles */}
       <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
         <label style={labelStyle}>Buttons</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -382,7 +357,6 @@ export default function PublicPageSettings() {
         </div>
       </div>
 
-      {/* Live Preview */}
       <div style={{ marginTop: '2rem', borderTop: '2px solid var(--cresoa-accent)', paddingTop: '1.5rem' }}>
         <h2 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem' }}>Live Preview</h2>
         <div style={{ border: '1px solid var(--cresoa-border)', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
@@ -393,4 +367,4 @@ export default function PublicPageSettings() {
       </div>
     </div>
   )
-}                                                                                                               
+            }
