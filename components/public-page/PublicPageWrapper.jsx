@@ -1,27 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import ClassicGold from '../public-templates/ClassicGold'
-import ModernBold from '../public-templates/ModernBold'
-import Elegant from '../public-templates/Elegant'
-import FreshSerene from '../public-templates/FreshSerene'
-import DynamicSunrise from '../public-templates/DynamicSunrise'
+import { getTemplate } from '../../lib/templateRegistry'
 import QuoteModal from './QuoteModal'
 import ReviewForm from './ReviewForm'
-
-const TEMPLATES = {
-  'classic-gold': ClassicGold,
-  'modern-bold': ModernBold,
-  'elegant': Elegant,
-  'fresh-serene': FreshSerene,
-  'dynamic-sunrise': DynamicSunrise,
-}
 
 export default function PublicPageWrapper({ business, page, services, shop, portfolio, reviews, templateId }) {
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
 
-  const Template = TEMPLATES[templateId] || Elegant
+  const Template = getTemplate(templateId)
 
   return (
     <>
