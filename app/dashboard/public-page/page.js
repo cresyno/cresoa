@@ -152,7 +152,7 @@ export default function PublicPageSettings() {
           about,
           services,
           shop_products: shopProducts,
-          portfolio_images: portfolio,
+          portfolio_images: JSON.stringify(portfolio), // Explicitly stringify
           show_quote_button: showQuoteButton,
           show_whatsapp_button: showWhatsappButton,
           has_services: hasServices,
