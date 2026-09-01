@@ -60,6 +60,7 @@ export default async function PublicPage({ params }) {
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
 
+    // Bulletproof portfolio parsing
     let portfolio = []
     try {
       const raw = page.portfolio_images || []
@@ -105,4 +106,4 @@ export default async function PublicPage({ params }) {
       </div>
     )
   }
-}
+              }
