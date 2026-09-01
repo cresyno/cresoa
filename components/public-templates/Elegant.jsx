@@ -4,12 +4,10 @@ import { useState } from 'react'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
   const [cartItems, setCartItems] = useState([])
-  const scrollTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-  }
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   const shopUrl = `/${page.slug || ''}/shop`
-  const shopPreview = shop.slice(0, 2) // Limit to 2 products
+  const shopPreview = shop.slice(0, 2)
 
   const addToCart = (product) => {
     setCartItems(prev => {
@@ -54,19 +52,13 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
       {/* Header */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(250,250,249,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E5E7EB', padding: '0.8rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          {business.logo_url ? (
-            <img src={business.logo_url} alt={business.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
-          ) : (
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>{business.name.charAt(0)}</div>
-          )}
+          {business.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} /> : <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>{business.name.charAt(0)}</div>}
           <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#0F2B4A' }}>{business.name}</span>
         </div>
         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', fontWeight: 500, color: '#6B7280' }}>
           <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>About</button>
           <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Services</button>
-          {page.has_shop && (
-            <a href={shopUrl} style={{ textDecoration: 'none', color: '#D4A52A', fontWeight: 600 }}>Shop</a>
-          )}
+          {page.has_shop && <a href={shopUrl} style={{ textDecoration: 'none', color: '#D4A52A', fontWeight: 600 }}>Shop</a>}
           <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Work</button>
           <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Contact</button>
         </div>
@@ -75,11 +67,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
       {/* Hero */}
       <section id="home" style={{ padding: '6rem 1.5rem', textAlign: 'center', ...heroStyle }}>
         <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-          {business.logo_url ? (
-            <img src={business.logo_url} alt={business.name} style={{ width: '100px', height: '100px', borderRadius: '20px', objectFit: 'contain', marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} />
-          ) : (
-            <div style={{ width: '100px', height: '100px', borderRadius: '20px', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: 800, margin: '0 auto 1.5rem', color: '#fff' }}>{business.name.charAt(0)}</div>
-          )}
+          {business.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '100px', height: '100px', borderRadius: '20px', objectFit: 'contain', marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} /> : <div style={{ width: '100px', height: '100px', borderRadius: '20px', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: 800, margin: '0 auto 1.5rem', color: '#fff' }}>{business.name.charAt(0)}</div>}
           <h1 style={{ fontSize: '2.5rem', fontWeight: 300, letterSpacing: '-0.02em', margin: '0 0 1rem', lineHeight: 1.2 }}>{business.name}</h1>
           <p style={{ fontSize: '1.15rem', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto', opacity: 0.9 }}>{page.description}</p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
@@ -116,7 +104,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Shop (Limit to 2 products) */}
+      {/* Shop (Limit to 2) */}
       {page.has_shop && shop.length > 0 && (
         <section id="shop" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Our Products</h2>
@@ -133,9 +121,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
           </div>
           {shop.length > 2 && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-              <a href={shopUrl} style={{ padding: '0.7rem 1.5rem', background: '#0F2B4A', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: 600 }}>
-                View All Products
-              </a>
+              <a href={shopUrl} style={{ padding: '0.7rem 1.5rem', background: '#0F2B4A', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: 600 }}>View All Products</a>
             </div>
           )}
         </section>
@@ -178,9 +164,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         <h2 style={{ fontSize: '2rem', fontWeight: 400, margin: '0 0 1.5rem' }}>Get in Touch</h2>
         <p style={{ opacity: 0.8, marginBottom: '2rem' }}>We'd love to hear from you!</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          {page.show_whatsapp_button && business.phone && (
-            <a href={`https://wa.me/${business.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp Us</a>
-          )}
+          {page.show_whatsapp_button && business.phone && <a href={`https://wa.me/${business.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp Us</a>}
           {page.show_quote_button && <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Request a Quote</button>}
         </div>
         {business.location && <p style={{ marginTop: '2rem', opacity: 0.7 }}>📍 {business.location}</p>}
@@ -191,7 +175,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         © {new Date().getFullYear()} {business.name} · Powered by <span style={{ color: '#D4A52A', fontWeight: 700 }}>Cresoa</span>
       </footer>
 
-      {/* Cart Floating Button (Only if shop enabled and has items) */}
+      {/* Cart Floating Button */}
       {cartItems.length > 0 && (
         <button onClick={handleWhatsAppCheckout} style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#25D366', color: '#fff', padding: '1rem 1.5rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,211,102,0.4)', zIndex: 1000 }}>
           🛒 Checkout ({cartItems.length} items) - ₦{getCartTotal().toLocaleString()}
@@ -199,4 +183,4 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
       )}
     </div>
   )
-      }
+                      }
