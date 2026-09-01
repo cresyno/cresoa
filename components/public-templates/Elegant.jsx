@@ -24,19 +24,38 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
     }, 0)
   }
 
-  const handleWhatsAppCheckout = () => {
-    if (!cartItems.length) return
-    const customerName = prompt('What is your name?') || 'Customer'
-    const customerPhone = prompt('What is your phone number?') || ''
-    const customerAddress = prompt('What is your delivery address?') || ''
-    const itemsText = cartItems.map(item => `- ${item.name} (x${item.quantity}) - ${item.price}`).join('\n')
-    const totalText = `Total: ₦${getCartTotal().toLocaleString()}`
-    const message = `Hello ${business.name},\n\nI would like to order:\n\n${itemsText}\n\n${totalText}\n\nName: ${customerName}\nPhone: ${customerPhone}\nAddress: ${customerAddress}`
-    const waUrl = `https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
-    window.open(waUrl, '_blank')
-    setCartItems([])
+  const handleWhatsAppCheckout = async () => {
+  if (!cartItems.length) return
+  const customerName = prompt('What is your name?') || 'Customer'
+  const customerPhone = prompt('What is your phone number?') || ''
+  const customerAddress = prompt('What is your delivery address?') || ''
+  const total = getCartTotal().toLocaleString()
+  const itemsText = cartItems.map(item => `- ${item.name} (x${item.quantity}) - ${item.price}`).join('\n')
+
+  // Save order to database first
+  try {
+    const res = await fetch('/api/public-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_id: page.business_id,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_address: customerAddress,
+        items: cartItems,
+        total_amount: `₦${total}`,
+      }),
+    })
+    if (!res.ok) console.error('Failed to save order')
+  } catch (err) {
+    console.error('Order save error:', err)
   }
 
+  const message = `Hello ${business.name},\n\nI would like to order:\n\n${itemsText}\n\nTotal: ₦${total}\n\nName: ${customerName}\nPhone: ${customerPhone}\nAddress: ${customerAddress}`
+  const waUrl = `https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+  window.open(waUrl, '_blank')
+  setCartItems([])
+    }
   const heroStyle = page.cover_image_url ? {
     backgroundImage: `linear-gradient(rgba(10,22,40,0.7), rgba(10,22,40,0.7)), url(${page.cover_image_url})`,
     backgroundSize: 'cover',
