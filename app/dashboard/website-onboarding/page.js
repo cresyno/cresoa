@@ -352,5 +352,12 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
-        {/* Footer buttons */}
-        <div style={{ display: '
+             {/* Footer buttons */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
+          {step > 1 ? <button onClick={handleBack} style={{ background: 'none', border: 'none', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>Back</button> : <div />}
+          {step < 5 ? <button onClick={handleNext} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.7rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 600 }}>Continue</button> : <div />}
+        </div>
+      </div>
+    </div>
+  )
+            }
