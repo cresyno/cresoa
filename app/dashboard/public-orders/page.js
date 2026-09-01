@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../../../lib/supabaseClient'
+import { supabase } from '../../../lib/supabaseClient'
 
 const STATUSES = ['new', 'confirmed', 'processing', 'ready', 'completed']
 
