@@ -84,9 +84,10 @@ export default async function PublicPage({ params }) {
         description: page.description || business?.description || '',
       }}
       services={page.services || []}
+      shop={page.shop_products || []}
       portfolio={portfolio}
       reviews={reviews || []}
       templateId={page.template_id || 'elegant'}
     />
   )
-}
+        }
