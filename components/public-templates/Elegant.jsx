@@ -2,34 +2,76 @@
 
 import { useState } from 'react'
 
-const fonts = "'Playfair Display', 'Inter', sans-serif"
+export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
+  const [activeSection, setActiveSection] = useState('home')
+  const [cartItems, setCartItems] = useState([])
 
-export default function Elegant({ business, page, services, portfolio, reviews, onQuoteClick, onReviewClick }) {
-  const [activeNav, setActiveNav] = useState('home')
-  const scrollTo = (id) => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setActiveNav(id) }
+  const scrollTo = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    setActiveSection(id)
+  }
+
+  const addToCart = (product) => {
+    setCartItems(prev => {
+      const existing = prev.find(item => item.name === product.name)
+      if (existing) {
+        return prev.map(item => item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
+      }
+      return [...prev, { ...product, quantity: 1 }]
+    })
+  }
+
+  const getCartTotal = () => {
+    return cartItems.reduce((sum, item) => {
+      const price = parseFloat(item.price.replace(/[^\d.]/g, '')) || 0
+      return sum + (price * item.quantity)
+    }, 0)
+  }
+
+  const handleWhatsAppCheckout = () => {
+    if (!cartItems.length) return
+    const customerName = prompt('What is your name?') || 'Customer'
+    const customerPhone = prompt('What is your phone number?') || ''
+    const customerAddress = prompt('What is your delivery address?') || ''
+
+    const itemsText = cartItems.map(item => `- ${item.name} (x${item.quantity}) - ${item.price}`).join('\n')
+    const totalText = `Total: ₦${getCartTotal().toLocaleString()}`
+
+    const message = `Hello ${business.name},\n\nI would like to order:\n\n${itemsText}\n\n${totalText}\n\nName: ${customerName}\nPhone: ${customerPhone}\nAddress: ${customerAddress}`
+
+    const waUrl = `https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
+    window.open(waUrl, '_blank')
+    setCartItems([])
+  }
 
   const heroStyle = page.cover_image_url ? {
-    background: `linear-gradient(rgba(219,39,119,0.3), rgba(30,41,59,0.5)), url(${page.cover_image_url}) center/cover no-repeat`,
+    backgroundImage: `linear-gradient(rgba(10,22,40,0.7), rgba(10,22,40,0.7)), url(${page.cover_image_url})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     color: '#fff',
-  } : { background: 'linear-gradient(180deg, #FAFAF9 0%, #FDF2F8 100%)', color: '#1E293B' }
+  } : {
+    background: 'linear-gradient(135deg, #0F2B4A 0%, #1A3F66 100%)',
+    color: '#fff',
+  }
 
   return (
-    <div style={{ fontFamily: fonts, background: '#FAFAF9', color: '#1E293B', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FAFAF9' }}>
       {/* Header */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(250,250,249,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E5E7EB', padding: '0.8rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           {business.logo_url ? (
-            <img src={business.logo_url} alt={business.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain', background: '#fff', border: '1px solid #E5E7EB' }} />
+            <img src={business.logo_url} alt={business.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'contain' }} />
           ) : (
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#DB2777', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>{business.name?.charAt(0) || 'B'}</div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>{business.name.charAt(0)}</div>
           )}
-          <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{business.name}</span>
+          <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#0F2B4A' }}>{business.name}</span>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
-          <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>About</button>
-          <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>Services</button>
-          <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>Work</button>
-          <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}>Contact</button>
+        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', fontWeight: 500, color: '#6B7280' }}>
+          <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'about' ? '#D4A52A' : '#6B7280' }}>About</button>
+          <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'services' ? '#D4A52A' : '#6B7280' }}>Services</button>
+          <button onClick={() => scrollTo('shop')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'shop' ? '#D4A52A' : '#6B7280' }}>Shop</button>
+          <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'portfolio' ? '#D4A52A' : '#6B7280' }}>Work</button>
+          <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'contact' ? '#D4A52A' : '#6B7280' }}>Contact</button>
         </div>
       </nav>
 
@@ -37,67 +79,89 @@ export default function Elegant({ business, page, services, portfolio, reviews, 
       <section id="home" style={{ padding: '6rem 1.5rem', textAlign: 'center', ...heroStyle }}>
         <div style={{ maxWidth: '700px', margin: '0 auto' }}>
           {business.logo_url ? (
-            <img src={business.logo_url} alt={business.name} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'contain', background: '#fff', padding: '10px', marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+            <img src={business.logo_url} alt={business.name} style={{ width: '100px', height: '100px', borderRadius: '20px', objectFit: 'contain', marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} />
           ) : (
-            <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#DB2777', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 800, color: '#fff', margin: '0 auto 1.5rem' }}>{business.name?.charAt(0) || 'B'}</div>
+            <div style={{ width: '100px', height: '100px', borderRadius: '20px', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: 800, margin: '0 auto 1.5rem', color: '#fff' }}>{business.name.charAt(0)}</div>
           )}
-          <h1 style={{ fontSize: '3rem', fontWeight: 400, letterSpacing: '-0.02em', margin: '0 0 1rem' }}>{business.name}</h1>
-          <p style={{ fontSize: '1.2rem', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto' }}>{page.description}</p>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 300, letterSpacing: '-0.02em', margin: '0 0 1rem', lineHeight: 1.2 }}>{business.name}</h1>
+          <p style={{ fontSize: '1.15rem', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto', opacity: 0.9 }}>{page.description}</p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
+            <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(212,165,42,0.3)' }}>Request a Free Quote →</button>
+            <button onClick={() => scrollTo('portfolio')} style={{ background: 'transparent', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', border: '2px solid #fff', fontWeight: 600, cursor: 'pointer' }}>View Our Work</button>
+          </div>
         </div>
       </section>
 
       {/* About */}
       {page.about && (
         <section id="about" style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem' }}>About Us</h2>
-          <p style={{ fontSize: '1.05rem', color: '#4B5563', lineHeight: 2, textAlign: 'center' }}>{page.about}</p>
+          <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>About Us</h2>
+          <p style={{ fontSize: '1.1rem', color: '#4B5563', lineHeight: 2, textAlign: 'center' }}>{page.about}</p>
         </section>
       )}
 
       {/* Services */}
-      <section id="services" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem' }}>Our Services</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-          {services.length === 0 ? (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', background: '#fff', borderRadius: '12px' }}>Our services are coming soon!</div>
-          ) : services.map((service, idx) => (
-            <div key={idx} style={{ background: '#fff', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #E5E7EB' }}>
-              {service.image_url && <img src={service.image_url} alt={service.name} style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.8rem' }} />}
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '0 0 0.5rem' }}>{service.name}</h3>
-              <p style={{ color: '#DB2777', fontWeight: 600, margin: '0 0 0.5rem' }}>{service.price}</p>
-              <p style={{ color: '#6B7280', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>{service.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Portfolio */}
-      <section id="portfolio" style={{ padding: '4rem 1.5rem', background: '#fff' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem' }}>Our Work</h2>
-          {portfolio.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', background: '#F3F4F6', borderRadius: '12px' }}>Our portfolio is coming soon!</div>
-          ) : (
+      {page.has_services !== false && services.length > 0 && (
+        <section id="services" style={{ padding: '4rem 1.5rem', background: '#F3F4F6' }}>
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Our Services</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {portfolio.map((img, idx) => (
-                <div key={idx} style={{ background: '#F3F4F6', borderRadius: '12px', overflow: 'hidden' }}>
-                  <img src={img.url} alt={`Work ${idx + 1}`} style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
-                  {img.description && <p style={{ padding: '0.8rem 1rem', margin: 0, color: '#4B5563', fontSize: '0.9rem', textAlign: 'center' }}>{img.description}</p>}
+              {services.map((service, idx) => (
+                <div key={idx} style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+                  {service.image_url && <img src={service.image_url} alt={service.name} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '12px', marginBottom: '1rem' }} />}
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 600, margin: '0 0 0.5rem' }}>{service.name}</h3>
+                  <p style={{ color: '#6B7280', fontSize: '0.95rem', lineHeight: 1.6 }}>{service.description}</p>
+                  <button onClick={onQuoteClick} style={{ marginTop: '1rem', padding: '0.5rem 1.2rem', borderRadius: '8px', border: 'none', background: '#D4A52A', color: '#0F2B4A', fontWeight: 600, cursor: 'pointer' }}>Request Service →</button>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
+
+      {/* Shop */}
+      {page.has_shop && shop.length > 0 && (
+        <section id="shop" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Our Products</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            {shop.map((product, idx) => (
+              <div key={idx} style={{ background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                {product.image_url && <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.5rem' }} />}
+                <h4 style={{ fontWeight: 600, margin: '0 0 0.3rem' }}>{product.name}</h4>
+                <p style={{ color: '#D4A52A', fontWeight: 700, margin: '0 0 0.5rem' }}>{product.price}</p>
+                <p style={{ color: '#6B7280', fontSize: '0.85rem', lineHeight: 1.5 }}>{product.description}</p>
+                <button onClick={() => addToCart(product)} style={{ marginTop: '0.5rem', width: '100%', padding: '0.6rem', borderRadius: '8px', border: 'none', background: '#0F2B4A', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Add to Cart</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Portfolio */}
+      {portfolio.length > 0 && (
+        <section id="portfolio" style={{ padding: '4rem 1.5rem', background: '#F3F4F6' }}>
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Our Work</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {portfolio.map((img, idx) => (
+                <div key={idx} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <img src={img.url} alt={`Work ${idx + 1}`} style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
+                  {img.description && <p style={{ padding: '1rem', margin: 0, color: '#4B5563', fontSize: '0.9rem' }}>{img.description}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Testimonials */}
       {reviews.length > 0 && (
         <section style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem' }}>Testimonials</h2>
+          <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>What Clients Say</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {reviews.map((review, idx) => (
-              <blockquote key={idx} style={{ background: '#fff', borderLeft: '4px solid #DB2777', padding: '1.5rem', borderRadius: '12px', margin: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                <p style={{ fontStyle: 'italic', margin: '0 0 0.8rem', lineHeight: 1.6 }}>“{review.review_text}”</p>
+              <blockquote key={idx} style={{ background: '#fff', borderLeft: '4px solid #D4A52A', padding: '1.5rem', borderRadius: '12px', margin: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <p style={{ fontStyle: 'italic', margin: '0 0 0.8rem' }}>"{review.review_text}"</p>
                 <footer style={{ color: '#6B7280', fontSize: '0.9rem' }}><strong>{review.customer_name}</strong> · {'⭐'.repeat(review.rating)}</footer>
               </blockquote>
             ))}
@@ -106,21 +170,29 @@ export default function Elegant({ business, page, services, portfolio, reviews, 
       )}
 
       {/* Contact */}
-      <section id="contact" style={{ background: '#1E293B', color: '#fff', padding: '4rem 1.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: 400, margin: '0 0 1.5rem' }}>Let's Work Together</h2>
+      <section id="contact" style={{ background: '#0F2B4A', color: '#fff', padding: '4rem 1.5rem', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '2rem', fontWeight: 400, margin: '0 0 1.5rem' }}>Get in Touch</h2>
+        <p style={{ opacity: 0.8, marginBottom: '2rem' }}>We'd love to hear from you!</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           {page.show_whatsapp_button && business.phone && (
-            <a href={`https://wa.me/${business.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp</a>
+            <a href={`https://wa.me/${business.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp Us</a>
           )}
-          {page.show_quote_button && <button onClick={onQuoteClick} style={{ background: '#DB2777', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Request Quote</button>}
-          <button onClick={onReviewClick} style={{ background: 'transparent', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', border: '2px solid #fff', fontWeight: 600, cursor: 'pointer' }}>Leave Review</button>
+          {page.show_quote_button && <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Request a Quote</button>}
         </div>
         {business.location && <p style={{ marginTop: '2rem', opacity: 0.7 }}>📍 {business.location}</p>}
       </section>
 
-      <footer style={{ background: '#111827', color: '#9CA3AF', padding: '2rem 1.5rem', textAlign: 'center', fontSize: '0.85rem' }}>
-        © {new Date().getFullYear()} {business.name} · Powered by <span style={{ color: '#DB2777', fontWeight: 700 }}>Cresoa</span>
+      {/* Footer */}
+      <footer style={{ background: '#0A1628', color: '#8899AA', padding: '2rem 1.5rem', textAlign: 'center', fontSize: '0.85rem' }}>
+        © {new Date().getFullYear()} {business.name} · Powered by <span style={{ color: '#D4A52A', fontWeight: 700 }}>Cresoa</span>
       </footer>
+
+      {/* Cart Floating Button (Only if shop enabled and has items) */}
+      {cartItems.length > 0 && (
+        <button onClick={handleWhatsAppCheckout} style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#25D366', color: '#fff', padding: '1rem 1.5rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,211,102,0.4)', zIndex: 1000 }}>
+          🛒 Checkout ({cartItems.length} items) - ₦{getCartTotal().toLocaleString()}
+        </button>
+      )}
     </div>
   )
-            }
+      }
