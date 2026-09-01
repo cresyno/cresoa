@@ -3,20 +3,18 @@
 import { useState } from 'react'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
-  const [activeSection, setActiveSection] = useState('home')
   const [cartItems, setCartItems] = useState([])
-
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-    setActiveSection(id)
   }
+
+  const shopUrl = `/${page.slug || ''}/shop`
+  const shopPreview = shop.slice(0, 2) // Limit to 2 products
 
   const addToCart = (product) => {
     setCartItems(prev => {
       const existing = prev.find(item => item.name === product.name)
-      if (existing) {
-        return prev.map(item => item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
-      }
+      if (existing) return prev.map(item => item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
       return [...prev, { ...product, quantity: 1 }]
     })
   }
@@ -33,12 +31,9 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
     const customerName = prompt('What is your name?') || 'Customer'
     const customerPhone = prompt('What is your phone number?') || ''
     const customerAddress = prompt('What is your delivery address?') || ''
-
     const itemsText = cartItems.map(item => `- ${item.name} (x${item.quantity}) - ${item.price}`).join('\n')
     const totalText = `Total: ₦${getCartTotal().toLocaleString()}`
-
     const message = `Hello ${business.name},\n\nI would like to order:\n\n${itemsText}\n\n${totalText}\n\nName: ${customerName}\nPhone: ${customerPhone}\nAddress: ${customerAddress}`
-
     const waUrl = `https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
     window.open(waUrl, '_blank')
     setCartItems([])
@@ -67,11 +62,13 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
           <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#0F2B4A' }}>{business.name}</span>
         </div>
         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', fontWeight: 500, color: '#6B7280' }}>
-          <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'about' ? '#D4A52A' : '#6B7280' }}>About</button>
-          <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'services' ? '#D4A52A' : '#6B7280' }}>Services</button>
-          <button onClick={() => scrollTo('shop')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'shop' ? '#D4A52A' : '#6B7280' }}>Shop</button>
-          <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'portfolio' ? '#D4A52A' : '#6B7280' }}>Work</button>
-          <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: activeSection === 'contact' ? '#D4A52A' : '#6B7280' }}>Contact</button>
+          <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>About</button>
+          <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Services</button>
+          {page.has_shop && (
+            <a href={shopUrl} style={{ textDecoration: 'none', color: '#D4A52A', fontWeight: 600 }}>Shop</a>
+          )}
+          <button onClick={() => scrollTo('portfolio')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Work</button>
+          <button onClick={() => scrollTo('contact')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Contact</button>
         </div>
       </nav>
 
@@ -119,12 +116,12 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Shop */}
+      {/* Shop (Limit to 2 products) */}
       {page.has_shop && shop.length > 0 && (
         <section id="shop" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Our Products</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            {shop.map((product, idx) => (
+            {shopPreview.map((product, idx) => (
               <div key={idx} style={{ background: '#fff', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                 {product.image_url && <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.5rem' }} />}
                 <h4 style={{ fontWeight: 600, margin: '0 0 0.3rem' }}>{product.name}</h4>
@@ -134,6 +131,13 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
               </div>
             ))}
           </div>
+          {shop.length > 2 && (
+            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+              <a href={shopUrl} style={{ padding: '0.7rem 1.5rem', background: '#0F2B4A', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: 600 }}>
+                View All Products
+              </a>
+            </div>
+          )}
         </section>
       )}
 
