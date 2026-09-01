@@ -59,14 +59,42 @@ export default async function PublicPage({ params }) {
     .eq('is_approved', true)
     .order('created_at', { ascending: false })
 
-  // Normalize portfolio to { url, description } format
+  // ─── ROBUST PORTFOLIO NORMALIZATION ───
   const rawPortfolio = page.portfolio_images || []
-  const portfolio = rawPortfolio.map(item => {
+  let portfolio = []
+
+  // If it's a string, try to parse it
+  if (typeof rawPortfolio === 'string') {
+    try {
+      portfolio = JSON.parse(rawPortfolio)
+    } catch (e) {
+      portfolio = []
+    }
+  } else {
+    portfolio = rawPortfolio
+  }
+
+  // Normalize each item
+  portfolio = portfolio.map(item => {
+    // If item is a simple string (old format), convert to object
     if (typeof item === 'string') return { url: item, description: '' }
-    return { url: item.url, description: item.description || '' }
+
+    // If item is an object but missing `url`, check for broken numeric-key URLs
+    if (item && typeof item === 'object' && !item.url) {
+      const urlChars = Object.keys(item)
+        .filter(k => /^\d+$/.test(k))
+        .sort((a, b) => parseInt(a) - parseInt(b))
+        .map(k => item[k])
+
+      if (urlChars.length > 0) {
+        return { url: urlChars.join(''), description: item.description || '' }
+      }
+    }
+
+    return { url: item.url || '', description: item.description || '' }
   })
 
-  // Ensure `about` is available (if not set in the page, use business description)
+  // Ensure `about` is available
   const about = page.about || business?.description || ''
 
   return (
@@ -90,4 +118,4 @@ export default async function PublicPage({ params }) {
       templateId={page.template_id || 'elegant'}
     />
   )
-        }
+          }
