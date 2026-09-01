@@ -300,7 +300,8 @@ export default function WebsiteEditor() {
             )}
           </div>
         )
-      case 'portfolio':
+
+case 'portfolio':
         return (
           <div key="portfolio" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
@@ -454,4 +455,4 @@ export default function WebsiteEditor() {
       </div>
     </div>
   )
-              }
+}
