@@ -18,7 +18,7 @@ const TEMPLATES = {
   'dynamic-sunrise': DynamicSunrise,
 }
 
-const Icon = ({ name, size = 18, stroke = 'currentColor' }) => {
+const Icon = ({ name, size = 18, stroke = 'currentColor', style }) => {
   const icons = {
     edit: <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
     save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>,
@@ -28,12 +28,27 @@ const Icon = ({ name, size = 18, stroke = 'currentColor' }) => {
     trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
     hide: <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>,
+    chevronDown: <polyline points="6 9 12 15 18 9" />,
+    chevronUp: <polyline points="18 15 12 9 6 15" />,
+    external: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></>,
+    camera: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>,
   }
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
 }
 
 const inputStyle = { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
 const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
+
+const safeParseArray = (input) => {
+  try {
+    if (Array.isArray(input)) return input
+    if (typeof input === 'string') {
+      const parsed = JSON.parse(input)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch (e) {}
+  return []
+}
 
 export default function WebsiteEditor() {
   const router = useRouter()
@@ -44,10 +59,10 @@ export default function WebsiteEditor() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [publicUrl, setPublicUrl] = useState('')
+  const [hasWebsite, setHasWebsite] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Website state
-  const [enabled, setEnabled] = useState(false)
-  const [publishStatus, setPublishStatus] = useState('draft')
   const [slug, setSlug] = useState('')
   const [templateId, setTemplateId] = useState('elegant')
   const [logo, setLogo] = useState('')
@@ -62,6 +77,7 @@ export default function WebsiteEditor() {
   const [hasServices, setHasServices] = useState(true)
   const [hasShop, setHasShop] = useState(false)
   const [sectionOrder, setSectionOrder] = useState(['hero', 'about', 'services', 'shop', 'portfolio', 'testimonials', 'contact'])
+  const [hiddenSections, setHiddenSections] = useState([])
 
   // Debounced save
   const saveTimer = useRef(null)
@@ -69,49 +85,41 @@ export default function WebsiteEditor() {
   useEffect(() => {
     const load = async () => {
       if (!businessId) return
+      setLoading(true)
       try {
-        const { data: biz } = await supabase.from('businesses').select('logo_url').eq('id', businessId).single()
-        if (biz?.logo_url) setLogo(biz.logo_url)
+        const { data: biz } = await supabase.from('businesses').select('*').eq('id', businessId).single()
+        if (biz) {
+          setLogo(biz.logo_url || '')
+          setSlug(biz.public_slug || '')
+        }
 
-        const { data, error } = await supabase
+        const { data: page } = await supabase
           .from('business_public_pages')
           .select('*')
           .eq('business_id', businessId)
           .maybeSingle()
-        if (error) throw error
-        if (data) {
-          setEnabled(data.is_enabled || false)
-          setPublishStatus(data.publish_status || 'draft')
-          setSlug(data.slug || '')
-          setTemplateId(data.template_id || 'elegant')
-          setHeroImage(data.cover_image_url || '')
-          setDescription(data.description || '')
-          setAbout(data.about || '')
-          setServices(safeParseArray(data.services))
-          setShopProducts(safeParseArray(data.shop_products))
-          setPortfolio(safeParseArray(data.portfolio_images))
-          setShowQuoteButton(data.show_quote_button ?? true)
-          setShowWhatsappButton(data.show_whatsapp_button ?? true)
-          setHasServices(data.has_services ?? true)
-          setHasShop(data.has_shop ?? false)
-          if (data.section_order && Array.isArray(data.section_order)) setSectionOrder(data.section_order)
-          setPublicUrl(`${window.location.origin}/${data.slug}`)
+
+        if (page) {
+          setHasWebsite(true)
+          setSlug(page.slug || '')
+          setTemplateId(page.template_id || 'elegant')
+          setHeroImage(page.cover_image_url || '')
+          setDescription(page.description || '')
+          setAbout(page.about || '')
+          setServices(safeParseArray(page.services))
+          setShopProducts(safeParseArray(page.shop_products))
+          setPortfolio(safeParseArray(page.portfolio_images))
+          setShowQuoteButton(page.show_quote_button ?? true)
+          setShowWhatsappButton(page.show_whatsapp_button ?? true)
+          setHasServices(page.has_services ?? true)
+          setHasShop(page.has_shop ?? false)
+          if (page.section_order && Array.isArray(page.section_order)) setSectionOrder(page.section_order)
+          setPublicUrl(`${window.location.origin}/${page.slug}`)
         }
       } catch (err) { console.error(err) } finally { setLoading(false) }
     }
     load()
   }, [businessId])
-
-  const safeParseArray = (input) => {
-    try {
-      if (Array.isArray(input)) return input
-      if (typeof input === 'string') {
-        const parsed = JSON.parse(input)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (e) {}
-    return []
-  }
 
   const saveWebsite = useCallback(async (showMsg = true) => {
     if (!businessId) return
@@ -125,8 +133,7 @@ export default function WebsiteEditor() {
         body: JSON.stringify({
           business_id: businessId,
           slug,
-          is_enabled: enabled,
-          publish_status: publishStatus,
+          is_enabled: true,
           template_id: templateId,
           cover_image_url: heroImage,
           description,
@@ -144,12 +151,20 @@ export default function WebsiteEditor() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Save failed')
       if (showMsg) { setMessage('✅ Saved!'); setTimeout(() => setMessage(''), 2000) }
+      setPublicUrl(`${window.location.origin}/${slug}`)
+      setHasWebsite(true)
+      setIsEditing(false)
     } catch (err) { setMessage('❌ ' + err.message) } finally { setSaving(false) }
-  }, [businessId, slug, enabled, publishStatus, templateId, heroImage, description, about, services, shopProducts, portfolio, showQuoteButton, showWhatsappButton, hasServices, hasShop, sectionOrder])
+  }, [businessId, slug, templateId, heroImage, description, about, services, shopProducts, portfolio, showQuoteButton, showWhatsappButton, hasServices, hasShop, sectionOrder])
 
   const handleAutoSave = () => {
+    if (!isEditing) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => saveWebsite(false), 800)
+  }
+
+  const handleSave = async () => {
+    await saveWebsite(true)
   }
 
   // Section reordering
@@ -162,22 +177,23 @@ export default function WebsiteEditor() {
     handleAutoSave()
   }
 
-  // Toggle section visibility (we'll use a separate hiddenSections state)
-  const [hiddenSections, setHiddenSections] = useState([])
+  // Toggle section visibility
   const toggleSection = (section) => {
     setHiddenSections(prev => prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section])
     handleAutoSave()
   }
 
-  // Generic service/product/portfolio updaters
+  // Services updaters
   const addService = () => { setServices(prev => [...prev, { name: '', description: '', image_url: '' }]); handleAutoSave() }
   const updateService = (idx, field, val) => { setServices(prev => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s)); handleAutoSave() }
   const removeService = (idx) => { setServices(prev => prev.filter((_, i) => i !== idx)); handleAutoSave() }
 
+  // Shop products updaters
   const addProduct = () => { setShopProducts(prev => [...prev, { name: '', description: '', price: '', image_url: '' }]); handleAutoSave() }
   const updateProduct = (idx, field, val) => { setShopProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: val } : p)); handleAutoSave() }
   const removeProduct = (idx) => { setShopProducts(prev => prev.filter((_, i) => i !== idx)); handleAutoSave() }
 
+  // Portfolio updaters
   const handlePortfolioUpload = (url) => { setPortfolio(prev => [...prev, { url, description: '' }]); handleAutoSave() }
   const updatePortfolioDescription = (idx, val) => { setPortfolio(prev => prev.map((p, i) => i === idx ? { ...p, description: val } : p)); handleAutoSave() }
   const removePortfolio = (idx) => { setPortfolio(prev => prev.filter((_, i) => i !== idx)); handleAutoSave() }
@@ -191,12 +207,12 @@ export default function WebsiteEditor() {
   const previewReviews = []
   const ActiveTemplate = TEMPLATES[templateId] || Elegant
 
-  // Render a section editor based on section name
+  // Render section editor
   const renderSectionEditor = (section) => {
     switch (section) {
       case 'hero':
         return (
-          <div key="hero" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="hero" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>Hero Section</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -209,7 +225,7 @@ export default function WebsiteEditor() {
               <>
                 <FileUpload businessId={businessId} purpose="cover" label="Hero Image" onUploaded={(url) => { setHeroImage(url); handleAutoSave() }} />
                 {heroImage && <img src={heroImage} alt="Hero" style={{ width: '100%', maxHeight: '150px', objectFit: 'cover', borderRadius: '8px', marginTop: '0.5rem' }} />}
-                <label style={{ ...labelStyle, marginTop: '0.5rem' }}>Description</label>
+                <label style={{ ...labelStyle, marginTop: '0.8rem' }}>Description</label>
                 <textarea value={description} onChange={(e) => { setDescription(e.target.value); handleAutoSave() }} rows={3} style={inputStyle} />
               </>
             )}
@@ -217,7 +233,7 @@ export default function WebsiteEditor() {
         )
       case 'about':
         return (
-          <div key="about" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="about" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>About Section</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -233,7 +249,7 @@ export default function WebsiteEditor() {
         )
       case 'services':
         return (
-          <div key="services" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="services" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>Services</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -245,9 +261,9 @@ export default function WebsiteEditor() {
             {!hiddenSections.includes('services') && (
               <>
                 {services.map((s, idx) => (
-                  <div key={idx} style={{ marginBottom: '0.6rem' }}>
-                    <input type="text" placeholder="Service name" value={s.name} onChange={(e) => updateService(idx, 'name', e.target.value)} style={{ ...inputStyle, marginBottom: '0.3rem' }} />
-                    <textarea placeholder="Description" value={s.description} onChange={(e) => updateService(idx, 'description', e.target.value)} rows={2} style={{ ...inputStyle, marginBottom: '0.3rem' }} />
+                  <div key={idx} style={{ marginBottom: '0.8rem' }}>
+                    <input type="text" placeholder="Service name" value={s.name} onChange={(e) => updateService(idx, 'name', e.target.value)} style={{ ...inputStyle, marginBottom: '0.4rem' }} />
+                    <textarea placeholder="Description" value={s.description} onChange={(e) => updateService(idx, 'description', e.target.value)} rows={2} style={{ ...inputStyle, marginBottom: '0.4rem' }} />
                     <FileUpload businessId={businessId} purpose="service" label="Image" onUploaded={(url) => updateService(idx, 'image_url', url)} />
                     <button onClick={() => removeService(idx)} style={{ background: 'none', border: 'none', color: 'var(--cresoa-danger)', cursor: 'pointer', fontSize: '0.85rem' }}>Remove</button>
                   </div>
@@ -259,7 +275,7 @@ export default function WebsiteEditor() {
         )
       case 'shop':
         return (
-          <div key="shop" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="shop" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>Shop</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -271,10 +287,10 @@ export default function WebsiteEditor() {
             {!hiddenSections.includes('shop') && (
               <>
                 {shopProducts.map((p, idx) => (
-                  <div key={idx} style={{ marginBottom: '0.6rem' }}>
-                    <input type="text" placeholder="Product name" value={p.name} onChange={(e) => updateProduct(idx, 'name', e.target.value)} style={{ ...inputStyle, marginBottom: '0.3rem' }} />
-                    <input type="text" placeholder="Price (₦)" value={p.price} onChange={(e) => updateProduct(idx, 'price', e.target.value)} style={{ ...inputStyle, marginBottom: '0.3rem' }} />
-                    <textarea placeholder="Description" value={p.description} onChange={(e) => updateProduct(idx, 'description', e.target.value)} rows={2} style={{ ...inputStyle, marginBottom: '0.3rem' }} />
+                  <div key={idx} style={{ marginBottom: '0.8rem' }}>
+                    <input type="text" placeholder="Product name" value={p.name} onChange={(e) => updateProduct(idx, 'name', e.target.value)} style={{ ...inputStyle, marginBottom: '0.4rem' }} />
+                    <input type="text" placeholder="Price" value={p.price} onChange={(e) => updateProduct(idx, 'price', e.target.value)} style={{ ...inputStyle, marginBottom: '0.4rem' }} />
+                    <textarea placeholder="Description" value={p.description} onChange={(e) => updateProduct(idx, 'description', e.target.value)} rows={2} style={{ ...inputStyle, marginBottom: '0.4rem' }} />
                     <FileUpload businessId={businessId} purpose="product" label="Image" onUploaded={(url) => updateProduct(idx, 'image_url', url)} />
                     <button onClick={() => removeProduct(idx)} style={{ background: 'none', border: 'none', color: 'var(--cresoa-danger)', cursor: 'pointer', fontSize: '0.85rem' }}>Remove</button>
                   </div>
@@ -284,10 +300,9 @@ export default function WebsiteEditor() {
             )}
           </div>
         )
-
-case 'portfolio':
+      case 'portfolio':
         return (
-          <div key="portfolio" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="portfolio" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>Portfolio</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -316,7 +331,7 @@ case 'portfolio':
         )
       case 'testimonials':
         return (
-          <div key="testimonials" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="testimonials" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>Testimonials</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -332,7 +347,7 @@ case 'portfolio':
         )
       case 'contact':
         return (
-          <div key="contact" style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)' }}>
+          <div key="contact" style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1.2rem', marginBottom: '0.8rem', border: '1px solid var(--cresoa-border)', boxShadow: 'var(--shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
               <strong style={{ fontSize: '1rem' }}>Contact</strong>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -356,23 +371,41 @@ case 'portfolio':
     }
   }
 
-  const visibleSections = sectionOrder.filter(s => !hiddenSections.includes(s))
-
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
+
+  // Empty state (no website yet)
+  if (!hasWebsite && !isEditing) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-bg)', padding: '1rem' }}>
+        <div style={{ maxWidth: '400px', textAlign: 'center', background: 'var(--cresoa-surface)', borderRadius: '20px', padding: '2.5rem', boxShadow: 'var(--shadow-lg)' }}>
+          <div style={{ width: '80px', height: '80px', margin: '0 auto 1rem', borderRadius: '20px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cresoa-accent)' }}>
+            <Icon name="external" size={32} />
+          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>You don't have a website yet</h2>
+          <p style={{ color: 'var(--cresoa-text-muted)', marginBottom: '1.5rem' }}>Create a beautiful professional website for your business in minutes.</p>
+          <button onClick={() => router.push(`/dashboard/website-onboarding?business_id=${businessId}`)} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.8rem 2rem', borderRadius: '10px', border: 'none', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(212,165,42,0.3)' }}>
+            🚀 Create Yours Now
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ padding: '1rem', maxWidth: '1100px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh', paddingBottom: '100px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>My Website</p>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0.2rem 0' }}>Website Editor</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {publicUrl && enabled && <a href={publicUrl} target="_blank" style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', textDecoration: 'none', fontWeight: 600 }}>View Website</a>}
-          <button onClick={() => { setPublishStatus(publishStatus === 'published' ? 'draft' : 'published'); saveWebsite() }} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', background: publishStatus === 'published' ? 'var(--cresoa-success)' : 'var(--cresoa-accent)', color: '#fff', fontWeight: 700 }}>
-            {publishStatus === 'published' ? 'Unpublish' : 'Publish'}
-          </button>
+          {publicUrl && <a href={publicUrl} target="_blank" style={{ padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Icon name="external" size={16} /> View Website</a>}
+          {isEditing ? (
+            <button onClick={handleSave} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--cresoa-accent)', color: '#fff', padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 700 }}><Icon name="save" size={16} /> {saving ? 'Saving...' : 'Save'}</button>
+          ) : (
+            <button onClick={() => setIsEditing(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', fontWeight: 700 }}><Icon name="edit" size={16} /> Edit</button>
+          )}
         </div>
       </div>
 
@@ -383,11 +416,11 @@ case 'portfolio':
         {/* LEFT: Editor */}
         <div style={{ minWidth: 0 }}>
           {/* Template Selector */}
-          <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
+          <div style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
             <label style={labelStyle}>Template</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem' }}>
               {Object.keys(TEMPLATES).map(id => (
-                <button key={id} onClick={() => { setTemplateId(id); handleAutoSave() }} style={{ padding: '0.6rem', borderRadius: '8px', border: `2px solid ${templateId === id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: templateId === id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+                <button key={id} onClick={() => { setTemplateId(id); handleAutoSave() }} disabled={!isEditing} style={{ padding: '0.6rem', borderRadius: '8px', border: `2px solid ${templateId === id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: templateId === id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: isEditing ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem' }}>
                   {id === 'elegant' ? 'Elegant' : id === 'classic-gold' ? 'Classic Gold' : id === 'modern-bold' ? 'Modern Bold' : id === 'fresh-serene' ? 'Fresh Serene' : 'Dynamic Sunrise'}
                 </button>
               ))}
@@ -395,9 +428,11 @@ case 'portfolio':
           </div>
 
           {/* Logo */}
-          <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
+          <div style={{ background: 'var(--cresoa-surface)', borderRadius: '14px', padding: '1rem', marginBottom: '1rem', border: '1px solid var(--cresoa-border)' }}>
             <label style={labelStyle}>Logo</label>
-            <FileUpload businessId={businessId} purpose="logo" label="Upload Logo" onUploaded={(url) => { setLogo(url); handleAutoSave() }} />
+            {isEditing ? (
+              <FileUpload businessId={businessId} purpose="logo" label="Upload Logo" onUploaded={(url) => { setLogo(url); handleAutoSave() }} />
+            ) : null}
             {logo && <img src={logo} style={{ marginTop: '0.5rem', width: '60px', height: '60px', borderRadius: '10px', objectFit: 'contain', background: '#fff', padding: '4px' }} />}
           </div>
 
@@ -419,4 +454,4 @@ case 'portfolio':
       </div>
     </div>
   )
-                  }
+              }
