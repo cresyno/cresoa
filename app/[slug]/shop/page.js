@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import ShopPageClient from '../../components/public-page/ShopPageClient'
+import ShopPageClient from '../../../components/public-page/ShopPageClient'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
