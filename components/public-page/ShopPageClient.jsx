@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import CartModal from './CartModal'
+import CheckoutModal from './CheckoutModal'
 
 export default function ShopPageClient({ business, page, shop }) {
   const [cartItems, setCartItems] = useState([])
   const [cartOpen, setCartOpen] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
 
   const addToCart = (product) => {
     setCartItems(prev => {
@@ -24,17 +25,9 @@ export default function ShopPageClient({ business, page, shop }) {
     }, 0)
   }
 
-  const handleCheckout = () => {
-    if (!cartItems.length) return
-    const customerName = prompt('What is your name?') || 'Customer'
-    const customerPhone = prompt('What is your phone number?') || ''
-    const customerAddress = prompt('What is your delivery address?') || ''
-    const itemsText = cartItems.map(item => `- ${item.name} (x${item.quantity}) - ${item.price}`).join('\n')
-    const totalText = `Total: ₦${getCartTotal().toLocaleString()}`
-    const message = `Hello ${business.name},\n\nI would like to order:\n\n${itemsText}\n\n${totalText}\n\nName: ${customerName}\nPhone: ${customerPhone}\nAddress: ${customerAddress}`
-    const waUrl = `https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
-    window.open(waUrl, '_blank')
+  const handleCheckoutSuccess = () => {
     setCartItems([])
+    setCheckoutOpen(false)
     setCartOpen(false)
   }
 
@@ -108,8 +101,23 @@ export default function ShopPageClient({ business, page, shop }) {
         onClose={() => setCartOpen(false)}
         cartItems={cartItems}
         onRemove={removeFromCart}
-        onCheckout={handleCheckout}
+        onCheckout={() => {
+          setCartOpen(false)
+          setCheckoutOpen(true)
+        }}
       />
+
+      {/* Checkout Modal */}
+      {checkoutOpen && (
+        <CheckoutModal
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          cartItems={cartItems}
+          business={business}
+          page={page}
+          onSuccess={handleCheckoutSuccess}
+        />
+      )}
     </div>
   )
-          }
+}
