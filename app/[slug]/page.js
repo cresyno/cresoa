@@ -60,7 +60,7 @@ export default async function PublicPage({ params }) {
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
 
-    // Bulletproof portfolio parsing
+    // Robust portfolio parsing (handles strings, arrays, weird formats)
     let portfolio = []
     try {
       const raw = page.portfolio_images || []
@@ -69,9 +69,10 @@ export default async function PublicPage({ params }) {
       portfolio = portfolio.map(item => {
         if (typeof item === 'string') return { url: item, description: '' }
         if (item && typeof item === 'object' && !item.url) {
+          // Handle weird numeric-key format
           const keys = Object.keys(item).filter(k => /^\d+$/.test(k))
           if (keys.length) {
-            const url = keys.sort((a,b) => parseInt(a)-parseInt(b)).map(k => item[k]).join('')
+            const url = keys.sort((a, b) => parseInt(a) - parseInt(b)).map(k => item[k]).join('')
             return { url, description: item.description || '' }
           }
         }
@@ -89,8 +90,31 @@ export default async function PublicPage({ params }) {
 
     return (
       <PublicPageWrapper
-        business={{ name: business?.name || 'Business', logo_url: business?.logo_url || '', phone: business?.phone || '', email: business?.email || '', location: business?.location || '' }}
-        page={{ ...page, about, description: page.description || business?.description || '' }}
+        business={{
+          name: business?.name || 'Business',
+          logo_url: business?.logo_url || '',
+          phone: business?.phone || '',
+          email: business?.email || '',
+          location: business?.location || '',
+          // Social links (if present in your businesses table)
+          facebook: business?.facebook || '',
+          instagram: business?.instagram || '',
+          tiktok: business?.tiktok || '',
+          youtube: business?.youtube || '',
+          linkedin: business?.linkedin || '',
+          google_business: business?.google_business || '',
+        }}
+        page={{
+          ...page,
+          about,
+          description: page.description || business?.description || '',
+          business_id: page.business_id, // explicit for CheckoutModal
+          slug: page.slug,
+          has_shop: page.has_shop,
+          has_services: page.has_services,
+          show_quote_button: page.show_quote_button,
+          show_whatsapp_button: page.show_whatsapp_button,
+        }}
         services={services}
         shop={shop}
         portfolio={portfolio}
@@ -102,8 +126,11 @@ export default async function PublicPage({ params }) {
     console.error('Public page error:', error)
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FAFAF9', textAlign: 'center' }}>
-        <div><h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>This page is unavailable</h1><p style={{ color: '#6B7280' }}>The business page may be temporarily unavailable. Please try again later.</p></div>
+        <div>
+          <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>This page is unavailable</h1>
+          <p style={{ color: '#6B7280' }}>The business page may be temporarily unavailable. Please try again later.</p>
+        </div>
       </div>
     )
   }
-              }
+            }
