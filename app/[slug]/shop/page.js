@@ -57,13 +57,18 @@ export default async function ShopPage({ params }) {
   return (
     <ShopPageClient
       business={{
-        name: business.name,
-        logo_url: business.logo_url,
-        phone: business.phone,
-        email: business.email,
-        location: business.location,
+        name: business?.name || 'Business',
+        logo_url: business?.logo_url || '',
+        phone: business?.phone || '',
+        email: business?.email || '',
+        location: business?.location || '',
       }}
-      page={page}
+      page={{
+        ...page,
+        business_id: page.business_id,
+        slug: page.slug,
+        has_shop: page.has_shop,
+      }}
       shop={shop}
     />
   )
