@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import CheckoutModal from '../CheckoutModal'
-import QuoteModal from './QuoteModal'
+import CheckoutModal from '../public-page/CheckoutModal'
+import QuoteModal from '../public-page/QuoteModal'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
   const [cartItems, setCartItems] = useState([])
