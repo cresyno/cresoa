@@ -1,18 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import CheckoutModal from './CheckoutModal'
+import QuoteModal from './QuoteModal'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
   const [cartItems, setCartItems] = useState([])
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [expandedImage, setExpandedImage] = useState(null)
+
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   const shopUrl = `/${page.slug || ''}/shop`
-  const shopPreview = shop.slice(0, 2)
+  const shopPreview = shop.slice(0, 4) // limit to 4
 
   const addToCart = (product) => {
     setCartItems(prev => {
-      const existing = prev.find(item => item.name === product.name)
-      if (existing) return prev.map(item => item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
+      const existing = prev.find(item => item.id === product.id || item.name === product.name)
+      if (existing) return prev.map(item => item.id === product.id || item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
       return [...prev, { ...product, quantity: 1 }]
     })
   }
@@ -24,38 +29,6 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
     }, 0)
   }
 
-  const handleWhatsAppCheckout = async () => {
-  if (!cartItems.length) return
-  const customerName = prompt('What is your name?') || 'Customer'
-  const customerPhone = prompt('What is your phone number?') || ''
-  const customerAddress = prompt('What is your delivery address?') || ''
-  const total = getCartTotal().toLocaleString()
-  const itemsText = cartItems.map(item => `- ${item.name} (x${item.quantity}) - ${item.price}`).join('\n')
-
-  // Save order to database first
-  try {
-    const res = await fetch('/api/public-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        business_id: page.business_id,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_address: customerAddress,
-        items: cartItems,
-        total_amount: `₦${total}`,
-      }),
-    })
-    if (!res.ok) console.error('Failed to save order')
-  } catch (err) {
-    console.error('Order save error:', err)
-  }
-
-  const message = `Hello ${business.name},\n\nI would like to order:\n\n${itemsText}\n\nTotal: ₦${total}\n\nName: ${customerName}\nPhone: ${customerPhone}\nAddress: ${customerAddress}`
-  const waUrl = `https://wa.me/${business.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
-  window.open(waUrl, '_blank')
-  setCartItems([])
-    }
   const heroStyle = page.cover_image_url ? {
     backgroundImage: `linear-gradient(rgba(10,22,40,0.7), rgba(10,22,40,0.7)), url(${page.cover_image_url})`,
     backgroundSize: 'cover',
@@ -75,6 +48,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
           <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#0F2B4A' }}>{business.name}</span>
         </div>
         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', fontWeight: 500, color: '#6B7280' }}>
+          <button onClick={() => scrollTo('home')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Home</button>
           <button onClick={() => scrollTo('about')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>About</button>
           <button onClick={() => scrollTo('services')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Services</button>
           {page.has_shop && <a href={shopUrl} style={{ textDecoration: 'none', color: '#D4A52A', fontWeight: 600 }}>Shop</a>}
@@ -83,10 +57,9 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Hero – NO LOGO */}
       <section id="home" style={{ padding: '6rem 1.5rem', textAlign: 'center', ...heroStyle }}>
         <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-          {business.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '100px', height: '100px', borderRadius: '20px', objectFit: 'contain', marginBottom: '1.5rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }} /> : <div style={{ width: '100px', height: '100px', borderRadius: '20px', background: '#D4A52A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: 800, margin: '0 auto 1.5rem', color: '#fff' }}>{business.name.charAt(0)}</div>}
           <h1 style={{ fontSize: '2.5rem', fontWeight: 300, letterSpacing: '-0.02em', margin: '0 0 1rem', lineHeight: 1.2 }}>{business.name}</h1>
           <p style={{ fontSize: '1.15rem', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto', opacity: 0.9 }}>{page.description}</p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
@@ -123,7 +96,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Shop (Limit to 2) */}
+      {/* Shop (Limit to 4) */}
       {page.has_shop && shop.length > 0 && (
         <section id="shop" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Our Products</h2>
@@ -138,7 +111,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
               </div>
             ))}
           </div>
-          {shop.length > 2 && (
+          {shop.length > 4 && (
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
               <a href={shopUrl} style={{ padding: '0.7rem 1.5rem', background: '#0F2B4A', color: '#fff', borderRadius: '8px', textDecoration: 'none', fontWeight: 600 }}>View All Products</a>
             </div>
@@ -146,7 +119,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Portfolio */}
+      {/* Portfolio – now with expand and CTA */}
       {portfolio.length > 0 && (
         <section id="portfolio" style={{ padding: '4rem 1.5rem', background: '#F3F4F6' }}>
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -154,12 +127,21 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
               {portfolio.map((img, idx) => (
                 <div key={idx} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                  <img src={img.url} alt={`Work ${idx + 1}`} style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
+                  <img src={img.url} alt={`Work ${idx + 1}`} style={{ width: '100%', height: '220px', objectFit: 'cover', cursor: 'pointer' }} onClick={() => setExpandedImage(img)} />
                   {img.description && <p style={{ padding: '1rem', margin: 0, color: '#4B5563', fontSize: '0.9rem' }}>{img.description}</p>}
                 </div>
               ))}
             </div>
           </div>
+          {/* Lightbox */}
+          {expandedImage && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '2rem' }}>
+              <button onClick={() => setExpandedImage(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+              <img src={expandedImage.url} alt="Expanded work" style={{ maxWidth: '80vw', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }} />
+              {expandedImage.description && <p style={{ color: 'white', marginTop: '1rem', textAlign: 'center' }}>{expandedImage.description}</p>}
+              <a href="/contact" onClick={(e) => { e.preventDefault(); scrollTo('contact'); setExpandedImage(null); }} style={{ marginTop: '1.5rem', background: '#D4A52A', color: '#0F2B4A', padding: '0.8rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 700 }}>Request Similar Work →</a>
+            </div>
+          )}
         </section>
       )}
 
@@ -186,6 +168,17 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
           {page.show_whatsapp_button && business.phone && <a href={`https://wa.me/${business.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp Us</a>}
           {page.show_quote_button && <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Request a Quote</button>}
         </div>
+        {/* Social Links */}
+        {(business.facebook || business.instagram || business.tiktok || business.youtube || business.linkedin || business.google_business) && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>
+            {business.facebook && <a href={business.facebook} target="_blank" rel="noopener" style={{ color: '#fff', fontSize: '1.5rem' }}><i className="fab fa-facebook" /></a>}
+            {business.instagram && <a href={business.instagram} target="_blank" rel="noopener" style={{ color: '#fff', fontSize: '1.5rem' }}><i className="fab fa-instagram" /></a>}
+            {business.tiktok && <a href={business.tiktok} target="_blank" rel="noopener" style={{ color: '#fff', fontSize: '1.5rem' }}><i className="fab fa-tiktok" /></a>}
+            {business.youtube && <a href={business.youtube} target="_blank" rel="noopener" style={{ color: '#fff', fontSize: '1.5rem' }}><i className="fab fa-youtube" /></a>}
+            {business.linkedin && <a href={business.linkedin} target="_blank" rel="noopener" style={{ color: '#fff', fontSize: '1.5rem' }}><i className="fab fa-linkedin" /></a>}
+            {business.google_business && <a href={business.google_business} target="_blank" rel="noopener" style={{ color: '#fff', fontSize: '1.5rem' }}><i className="fab fa-google" /></a>}
+          </div>
+        )}
         {business.location && <p style={{ marginTop: '2rem', opacity: 0.7 }}>📍 {business.location}</p>}
       </section>
 
@@ -196,10 +189,24 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
 
       {/* Cart Floating Button */}
       {cartItems.length > 0 && (
-        <button onClick={handleWhatsAppCheckout} style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#25D366', color: '#fff', padding: '1rem 1.5rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,211,102,0.4)', zIndex: 1000 }}>
+        <button onClick={() => setCheckoutOpen(true)} style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#25D366', color: '#fff', padding: '1rem 1.5rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,211,102,0.4)', zIndex: 1000 }}>
           🛒 Checkout ({cartItems.length} items) - ₦{getCartTotal().toLocaleString()}
         </button>
       )}
+
+      {/* Checkout Modal */}
+      {checkoutOpen && (
+        <CheckoutModal
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          cartItems={cartItems}
+          business={business}
+          page={page}
+          onSuccess={() => setCartItems([])}
+        />
+      )}
+
+      {/* Quote Modal is already provided separately; we pass the callback */}
     </div>
   )
-                      }
+                             }
