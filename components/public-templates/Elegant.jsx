@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import CheckoutModal from './CheckoutModal'
+import CheckoutModal from '../CheckoutModal'
 import QuoteModal from './QuoteModal'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
