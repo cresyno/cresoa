@@ -1,36 +1,42 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '../../../../lib/supabaseClient';
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 export async function GET(req) {
-  const { searchParams } = new URL(req.url);
-  const slug = searchParams.get('slug');
-  const businessId = searchParams.get('business_id');
+  const { searchParams } = new URL(req.url)
+  const slug = searchParams.get('slug')
 
   if (!slug) {
-    return NextResponse.json({ available: false, message: 'Slug is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Slug is required' }, { status: 400 })
   }
 
-  // Normalize slug (lowercase, remove special characters, spaces to hyphens)
-  const normalized = slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-
-  if (!normalized) {
-    return NextResponse.json({ available: false, message: 'Invalid slug' }, { status: 400 });
+  // Validate slug format (lowercase, hyphens, no spaces)
+  const slugRegex = /^[a-z0-9-]+$/
+  if (!slugRegex.test(slug)) {
+    return NextResponse.json({ error: 'Invalid slug format' }, { status: 400 })
   }
 
-  // Check if slug exists (excluding current business)
-  const { data, error } = await supabase
-    .from('business_public_pages')
-    .select('business_id')
-    .eq('slug', normalized)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('business_public_pages')
+      .select('business_id')
+      .eq('slug', slug)
+      .maybeSingle()
 
-  if (error) {
-    return NextResponse.json({ available: false, message: 'Error checking availability' }, { status: 500 });
+    if (error) throw error
+
+    if (data) {
+      // Slug is taken, but we could also check if it's the same business editing
+      return NextResponse.json({ available: false, message: 'This slug is already in use.' })
+    }
+
+    return NextResponse.json({ available: true, message: 'Slug is available.' })
+  } catch (error) {
+    console.error('Slug check error:', error)
+    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 })
   }
-
-  if (data && data.business_id !== businessId) {
-    return NextResponse.json({ available: false, message: 'This slug is already taken' }, { status: 200 });
-  }
-
-  return NextResponse.json({ available: true, normalized: normalized }, { status: 200 });
 }
