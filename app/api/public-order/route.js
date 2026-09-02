@@ -14,6 +14,13 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Validate each item has name, price, quantity
+    for (const item of items) {
+      if (!item.name || !item.price || !item.quantity) {
+        return NextResponse.json({ error: 'Invalid item in order' }, { status: 400 })
+      }
+    }
+
     const { data, error } = await supabase
       .from('business_orders')
       .insert({
