@@ -27,6 +27,7 @@ export async function POST(req) {
       cover_image_url,
       description,
       about,
+      why_us,
       services,
       shop_products,
       portfolio_images,
@@ -34,13 +35,18 @@ export async function POST(req) {
       show_whatsapp_button,
       has_services,
       has_shop,
+      hero_font,
+      hero_layout,
+      header_order,
+      header_sidebar,
+      footer_text,
     } = data
 
     if (!business_id || !slug) {
       return NextResponse.json({ error: 'Business ID and slug required' }, { status: 400 })
     }
 
-    // Upsert page
+    // Upsert page with all new fields
     const { error: dbError } = await supabaseAdmin
       .from('business_public_pages')
       .upsert({
@@ -51,13 +57,19 @@ export async function POST(req) {
         cover_image_url: cover_image_url || null,
         description: description || null,
         about: about || null,
+        why_us: why_us || [],
         services: services || [],
         shop_products: shop_products || [],
-        portfolio_images: portfolio_images || [], // ✅ This must be an array
+        portfolio_images: portfolio_images || [],
         show_quote_button,
         show_whatsapp_button,
         has_services,
         has_shop,
+        hero_font: hero_font || 'Inter',
+        hero_layout: hero_layout || 'center',
+        header_order: header_order || ['Home', 'About', 'Services', 'Shop', 'Work', 'Contact'],
+        header_sidebar: header_sidebar || false,
+        footer_text: footer_text || '',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'business_id' })
 
