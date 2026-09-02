@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import CheckoutModal from '../public-page/CheckoutModal'
 import QuoteModal from '../public-page/QuoteModal'
+import ReviewModal from '../public-page/ReviewModal'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
   const [cartItems, setCartItems] = useState([])
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [expandedImage, setExpandedImage] = useState(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
@@ -16,8 +18,8 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
 
   const addToCart = (product) => {
     setCartItems(prev => {
-      const existing = prev.find(item => item.id === product.id || item.name === product.name)
-      if (existing) return prev.map(item => item.id === product.id || item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
+      const existing = prev.find(item => item.name === product.name)
+      if (existing) return prev.map(item => item.name === product.name ? { ...item, quantity: item.quantity + 1 } : item)
       return [...prev, { ...product, quantity: 1 }]
     })
   }
@@ -119,7 +121,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Portfolio – now with expand and CTA */}
+      {/* Portfolio – with expand and CTA */}
       {portfolio.length > 0 && (
         <section id="portfolio" style={{ padding: '4rem 1.5rem', background: '#F3F4F6' }}>
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -167,6 +169,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           {page.show_whatsapp_button && business.phone && <a href={`https://wa.me/${business.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp Us</a>}
           {page.show_quote_button && <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Request a Quote</button>}
+          <button onClick={() => setReviewOpen(true)} style={{ background: 'transparent', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', border: '2px solid #fff', fontWeight: 600, cursor: 'pointer' }}>Leave a Review</button>
         </div>
         {/* Social Links */}
         {(business.facebook || business.instagram || business.tiktok || business.youtube || business.linkedin || business.google_business) && (
@@ -194,7 +197,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </button>
       )}
 
-      {/* Checkout Modal */}
+      {/* Modals */}
       {checkoutOpen && (
         <CheckoutModal
           open={checkoutOpen}
@@ -206,7 +209,17 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         />
       )}
 
-      {/* Quote Modal is already provided separately; we pass the callback */}
+      {reviewOpen && (
+        <ReviewModal
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
+          businessId={page.business_id}
+        />
+      )}
+
+      {/* Quote Modal is passed via onQuoteClick from parent, but if not, we can render here */}
+      {/* If you want a built-in QuoteModal, uncomment below and remove onQuoteClick handler */}
+      {/* <QuoteModal open={quoteOpen} onClose={() => setQuoteOpen(false)} businessId={page.business_id} businessName={business.name} /> */}
     </div>
   )
-                             }
+                                        }
