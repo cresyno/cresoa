@@ -10,6 +10,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [expandedImage, setExpandedImage] = useState(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // ADDED
 
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
@@ -48,19 +49,23 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
 
   const heroTextAlign = page.hero_layout === 'left' ? 'left' : 'center'
 
-  // Render nav items based on headerOrder
+  // Render nav items based on headerOrder (fixed)
   const navItems = headerOrder.map(item => {
     const label = item.toLowerCase()
-    let href = '#'
-    let onClick = null
-    if (label === 'home') onClick = () => scrollTo('home')
-    else if (label === 'about') onClick = () => scrollTo('about')
-    else if (label === 'services') onClick = () => scrollTo('services')
-    else if (label === 'shop') { href = `/${page.slug || ''}/shop`; }
-    else if (label === 'work') onClick = () => scrollTo('portfolio')
-    else if (label === 'contact') onClick = () => scrollTo('contact')
+    if (label === 'shop') {
+      // Use an anchor for shop – works in both header and sidebar
+      return (
+        <a key={item} href={`/${page.slug || ''}/shop`} style={{ textDecoration: 'none', color: 'inherit', fontSize: '0.85rem', fontWeight: 500 }}>
+          {item}
+        </a>
+      )
+    }
+    // For other items, scroll to section
+    const scrollTarget = {
+      home: 'home', about: 'about', services: 'services', work: 'portfolio', contact: 'contact'
+    }[label] || 'home'
     return (
-      <button key={item} onClick={onClick} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
+      <button key={item} onClick={() => scrollTo(scrollTarget)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
         {item}
       </button>
     )
@@ -70,14 +75,43 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
     <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FAFAF9' }}>
       {/* Header or Sidebar */}
       {sidebar ? (
-        <div style={{ position: 'fixed', left: 0, top: 0, height: '100vh', width: '200px', background: '#0F2B4A', color: '#fff', padding: '1rem', zIndex: 200 }}>
-          <div style={{ marginBottom: '2rem' }}>
-            <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>{business.name}</span>
+        <>
+          {/* Hamburger button – always visible */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              position: 'fixed', top: '15px', left: '15px', zIndex: 300,
+              background: '#0F2B4A', color: '#fff', border: 'none', borderRadius: '8px',
+              padding: '0.5rem 0.8rem', cursor: 'pointer', fontSize: '1.2rem'
+            }}
+          >
+            ☰
+          </button>
+
+          {/* Overlay when sidebar open */}
+          {sidebarOpen && (
+            <div
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar itself */}
+          <div style={{
+            position: 'fixed', left: 0, top: 0, height: '100vh', width: '250px',
+            background: '#0F2B4A', color: '#fff', padding: '2rem 1rem',
+            transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.3s ease', zIndex: 250,
+            display: 'flex', flexDirection: 'column'
+          }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <span style={{ fontWeight: 800, fontSize: '1.2rem' }}>{business.name}</span>
+            </div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {navItems}
+            </nav>
           </div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {navItems}
-          </nav>
-        </div>
+        </>
       ) : (
         <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(250,250,249,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #E5E7EB', padding: '0.8rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -271,4 +305,4 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
       {/* Quote Modal is passed via onQuoteClick from parent */}
     </div>
   )
-          }
+              }
