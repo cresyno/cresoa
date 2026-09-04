@@ -9,13 +9,19 @@ import ModernBold from '../../../components/public-templates/ModernBold'
 import Elegant from '../../../components/public-templates/Elegant'
 import FreshSerene from '../../../components/public-templates/FreshSerene'
 import DynamicSunrise from '../../../components/public-templates/DynamicSunrise'
+import LuxuryGold from '../../../components/public-templates/LuxuryGold'
+import MinimalPro from '../../../components/public-templates/MinimalPro'
+import CreativeStudio from '../../../components/public-templates/CreativeStudio'
 
 const TEMPLATES = [
-  { id: 'classic-gold', name: 'Classic Gold', component: ClassicGold },
-  { id: 'modern-bold', name: 'Modern Bold', component: ModernBold },
-  { id: 'elegant', name: 'Elegant', component: Elegant },
-  { id: 'fresh-serene', name: 'Fresh Serene', component: FreshSerene },
-  { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', component: DynamicSunrise },
+  { id: 'classic-gold', name: 'Classic Gold', component: ClassicGold, preview: 'linear-gradient(135deg, #D4AF37, #F5E6A8)' },
+  { id: 'modern-bold', name: 'Modern Bold', component: ModernBold, preview: 'linear-gradient(135deg, #0F2B4A, #1A3F66)' },
+  { id: 'elegant', name: 'Elegant', component: Elegant, preview: 'linear-gradient(135deg, #D4A52A, #0F2B4A)' },
+  { id: 'fresh-serene', name: 'Fresh Serene', component: FreshSerene, preview: 'linear-gradient(135deg, #A8D8EA, #AA96DA)' },
+  { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', component: DynamicSunrise, preview: 'linear-gradient(135deg, #FFD194, #FF7E5F)' },
+  { id: 'luxury-gold', name: 'Luxury Gold', component: LuxuryGold, preview: 'linear-gradient(135deg, #1a1a1a, #D4AF37)' },
+  { id: 'minimal-pro', name: 'Minimal Pro', component: MinimalPro, preview: 'linear-gradient(135deg, #f5f5f5, #333)' },
+  { id: 'creative-studio', name: 'Creative Studio', component: CreativeStudio, preview: 'linear-gradient(135deg, #FF6B6B, #FFE66D)' },
 ]
 
 const Icon = ({ name, size = 20, stroke = 'currentColor' }) => {
