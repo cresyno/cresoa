@@ -88,22 +88,25 @@ export default async function PublicPage({ params }) {
 
     const about = page.about || business?.description || ''
 
-    return (
-      <PublicPageWrapper
-        business={{
-          name: business?.name || 'Business',
-          logo_url: business?.logo_url || '',
-          phone: business?.phone || '',
-          email: business?.email || '',
-          location: business?.location || '',
-          // Social links (if present in your businesses table)
-          facebook: business?.facebook || '',
-          instagram: business?.instagram || '',
-          tiktok: business?.tiktok || '',
-          youtube: business?.youtube || '',
-          linkedin: business?.linkedin || '',
-          google_business: business?.google_business || '',
-        }}
+    // app/[slug]/page.js (partial - just the business object)
+return (
+  <PublicPageWrapper
+    business={{
+      name: business?.name || 'Business',
+      logo_url: business?.logo_url || '',
+      phone: business?.phone || '',
+      whatsapp: business?.whatsapp || business?.phone || '',
+      email: business?.email || '',
+      location: business?.location || '',
+      business_type: business?.business_type || '', // ✅ ADD THIS
+      facebook: business?.facebook || '',
+      instagram: business?.instagram || '',
+      tiktok: business?.tiktok || '',
+      youtube: business?.youtube || '',
+      linkedin: business?.linkedin || '',
+      google_business: business?.google_business || '',
+    }}
+    
         page={{
           ...page,
           about,
