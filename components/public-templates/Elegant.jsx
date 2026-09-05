@@ -4,17 +4,21 @@ import { useState } from 'react'
 import CheckoutModal from '../public-page/CheckoutModal'
 import QuoteModal from '../public-page/QuoteModal'
 import ReviewModal from '../public-page/ReviewModal'
+import FashionQuoteModal from '../public-page/FashionQuoteModal'
+import RepairBookingModal from '../public-page/RepairBookingModal'
+import PrintingQuoteModal from '../public-page/PrintingQuoteModal'
 
 export default function Elegant({ business, page, services, shop, portfolio, reviews, onQuoteClick }) {
   const [cartItems, setCartItems] = useState([])
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [expandedImage, setExpandedImage] = useState(null)
   const [reviewOpen, setReviewOpen] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false) // ADDED
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sectorModal, setSectorModal] = useState(null) // 'fashion' | 'repair' | 'printing' | null
 
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
-  // Determine header order and sidebar mode
+  // Header order
   const defaultOrder = ['Home', 'About', 'Services', 'Shop', 'Work', 'Contact']
   const headerOrder = page.header_order || defaultOrder
   const sidebar = page.header_sidebar || false
@@ -22,11 +26,37 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
   // Featured products (max 4)
   const featuredProducts = shop.filter(p => p.featured).slice(0, 4)
 
-  // Contact info from business
+  // Contact info
   const phone = business.phone || ''
   const whatsapp = business.whatsapp || business.phone || ''
   const email = business.email || ''
   const address = business.location || ''
+
+  // Business type
+  const businessType = business.business_type || ''
+
+  // Determine CTA label and type
+  const ctaConfig = {
+    fashion: { label: 'Request Custom Design', type: 'fashion' },
+    repairs: { label: 'Book a Repair', type: 'repair' },
+    printing: { label: 'Get a Printing Quote', type: 'printing' },
+  }
+  const defaultCta = { label: 'Request a Quote', type: 'quote' }
+  const currentCta = ctaConfig[businessType] || defaultCta
+
+  // Open the correct modal
+  const handleCtaClick = () => {
+    if (currentCta.type === 'fashion') setSectorModal('fashion')
+    else if (currentCta.type === 'repair') setSectorModal('repair')
+    else if (currentCta.type === 'printing') setSectorModal('printing')
+    else {
+      // Fallback to generic quote modal
+      if (onQuoteClick) onQuoteClick()
+    }
+  }
+
+  // Sector-specific extra sections (optional)
+  const extraSections = page.sector_sections || []
 
   const getCartTotal = () => {
     return cartItems.reduce((sum, item) => {
@@ -49,18 +79,15 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
 
   const heroTextAlign = page.hero_layout === 'left' ? 'left' : 'center'
 
-  // Render nav items based on headerOrder (fixed)
   const navItems = headerOrder.map(item => {
     const label = item.toLowerCase()
     if (label === 'shop') {
-      // Use an anchor for shop – works in both header and sidebar
       return (
         <a key={item} href={`/${page.slug || ''}/shop`} style={{ textDecoration: 'none', color: 'inherit', fontSize: '0.85rem', fontWeight: 500 }}>
           {item}
         </a>
       )
     }
-    // For other items, scroll to section
     const scrollTarget = {
       home: 'home', about: 'about', services: 'services', work: 'portfolio', contact: 'contact'
     }[label] || 'home'
@@ -76,7 +103,6 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
       {/* Header or Sidebar */}
       {sidebar ? (
         <>
-          {/* Hamburger button – always visible */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
@@ -87,16 +113,9 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
           >
             ☰
           </button>
-
-          {/* Overlay when sidebar open */}
           {sidebarOpen && (
-            <div
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}
-              onClick={() => setSidebarOpen(false)}
-            />
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }} onClick={() => setSidebarOpen(false)} />
           )}
-
-          {/* Sidebar itself */}
           <div style={{
             position: 'fixed', left: 0, top: 0, height: '100vh', width: '250px',
             background: '#0F2B4A', color: '#fff', padding: '2rem 1rem',
@@ -124,13 +143,15 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </nav>
       )}
 
-      {/* Hero – NO LOGO */}
+      {/* Hero */}
       <section id="home" style={{ padding: '6rem 1.5rem', textAlign: heroTextAlign, ...heroStyle }}>
         <div style={{ maxWidth: '700px', margin: '0 auto', textAlign: heroTextAlign }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 300, letterSpacing: '-0.02em', margin: '0 0 1rem', lineHeight: 1.2 }}>{business.name}</h1>
           <p style={{ fontSize: '1.15rem', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto', opacity: 0.9 }}>{page.description}</p>
           <div style={{ display: 'flex', justifyContent: heroTextAlign === 'left' ? 'flex-start' : 'center', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap' }}>
-            <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(212,165,42,0.3)' }}>Request a Free Quote →</button>
+            <button onClick={handleCtaClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(212,165,42,0.3)' }}>
+              {currentCta.label} →
+            </button>
             <button onClick={() => scrollTo('portfolio')} style={{ background: 'transparent', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', border: '2px solid #fff', fontWeight: 600, cursor: 'pointer' }}>View Our Work</button>
           </div>
         </div>
@@ -155,7 +176,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
                   {service.image_url && <img src={service.image_url} alt={service.name} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '12px', marginBottom: '1rem' }} />}
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 600, margin: '0 0 0.5rem' }}>{service.name}</h3>
                   <p style={{ color: '#6B7280', fontSize: '0.95rem', lineHeight: 1.6 }}>{service.description}</p>
-                  <button onClick={onQuoteClick} style={{ marginTop: '1rem', padding: '0.5rem 1.2rem', borderRadius: '8px', border: 'none', background: '#D4A52A', color: '#0F2B4A', fontWeight: 600, cursor: 'pointer' }}>Request Service →</button>
+                  <button onClick={handleCtaClick} style={{ marginTop: '1rem', padding: '0.5rem 1.2rem', borderRadius: '8px', border: 'none', background: '#D4A52A', color: '#0F2B4A', fontWeight: 600, cursor: 'pointer' }}>Request Service →</button>
                 </div>
               ))}
             </div>
@@ -163,7 +184,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Featured Products (max 4) */}
+      {/* Featured Products */}
       {page.has_shop && featuredProducts.length > 0 && (
         <section id="shop" style={{ padding: '4rem 1.5rem', maxWidth: '900px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Featured Products</h2>
@@ -186,7 +207,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
-      {/* Portfolio – with expand and CTA */}
+      {/* Portfolio */}
       {portfolio.length > 0 && (
         <section id="portfolio" style={{ padding: '4rem 1.5rem', background: '#F3F4F6' }}>
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -200,7 +221,6 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
               ))}
             </div>
           </div>
-          {/* Lightbox */}
           {expandedImage && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '2rem' }}>
               <button onClick={() => setExpandedImage(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'white', border: 'none', borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
@@ -227,6 +247,66 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         </section>
       )}
 
+      {/* Sector-specific extra sections (e.g., size guide, repair process, pricing) */}
+      {extraSections.includes('size-guide') && (
+        <section style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Size Guide</h2>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ border: '1px solid #ddd', padding: '0.5rem' }}>Size</th>
+                  <th style={{ border: '1px solid #ddd', padding: '0.5rem' }}>Bust</th>
+                  <th style={{ border: '1px solid #ddd', padding: '0.5rem' }}>Waist</th>
+                  <th style={{ border: '1px solid #ddd', padding: '0.5rem' }}>Hips</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>S</td>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>34</td>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>26</td>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>36</td>
+                </tr>
+                <tr>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>M</td>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>36</td>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>28</td>
+                  <td style={{ border: '1px solid #ddd', padding: '0.5rem' }}>38</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {extraSections.includes('repair-process') && (
+        <section style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Repair Process</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div><strong>1.</strong> Contact us with your issue</div>
+            <div><strong>2.</strong> We assess and give a quote</div>
+            <div><strong>3.</strong> We repair and return</div>
+          </div>
+        </section>
+      )}
+
+      {extraSections.includes('pricing') && (
+        <section style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '2rem', fontWeight: 400, textAlign: 'center', marginBottom: '2rem', color: '#0F2B4A' }}>Pricing Packages</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{ background: '#fff', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <h4>Starter</h4>
+              <p>₦10,000</p>
+            </div>
+            <div style={{ background: '#fff', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <h4>Pro</h4>
+              <p>₦25,000</p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Testimonials */}
       {reviews.length > 0 && (
         <section style={{ padding: '4rem 1.5rem', maxWidth: '800px', margin: '0 auto' }}>
@@ -248,7 +328,7 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
         <p style={{ opacity: 0.8, marginBottom: '2rem' }}>We'd love to hear from you!</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           {page.show_whatsapp_button && whatsapp && <a href={`https://wa.me/${whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener" style={{ background: '#25D366', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', textDecoration: 'none', fontWeight: 600 }}>WhatsApp Us</a>}
-          {page.show_quote_button && <button onClick={onQuoteClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Request a Quote</button>}
+          {page.show_quote_button && <button onClick={handleCtaClick} style={{ background: '#D4A52A', color: '#0F2B4A', padding: '0.9rem 2rem', borderRadius: '999px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>{currentCta.label}</button>}
           <button onClick={() => setReviewOpen(true)} style={{ background: 'transparent', color: '#fff', padding: '0.9rem 2rem', borderRadius: '999px', border: '2px solid #fff', fontWeight: 600, cursor: 'pointer' }}>Leave a Review</button>
         </div>
         {/* Social Links */}
@@ -284,25 +364,29 @@ export default function Elegant({ business, page, services, shop, portfolio, rev
 
       {/* Modals */}
       {checkoutOpen && (
-        <CheckoutModal
-          open={checkoutOpen}
-          onClose={() => setCheckoutOpen(false)}
-          cartItems={cartItems}
-          business={business}
-          page={page}
-          onSuccess={() => setCartItems([])}
-        />
+        <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} cartItems={cartItems} business={business} page={page} onSuccess={() => setCartItems([])} />
       )}
 
       {reviewOpen && (
-        <ReviewModal
-          open={reviewOpen}
-          onClose={() => setReviewOpen(false)}
-          businessId={page.business_id}
-        />
+        <ReviewModal open={reviewOpen} onClose={() => setReviewOpen(false)} businessId={page.business_id} />
       )}
 
-      {/* Quote Modal is passed via onQuoteClick from parent */}
+      {/* Sector-specific modals */}
+      {sectorModal === 'fashion' && (
+        <FashionQuoteModal open={true} onClose={() => setSectorModal(null)} businessId={page.business_id} businessName={business.name} />
+      )}
+      {sectorModal === 'repair' && (
+        <RepairBookingModal open={true} onClose={() => setSectorModal(null)} businessId={page.business_id} businessName={business.name} />
+      )}
+      {sectorModal === 'printing' && (
+        <PrintingQuoteModal open={true} onClose={() => setSectorModal(null)} businessId={page.business_id} businessName={business.name} />
+      )}
+
+      {/* Fallback quote modal if onQuoteClick is provided and business_type is not one of the three */}
+      {!sectorModal && onQuoteClick && (
+        // We don't render a generic modal here; onQuoteClick is expected to handle it in parent
+        null
+      )}
     </div>
   )
-              }
+      }
