@@ -40,13 +40,22 @@ export async function POST(req) {
       header_order,
       header_sidebar,
       footer_text,
+      // NEW FIELDS (must be included)
+      color_primary,
+      color_secondary,
+      color_accent,
+      font_heading,
+      font_body,
+      sector_sections,
+      cta_label,
+      cta_type,
     } = data
 
     if (!business_id || !slug) {
       return NextResponse.json({ error: 'Business ID and slug required' }, { status: 400 })
     }
 
-    // Upsert page with all new fields
+    // Upsert page with all fields (including new)
     const { error: dbError } = await supabaseAdmin
       .from('business_public_pages')
       .upsert({
@@ -70,6 +79,15 @@ export async function POST(req) {
         header_order: header_order || ['Home', 'About', 'Services', 'Shop', 'Work', 'Contact'],
         header_sidebar: header_sidebar || false,
         footer_text: footer_text || '',
+        // New fields saved
+        color_primary: color_primary || '#0F2B4A',
+        color_secondary: color_secondary || '#D4A52A',
+        color_accent: color_accent || '#D4A52A',
+        font_heading: font_heading || 'Inter',
+        font_body: font_body || 'Inter',
+        sector_sections: sector_sections || [],
+        cta_label: cta_label || '',
+        cta_type: cta_type || '',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'business_id' })
 
@@ -82,4 +100,4 @@ export async function POST(req) {
     console.error(error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-}
+        }
