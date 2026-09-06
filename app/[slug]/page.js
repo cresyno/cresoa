@@ -88,35 +88,48 @@ export default async function PublicPage({ params }) {
 
     const about = page.about || business?.description || ''
 
-    // app/[slug]/page.js (partial - just the business object)
-return (
-  <PublicPageWrapper
-    business={{
-      name: business?.name || 'Business',
-      logo_url: business?.logo_url || '',
-      phone: business?.phone || '',
-      whatsapp: business?.whatsapp || business?.phone || '',
-      email: business?.email || '',
-      location: business?.location || '',
-      business_type: business?.business_type || '', // ✅ ADD THIS
-      facebook: business?.facebook || '',
-      instagram: business?.instagram || '',
-      tiktok: business?.tiktok || '',
-      youtube: business?.youtube || '',
-      linkedin: business?.linkedin || '',
-      google_business: business?.google_business || '',
-    }}
-    
+    return (
+      <PublicPageWrapper
+        business={{
+          name: business?.name || 'Business',
+          logo_url: business?.logo_url || '',
+          phone: business?.phone || '',
+          whatsapp: business?.whatsapp || business?.phone || '',
+          email: business?.email || '',
+          location: business?.location || '',
+          business_type: business?.business_type || '', // ✅ Sector
+          facebook: business?.facebook || '',
+          instagram: business?.instagram || '',
+          tiktok: business?.tiktok || '',
+          youtube: business?.youtube || '',
+          linkedin: business?.linkedin || '',
+          google_business: business?.google_business || '',
+        }}
         page={{
-          ...page,
+          ...page, // spread all existing page properties
           about,
           description: page.description || business?.description || '',
-          business_id: page.business_id, // explicit for CheckoutModal
+          business_id: page.business_id,
           slug: page.slug,
           has_shop: page.has_shop,
           has_services: page.has_services,
           show_quote_button: page.show_quote_button,
           show_whatsapp_button: page.show_whatsapp_button,
+
+          // New editor settings (must be passed for templates to use)
+          hero_font: page.hero_font || 'Inter',
+          hero_layout: page.hero_layout || 'center',
+          header_order: page.header_order || ['Home', 'About', 'Services', 'Shop', 'Work', 'Contact'],
+          header_sidebar: page.header_sidebar || false,
+          footer_text: page.footer_text || '',
+          sector_sections: page.sector_sections || [],
+          color_primary: page.color_primary || '#0F2B4A',
+          color_secondary: page.color_secondary || '#D4A52A',
+          color_accent: page.color_accent || '#D4A52A',
+          font_heading: page.font_heading || 'Inter',
+          font_body: page.font_body || 'Inter',
+          cta_label: page.cta_label || '',
+          cta_type: page.cta_type || '',
         }}
         services={services}
         shop={shop}
@@ -136,4 +149,4 @@ return (
       </div>
     )
   }
-            }
+}
