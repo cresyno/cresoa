@@ -3,22 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
+import { getSectorConfig } from '../../../lib/sector-config'
 
-// ─── Self-contained SVG Icons ───
+// SVG icons (same as before)
 const SvgIcon = ({ name, size = 24, stroke = 'currentColor', style }) => {
   const icons = {
     fashion: <path d="M20.38 3.46L16 2l-4 4-4-4-4.38 1.46a2 2 0 0 0-1.28 2.25L3.6 9.6a2 2 0 0 0 1.46 1.34l2.34.52V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-8.54l2.34-.52a2 2 0 0 0 1.46-1.34l1.26-3.89a2 2 0 0 0-1.28-2.25z" />,
-    printing: <><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
     repairs: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
-    beauty: <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />,
-    food: <><path d="M3 11h18a9 9 0 0 1-18 0z" /><path d="M12 20v-8" /></>,
-    retail: <><path d="M4 4h16l-1 7H5z" /><path d="M5 11v9h14v-9" /></>,
-    interior: <><path d="M3 3h18v18H3z" /><path d="M9 3v18" /></>,
-    services: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
+    printing: <><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
     trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
-    back: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></>,
-    next: <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
     check: <polyline points="20 6 9 17 4 12" />,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{icons[name]}</svg>
@@ -26,25 +20,17 @@ const SvgIcon = ({ name, size = 24, stroke = 'currentColor', style }) => {
 
 const businessTypes = [
   { id: 'fashion', label: 'Fashion & Clothing', icon: 'fashion', gradient: 'linear-gradient(135deg, #D4A52A, #F5D67B)' },
-  { id: 'printing', label: 'Printing & Branding', icon: 'printing', gradient: 'linear-gradient(135deg, #3E7BFA, #6AA5FF)' },
   { id: 'repairs', label: 'Repairs & Technical', icon: 'repairs', gradient: 'linear-gradient(135deg, #2E7D5E, #6FCF97)' },
-  { id: 'beauty', label: 'Beauty & Salon', icon: 'beauty', gradient: 'linear-gradient(135deg, #DB2777, #F472B6)' },
-  { id: 'food', label: 'Food & Restaurants', icon: 'food', gradient: 'linear-gradient(135deg, #EA580C, #FB923C)' },
-  { id: 'retail', label: 'Retail & Store', icon: 'retail', gradient: 'linear-gradient(135deg, #6366F1, #818CF8)' },
-  { id: 'interior', label: 'Interior Design', icon: 'interior', gradient: 'linear-gradient(135deg, #10B981, #34D399)' },
-  { id: 'services', label: 'Professional Services', icon: 'services', gradient: 'linear-gradient(135deg, #F59E0B, #FCD34D)' },
+  { id: 'printing', label: 'Printing & Branding', icon: 'printing', gradient: 'linear-gradient(135deg, #0F2B4A, #3E7BFA)' },
 ]
 
 const templateOptions = [
-  { id: 'elegant', name: 'Elegant', desc: 'Clean & Sophisticated', colors: ['#DB2777', '#1E293B', '#FAFAF9'] },
+  { id: 'elegant', name: 'Elegant', desc: 'Clean & Sophisticated', colors: ['#0F2B4A', '#D4A52A', '#FAFAF9'] },
   { id: 'classic-gold', name: 'Classic Gold', desc: 'Premium & Trustworthy', colors: ['#0F2B4A', '#D4A52A', '#F7F5F0'] },
   { id: 'modern-bold', name: 'Modern Bold', desc: 'Energetic & Creative', colors: ['#4C1D95', '#F97316', '#FFFFFF'] },
   { id: 'fresh-serene', name: 'Fresh Serene', desc: 'Calm & Organic', colors: ['#2D4A22', '#9CAF88', '#F5F5DC'] },
   { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', desc: 'Bold & High-Energy', colors: ['#EA580C', '#DB2777', '#FFFFFF'] },
 ]
-
-const inputStyle = { width: '100%', padding: '0.8rem 1rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
-const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
 
 const STEPS = [
   { id: 1, label: 'Business' },
@@ -53,6 +39,9 @@ const STEPS = [
   { id: 4, label: 'Content' },
   { id: 5, label: 'Publish' },
 ]
+
+const inputStyle = { width: '100%', padding: '0.8rem 1rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
+const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
 
 export default function WebsiteOnboarding() {
   const router = useRouter()
@@ -64,7 +53,6 @@ export default function WebsiteOnboarding() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Form state
   const [form, setForm] = useState({
     businessName: '',
     companyAddress: '',
@@ -83,7 +71,6 @@ export default function WebsiteOnboarding() {
     hasAbout: true,
   })
 
-  // Services / Products
   const [services, setServices] = useState([{ name: '', description: '' }])
   const [products, setProducts] = useState([{ name: '', price: '', description: '' }])
 
@@ -99,6 +86,7 @@ export default function WebsiteOnboarding() {
             businessName: biz.name || '',
             companyAddress: biz.location || '',
             phone: biz.phone || '',
+            whatsapp: biz.whatsapp || '',
             email: biz.email || '',
             logo: biz.logo_url || '',
           }))
@@ -139,6 +127,16 @@ export default function WebsiteOnboarding() {
     updateField('slug', val)
   }
 
+  const handleBusinessTypeSelect = (typeId) => {
+    const config = getSectorConfig(typeId)
+    if (!config) return
+    updateField('businessType', typeId)
+    updateField('templateId', config.template)
+    updateField('description', config.sampleDescription)
+    setServices(config.defaultServices.map(s => ({ name: s.name, description: s.description })))
+    setProducts(config.defaultProducts.map(p => ({ name: p.name, price: p.price, description: p.description })))
+  }
+
   const validateStep = () => {
     if (step === 1) {
       if (!form.businessName.trim()) { setError('Business name is required'); return false }
@@ -167,7 +165,8 @@ export default function WebsiteOnboarding() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Save to business_public_pages
+      const { data: config } = getSectorConfig(form.businessType) || {}
+
       const { error: saveError } = await supabase
         .from('business_public_pages')
         .upsert({
@@ -185,19 +184,26 @@ export default function WebsiteOnboarding() {
           show_whatsapp_button: true,
           has_services: form.hasServices,
           has_shop: form.hasShop,
-          has_services: form.hasServices,
-          has_shop: form.hasShop,
+          business_type: form.businessType,
+          sector_sections: config?.extraSections || [],
+          color_primary: config?.colors?.primary,
+          color_secondary: config?.colors?.secondary,
+          color_accent: config?.colors?.accent,
+          font_heading: config?.fonts?.heading,
+          font_body: config?.fonts?.body,
+          cta_label: config?.cta?.label,
+          cta_type: config?.cta?.type,
         }, { onConflict: 'business_id' })
 
       if (saveError) throw saveError
 
-      // Update business phone/email if needed
-      const { error: bizUpdateError } = await supabase
-        .from('businesses')
-        .update({ phone: form.phone, location: form.companyAddress, email: form.email })
-        .eq('id', businessId)
-
-      if (bizUpdateError) throw bizUpdateError
+      await supabase.from('businesses').update({
+        phone: form.phone,
+        whatsapp: form.whatsapp || form.phone,
+        location: form.companyAddress,
+        email: form.email,
+        business_type: form.businessType,
+      }).eq('id', businessId)
 
       router.push(`/dashboard/website-editor?business_id=${businessId}&published=1`)
     } catch (e) {
@@ -212,7 +218,6 @@ export default function WebsiteOnboarding() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ maxWidth: '680px', width: '100%', background: 'var(--cresoa-surface)', borderRadius: '20px', padding: '2rem', boxShadow: 'var(--shadow-lg)' }}>
-        {/* Progress Bar */}
         <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '2rem' }}>
           {STEPS.map(s => (
             <div key={s.id} style={{ flex: 1, height: '6px', borderRadius: '99px', background: step >= s.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)' }} />
@@ -222,7 +227,6 @@ export default function WebsiteOnboarding() {
 
         {error && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem' }}>{error}</div>}
 
-        {/* Step 1: Business Info */}
         {step === 1 && (
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Tell us about your business</h2>
@@ -251,25 +255,25 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
-        {/* Step 2: Business Type */}
         {step === 2 && (
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>What kind of business?</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.8rem' }}>
               {businessTypes.map(type => (
-                <button key={type.id} onClick={() => updateField('businessType', type.id)} style={{ padding: '1rem', borderRadius: '12px', border: `2px solid ${form.businessType === type.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.businessType === type.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer', textAlign: 'center' }}>
-                  <div style={{ width: '40px', height: '40px', margin: '0 auto 0.5rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: type.gradient }}><SvgIcon name={type.icon} size={20} /></div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{type.label}</span>
+                <button key={type.id} onClick={() => handleBusinessTypeSelect(type.id)} style={{ padding: '1.5rem', borderRadius: '12px', border: `2px solid ${form.businessType === type.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.businessType === type.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer', textAlign: 'center' }}>
+                  <div style={{ width: '50px', height: '50px', margin: '0 auto 0.5rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: type.gradient }}><SvgIcon name={type.icon} size={24} /></div>
+                  <span style={{ fontSize: '1rem', fontWeight: 700 }}>{type.label}</span>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '0.3rem' }}>Tailored features</div>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Step 3: Template */}
         {step === 3 && (
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Pick a design</h2>
+            {form.businessType && <p style={{ fontSize: '0.9rem', color: 'var(--cresoa-accent)', marginBottom: '1rem' }}>Recommended for {businessTypes.find(t => t.id === form.businessType)?.label}</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
               {templateOptions.map(t => (
                 <button key={t.id} onClick={() => updateField('templateId', t.id)} style={{ padding: '1rem', borderRadius: '12px', border: `2px solid ${form.templateId === t.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.templateId === t.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer' }}>
@@ -284,12 +288,9 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
-        {/* Step 4: Content (Services/Products toggle + add items) */}
         {step === 4 && (
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Add content</h2>
-
-            {/* Toggles */}
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
                 <input type="checkbox" checked={form.hasServices} onChange={(e) => updateField('hasServices', e.target.checked)} /> Services
@@ -328,13 +329,13 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
-        {/* Step 5: Publish */}
         {step === 5 && (
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Publish your website</h2>
             <div style={{ background: 'var(--cresoa-surface-soft)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Template</span><strong>{templateOptions.find(t => t.id === form.templateId)?.name}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Services</span><strong>{form.hasServices ? services.filter(s => s.name.trim()).length : 0} items</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Business Type</span><strong>{businessTypes.find(t => t.id === form.businessType)?.label}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Services</span><strong>{form.hasServices ? services.filter(s => s.name.trim()).length : 0} items</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Products</span><strong>{form.hasShop ? products.filter(p => p.name.trim()).length : 0} items</strong></div>
             </div>
 
@@ -352,12 +353,11 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
-             {/* Footer buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
           {step > 1 ? <button onClick={handleBack} style={{ background: 'none', border: 'none', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>Back</button> : <div />}
           {step < 5 ? <button onClick={handleNext} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.7rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 600 }}>Continue</button> : <div />}
         </div>
       </div>
     </div>
   )
-            }
+                                      }                                                          
