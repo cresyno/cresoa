@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabaseClient'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function FashionQuoteModal({ open, onClose, businessId, businessName }) {
   const [form, setForm] = useState({ name: '', phone: '', clothing_type: '', fabric_preference: '', measurements: '', deadline: '' })
