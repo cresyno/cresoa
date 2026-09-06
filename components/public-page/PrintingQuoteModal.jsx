@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabaseClient'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function PrintingQuoteModal({ open, onClose, businessId, businessName }) {
   const [form, setForm] = useState({ name: '', phone: '', print_type: 'Business Cards', quantity: '', size: '', file_url: '' })
