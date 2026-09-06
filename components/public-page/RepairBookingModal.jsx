@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../../lib/supabaseClient'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function RepairBookingModal({ open, onClose, businessId, businessName }) {
   const [form, setForm] = useState({ name: '', phone: '', device_type: '', issue_description: '', preferred_date: '', urgency: 'Normal' })
