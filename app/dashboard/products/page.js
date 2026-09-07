@@ -7,6 +7,7 @@ import { compressImage } from '../../../lib/compressImage'
 
 const inputStyle = { width: '100%', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', boxSizing: 'border-box' }
 const labelStyle = { display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', color: 'var(--cresoa-text)' }
+const cardStyle = { background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--cresoa-border)' }
 
 export default function ProductsPage() {
   const searchParams = useSearchParams()
@@ -19,17 +20,64 @@ export default function ProductsPage() {
   const [editingId, setEditingId] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', price: '', description: '', image_url: '', featured: false, active: true, stock: 0 })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filter, setFilter] = useState('all')
 
+  // Fetch products from business_products, and migrate from shop_products if empty
   const fetchProducts = async () => {
     if (!businessId) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      // Try to fetch from business_products table
+      let { data, error } = await supabase
         .from('business_products')
         .select('*')
         .eq('business_id', businessId)
         .order('created_at', { ascending: false })
+
       if (error) throw error
+
+      // If no products, migrate from business_public_pages.shop_products
+      if (!data || data.length === 0) {
+        const { data: pageData, error: pageErr } = await supabase
+          .from('business_public_pages')
+          .select('shop_products')
+          .eq('business_id', businessId)
+          .maybeSingle()
+
+        if (!pageErr && pageData?.shop_products?.length) {
+          const legacyProducts = pageData.shop_products.map((p, idx) => ({
+            business_id: businessId,
+            name: p.name || 'Untitled',
+            price: p.price || '0',
+            description: p.description || '',
+            image_url: p.image_url || '',
+            featured: p.featured || false,
+            active: true,
+            stock: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }))
+
+          const { error: insertErr } = await supabase
+            .from('business_products')
+            .insert(legacyProducts)
+
+          if (insertErr) throw insertErr
+
+          // Re-fetch from business_products
+          const { data: newData, error: refetchErr } = await supabase
+            .from('business_products')
+            .select('*')
+            .eq('business_id', businessId)
+            .order('created_at', { ascending: false })
+
+          if (refetchErr) throw refetchErr
+          data = newData
+          setMessage('✅ Migrated ' + legacyProducts.length + ' products from your website')
+        }
+      }
+
       setProducts(data || [])
     } catch (err) {
       setMessage('Error loading products: ' + err.message)
@@ -41,6 +89,13 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchProducts()
   }, [businessId])
+
+  // Reset form when opening add
+  const openAddForm = () => {
+    setEditingId(null)
+    setForm({ name: '', price: '', description: '', image_url: '', featured: false, active: true, stock: 0 })
+    setShowForm(true)
+  }
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -149,7 +204,6 @@ export default function ProductsPage() {
 
   const toggleFeatured = async (product) => {
     const newFeatured = !product.featured
-    // Limit to 4 featured
     if (newFeatured) {
       const featuredCount = products.filter(p => p.featured).length
       if (featuredCount >= 4) {
@@ -175,23 +229,50 @@ export default function ProductsPage() {
     else fetchProducts()
   }
 
+  // Filter and search
+  const filteredProducts = products.filter(p => {
+    if (filter === 'active' && !p.active) return false
+    if (filter === 'inactive' && p.active) return false
+    if (filter === 'featured' && !p.featured) return false
+    if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    return true
+  })
+
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
 
   return (
-    <div style={{ padding: '1rem', maxWidth: '1000px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+    <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Products Management</h1>
-        <button onClick={() => { setShowForm(true); setEditingId(null); setForm({ name: '', price: '', description: '', image_url: '', featured: false, active: true, stock: 0 }) }} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.6rem 1.2rem', borderRadius: '8px', border: 'none', fontWeight: 700 }}>+ Add Product</button>
+        <button onClick={openAddForm} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.6rem 1.2rem', borderRadius: '8px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>+ Add Product</button>
       </div>
 
       {message && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', marginBottom: '1rem', background: message.startsWith('✅') ? 'var(--cresoa-success-soft)' : 'var(--cresoa-danger-soft)', color: message.startsWith('✅') ? 'var(--cresoa-success)' : 'var(--cresoa-danger)' }}>{message}</div>}
 
+      {/* Search and Filter */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ ...inputStyle, maxWidth: '250px' }}
+        />
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ ...inputStyle, maxWidth: '150px' }}>
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="featured">Featured</option>
+        </select>
+      </div>
+
+      {/* Add/Edit Form */}
       {showForm && (
-        <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--cresoa-border)' }}>
-          <h3 style={{ marginBottom: '1rem' }}>{editingId ? 'Edit Product' : 'Add Product'}</h3>
+        <div style={{ ...cardStyle, marginBottom: '1.5rem', padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem' }}>{editingId ? 'Edit Product' : 'Add New Product'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <label style={labelStyle}>Name *</label>
+              <label style={labelStyle}>Product Name *</label>
               <input type="text" name="name" value={form.name} onChange={handleInputChange} style={inputStyle} />
             </div>
             <div>
@@ -204,11 +285,11 @@ export default function ProductsPage() {
             <textarea name="description" value={form.description} onChange={handleInputChange} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
           <div style={{ marginTop: '0.8rem' }}>
-            <label style={labelStyle}>Image</label>
+            <label style={labelStyle}>Product Image</label>
             <input type="file" accept="image/*" onChange={handleImageUpload} />
             {form.image_url && <img src={form.image_url} alt="Product" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', marginTop: '0.5rem' }} />}
           </div>
-          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem' }}>
+          <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <input type="checkbox" name="featured" checked={form.featured} onChange={handleInputChange} /> Featured on homepage (max 4)
             </label>
@@ -227,30 +308,38 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
-        {products.map(product => (
-          <div key={product.id} style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', padding: '1rem', border: '1px solid var(--cresoa-border)' }}>
-            {product.image_url && <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.5rem' }} />}
-            <h4 style={{ fontWeight: 700, margin: '0 0 0.3rem' }}>{product.name}</h4>
-            <p style={{ color: 'var(--cresoa-accent)', fontWeight: 700, margin: '0 0 0.3rem' }}>₦{product.price}</p>
-            {product.description && <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>{product.description}</p>}
-            <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem' }}>
-              <button onClick={() => handleEdit(product)} style={{ background: 'none', border: '1px solid var(--cresoa-border)', padding: '0.3rem 0.6rem', borderRadius: '6px', cursor: 'pointer' }}>Edit</button>
-              <button onClick={() => handleDelete(product.id)} style={{ background: 'none', border: '1px solid var(--cresoa-danger)', color: 'var(--cresoa-danger)', padding: '0.3rem 0.6rem', borderRadius: '6px', cursor: 'pointer' }}>Delete</button>
+      {/* Products Grid */}
+      {filteredProducts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--cresoa-text-muted)' }}>
+          <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>No products yet</p>
+          <p>Add your first product to start selling online.</p>
+          <button onClick={openAddForm} style={{ marginTop: '1rem', background: 'var(--cresoa-accent)', color: '#fff', padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 700 }}>+ Add Product</button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+          {filteredProducts.map(product => (
+            <div key={product.id} style={cardStyle}>
+              {product.image_url && <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '0.5rem' }} />}
+              <h4 style={{ fontWeight: 700, margin: '0 0 0.3rem' }}>{product.name}</h4>
+              <p style={{ color: 'var(--cresoa-accent)', fontWeight: 700, margin: '0 0 0.3rem' }}>₦{product.price}</p>
+              {product.description && <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem' }}>{product.description}</p>}
+              <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem' }}>
+                <button onClick={() => handleEdit(product)} style={{ background: 'none', border: '1px solid var(--cresoa-border)', padding: '0.3rem 0.6rem', borderRadius: '6px', cursor: 'pointer' }}>Edit</button>
+                <button onClick={() => handleDelete(product.id)} style={{ background: 'none', border: '1px solid var(--cresoa-danger)', color: 'var(--cresoa-danger)', padding: '0.3rem 0.6rem', borderRadius: '6px', cursor: 'pointer' }}>Delete</button>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                  <input type="checkbox" checked={product.featured} onChange={() => toggleFeatured(product)} /> Featured
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
+                  <input type="checkbox" checked={product.active} onChange={() => toggleActive(product)} /> Active
+                </label>
+                <span style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Stock: {product.stock}</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
-                <input type="checkbox" checked={product.featured} onChange={() => toggleFeatured(product)} /> Featured
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.8rem' }}>
-                <input type="checkbox" checked={product.active} onChange={() => toggleActive(product)} /> Active
-              </label>
-              <span style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Stock: {product.stock}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      {products.length === 0 && <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>No products yet. Add your first product.</p>}
+          ))}
+        </div>
+      )}
     </div>
   )
     }
