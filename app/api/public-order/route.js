@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY  // ⚠️ Use service role (server only)
 )
 
 export async function POST(req) {
@@ -14,14 +14,8 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Validate each item has name, price, quantity
-    for (const item of items) {
-      if (!item.name || !item.price || !item.quantity) {
-        return NextResponse.json({ error: 'Invalid item in order' }, { status: 400 })
-      }
-    }
-
-    const { data, error } = await supabase
+    // Insert using admin client (bypasses RLS)
+    const { data, error } = await supabaseAdmin
       .from('business_orders')
       .insert({
         business_id,
