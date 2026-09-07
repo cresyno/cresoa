@@ -206,6 +206,11 @@ function DashboardLayoutContent({ children }) {
       { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
       { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
       { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
+      // New Website Management items for all sectors
+      { name: 'Website Editor', path: '/dashboard/public-page', icon: 'globe' },
+      { name: 'Website Orders', path: '/dashboard/public-orders', icon: 'file-text' },
+      { name: 'Website Quotes', path: '/dashboard/public-quote', icon: 'message-circle' },
+      { name: 'Website Products', path: '/dashboard/products', icon: 'package' },
     ]
 
     if (sector === 'repairs') {
@@ -216,6 +221,11 @@ function DashboardLayoutContent({ children }) {
         { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
         { name: 'Invoices', path: '/dashboard/repairs/invoices', icon: 'file-text' },
         { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: 'bell' },
+        // New Website Management items for repairs
+        { name: 'Website Editor', path: '/dashboard/public-page', icon: 'globe' },
+        { name: 'Website Orders', path: '/dashboard/public-orders', icon: 'file-text' },
+        { name: 'Website Quotes', path: '/dashboard/public-quote', icon: 'message-circle' },
+        { name: 'Website Products', path: '/dashboard/products', icon: 'package' },
       ]
     }
 
@@ -377,7 +387,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
-        {showSettingsSection && (
+          {showSettingsSection && (
           <div className="nav-section">
             <div className="section-label">Settings</div>
             {showBusinessSettings && <a href={baseUrl('/dashboard/settings')} className={isActive('/dashboard/settings') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="settings" size={16} stroke="currentColor" /></span> Business Settings</a>}
@@ -427,4 +437,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </Suspense>
   )
-              }
+          }
