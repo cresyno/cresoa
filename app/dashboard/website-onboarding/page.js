@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getSectorConfig } from '../../../lib/sector-config'
+import { compressImage } from '../../../lib/compressImage'
 
 // SVG icons (same as before)
 const SvgIcon = ({ name, size = 24, stroke = 'currentColor', style }) => {
@@ -25,18 +26,21 @@ const businessTypes = [
 ]
 
 const templateOptions = [
-  { id: 'elegant', name: 'Elegant', desc: 'Clean & Sophisticated', colors: ['#0F2B4A', '#D4A52A', '#FAFAF9'] },
-  { id: 'classic-gold', name: 'Classic Gold', desc: 'Premium & Trustworthy', colors: ['#0F2B4A', '#D4A52A', '#F7F5F0'] },
-  { id: 'modern-bold', name: 'Modern Bold', desc: 'Energetic & Creative', colors: ['#4C1D95', '#F97316', '#FFFFFF'] },
-  { id: 'fresh-serene', name: 'Fresh Serene', desc: 'Calm & Organic', colors: ['#2D4A22', '#9CAF88', '#F5F5DC'] },
-  { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', desc: 'Bold & High-Energy', colors: ['#EA580C', '#DB2777', '#FFFFFF'] },
+  { id: 'elegant', name: 'Elegant', desc: 'Clean & Sophisticated', gradient: 'linear-gradient(135deg, #D4A52A, #0F2B4A)' },
+  { id: 'classic-gold', name: 'Classic Gold', desc: 'Premium & Trustworthy', gradient: 'linear-gradient(135deg, #D4AF37, #F5E6A8)' },
+  { id: 'modern-bold', name: 'Modern Bold', desc: 'Energetic & Creative', gradient: 'linear-gradient(135deg, #4C1D95, #F97316)' },
+  { id: 'fresh-serene', name: 'Fresh Serene', desc: 'Calm & Organic', gradient: 'linear-gradient(135deg, #A8D8EA, #AA96DA)' },
+  { id: 'dynamic-sunrise', name: 'Dynamic Sunrise', desc: 'Bold & High-Energy', gradient: 'linear-gradient(135deg, #FFD194, #FF7E5F)' },
+  { id: 'luxury-gold', name: 'Luxury Gold', desc: 'Opulent & Timeless', gradient: 'linear-gradient(135deg, #1a1a1a, #D4AF37)' },
+  { id: 'minimal-pro', name: 'Minimal Pro', desc: 'Modern & Clean', gradient: 'linear-gradient(135deg, #f5f5f5, #333)' },
+  { id: 'creative-studio', name: 'Creative Studio', desc: 'Vibrant & Playful', gradient: 'linear-gradient(135deg, #FF6B6B, #FFE66D)' },
 ]
 
 const STEPS = [
   { id: 1, label: 'Business' },
   { id: 2, label: 'Type' },
   { id: 3, label: 'Template' },
-  { id: 4, label: 'Content' },
+  { id: 4, label: 'Media & Content' },
   { id: 5, label: 'Publish' },
 ]
 
@@ -137,6 +141,51 @@ export default function WebsiteOnboarding() {
     setProducts(config.defaultProducts.map(p => ({ name: p.name, price: p.price, description: p.description })))
   }
 
+  // Image upload helpers
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setSaving(true)
+    try {
+      const compressedBlob = await compressImage(file, 200)
+      const filePath = `${businessId}/logo-${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage
+        .from('business-assets')
+        .upload(filePath, compressedBlob, { contentType: 'image/jpeg' })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage
+        .from('business-assets')
+        .getPublicUrl(filePath)
+      updateField('logo', urlData.publicUrl)
+    } catch (err) {
+      setError('Logo upload failed: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleHeroUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setSaving(true)
+    try {
+      const compressedBlob = await compressImage(file, 200)
+      const filePath = `${businessId}/hero-${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage
+        .from('business-assets')
+        .upload(filePath, compressedBlob, { contentType: 'image/jpeg' })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage
+        .from('business-assets')
+        .getPublicUrl(filePath)
+      updateField('heroImage', urlData.publicUrl)
+    } catch (err) {
+      setError('Hero image upload failed: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const validateStep = () => {
     if (step === 1) {
       if (!form.businessName.trim()) { setError('Business name is required'); return false }
@@ -203,9 +252,10 @@ export default function WebsiteOnboarding() {
         location: form.companyAddress,
         email: form.email,
         business_type: form.businessType,
+        logo_url: form.logo,
       }).eq('id', businessId)
 
-      router.push(`/dashboard/website-editor?business_id=${businessId}&published=1`)
+      router.push(`/dashboard/public-page?business_id=${businessId}&published=1`)
     } catch (e) {
       setError('Failed to publish: ' + e.message)
     } finally {
@@ -217,28 +267,30 @@ export default function WebsiteOnboarding() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cresoa-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div style={{ maxWidth: '680px', width: '100%', background: 'var(--cresoa-surface)', borderRadius: '20px', padding: '2rem', boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '2rem' }}>
+      <div style={{ maxWidth: '720px', width: '100%', background: 'var(--cresoa-surface)', borderRadius: '24px', padding: '2rem', boxShadow: 'var(--shadow-lg)' }}>
+        {/* Progress Bar */}
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.5rem' }}>
           {STEPS.map(s => (
-            <div key={s.id} style={{ flex: 1, height: '6px', borderRadius: '99px', background: step >= s.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)' }} />
+            <div key={s.id} style={{ flex: 1, height: '8px', borderRadius: '99px', background: step >= s.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)', transition: 'background 0.3s' }} />
           ))}
         </div>
-        <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem', marginBottom: '1rem', fontWeight: 600 }}>Step {step} of {STEPS.length} · {STEPS[step-1].label}</p>
+        <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', marginBottom: '1.5rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step {step} of {STEPS.length} · {STEPS[step-1].label}</p>
 
-        {error && <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem' }}>{error}</div>}
+        {error && <div style={{ padding: '0.8rem 1rem', borderRadius: '10px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</div>}
 
+        {/* Step 1: Business Info */}
         {step === 1 && (
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Tell us about your business</h2>
-            <div style={{ marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '1.5rem' }}>Tell us about your business</h2>
+            <div style={{ marginBottom: '1.2rem' }}>
               <label style={labelStyle}>Business Name *</label>
               <input type="text" value={form.businessName} onChange={(e) => updateField('businessName', e.target.value)} placeholder="e.g. Abraham Prints" style={inputStyle} />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '1.2rem' }}>
               <label style={labelStyle}>Address</label>
               <input type="text" value={form.companyAddress} onChange={(e) => updateField('companyAddress', e.target.value)} placeholder="e.g. 12 Allen Ave, Ikeja" style={inputStyle} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.2rem' }}>
               <div>
                 <label style={labelStyle}>Phone *</label>
                 <input type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="0803..." style={inputStyle} />
@@ -248,19 +300,25 @@ export default function WebsiteOnboarding() {
                 <input type="tel" value={form.whatsapp} onChange={(e) => updateField('whatsapp', e.target.value)} placeholder="Same or different" style={inputStyle} />
               </div>
             </div>
-            <div style={{ marginTop: '1rem' }}>
+            <div style={{ marginBottom: '1.2rem' }}>
               <label style={labelStyle}>Email</label>
               <input type="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} placeholder="contact@business.com" style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: '1.2rem' }}>
+              <label style={labelStyle}>Business Logo</label>
+              <input type="file" accept="image/*" onChange={handleLogoUpload} />
+              {form.logo && <img src={form.logo} alt="Logo" style={{ marginTop: '0.5rem', width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover' }} />}
             </div>
           </div>
         )}
 
+        {/* Step 2: Business Type */}
         {step === 2 && (
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>What kind of business?</h2>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '1.5rem' }}>What kind of business?</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.8rem' }}>
               {businessTypes.map(type => (
-                <button key={type.id} onClick={() => handleBusinessTypeSelect(type.id)} style={{ padding: '1.5rem', borderRadius: '12px', border: `2px solid ${form.businessType === type.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.businessType === type.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer', textAlign: 'center' }}>
+                <button key={type.id} onClick={() => handleBusinessTypeSelect(type.id)} style={{ padding: '1.5rem', borderRadius: '16px', border: `2px solid ${form.businessType === type.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.businessType === type.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' }}>
                   <div style={{ width: '50px', height: '50px', margin: '0 auto 0.5rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: type.gradient }}><SvgIcon name={type.icon} size={24} /></div>
                   <span style={{ fontSize: '1rem', fontWeight: 700 }}>{type.label}</span>
                   <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '0.3rem' }}>Tailored features</div>
@@ -270,16 +328,15 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
+        {/* Step 3: Template */}
         {step === 3 && (
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Pick a design</h2>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '1.5rem' }}>Pick a design</h2>
             {form.businessType && <p style={{ fontSize: '0.9rem', color: 'var(--cresoa-accent)', marginBottom: '1rem' }}>Recommended for {businessTypes.find(t => t.id === form.businessType)?.label}</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
               {templateOptions.map(t => (
-                <button key={t.id} onClick={() => updateField('templateId', t.id)} style={{ padding: '1rem', borderRadius: '12px', border: `2px solid ${form.templateId === t.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.templateId === t.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
-                    {t.colors.map(c => <div key={c} style={{ width: '16px', height: '16px', borderRadius: '50%', background: c }} />)}
-                  </div>
+                <button key={t.id} onClick={() => updateField('templateId', t.id)} style={{ padding: '1rem', borderRadius: '16px', border: `2px solid ${form.templateId === t.id ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, background: form.templateId === t.id ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-surface)', cursor: 'pointer', textAlign: 'center' }}>
+                  <div style={{ height: '80px', borderRadius: '12px', background: t.gradient, marginBottom: '0.6rem' }} />
                   <strong style={{ display: 'block', fontSize: '1rem' }}>{t.name}</strong>
                   <span style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{t.desc}</span>
                 </button>
@@ -288,10 +345,16 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
+        {/* Step 4: Content & Hero Image */}
         {step === 4 && (
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Add content</h2>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '1.5rem' }}>Add content & hero image</h2>
+            <div style={{ marginBottom: '1.2rem' }}>
+              <label style={labelStyle}>Hero Image (optional)</label>
+              <input type="file" accept="image/*" onChange={handleHeroUpload} />
+              {form.heroImage && <img src={form.heroImage} alt="Hero" style={{ marginTop: '0.5rem', width: '100%', maxHeight: '150px', objectFit: 'cover', borderRadius: '12px' }} />}
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.2rem' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
                 <input type="checkbox" checked={form.hasServices} onChange={(e) => updateField('hasServices', e.target.checked)} /> Services
               </label>
@@ -301,7 +364,7 @@ export default function WebsiteOnboarding() {
             </div>
 
             {form.hasServices && (
-              <div style={{ marginBottom: '1rem' }}>
+              <div style={{ marginBottom: '1.2rem' }}>
                 <label style={labelStyle}>Services</label>
                 {services.map((s, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -313,8 +376,8 @@ export default function WebsiteOnboarding() {
               </div>
             )}
 
-            {form.hasShop && (
-              <div style={{ marginBottom: '1rem' }}>
+                   {form.hasShop && (
+              <div style={{ marginBottom: '1.2rem' }}>
                 <label style={labelStyle}>Products</label>
                 {products.map((p, idx) => (
                   <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -329,17 +392,18 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
+        {/* Step 5: Publish */}
         {step === 5 && (
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem' }}>Publish your website</h2>
-            <div style={{ background: 'var(--cresoa-surface-soft)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '1.5rem' }}>Publish your website</h2>
+            <div style={{ background: 'var(--cresoa-surface-soft)', borderRadius: '12px', padding: '1rem', marginBottom: '1.2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Template</span><strong>{templateOptions.find(t => t.id === form.templateId)?.name}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Business Type</span><strong>{businessTypes.find(t => t.id === form.businessType)?.label}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Services</span><strong>{form.hasServices ? services.filter(s => s.name.trim()).length : 0} items</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}><span>Services</span><strong>{form.hasServices ? services.filter(s => s.name.trim()).length : 0} items</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Products</span><strong>{form.hasShop ? products.filter(p => p.name.trim()).length : 0} items</strong></div>
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '1.2rem' }}>
               <label style={labelStyle}>Your Website URL</label>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span style={{ padding: '0.8rem 0', color: 'var(--cresoa-text-muted)' }}>cresoa.com.ng/</span>
@@ -353,11 +417,12 @@ export default function WebsiteOnboarding() {
           </div>
         )}
 
-           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
-          {step > 1 ? <button onClick={handleBack} style={{ background: 'none', border: 'none', color: 'var(--cresoa-text-muted)', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>Back</button> : <div />}
-          {step < 5 ? <button onClick={handleNext} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.7rem 1.5rem', borderRadius: '8px', border: 'none', fontWeight: 600 }}>Continue</button> : <div />}
+        {/* Navigation Buttons */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem' }}>
+          {step > 1 ? <button onClick={handleBack} style={{ background: 'none', border: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', padding: '0.7rem 1.5rem', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>← Back</button> : <div />}
+          {step < 5 ? <button onClick={handleNext} style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.7rem 2rem', borderRadius: '10px', border: 'none', fontWeight: 700 }}>Continue →</button> : <div />}
         </div>
       </div>
     </div>
   )
-                                      }                                                          
+          }
