@@ -443,30 +443,29 @@ export default function PublicPageSettings() {
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--cresoa-bg)' }}><div className="cresoa-loading-spinner" /></div>
 
-  // ── EMPTY STATE (No website yet) ──
-  if (!hasWebsite && !isEditing) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-bg)', padding: '1rem' }}>
-        <div style={{ maxWidth: '420px', textAlign: 'center', background: 'var(--cresoa-surface)', borderRadius: '20px', padding: '2.5rem', boxShadow: 'var(--shadow-lg)' }}>
-          <div style={{ width: '80px', height: '80px', margin: '0 auto 1rem', borderRadius: '20px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cresoa-accent)' }}>
-            <Icon name="eye" size={32} />
-          </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>You don't have a website yet</h2>
-          <p style={{ color: 'var(--cresoa-text-muted)', marginBottom: '1.5rem' }}>
-            Create a beautiful, professional website for your business in minutes. Choose a template, add your content, and publish.
-          </p>
-          <button
-            onClick={() => router.push(`/dashboard/website-onboarding?business_id=${businessId}`)}
-            style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.8rem 2rem', borderRadius: '10px', border: 'none', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(212,165,42,0.3)' }}
-          >
-            🚀 Create Your Website Now
-          </button>
-          <p style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '1rem' }}>It takes less than 5 minutes.</p>
+// ── EMPTY STATE (No website yet) ──
+if (!hasWebsite && !isEditing) {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-bg)', padding: '1rem' }}>
+      <div style={{ maxWidth: '420px', textAlign: 'center', background: 'var(--cresoa-surface)', borderRadius: '20px', padding: '2.5rem', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ width: '80px', height: '80px', margin: '0 auto 1rem', borderRadius: '20px', background: 'var(--cresoa-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cresoa-accent)' }}>
+          <Icon name="eye" size={32} />
         </div>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>You don't have a website yet</h2>
+        <p style={{ color: 'var(--cresoa-text-muted)', marginBottom: '1.5rem' }}>
+          Create a beautiful, professional website for your business in minutes. Choose a template, add your content, and publish.
+        </p>
+        <button
+          onClick={() => router.push(`/dashboard/website-onboarding?business_id=${businessId}`)}
+          style={{ background: 'var(--cresoa-accent)', color: '#fff', padding: '0.8rem 2rem', borderRadius: '10px', border: 'none', fontWeight: 700, fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(212,165,42,0.3)' }}
+        >
+          🚀 Create Your Website Now
+        </button>
+        <p style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '1rem' }}>It takes less than 5 minutes.</p>
       </div>
-    )
-  }
-
+    </div>
+  )
+}
   // ── EDITOR UI (Website exists or is editing) ──
   return (
     <div style={{ padding: '1rem', maxWidth: '900px', margin: '0 auto', background: 'var(--cresoa-bg)', minHeight: '100vh', paddingBottom: '100px' }}>
