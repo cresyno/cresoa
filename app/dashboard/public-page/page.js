@@ -95,6 +95,7 @@ const HELP_TEXT = {
 
 export default function PublicPageSettings() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const businessId = searchParams.get('business_id')
 
   const [loading, setLoading] = useState(true)
