@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { compressImage } from '../../../lib/compressImage'
 import ClassicGold from '../../../components/public-templates/ClassicGold'
