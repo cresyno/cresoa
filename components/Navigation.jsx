@@ -1,34 +1,20 @@
 'use client'
 
+// components/BottomNav.js
+// Replaces Navigation.js, RepairsNavigation.js, PrintingNavigation.js.
+// Items come from lib/sector-config.js — there is nothing sector-specific
+// written in this file, so it can never drift from the sidebar again.
+
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { getBottomNavItemsFor, isNavPathActive } from '../lib/sector-config'
+import { BottomNavIcon } from './BottomNavIcons'
 
-// ─── Self-contained SVG icons (no imports) ───
-const Svg = ({ name, size = 20, stroke = 'currentColor', style }) => {
-  const icons = {
-    home: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>,
-    'file-text': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
-    layers: <><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>,
-    users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
-    invoice: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>,
-    tool: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
-    package: <><path d="M20.91 8.84L12 13 3.09 8.84" /><line x1="12" y1="22" x2="12" y2="13" /><line x1="2" y1="4" x2="12" y2="9" /><line x1="22" y1="4" x2="12" y2="9" /></>,
-    'bar-chart-2': <><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>,
-  }
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
-      {icons[name]}
-    </svg>
-  )
-}
-
-export function Navigation({ businessId, sector }) {
+export function BottomNav({ businessId, sector }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isDesktop, setIsDesktop] = useState(false)
-
-  // ─── Sector state ───
-  const [currentSector, setCurrentSector] = useState(sector || 'fashion')
+  const [tapBounce, setTapBounce] = useState(null)
 
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768)
@@ -37,108 +23,104 @@ export function Navigation({ businessId, sector }) {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  useEffect(() => {
-    if (sector) {
-      setCurrentSector(sector)
-      return
-    }
-    const storedSector = localStorage.getItem('cresoa-sector')
-    if (storedSector) setCurrentSector(storedSector)
-  }, [sector])
+  // Desktop already has the full sidebar (see app/dashboard/layout.js) —
+  // a second nav bar there would just be a duplicate. Mobile-only by design.
+  if (isDesktop) return null
 
-  // ─── Sector-based navigation items ───
-  const getNavItems = () => {
-    if (currentSector === 'repairs') {
-      return [
-        { icon: 'bar-chart-2', label: 'Dashboard', path: '/dashboard/repairs' },
-        { icon: 'tool', label: 'Jobs', path: '/dashboard/repairs/jobs' },
-        { icon: 'users', label: 'Customers', path: '/dashboard/customers' }, // shared
-        { icon: 'package', label: 'Parts', path: '/dashboard/inventory' }, // shared
-        { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' }, // shared
-        { icon: 'layers', label: 'Reminders', path: '/dashboard/reminders' }, // shared
-      ]
-    }
-    // Fashion (default)
-    return [
-      { icon: 'home', label: 'Home', path: '/dashboard/fashion' },
-      { icon: 'file-text', label: 'Orders', path: '/dashboard/orders' },
-      { icon: 'layers', label: 'Production', path: '/dashboard/production' },
-      { icon: 'users', label: 'Customers', path: '/dashboard/customers' },
-      { icon: 'invoice', label: 'Invoices', path: '/dashboard/invoices' },
-      { icon: 'layers', label: 'Reminders', path: '/dashboard/reminders' },
-    ]
-  }
+  const currentSector = sector || 'fashion'
+  const navItems = getBottomNavItemsFor(currentSector)
 
-  const navItems = getNavItems()
-
-  const navigate = (path) => {
+  const navigate = (path, idx) => {
     if (!businessId) {
       console.warn('No businessId for navigation')
       return
     }
     const separator = path.includes('?') ? '&' : '?'
     router.push(`${path}${separator}business_id=${businessId}`)
+    setTapBounce(idx)
+    setTimeout(() => setTapBounce(null), 300)
   }
 
-  // Desktop
-  if (isDesktop) {
-    return (
-      <nav style={{ display: 'flex', gap: 16, padding: '8px 0', borderBottom: '1px solid var(--cresoa-border)', marginBottom: 16 }}>
-        {navItems.map(item => {
-          const isActive = pathname?.startsWith(item.path) || false
+  const activeIndex = navItems.findIndex((item) => isNavPathActive(pathname, item.path))
+
+  return (
+    <>
+      <style>{`
+        @keyframes cresoaNavBounce {
+          0% { transform: scale(1); }
+          30% { transform: scale(1.3); }
+          60% { transform: scale(0.9); }
+          100% { transform: scale(1); }
+        }
+        .cresoa-nav-bounce { animation: cresoaNavBounce 0.3s ease; }
+      `}</style>
+      <nav style={navContainer}>
+        {navItems.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 2,
+              left: 0,
+              width: `${100 / navItems.length}%`,
+              height: 3,
+              background: 'var(--cresoa-accent)',
+              borderRadius: '999px',
+              transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: `translateX(${Math.max(activeIndex, 0) * 100}%)`,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+        {navItems.map((item, idx) => {
+          const isActive = idx === activeIndex
+          const isTapped = tapBounce === idx
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
-              style={{
-                background: 'transparent',
-                border: 0,
-                padding: '6px 12px',
-                cursor: 'pointer',
-                color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)',
-                fontWeight: isActive ? 700 : 400,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 14,
-              }}
+              onClick={() => navigate(item.path, idx)}
+              style={{ ...navButton, color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)' }}
             >
-              <Svg name={item.icon} size={20} />
-              <span>{item.label}</span>
+              <div
+                className={isTapped ? 'cresoa-nav-bounce' : ''}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, transform: isActive ? 'scale(1.1)' : 'scale(1)', transition: 'transform 0.2s ease' }}
+              >
+                <BottomNavIcon name={item.icon} size={24} stroke={isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)'} />
+                <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.name}</span>
+              </div>
             </button>
           )
         })}
       </nav>
-    )
-  }
-
-  // Mobile
-  return (
-    <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', padding: '8px 0', borderTop: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', zIndex: 100 }}>
-      {navItems.map(item => {
-        const isActive = pathname?.startsWith(item.path) || false
-        return (
-          <button
-            key={item.path}
-            onClick={() => navigate(item.path)}
-            style={{
-              background: 'transparent',
-              border: 0,
-              padding: '8px 4px',
-              cursor: 'pointer',
-              color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              fontSize: 10,
-              fontWeight: isActive ? 700 : 400,
-            }}
-          >
-            <Svg name={item.icon} size={24} />
-            <span>{item.label}</span>
-          </button>
-        )
-      })}
-    </nav>
+    </>
   )
-        }
+}
+
+const navContainer = {
+  position: 'fixed',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  display: 'flex',
+  justifyContent: 'space-around',
+  padding: '8px 0',
+  background: 'var(--cresoa-surface)',
+  borderTop: '1px solid var(--cresoa-border)',
+  zIndex: 1000,
+  height: '64px',
+  boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
+}
+
+const navButton = {
+  background: 'transparent',
+  border: 0,
+  padding: '8px 4px',
+  cursor: 'pointer',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 2,
+  justifyContent: 'center',
+  transition: 'color 0.2s ease',
+  minWidth: 0,
+  flex: 1,
+}
