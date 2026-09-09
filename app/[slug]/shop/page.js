@@ -62,26 +62,23 @@ export default async function ShopPage({ params }) {
   // Live source of truth: products explicitly checked "List on website"
   // and currently active. This replaces the old shop_products JSON blob.
   let shop = []
-  const { data: liveProducts, error: productsError } = await supabaseAdmin
+  const { data: allProducts, error: productsError } = await supabaseAdmin
     .from('business_products')
     .select('*')
     .eq('business_id', page.business_id)
-    .eq('on_website', true)
-    .eq('active', true)
     .order('created_at', { ascending: false })
 
-  if (!productsError && liveProducts) {
-    shop = liveProducts.map(toShopItem)
-  }
-
-  // Safety net: a business that has never opened the new Products dashboard
-  // won't have any business_products rows yet (or on_website set) — fall back
-  // to the legacy JSON column so their storefront doesn't go blank.
-  if (shop.length === 0 && !productsError) {
+  if (!productsError && allProducts && allProducts.length > 0) {
+    // This business has migrated to the new Products system — trust it
+    // completely, even if the result is an empty storefront right now.
+    shop = allProducts
+      .filter((p) => p.on_website && p.active)
+      .map(toShopItem)
+  } else if (!productsError) {
+    // Safety net: only for a business with ZERO rows in business_products —
+    // i.e. one that has never opened the new Products dashboard at all.
     const legacyShop = Array.isArray(page.shop_products) ? page.shop_products : []
-    if (legacyShop.length > 0) {
-      shop = legacyShop
-    }
+    shop = legacyShop
   }
 
   return (
