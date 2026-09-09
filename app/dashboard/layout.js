@@ -9,6 +9,7 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner'
 import SectorMismatch from '../../components/SectorMismatch'
+import { getNavItemsFor, getDashboardBasePath, getSectorBadge, SHARED_DASHBOARD_PATHS, SECTOR_KEYS } from '../../lib/sector-config'
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
@@ -173,24 +174,30 @@ function DashboardLayoutContent({ children }) {
       const sectorPath = pathname?.split('/')[2] // e.g., 'fashion', 'repairs', 'printing'
 
       // If path is a sector-specific path but doesn't match the business sector
-      if (sectorPath && ['fashion', 'repairs', 'printing'].includes(sectorPath) && sectorPath !== currentSector) {
+      if (sectorPath && SECTOR_KEYS.includes(sectorPath) && sectorPath !== currentSector) {
         setMismatchInfo({ sector: currentSector, businessId: business.id })
         return
       }
 
-      // Repairs/fashion cross-guards (keep existing)
-      if (currentSector === 'repairs' && (
-        pathname?.startsWith('/dashboard/orders') ||
-        pathname?.startsWith('/dashboard/customers') ||
-        pathname?.startsWith('/dashboard/inventory') ||
-        pathname?.startsWith('/dashboard/groups') ||
-        pathname?.startsWith('/dashboard/fashion')
-      )) {
-        router.push('/dashboard/repairs?business_id=' + business.id)
+      // Fashion lives at the bare /dashboard root with no distinguishing
+      // URL segment, so a non-fashion business wandering into fashion-only
+      // paths isn't caught by the segment check above — guard it explicitly.
+      const FASHION_ONLY_PATHS = ['/dashboard/orders', '/dashboard/customers', '/dashboard/inventory', '/dashboard/groups']
+      const onSharedPath = SHARED_DASHBOARD_PATHS.some((p) => pathname?.startsWith(p))
+      if (
+        currentSector !== 'fashion' &&
+        !onSharedPath &&
+        FASHION_ONLY_PATHS.some((p) => pathname?.startsWith(p))
+      ) {
+        router.push(`${getDashboardBasePath(currentSector)}?business_id=${business.id}`)
         return
       }
 
-      if (currentSector === 'fashion' && pathname?.startsWith('/dashboard/repairs')) {
+      if (
+        currentSector === 'fashion' &&
+        !onSharedPath &&
+        SECTOR_KEYS.some((key) => key !== 'fashion' && pathname?.startsWith(getDashboardBasePath(key)))
+      ) {
         router.push('/dashboard?business_id=' + business.id)
         return
       }
@@ -198,39 +205,8 @@ function DashboardLayoutContent({ children }) {
   }, [loading, business, pathname, router, searchParams])
 
   // ─── NAVIGATION ITEMS ───
-  const getNavItems = (sector) => {
-    const defaultItems = [
-      { name: 'Dashboard', path: '/dashboard', icon: 'bar-chart-2' },
-      { name: 'Orders', path: '/dashboard/orders', icon: 'file-text' },
-      { name: 'Customers', path: '/dashboard/customers', icon: 'users' },
-      { name: 'Inventory', path: '/dashboard/inventory', icon: 'package' },
-      { name: 'Invoices', path: '/dashboard/invoices', icon: 'file-text' },
-      { name: 'Reminders', path: '/dashboard/reminders', icon: 'bell' },
-      // New Website Management items for all sectors
-      { name: 'Website Editor', path: '/dashboard/public-page', icon: 'globe' },
-      { name: 'Website Orders', path: '/dashboard/public-orders', icon: 'file-text' },
-      { name: 'Website Quotes', path: '/dashboard/public-quote', icon: 'message-circle' },
-      { name: 'Website Products', path: '/dashboard/products', icon: 'package' },
-    ]
-
-    if (sector === 'repairs') {
-      return [
-        { name: 'Dashboard', path: '/dashboard/repairs', icon: 'bar-chart-2' },
-        { name: 'Jobs', path: '/dashboard/repairs/jobs', icon: 'tool' },
-        { name: 'Customers', path: '/dashboard/repairs/customers', icon: 'users' },
-        { name: 'Parts', path: '/dashboard/repairs/parts', icon: 'package' },
-        { name: 'Invoices', path: '/dashboard/repairs/invoices', icon: 'file-text' },
-        { name: 'Reminders', path: '/dashboard/repairs/reminders', icon: 'bell' },
-        // New Website Management items for repairs
-        { name: 'Website Editor', path: '/dashboard/public-page', icon: 'globe' },
-        { name: 'Website Orders', path: '/dashboard/public-orders', icon: 'file-text' },
-        { name: 'Website Quotes', path: '/dashboard/public-quote', icon: 'message-circle' },
-        { name: 'Website Products', path: '/dashboard/products', icon: 'package' },
-      ]
-    }
-
-    return defaultItems
-  }
+  // Sourced entirely from lib/sector-config.js — adding a new sector means
+  // adding one entry there, never touching this file again.
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -238,7 +214,11 @@ function DashboardLayoutContent({ children }) {
   }
 
   const isActive = (path) => {
-    if (path === '/dashboard' || path === '/dashboard/repairs' || path === '/dashboard/fashion') {
+    // A sector's own dashboard-home link (e.g. '/dashboard', '/dashboard/repairs',
+    // '/dashboard/printing') must match exactly, or it'd stay "active" on every
+    // sub-page too since those sub-paths start with the same prefix.
+    const isSomeSectorHome = SECTOR_KEYS.some((key) => getDashboardBasePath(key) === path)
+    if (isSomeSectorHome) {
       return pathname === path
     }
     return pathname?.startsWith(path)
@@ -246,15 +226,10 @@ function DashboardLayoutContent({ children }) {
 
   const handleNavClick = () => setSidebarOpen(false)
 
-  const getIndustryBadge = () => {
-    const sector = business?.sector || 'fashion'
-    if (sector === 'repairs') return '🔧 Repairs'
-    if (sector === 'fashion') return '👗 Fashion'
-    return ''
-  }
+  const getIndustryBadge = () => getSectorBadge(business?.sector || 'fashion')
 
   const currentSector = business?.sector || 'fashion'
-  const currentNavItems = getNavItems(currentSector)
+  const currentNavItems = getNavItemsFor(currentSector)
 
   if (loading && !authChecked) {
     return (
@@ -410,7 +385,7 @@ function DashboardLayoutContent({ children }) {
         </div>
       </div>
 
-      <div className="main-content">
+    <div className="main-content">
         <div className="dashboard-header">
           <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
