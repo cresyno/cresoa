@@ -1,0 +1,543 @@
+/* ============================================================
+   Products page — layout, cards, tabs, modal
+   Built on the existing --cresoa-* design tokens.
+   Real CSS media queries (inline style objects can't do this).
+   ============================================================ */
+
+.page {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: var(--cresoa-bg);
+  min-height: 100vh;
+  color: var(--cresoa-text);
+}
+
+/* ---------- Header ---------- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.addButton {
+  background: var(--cresoa-accent);
+  color: #fff;
+  padding: 0.65rem 1.1rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addButton:active {
+  transform: scale(0.98);
+}
+
+/* ---------- Toast / message ---------- */
+.message {
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.messageSuccess {
+  background: var(--cresoa-success-soft);
+  color: var(--cresoa-success);
+}
+
+.messageError {
+  background: var(--cresoa-danger-soft);
+  color: var(--cresoa-danger);
+}
+
+/* ---------- Toolbar: search + filters ---------- */
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.searchInput {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.filterSelect {
+  flex: 0 1 140px;
+  min-width: 110px;
+}
+
+.input {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-bg);
+  color: var(--cresoa-text);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.input:focus-visible,
+.tabButton:focus-visible,
+.addButton:focus-visible,
+.smallButton:focus-visible,
+.stepButton:focus-visible {
+  outline: 2px solid var(--cresoa-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Mobile tabs (only meaningful <880px) ---------- */
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--cresoa-border);
+}
+
+.tabButton {
+  flex: 1;
+  padding: 0.6rem 0.5rem;
+  border: none;
+  background: none;
+  color: var(--cresoa-text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabButtonActive {
+  color: var(--cresoa-accent);
+  border-bottom-color: var(--cresoa-accent);
+}
+
+.tabCount {
+  color: var(--cresoa-text-muted);
+  font-weight: 600;
+  margin-left: 0.3rem;
+}
+
+/* Tabs are the mobile navigation — hide the row entirely once both
+   columns are shown side by side. */
+@media (min-width: 881px) {
+  .tabs { display: none; }
+}
+
+/* ---------- Bulk action bar ---------- */
+.bulkBar {
+  padding: 0.6rem 0.8rem;
+  background: var(--cresoa-accent-soft);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.bulkQtyInput {
+  width: 90px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-bg);
+  color: var(--cresoa-text);
+}
+
+.smallButton {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.smallButtonDanger {
+  border-color: var(--cresoa-danger);
+  background: var(--cresoa-danger);
+  color: #fff;
+}
+
+.smallButtonGhost {
+  border: none;
+  background: none;
+  text-decoration: underline;
+}
+
+/* ---------- Two-column layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 880px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  /* Only the column matching the active tab is shown below 880px */
+  .columnHiddenMobile {
+    display: none;
+  }
+}
+
+.column {
+  background: var(--cresoa-surface);
+  border-radius: 14px;
+  border: 1px solid var(--cresoa-border);
+  padding: 0.9rem;
+}
+
+.columnHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+  gap: 0.5rem;
+}
+
+.columnTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.columnSubtitle {
+  font-size: 0.78rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
+
+.selectAllRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--cresoa-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* ---------- Product card ---------- */
+.card {
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: var(--cresoa-bg);
+}
+
+.cardTop {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.cardCheckbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  accent-color: var(--cresoa-accent);
+}
+
+.cardThumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: var(--cresoa-surface);
+}
+
+.cardThumbPlaceholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: var(--cresoa-surface);
+  border: 1px dashed var(--cresoa-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cresoa-text-muted);
+  font-size: 0.7rem;
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardName {
+  margin: 0 0 0.2rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.cardPrice {
+  margin: 0 0 0.3rem;
+  color: var(--cresoa-accent);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.cardDescription {
+  margin: 0 0 0.4rem;
+  color: var(--cresoa-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.badgeActive {
+  background: var(--cresoa-success-soft);
+  color: var(--cresoa-success);
+}
+
+.badgeInactive {
+  background: var(--cresoa-danger-soft);
+  color: var(--cresoa-danger);
+}
+
+.badgeOutOfStock {
+  background: var(--cresoa-danger-soft);
+  color: var(--cresoa-danger);
+}
+
+.badgeFeatured {
+  background: var(--cresoa-accent-soft);
+  color: var(--cresoa-accent);
+}
+
+/* Stock stepper — 44px min tap target for thumbs */
+.stepperRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.stepperLabel {
+  font-size: 0.78rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 600;
+}
+
+.stepButton {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepValue {
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cresoa-text-muted);
+  cursor: pointer;
+}
+
+.checkboxLabel input {
+  accent-color: var(--cresoa-accent);
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- Modal ---------- */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--cresoa-surface);
+  border-radius: 16px;
+  padding: 1.4rem;
+  max-width: 520px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modalTitle {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.modalGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+
+@media (max-width: 420px) {
+  .modalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.field {
+  margin-top: 0.8rem;
+}
+
+.toggleGroup {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+.thumbPreview {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-top: 0.5rem;
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+}
+
+.primaryButton {
+  background: var(--cresoa-accent);
+  color: #fff;
+  padding: 0.65rem 1.4rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  padding: 0.65rem 1.4rem;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  margin-top: 0.3rem;
+}
+
+/* ---------- Down to 320px: tighten spacing, never overflow ---------- */
+@media (max-width: 360px) {
+  .page { padding: 0.65rem; }
+  .cardThumb, .cardThumbPlaceholder { width: 48px; height: 48px; }
+  .title { font-size: 1.2rem; }
+  .addButton { padding: 0.55rem 0.85rem; font-size: 0.85rem; }
+  }
