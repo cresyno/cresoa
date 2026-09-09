@@ -71,8 +71,14 @@ export default async function ShopPage({ params }) {
   if (!productsError && allProducts && allProducts.length > 0) {
     // This business has migrated to the new Products system — trust it
     // completely, even if the result is an empty storefront right now.
+    //
+    // Visibility rule (the real strategy):
+    //  - active = false  -> never shows, no matter what (paused/discontinued)
+    //  - active = true, on_website = false -> inventory only, not on the site
+    //  - active = true, on_website = true  -> shows; stock=0 shows as
+    //    "Out of stock" (handled client-side) rather than disappearing
     shop = allProducts
-      .filter((p) => p.on_website && p.active)
+      .filter((p) => p.active && p.on_website)
       .map(toShopItem)
   } else if (!productsError) {
     // Safety net: only for a business with ZERO rows in business_products —
