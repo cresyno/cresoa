@@ -545,7 +545,7 @@ export default function ProductsPage() {
                         <button onClick={() => updateStock(product, 1)} className={styles.stepButton} aria-label="Increase stock">+</button>
                       </div>
 
-                    <div className={styles.cardActions}>
+<div className={styles.cardActions}>
                         <button onClick={() => openEditModal(product)} className={styles.smallButton}>Edit</button>
                         <button onClick={() => toggleActive(product)} className={styles.smallButton}>
                           {product.active ? 'Mark inactive' : 'Mark active'}
@@ -573,6 +573,7 @@ export default function ProductsPage() {
             <h3 className={styles.columnTitle}>Website</h3>
             <span className={styles.columnSubtitle}>{websiteProducts.length} listed</span>
           </div>
+          <p className={styles.hint}>Only items that are both listed and active actually show on your live shop.</p>
 
           {websiteProducts.length === 0 ? (
             <div className={styles.emptyState}>
@@ -590,6 +591,7 @@ export default function ProductsPage() {
                     )}
                     <div className={styles.cardBody}>
                       <div className={styles.badgeRow}>
+                        {!product.active && <span className={`${styles.badge} ${styles.badgeInactive}`}>Hidden — inactive</span>}
                         {(product.stock || 0) <= 0 && <span className={`${styles.badge} ${styles.badgeOutOfStock}`}>Out of stock</span>}
                         {product.featured && <span className={`${styles.badge} ${styles.badgeFeatured}`}>Featured</span>}
                       </div>
@@ -681,4 +683,4 @@ export default function ProductsPage() {
       )}
     </div>
   )
-                              }
+                            }
