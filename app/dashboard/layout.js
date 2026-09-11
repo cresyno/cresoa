@@ -9,7 +9,8 @@ import BusinessSwitcher from '../components/BusinessSwitcher'
 import { Icon } from '../../components/Icon'
 import Banner from '../../components/Banner'
 import SectorMismatch from '../../components/SectorMismatch'
-import { getNavItemsFor, getDashboardBasePath, getSectorBadge, SHARED_DASHBOARD_PATHS, SECTOR_KEYS } from '../../lib/sector-config'
+import { BottomNav } from '../../components/BottomNav'
+import { getNavItemsFor, getDashboardBasePath, getSectorBadge, isNavPathActive, SHARED_DASHBOARD_PATHS, SECTOR_KEYS } from '../../lib/sector-config'
 
 function DashboardLayoutContent({ children }) {
   const router = useRouter()
@@ -182,7 +183,7 @@ function DashboardLayoutContent({ children }) {
       // Fashion lives at the bare /dashboard root with no distinguishing
       // URL segment, so a non-fashion business wandering into fashion-only
       // paths isn't caught by the segment check above — guard it explicitly.
-      const FASHION_ONLY_PATHS = ['/dashboard/orders', '/dashboard/customers', '/dashboard/inventory', '/dashboard/groups']
+      const FASHION_ONLY_PATHS = ['/dashboard/orders', '/dashboard/customers', '/dashboard/inventory', '/dashboard/groups', '/dashboard/production']
       const onSharedPath = SHARED_DASHBOARD_PATHS.some((p) => pathname?.startsWith(p))
       if (
         currentSector !== 'fashion' &&
@@ -198,7 +199,7 @@ function DashboardLayoutContent({ children }) {
         !onSharedPath &&
         SECTOR_KEYS.some((key) => key !== 'fashion' && pathname?.startsWith(getDashboardBasePath(key)))
       ) {
-        router.push('/dashboard?business_id=' + business.id)
+        router.push(getDashboardBasePath('fashion') + '?business_id=' + business.id)
         return
       }
     }
@@ -213,16 +214,7 @@ function DashboardLayoutContent({ children }) {
     router.push('/login')
   }
 
-  const isActive = (path) => {
-    // A sector's own dashboard-home link (e.g. '/dashboard', '/dashboard/repairs',
-    // '/dashboard/printing') must match exactly, or it'd stay "active" on every
-    // sub-page too since those sub-paths start with the same prefix.
-    const isSomeSectorHome = SECTOR_KEYS.some((key) => getDashboardBasePath(key) === path)
-    if (isSomeSectorHome) {
-      return pathname === path
-    }
-    return pathname?.startsWith(path)
-  }
+  const isActive = (path) => isNavPathActive(pathname, path)
 
   const handleNavClick = () => setSidebarOpen(false)
 
@@ -320,7 +312,7 @@ function DashboardLayoutContent({ children }) {
         .beta-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.7rem; border-radius: 16px; background: linear-gradient(135deg, #D4A52A, #C79A2B); color: #0F2B4A; font-weight: 700; font-size: 0.65rem; text-decoration: none; box-shadow: 0 2px 8px rgba(212,165,42,0.2); transition: transform 0.1s ease; }
         .beta-btn:hover { transform: scale(1.02); }
         @media (min-width: 769px) { .hamburger { display: none !important; } .sidebar { transform: translateX(0) !important; } .overlay { display: none !important; } }
-        @media (max-width: 768px) { .hamburger { display: block; } .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; } .sidebar.open { transform: translateX(0); } .overlay.open { display: block; } .main-content { padding-top: 3rem; } }
+        @media (max-width: 768px) { .hamburger { display: block; } .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; } .sidebar.open { transform: translateX(0); } .overlay.open { display: block; } .main-content { padding-top: 3rem; padding-bottom: 64px; } }
       `}</style>
 
       <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? '✕' : '☰'}</button>
@@ -396,6 +388,7 @@ function DashboardLayoutContent({ children }) {
         <Banner />
         {children}
       </div>
+      <BottomNav businessId={business?.id} sector={currentSector} />
     </div>
   )
 }
