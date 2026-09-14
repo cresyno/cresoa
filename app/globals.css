@@ -1460,3 +1460,107 @@ body {
     margin: 0 auto;
   }
 }
+
+/* Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+body, .cresoa-dashboard {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+h1, h2, h3, .font-serif {
+  font-family: 'Lora', serif;
+}
+
+/* Micro-interactions */
+.cresoa-metric-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.cresoa-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: var(--cresoa-primary);
+}
+.cresoa-list-row {
+  transition: background-color 0.2s ease;
+}
+.cresoa-list-row:hover {
+  background-color: var(--cresoa-surface-muted);
+}
+.cresoa-primary-button {
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+.cresoa-primary-button:hover {
+  opacity: 0.9;
+}
+.cresoa-primary-button:active {
+  transform: scale(0.98);
+}
+
+/* Chart Tooltips */
+.chart-bar-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  cursor: pointer;
+}
+.chart-tooltip {
+  position: absolute;
+  top: -30px;
+  background: var(--cresoa-text);
+  color: var(--cresoa-surface);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  animation: fadeIn 0.2s ease;
+}
+.chart-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px 4px 0;
+  border-style: solid;
+  border-color: var(--cresoa-text) transparent transparent;
+}
+
+/* Elegant Empty States */
+.elegant-empty {
+  padding: 32px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.elegant-empty h4 {
+  font-family: 'Lora', serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--cresoa-text);
+  margin-bottom: 8px;
+}
+.elegant-empty p {
+  font-size: 13px;
+  color: var(--cresoa-text-muted);
+  max-width: 200px;
+}
+
+/* Skeleton Loaders */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.skeleton-box {
+  background-color: var(--cresoa-border);
+  border-radius: 8px;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
