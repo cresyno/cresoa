@@ -124,11 +124,11 @@ function getGroupProgress(groups, orders) {
 }
 
 // ============================================================
-// DASHBOARD SHELL
+// DASHBOARD SHELL (FORCED MOBILE ISOLATION)
 // ============================================================
 function DashboardShell({ children, theme }) {
   return (
-    <main className="cresoa-dashboard" data-theme={theme}>
+    <main className="cresoa-dashboard cresoa-dashboard-force-mobile" data-theme={theme}>
       <div className="cresoa-dashboard-shell">{children}</div>
     </main>
   )
@@ -326,7 +326,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-           {/* STANDARD 2x2 KPI GRID (JAKOB'S LAW) */}
+        {/* STANDARD 2x2 KPI GRID (JAKOB'S LAW) */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
           {kpiCards.map(card => (
             <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', padding: '16px 12px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
@@ -360,6 +360,9 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* ========================================== */}
+        {/* HIGH-END ANALYTICS SECTION (REAL SVG CHART) */}
+        {/* ========================================== */}
         <div style={{ marginTop: 24, padding: '0 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
@@ -371,6 +374,7 @@ function FashionDashboard({ businessId }) {
           </div>
 
           <Card>
+            {/* Performance Chart */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
                 <div>
@@ -414,8 +418,10 @@ function FashionDashboard({ businessId }) {
               </div>
             </div>
 
+            {/* Financial Health */}
             <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
+              
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
@@ -426,6 +432,7 @@ function FashionDashboard({ businessId }) {
                     <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
+                
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                     <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
@@ -436,6 +443,7 @@ function FashionDashboard({ businessId }) {
                   </div>
                 </div>
               </div>
+              
               {summary.outstanding > 0 && (
                 <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
@@ -446,6 +454,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Recent Orders & Customers – Stacked Vertically for Mobile */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -462,6 +471,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Group Orders */}
         <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
@@ -506,4 +516,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+              }
