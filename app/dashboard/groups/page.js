@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
@@ -10,17 +10,10 @@ import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
+import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
 export default function GroupsPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: '1.5rem' }}>Loading groups...</div>}>
-      <GroupsPageContent />
-    </Suspense>
-  )
-}
-
-function GroupsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -64,11 +57,14 @@ function GroupsPageContent() {
       }
 
       setBusiness(businessData)
+      
+      // 🔍 DEBUG: Check exactly what your database returns
+      console.log('DEBUG SECTOR:', businessData.sector)
+      console.log('DEBUG PLAN:', businessData.plan)
 
-      const isFashion = businessData.sector === 'fashion'
+      // ✅ FIXED: Case-insensitive match to catch 'fashion', 'Fashion', 'Fashion & Custom Wear', etc.
+      const isFashion = businessData.sector?.trim().toLowerCase() === 'fashion' || businessData.sector === 'Fashion & Custom Wear'
       const groupsAllowed = isFeatureAvailable(businessData.plan || 'free', 'groups')
-
-      console.log('[groups gate]', { sector: businessData.sector, plan: businessData.plan, isFashion, groupsAllowed })
 
       if (!isFashion || !groupsAllowed) {
         setGroups([])
@@ -152,9 +148,10 @@ function GroupsPageContent() {
   const planLimits = getPlanLimits(business?.plan || 'free')
   const memberLimit = planLimits?.maxGroupMembers || 0
 
+  // ✅ FIXED: Case-insensitive check here too
   const canUseGroups =
     business &&
-    business.sector === 'fashion' &&
+    (business.sector?.trim().toLowerCase() === 'fashion' || business.sector === 'Fashion & Custom Wear') &&
     isFeatureAvailable(business.plan || 'free', 'groups')
 
   const stats = useMemo(() => {
@@ -287,12 +284,10 @@ function GroupsPageContent() {
 
   // ─── RESTRICTED ───
   if (!canUseGroups) {
-    const isFashion = business?.sector === 'fashion'
+    // ✅ FIXED: Case-insensitive check here as well
+    const isFashion = business?.sector?.trim().toLowerCase() === 'fashion' || business?.sector === 'Fashion & Custom Wear'
     return (
       <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
-        <div style={{ background: '#FEF3C7', border: '1px solid #D4A52A', borderRadius: '8px', padding: '0.6rem 0.9rem', marginBottom: '1rem', fontSize: '0.78rem', fontFamily: 'monospace' }}>
-          DEBUG — sector: {String(business?.sector)} | plan: {String(business?.plan)} | isFashion: {String(isFashion)} | canUseGroups: {String(canUseGroups)}
-        </div>
         <Navigation businessId={businessId} />
         <Card style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '2rem', flexWrap: 'wrap' }}>
           <div style={{ width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', background: 'rgba(212,165,42,0.12)', color: 'var(--cresoa-accent)' }}>
@@ -323,9 +318,6 @@ function GroupsPageContent() {
   // ─── MAIN RENDER ───
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
-      <div style={{ background: '#DCFCE7', border: '1px solid #16A34A', borderRadius: '8px', padding: '0.6rem 0.9rem', marginBottom: '1rem', fontSize: '0.78rem', fontFamily: 'monospace' }}>
-        DEBUG — gate passed. sector: {String(business?.sector)} | plan: {String(business?.plan)} | canUseGroups: {String(canUseGroups)}
-      </div>
       <Navigation businessId={businessId} />
 
       {/* Header */}
@@ -388,7 +380,7 @@ function GroupsPageContent() {
         </Card>
       </div>
 
-{/* Toolbar */}
+     {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
         <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
           <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
@@ -538,6 +530,10 @@ function GroupsPageContent() {
           })}
         </div>
       )}
+
+      <div style={{ marginTop: '2rem' }}>
+        <Navigation businessId={businessId} />
+      </div>
     </div>
   )
-        }
+            }
