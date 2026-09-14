@@ -60,6 +60,8 @@ export default function GroupsPage() {
       const isFashion = businessData.sector === 'fashion'
       const groupsAllowed = isFeatureAvailable(businessData.plan || 'free', 'groups')
 
+      console.log('[groups gate]', { sector: businessData.sector, plan: businessData.plan, isFashion, groupsAllowed })
+
       if (!isFashion || !groupsAllowed) {
         setGroups([])
         setLoading(false)
@@ -418,7 +420,7 @@ export default function GroupsPage() {
         </div>
       </div>
 
-                    {/* Results */}
+        {/* Results */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>
           <strong style={{ color: 'var(--cresoa-text)' }}>{filteredGroups.length}</strong> {filteredGroups.length === 1 ? 'group' : 'groups'}
@@ -524,4 +526,4 @@ export default function GroupsPage() {
       )}
     </div>
   )
-          }
+      }
