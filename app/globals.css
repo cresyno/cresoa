@@ -1564,3 +1564,14 @@ h1, h2, h3, .font-serif {
   border-radius: 8px;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Override global forced layouts ONLY for the Fashion Dashboard */
+.cresoa-dashboard-force-mobile .cresoa-dashboard-shell {
+  display: block !important;
+}
+.cresoa-dashboard-force-mobile .cresoa-metric-card {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
