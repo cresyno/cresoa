@@ -23,8 +23,6 @@ export function BottomNav({ businessId, sector }) {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Desktop already has the full sidebar (see app/dashboard/layout.js) —
-  // a second nav bar there would just be a duplicate. Mobile-only by design.
   if (isDesktop) return null
 
   const currentSector = sector || 'fashion'
@@ -38,7 +36,7 @@ export function BottomNav({ businessId, sector }) {
     const separator = path.includes('?') ? '&' : '?'
     router.push(`${path}${separator}business_id=${businessId}`)
     setTapBounce(idx)
-    setTimeout(() => setTapBounce(null), 300)
+    setTimeout(() => setTapBounce(null), 320)
   }
 
   const activeIndex = navItems.findIndex((item) => isNavPathActive(pathname, item.path))
@@ -46,50 +44,86 @@ export function BottomNav({ businessId, sector }) {
   return (
     <>
       <style>{`
-        @keyframes cresoaNavBounce {
-          0% { transform: scale(1); }
-          30% { transform: scale(1.3); }
-          60% { transform: scale(0.9); }
+        @keyframes cresoaNavTap {
+          0%   { transform: scale(1); }
+          40%  { transform: scale(0.82); }
+          70%  { transform: scale(1.06); }
           100% { transform: scale(1); }
         }
-        .cresoa-nav-bounce { animation: cresoaNavBounce 0.3s ease; }
+        .cresoa-nav-item { -webkit-tap-highlight-color: transparent; user-select: none; }
+        .cresoa-nav-item:active .cresoa-nav-icon-wrap { transform: scale(0.92); }
+        .cresoa-nav-tap { animation: cresoaNavTap 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .cresoa-nav-label { letter-spacing: 0.01em; }
       `}</style>
-      <nav style={navContainer}>
-        {navItems.length > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 2,
-              left: 0,
-              width: `${100 / navItems.length}%`,
-              height: 3,
-              background: 'var(--cresoa-accent)',
-              borderRadius: '999px',
-              transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: `translateX(${Math.max(activeIndex, 0) * 100}%)`,
-              pointerEvents: 'none',
-            }}
-          />
-        )}
-        {navItems.map((item, idx) => {
-          const isActive = idx === activeIndex
-          const isTapped = tapBounce === idx
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path, idx)}
-              style={{ ...navButton, color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)' }}
-            >
-              <div
-                className={isTapped ? 'cresoa-nav-bounce' : ''}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, transform: isActive ? 'scale(1.1)' : 'scale(1)', transition: 'transform 0.2s ease' }}
+
+      <nav style={navContainer} aria-label="Primary">
+        {/* Glass highlight strip */}
+        <div style={glassStrip} />
+
+        <div style={itemsRow}>
+          {navItems.map((item, idx) => {
+            const isActive = idx === activeIndex
+            const isTapped = tapBounce === idx
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path, idx)}
+                className="cresoa-nav-item"
+                aria-label={item.name}
+                aria-current={isActive ? 'page' : undefined}
+                style={navButton}
               >
-                <BottomNavIcon name={item.icon} size={24} stroke={isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)'} />
-                <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.name}</span>
-              </div>
-            </button>
-          )
-        })}
+                <div
+                  className={isTapped ? 'cresoa-nav-tap' : ''}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
+                  {/* Icon with active pill background */}
+                  <div
+                    className="cresoa-nav-icon-wrap"
+                    style={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 44,
+                      height: 28,
+                      borderRadius: 999,
+                      background: isActive ? 'rgba(212, 165, 42, 0.14)' : 'transparent',
+                      transition: 'background 0.25s ease, transform 0.2s ease',
+                    }}
+                  >
+                    <BottomNavIcon
+                      name={item.icon}
+                      size={20}
+                      stroke={isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)'}
+                    />
+                  </div>
+
+                  {/* Label */}
+                  <span
+                    className="cresoa-nav-label"
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? 'var(--cresoa-accent)' : 'var(--cresoa-text-muted)',
+                      transition: 'color 0.2s ease, font-weight 0.2s ease',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {item.name}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </nav>
     </>
   )
@@ -100,27 +134,45 @@ const navContainer = {
   bottom: 0,
   left: 0,
   right: 0,
-  display: 'flex',
-  justifyContent: 'space-around',
-  padding: '8px 0',
-  background: 'var(--cresoa-surface)',
-  borderTop: '1px solid var(--cresoa-border)',
   zIndex: 1000,
-  height: '64px',
-  boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
+  // Frosted-glass surface like iOS / Linear / Revolut
+  background: 'color-mix(in srgb, var(--cresoa-surface) 82%, transparent)',
+  backdropFilter: 'blur(20px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  borderTop: '1px solid color-mix(in srgb, var(--cresoa-border) 60%, transparent)',
+  boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.06), 0 -1px 0 rgba(255, 255, 255, 0.04)',
+  // Respect iPhone home indicator
+  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+}
+
+const glassStrip = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  height: 1,
+  background: 'linear-gradient(90deg, transparent, rgba(212,165,42,0.35), transparent)',
+  pointerEvents: 'none',
+}
+
+const itemsRow = {
+  display: 'flex',
+  alignItems: 'stretch',
+  justifyContent: 'space-around',
+  height: 60,
+  padding: '0 4px',
 }
 
 const navButton = {
   background: 'transparent',
   border: 0,
-  padding: '8px 4px',
+  padding: '6px 2px',
   cursor: 'pointer',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  gap: 2,
   justifyContent: 'center',
-  transition: 'color 0.2s ease',
-  minWidth: 0,
   flex: 1,
-                }
+  minWidth: 0,
+  outline: 'none',
+                        }
