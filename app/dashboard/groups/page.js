@@ -279,9 +279,12 @@ export default function GroupsPage() {
 
   // ─── RESTRICTED ───
   if (!canUseGroups) {
-    const isFashion = business?.sector === 'Fashion & Custom Wear'
+    const isFashion = business?.sector === 'fashion'
     return (
       <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+        <div style={{ background: '#FEF3C7', border: '1px solid #D4A52A', borderRadius: '8px', padding: '0.6rem 0.9rem', marginBottom: '1rem', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+          DEBUG — sector: {String(business?.sector)} | plan: {String(business?.plan)} | isFashion: {String(isFashion)} | canUseGroups: {String(canUseGroups)}
+        </div>
         <Navigation businessId={businessId} />
         <Card style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '2rem', flexWrap: 'wrap' }}>
           <div style={{ width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px', background: 'rgba(212,165,42,0.12)', color: 'var(--cresoa-accent)' }}>
@@ -312,6 +315,9 @@ export default function GroupsPage() {
   // ─── MAIN RENDER ───
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+      <div style={{ background: '#DCFCE7', border: '1px solid #16A34A', borderRadius: '8px', padding: '0.6rem 0.9rem', marginBottom: '1rem', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+        DEBUG — gate passed. sector: {String(business?.sector)} | plan: {String(business?.plan)} | canUseGroups: {String(canUseGroups)}
+      </div>
       <Navigation businessId={businessId} />
 
       {/* Header */}
@@ -374,7 +380,7 @@ export default function GroupsPage() {
         </Card>
       </div>
 
-      {/* Toolbar */}
+{/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
         <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
           <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
@@ -420,7 +426,7 @@ export default function GroupsPage() {
         </div>
       </div>
 
-        {/* Results */}
+          {/* Results */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>
           <strong style={{ color: 'var(--cresoa-text)' }}>{filteredGroups.length}</strong> {filteredGroups.length === 1 ? 'group' : 'groups'}
@@ -526,4 +532,4 @@ export default function GroupsPage() {
       )}
     </div>
   )
-      }
+        }
