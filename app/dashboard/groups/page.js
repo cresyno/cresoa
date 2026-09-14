@@ -10,7 +10,6 @@ import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
-import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
 export default function GroupsPage() {
@@ -58,7 +57,7 @@ export default function GroupsPage() {
 
       setBusiness(businessData)
 
-      const isFashion = businessData.sector === 'Fashion & Custom Wear'
+      const isFashion = businessData.sector === 'fashion'
       const groupsAllowed = isFeatureAvailable(businessData.plan || 'free', 'groups')
 
       if (!isFashion || !groupsAllowed) {
@@ -145,7 +144,7 @@ export default function GroupsPage() {
 
   const canUseGroups =
     business &&
-    business.sector === 'Fashion & Custom Wear' &&
+    business.sector === 'fashion' &&
     isFeatureAvailable(business.plan || 'free', 'groups')
 
   const stats = useMemo(() => {
@@ -419,7 +418,7 @@ export default function GroupsPage() {
         </div>
       </div>
 
-          {/* Results */}
+{/* Results */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.75rem' }}>
           <strong style={{ color: 'var(--cresoa-text)' }}>{filteredGroups.length}</strong> {filteredGroups.length === 1 ? 'group' : 'groups'}
@@ -523,10 +522,6 @@ export default function GroupsPage() {
           })}
         </div>
       )}
-
-      <div style={{ marginTop: '2rem' }}>
-        <Navigation businessId={businessId} />
-      </div>
     </div>
   )
-}
+            }
