@@ -5,20 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
 import { formatMoney, formatShortDate, safeAmount } from '../../../lib/utils'
 import { PRODUCTION_STAGES } from '../../../lib/constants'
-import { Icon } from '../../../components/Icon'
 
 import { Card } from '../../../components/Card'
 import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
-import { DashboardLoading } from '../../../components/Loading'
-import { EmptyState } from '../../../components/EmptyState'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// HELPERS
+// HELPERS (UNTOUCHED LOGIC)
 // ============================================================
 function getInitials(name) {
   if (!name) return '?'
@@ -126,13 +123,40 @@ function getGroupProgress(groups, orders) {
 }
 
 // ============================================================
-// DASHBOARD SHELL
+// DASHBOARD SHELL & SKELETON
 // ============================================================
 function DashboardShell({ children, theme }) {
   return (
     <main className="cresoa-dashboard" data-theme={theme}>
       <div className="cresoa-dashboard-shell">{children}</div>
     </main>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <DashboardShell theme="light">
+      <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80, padding: '0 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, marginTop: 16 }}>
+          <div>
+            <div className="skeleton-box" style={{ width: 100, height: 14, marginBottom: 8 }} />
+            <div className="skeleton-box" style={{ width: 180, height: 28, marginBottom: 8 }} />
+            <div className="skeleton-box" style={{ width: 140, height: 14 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div className="skeleton-box" style={{ width: 36, height: 36, borderRadius: 8 }} />
+            <div className="skeleton-box" style={{ width: 100, height: 36, borderRadius: 8 }} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="skeleton-box" style={{ height: 100, borderRadius: 12 }} />
+          ))}
+        </div>
+        <div className="skeleton-box" style={{ height: 200, borderRadius: 12, marginBottom: 16 }} />
+        <div className="skeleton-box" style={{ height: 300, borderRadius: 12 }} />
+      </div>
+    </DashboardShell>
   )
 }
 
@@ -148,6 +172,7 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
+  const [activeBar, setActiveBar] = useState(null) // State for chart tooltip
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -178,13 +203,18 @@ function FashionDashboard({ businessId }) {
 
   const handleRetry = () => refresh()
 
-  if (loading) return <DashboardShell theme={theme}><DashboardLoading /></DashboardShell>
-  if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh}>Retry</button></Card></DashboardShell>
+  if (loading) return <DashboardSkeleton />
+  if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{marginTop: 12}}>Retry</button></Card></DashboardShell>
 
   // ---- Render functions ----
   const renderOrderRows = (ordersList) => {
     if (!ordersList || ordersList.length === 0) {
-      return <EmptyState title="No orders" message="Create your first order to get started." />
+      return (
+        <div className="elegant-empty">
+          <h4>No orders yet</h4>
+          <p>Create your first order to get started.</p>
+        </div>
+      )
     }
     return ordersList.slice(0, 4).map(order => {
       const customerName = resolveCustomerName(order, customers)
@@ -195,8 +225,8 @@ function FashionDashboard({ businessId }) {
         <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact">
           <span className="cresoa-avatar">{initials}</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
-            <span className="cresoa-row-title">{displayName}</span>
-            <span className="cresoa-row-meta">
+            <span className="cresoa-row-title" style={{ fontWeight: 600, fontSize: 13 }}>{displayName}</span>
+            <span className="cresoa-row-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)' }}>
               {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
             </span>
           </span>
@@ -208,7 +238,12 @@ function FashionDashboard({ businessId }) {
 
   const renderCustomerRows = (customersList) => {
     if (!customersList || customersList.length === 0) {
-      return <EmptyState title="No customers" message="Add customers to see them here." />
+      return (
+        <div className="elegant-empty">
+          <h4>No customers yet</h4>
+          <p>Add customers to see them here.</p>
+        </div>
+      )
     }
     return customersList.slice(0, 4).map(customer => {
       const name = customer.name || 'Unnamed'
@@ -220,13 +255,13 @@ function FashionDashboard({ businessId }) {
         <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact">
           <span className="cresoa-avatar">{initials}</span>
           <span style={{ flex: 1, textAlign: 'left' }}>
-            <span className="cresoa-row-title">{name}</span>
-            <span className="cresoa-row-meta">
+            <span className="cresoa-row-title" style={{ fontWeight: 600, fontSize: 13 }}>{name}</span>
+            <span className="cresoa-row-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)' }}>
               {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
               {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
             </span>
           </span>
-          <span className="cresoa-row-arrow">›</span>
+          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
         </button>
       )
     })
@@ -234,20 +269,27 @@ function FashionDashboard({ businessId }) {
 
   const renderGroupCards = (groupsList) => {
     if (!groupsList || groupsList.length === 0) {
-      return <EmptyState title="No group orders" message="Create a group to manage coordinated outfits." />
+      return (
+        <div className="elegant-empty">
+          <h4>No group orders</h4>
+          <p>Create a group to manage coordinated outfits.</p>
+        </div>
+      )
     }
     return groupsList.slice(0, 4).map(group => {
       const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
       const progress = group.progress
       return (
-        <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)}>
-          <span className="cresoa-group-icon"><Icon name="users" size={16} /></span>
+        <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+          <span className="cresoa-group-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', fontSize: 14, fontWeight: 'bold', flexShrink: 0 }}>
+            {group.name ? group.name.charAt(0).toUpperCase() : 'G'}
+          </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <strong className="cresoa-row-title">{group.name}</strong>
-            <div className="cresoa-row-meta">
+            <strong className="cresoa-row-title" style={{ fontSize: 13, fontWeight: 600 }}>{group.name}</strong>
+            <div className="cresoa-row-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>
               {progress !== null ? (
                 <>
-                  <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
+                  <div style={{ height: 4, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4, marginBottom: 4, width: '100%', maxWidth: 200 }}>
                     <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
                   </div>
                   <span>{progress}% complete</span>
@@ -259,23 +301,23 @@ function FashionDashboard({ businessId }) {
               {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
             </div>
           </div>
-          <span className="cresoa-row-arrow">›</span>
+          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
         </div>
       )
     })
   }
 
-  // ---- Chart ----
+  // ---- Chart Calculations ----
   const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
   const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
   const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
 
   // ---- KPI Cards (2×2) ----
   const kpiCards = [
-    { label: 'Revenue', value: formatMoney(summary.revenue), trend: '↑ 14.2%', meta: 'Total order value', icon: 'dollar-sign', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Orders', value: String(summary.orders), trend: '↑ 3 today', meta: 'Orders in period', icon: 'package', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Collected', value: formatMoney(summary.paid), trend: `${summary.orders ? Math.round((summary.paid / summary.revenue) * 100) : 0}% collected`, meta: 'Payments received', icon: 'check-circle', onClick: () => navigate('/dashboard/orders?filter=payments') },
-    { label: 'Outstanding', value: formatMoney(summary.outstanding), trend: `${summary.outstanding > 0 ? '3 need action' : 'All clear'}`, meta: 'Balance to collect', icon: 'alert-circle', onClick: () => navigate('/dashboard/orders?filter=attention') },
+    { label: 'Revenue', value: formatMoney(summary.revenue), trend: '↑ 14.2%', meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Orders', value: String(summary.orders), trend: '↑ 3 today', meta: 'Orders in period', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Collected', value: formatMoney(summary.paid), trend: `${summary.orders ? Math.round((summary.paid / summary.revenue) * 100) : 0}% collected`, meta: 'Payments received', onClick: () => navigate('/dashboard/orders?filter=payments') },
+    { label: 'Outstanding', value: formatMoney(summary.outstanding), trend: `${summary.outstanding > 0 ? '3 need action' : 'All clear'}`, meta: 'Balance to collect', onClick: () => navigate('/dashboard/orders?filter=attention') },
   ]
 
   // ---- Financial Health ----
@@ -288,45 +330,41 @@ function FashionDashboard({ businessId }) {
 
         <Navigation businessId={businessId} />
 
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, padding: '16px 16px 0' }}>
           <div>
-            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>Cresoa Fashion</p>
-            <h1 style={{ fontSize: 'clamp(22px, 5vw, 30px)', fontWeight: 850, color: 'var(--cresoa-text)' }}>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Cresoa Fashion</p>
+            <h1 style={{ fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: 700, color: 'var(--cresoa-text)', marginTop: 4, lineHeight: 1.1 }}>
               {business?.name || 'Your business'}
             </h1>
-            <p style={{ color: 'var(--cresoa-text-muted)' }}>Good morning 👋</p>
-            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 12 }}>{new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button">
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ fontSize: 11, fontWeight: 600, padding: '0 12px', height: 36 }}>
+              {theme === 'dark' ? 'Light' : 'Dark'}
             </button>
-            <button onClick={refresh} className="cresoa-icon-button">
-              <Icon name="refresh-cw" size={18} />
+            <button onClick={refresh} className="cresoa-icon-button" style={{ fontSize: 11, fontWeight: 600, padding: '0 12px', height: 36 }}>
+              Sync
             </button>
-            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button">
-              <Icon name="plus" size={14} /> New Order
+            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ height: 36, padding: '0 16px' }}>
+              + New Order
             </button>
           </div>
         </header>
 
         {/* KPI 2×2 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
           {kpiCards.map(card => (
-            <button key={card.label} type="button" onClick={card.onClick} className="cresoa-metric-card">
-              <span className="cresoa-metric-icon"><Icon name={card.icon} size={18} /></span>
-              <span style={{ minWidth: 0 }}>
-                <span className="cresoa-metric-label">{card.label}</span>
-                <strong className="cresoa-metric-value">{card.value}</strong>
-                <span className="cresoa-metric-trend" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-success)' }}>{card.trend}</span>
-                <span className="cresoa-metric-meta">{card.meta}</span>
-              </span>
+            <button key={card.label} type="button" onClick={card.onClick} className="cresoa-metric-card" style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 6, border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 20, fontWeight: 800, color: 'var(--cresoa-text)', letterSpacing: '-0.5px' }}>{card.value}</strong>
+              <span className="cresoa-metric-trend" style={{ fontSize: 11, color: 'var(--cresoa-success)', fontWeight: 600 }}>{card.trend}</span>
+              <span className="cresoa-metric-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>{card.meta}</span>
             </button>
           ))}
         </div>
 
         {/* Action Center */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader
               title="Action Required"
@@ -343,14 +381,14 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* Production Pipeline */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
             <div className="cresoa-pipeline">
               {PRODUCTION_STAGES.map((stage, idx) => (
                 <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="cresoa-pipeline-item">
-                  <span className="cresoa-pipeline-number">{productionCounts[stage] || 0}</span>
-                  <span className="cresoa-pipeline-label">{stage}</span>
+                  <span className="cresoa-pipeline-number" style={{ fontWeight: 800, fontSize: 16 }}>{productionCounts[stage] || 0}</span>
+                  <span className="cresoa-pipeline-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stage}</span>
                   {idx < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
                 </button>
               ))}
@@ -358,80 +396,105 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Performance Chart (Revenue only) */}
-        <div style={{ marginTop: 16 }}>
-          <Card>
-            <SectionHeader title="Performance" subtitle="Daily performance" />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-              <div>
-                <strong style={{ fontSize: 22 }}>{formatMoney(totalRevenue)}</strong>
-                <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)' }}>↑ 18% vs previous</span>
-              </div>
-              <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
-                <option value="7">7 days</option>
-                <option value="30">30 days</option>
-                <option value="90">90 days</option>
-              </select>
-            </div>
-            <div className="cresoa-chart" style={{ minHeight: 120 }}>
-              {series.map(day => {
-                const height = Math.max((safeAmount(day.revenue) / maxRevenue) * 100, day.revenue ? 4 : 1)
-                return (
-                  <div key={day.key} className="cresoa-chart-day">
-                    <div className="cresoa-chart-bar-wrap">
-                      <div className="cresoa-chart-value">{day.revenue > 0 ? formatMoney(day.revenue) : ''}</div>
-                      <div className="cresoa-chart-bar" style={{ height: height+'%' }} />
-                    </div>
-                    <span>{day.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-        </div>
+        {/* ========================================== */}
+        {/* HIGH-END ANALYTICS SECTION */}
+        {/* ========================================== */}
+        <div style={{ marginTop: 24, padding: '0 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
+            <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)} style={{ fontSize: 12, background: 'transparent', border: 'none', color: 'var(--cresoa-text-muted)', fontWeight: 600, cursor: 'pointer' }}>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
 
-  {/* Financial Health */}
-        <div style={{ marginTop: 16 }}>
           <Card>
-            <SectionHeader title="Financial Health" />
-            <div style={{ display: 'grid', gap: 16 }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Revenue</span>
-                  <strong>{formatMoney(summary.revenue)}</strong>
+            {/* Performance Chart */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
+                  <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(totalRevenue)}</strong>
                 </div>
-                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
-                  <div style={{ width: '100%', height: '100%', background: 'var(--gradient-accent)', borderRadius: 99 }} />
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
+                  <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)', fontWeight: 600, marginTop: 2 }}>↑ 18% vs previous</span>
                 </div>
               </div>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
-                  <div>
-                    <strong>{formatMoney(summary.paid)}</strong>
-                    <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>({Math.round(collectedPercent)}%)</span>
+              
+              {/* Interactive Chart */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 140, gap: 6, paddingTop: 20, borderBottom: '1px solid var(--cresoa-border)' }}>
+                {series.map(day => {
+                  const heightPct = Math.max((safeAmount(day.revenue) / maxRevenue) * 100, day.revenue ? 4 : 1)
+                  const isActive = activeBar === day.key
+                  return (
+                    <div 
+                      key={day.key} 
+                      className="chart-bar-wrapper"
+                      onMouseEnter={() => setActiveBar(day.key)}
+                      onMouseLeave={() => setActiveBar(null)}
+                      onClick={() => setActiveBar(day.key)}
+                      style={{ flex: 1, height: '100%' }}
+                    >
+                      {isActive && day.revenue > 0 && (
+                        <div className="chart-tooltip">
+                          {formatMoney(day.revenue)}
+                        </div>
+                      )}
+                      <div style={{ 
+                        width: '100%', 
+                        maxWidth: 32, 
+                        height: `${heightPct}%`, 
+                        background: isActive ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', 
+                        borderRadius: '4px 4px 0 0', 
+                        transition: 'all 0.2s ease',
+                        opacity: day.revenue > 0 ? 1 : 0.4
+                      }} />
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 4px' }}>
+                {series.map(day => (
+                  <span key={day.key} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', flex: 1, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {day.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Financial Health */}
+            <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Collected Bar */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
+                    <span style={{ fontWeight: 700, color: 'var(--cresoa-text)' }}>{formatMoney(summary.paid)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(collectedPercent)}%)</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
-                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
-                  <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
-                </div>
-              </div>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
-                  <div>
-                    <strong>{formatMoney(summary.outstanding)}</strong>
-                    <span style={{ marginLeft: 8, color: 'var(--cresoa-text-muted)' }}>({Math.round(outstandingPercent)}%)</span>
+                
+                {/* Outstanding Bar */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
+                    <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>{formatMoney(summary.outstanding)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(outstandingPercent)}%)</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
-                <div style={{ height: 6, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4 }}>
-                  <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99 }} />
-                </div>
               </div>
+              
               {summary.outstanding > 0 && (
-                <div style={{ padding: '8px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)' }}>
-                  <Icon name="alert-triangle" size={14} style={{ marginRight: 6 }} />
+                <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
                   {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
                 </div>
               )}
@@ -440,7 +503,7 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* Recent Orders & Customers – 2-col */}
-        <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
             <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
@@ -457,7 +520,7 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* Group Orders */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
             <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
