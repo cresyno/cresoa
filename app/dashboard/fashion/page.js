@@ -176,7 +176,7 @@ function FashionDashboard({ businessId }) {
 
   const handleRetry = () => refresh()
 
-  if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center' }}>Loading dashboard...</div></DashboardShell>
+  if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
 
   // ---- Render functions ----
@@ -279,7 +279,7 @@ function FashionDashboard({ businessId }) {
 
   // SVG Path calculations for the line chart
   const chartWidth = 100
-  const chartHeight = 60
+  const chartHeight = 40
   const points = series.map((d, i) => {
     const x = series.length > 1 ? (i / (series.length - 1)) * chartWidth : chartWidth / 2
     const y = chartHeight - (safeAmount(d.revenue) / maxRevenue) * chartHeight
@@ -289,7 +289,7 @@ function FashionDashboard({ businessId }) {
   const areaPath = `${linePath} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`
 
   // X-axis label skip logic to prevent text overlap on mobile
-  const labelStep = Math.ceil(series.length / 6)
+  const labelStep = Math.ceil(series.length / 5)
   
   // ---- KPI Cards Data ----
   const kpiCards = {
@@ -305,10 +305,11 @@ function FashionDashboard({ businessId }) {
 
   return (
     <DashboardShell theme={theme}>
-      <div style={{ maxWidth: 800, margin: '0 auto', paddingBottom: 80 }}>
+      <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, width: '100%' }}>
 
         <Navigation businessId={businessId} />
 
+        {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, padding: '16px 16px 0' }}>
           <div>
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Cresoa Fashion</p>
@@ -330,35 +331,39 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* FORCED CARD ARRANGEMENT (Matches Sketch) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
+        {/* MOBILE-FIRST CARD ARRANGEMENT */}
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
           
-          {/* Left Column: Revenue */}
-          <button onClick={kpiCards.revenue.onClick} className="cresoa-metric-card" style={{ gridRow: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 14px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
+          {/* Main Revenue Card (Full Width) */}
+          <button onClick={kpiCards.revenue.onClick} className="cresoa-metric-card" style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '20px 16px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
             <span className="cresoa-metric-label" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards.revenue.label}</span>
-            <strong className="cresoa-metric-value" style={{ fontSize: 22, fontWeight: 800, color: 'var(--cresoa-text)', letterSpacing: '-0.5px', margin: '8px 0' }}>{kpiCards.revenue.value}</strong>
-            <span className="cresoa-metric-trend" style={{ fontSize: 11, color: 'var(--cresoa-success)', fontWeight: 600, display: 'block' }}>{kpiCards.revenue.trend}</span>
-            <span className="cresoa-metric-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 6 }}>{kpiCards.revenue.meta}</span>
+            <strong className="cresoa-metric-value" style={{ fontSize: 28, fontWeight: 800, color: 'var(--cresoa-text)', letterSpacing: '-0.5px', margin: '8px 0' }}>{kpiCards.revenue.value}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              <span className="cresoa-metric-trend" style={{ fontSize: 12, color: 'var(--cresoa-success)', fontWeight: 600 }}>{kpiCards.revenue.trend}</span>
+              <span className="cresoa-metric-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)' }}>{kpiCards.revenue.meta}</span>
+            </div>
           </button>
 
-                {/* Right Column: 3 Small Cards */}
-          <button onClick={kpiCards.orders.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
-            <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards.orders.label}</span>
-            <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{kpiCards.orders.value}</strong>
-            <span className="cresoa-metric-trend" style={{ fontSize: 10, color: 'var(--cresoa-success)', fontWeight: 600 }}>{kpiCards.orders.trend}</span>
-          </button>
+       {/* 3 Smaller Cards (Full Width, evenly stacked) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <button onClick={kpiCards.orders.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'center', cursor: 'pointer' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>Orders</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{kpiCards.orders.value}</strong>
+              <span className="cresoa-metric-trend" style={{ fontSize: 10, color: 'var(--cresoa-success)', fontWeight: 600 }}>{kpiCards.orders.trend}</span>
+            </button>
 
-          <button onClick={kpiCards.paid.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
-            <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards.paid.label}</span>
-            <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{kpiCards.paid.value}</strong>
-            <span className="cresoa-metric-trend" style={{ fontSize: 10, color: 'var(--cresoa-success)', fontWeight: 600 }}>{kpiCards.paid.trend}</span>
-          </button>
+            <button onClick={kpiCards.paid.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'center', cursor: 'pointer' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>Received</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{kpiCards.paid.value}</strong>
+              <span className="cresoa-metric-trend" style={{ fontSize: 10, color: 'var(--cresoa-success)', fontWeight: 600 }}>{kpiCards.paid.trend}</span>
+            </button>
 
-          <button onClick={kpiCards.outstanding.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
-            <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards.outstanding.label}</span>
-            <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{kpiCards.outstanding.value}</strong>
-            <span className="cresoa-metric-trend" style={{ fontSize: 10, color: 'var(--cresoa-danger)', fontWeight: 600 }}>{kpiCards.outstanding.trend}</span>
-          </button>
+            <button onClick={kpiCards.outstanding.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'center', cursor: 'pointer' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>Outstanding</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{kpiCards.outstanding.value}</strong>
+              <span className="cresoa-metric-trend" style={{ fontSize: 10, color: 'var(--cresoa-danger)', fontWeight: 600 }}>{kpiCards.outstanding.trend}</span>
+            </button>
+          </div>
         </div>
 
         {/* Action Center */}
@@ -421,25 +426,28 @@ function FashionDashboard({ businessId }) {
                 </div>
               </div>
               
-              {/* SVG Line Chart */}
-              <div style={{ width: '100%', height: 100, position: 'relative' }}>
-                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                  <defs>
-                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--cresoa-primary)" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="var(--cresoa-primary)" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Area Fill */}
-                  <path d={areaPath} fill="url(#chartGradient)" />
-                  {/* Line Path */}
-                  <path d={linePath} fill="none" stroke="var(--cresoa-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                  {/* Data Points */}
-                  {points.map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r="2" fill="var(--cresoa-primary)" />
-                  ))}
-                </svg>
-              </div>
+              {/* SVG Line Chart with Empty State Protection */}
+              {totalRevenue === 0 ? (
+                <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
+                  No revenue recorded for this period.
+                </div>
+              ) : (
+                <div style={{ width: '100%', height: 100, position: 'relative' }}>
+                  <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                    <defs>
+                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--cresoa-primary)" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="var(--cresoa-primary)" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d={areaPath} fill="url(#chartGradient)" />
+                    <path d={linePath} fill="none" stroke="var(--cresoa-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                    {points.map((p, i) => (
+                      <circle key={i} cx={p.x} cy={p.y} r="2" fill="var(--cresoa-primary)" />
+                    ))}
+                  </svg>
+                </div>
+              )}
               
               {/* X-Axis Labels (Limited to prevent overflow) */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 4px' }}>
@@ -489,8 +497,8 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Recent Orders & Customers – 2-col */}
-        <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '0 16px' }}>
+        {/* Recent Orders & Customers – Single Column on Mobile */}
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
             <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
