@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
@@ -13,6 +13,14 @@ import { StatusPill } from '../../../components/StatusPill'
 import '../../globals.css'
 
 export default function GroupsPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '1.5rem' }}>Loading groups...</div>}>
+      <GroupsPageContent />
+    </Suspense>
+  )
+}
+
+function GroupsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
