@@ -1565,13 +1565,15 @@ h1, h2, h3, .font-serif {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Override global forced layouts ONLY for the Fashion Dashboard */
-.cresoa-dashboard-force-mobile .cresoa-dashboard-shell {
+/* Add this to your globals.css to stop the forced desktop layout ONLY on this page */
+.cresoa-dashboard-force-mobile {
   display: block !important;
 }
-.cresoa-dashboard-force-mobile .cresoa-metric-card {
-  display: flex !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  min-width: 0 !important;
+.cresoa-dashboard-force-mobile .cresoa-dashboard-shell {
+  display: block !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+.cresoa-dashboard-force-mobile .forced-grid-class { /* Replace with the actual class that's forcing the layout if you know it */
+  display: block !important;
 }
