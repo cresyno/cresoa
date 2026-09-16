@@ -117,7 +117,7 @@ const navContainer = {
   padding: '8px 0',
   background: 'var(--cresoa-surface)',
   borderTop: '1px solid var(--cresoa-border)',
-  zIndex: 1000,
+  zIndex: 40,
   height: '64px',
   boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
 }
