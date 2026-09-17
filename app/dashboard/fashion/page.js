@@ -38,7 +38,6 @@ function getDaySeries(orders, days = 7) {
       if (!o.created_at) return false;
       return new Date(o.created_at).toISOString().split('T')[0] === key
     })
-    // Chart shows Collected Revenue (amount_paid)
     const collected = dayOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
     result.push({ key, label: date.toLocaleDateString('en-NG', { weekday: 'short' }), orders: dayOrders.length, collected })
   }
@@ -48,7 +47,6 @@ function getDaySeries(orders, days = 7) {
 function getAnalyticsSummary(orders) {
   const revenue = orders.reduce((s, o) => s + safeAmount(o.price), 0)
   const paid = orders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
-  // Outstanding is price - amount_paid, ensuring it doesn't go below 0
   const outstanding = orders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
   return { revenue, paid, outstanding, orders: orders.length }
 }
@@ -167,14 +165,25 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  // ---- DEFINED VARIABLES (Fixes the ReferenceError) ----
-  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
-  const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
-  const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
-  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
-  const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
+  // ============================================================
+  // 1. CURRENT MONTH DATA (For KPI Cards & Health Score - NOT tied to analytics selector)
+  // ============================================================
+  const currentMonthOrders = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return orders.filter(o => {
+      if (!o.created_at) return false;
+      const d = new Date(o.created_at);
+      return d >= startOfMonth && d <= endOfMonth;
+    });
+  }, [orders]);
 
-  // ---- Analytics Data Transformation (100% Real Data) ----
+  const currentMonthSummary = useMemo(() => getAnalyticsSummary(currentMonthOrders), [currentMonthOrders]);
+
+  // ============================================================
+  // 2. ANALYTICS DATA (For the Stick Chart - controlled by period selector)
+  // ============================================================
   const analytics = useMemo(() => {
     const daysMap = { '7': 7, '30': 30, '90': 90 };
     const days = daysMap[period] || 7;
@@ -193,8 +202,9 @@ function FashionDashboard({ businessId }) {
     const outstanding = filteredOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
     const orderCount = filteredOrders.length;
     
-    const collectedPercent = totalOrderValue > 0 ? (collected / totalOrderValue) * 100 : 0;
-    const outstandingPercent = totalOrderValue > 0 ? (outstanding / totalOrderValue) * 100 : 0;
+    // Cap percentages at 100% to prevent UI overflow if overpaid
+    const collectedPercent = totalOrderValue > 0 ? Math.min((collected / totalOrderValue) * 100, 100) : 0;
+    const outstandingPercent = totalOrderValue > 0 ? Math.min((outstanding / totalOrderValue) * 100, 100) : 0;
 
     const chartData = [];
     for (let i = days - 1; i >= 0; i--) {
@@ -237,52 +247,51 @@ function FashionDashboard({ businessId }) {
     };
   }, [orders, period]);
 
-  // SVG Chart Calculations
-  const chartWidth = 100;
-  const chartHeight = 40;
-  
-  const chartPoints = analytics.chartData.map((d, i) => {
-    const x = analytics.chartData.length > 1 ? (i / (analytics.chartData.length - 1)) * chartWidth : chartWidth / 2;
-    const y = chartHeight - (d.collected / analytics.maxRevenue) * chartHeight;
-    return { x, y, value: d.collected, label: d.label, shortLabel: d.shortLabel };
+  // Stick Chart Data Calculations
+  const chartPoints = analytics.chartData.map((d) => {
+    const heightPct = analytics.maxRevenue > 0 ? (d.collected / analytics.maxRevenue) * 100 : 0;
+    return {
+      label: d.label,
+      shortLabel: d.shortLabel,
+      height: `${Math.max(heightPct, 2)}%`,
+      value: d.collected,
+      hasData: d.collected > 0
+    };
   });
 
-  const getSmoothPath = (pts) => {
-    if (pts.length === 0) return '';
-    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
-    let d = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i];
-      const p1 = pts[i + 1];
-      const cp1x = p0.x + (p1.x - p0.x) / 3;
-      const cp1y = p0.y;
-      const cp2x = p1.x - (p1.x - p0.x) / 3;
-      const cp2y = p1.y;
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
-    }
-    return d;
-  };
-
-  const linePath = getSmoothPath(chartPoints);
-  const areaPath = `${linePath} L ${chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].x : chartWidth} ${chartHeight} L ${chartPoints.length > 0 ? chartPoints[0].x : 0} ${chartHeight} Z`;
-
-  // ---- Health Score ----
+  // ============================================================
+  // 3. BUSINESS HEALTH SCORE (STRICTLY CAPPED AT 100%)
+  // ============================================================
   const healthScoreData = useMemo(() => {
-    if (analytics.totalOrderValue === 0 && analytics.orderCount === 0) return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' }
-    
-    const collectionRate = analytics.totalOrderValue > 0 ? (analytics.collected / analytics.totalOrderValue) : 0;
-    const deliveredOrders = orders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
-    const completionRate = analytics.orderCount > 0 ? (deliveredOrders / analytics.orderCount) : 0;
-    
-    const score = Math.round(((collectionRate * 0.5) + (completionRate * 0.5)) * 100);
-    
+    if (currentMonthSummary.revenue === 0 && currentMonthSummary.orders === 0) {
+      return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' };
+    }
+
+    // 1. Collection Rate (Capped at 1.0 to prevent overpayments from inflating the score)
+    const rawCollectionRate = currentMonthSummary.revenue > 0 ? (currentMonthSummary.paid / currentMonthSummary.revenue) : 0;
+    const collectionRate = Math.min(Math.max(rawCollectionRate, 0), 1);
+
+    // 2. Completion Rate (ONLY counts delivered orders from CURRENT MONTH orders, not all historical orders)
+    const currentMonthDeliveredCount = currentMonthOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
+    const rawCompletionRate = currentMonthSummary.orders > 0 ? (currentMonthDeliveredCount / currentMonthSummary.orders) : 0;
+    const completionRate = Math.min(Math.max(rawCompletionRate, 0), 1);
+
+    // 3. Weighted Score (50% Collection, 50% Completion), strictly capped at 100
+    const rawScore = ((collectionRate * 0.5) + (completionRate * 0.5)) * 100;
+    const score = Math.min(Math.round(rawScore), 100);
+
     let label = 'Needs Attention';
     let color = 'var(--cresoa-danger)';
-    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)' }
-    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)' }
-    
+    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)'; }
+    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)'; }
+
     return { score, label, color };
-  }, [analytics, orders]);
+  }, [currentMonthSummary, currentMonthOrders]);
+
+  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
+  const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
+  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
+  const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
 
   const navigate = (path) => {
     const sep = path.includes('?') ? '&' : '?'
@@ -314,16 +323,15 @@ function FashionDashboard({ businessId }) {
       const displayName = `${orderRef} – ${customerName}`
       const initials = getInitials(customerName)
       return (
-        <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="atelier-row">
+        <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact" style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)', textAlign: 'left', cursor: 'pointer' }}>
           <span className="cresoa-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>{initials}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span className="title" style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</span>
-            <span className="sub">{order.created_at ? formatShortDate(order.created_at) : 'Unknown date'}</span>
+            <span className="cresoa-row-title" style={{ display: 'block', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</span>
+            <span className="cresoa-row-meta" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 2 }}>
+              {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
+            </span>
           </span>
-          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-            <span className="figure atelier-mono">{formatMoney(order.price || 0)}</span>
-            <StatusPill status={order.current_status || 'Order placed'} />
-          </span>
+          <StatusPill status={order.current_status || 'Order placed'} />
         </button>
       )
     })
@@ -345,13 +353,16 @@ function FashionDashboard({ businessId }) {
       const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
       const initials = getInitials(name)
       return (
-        <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="atelier-row">
+        <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact" style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)', textAlign: 'left', cursor: 'pointer' }}>
           <span className="cresoa-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', color: 'var(--cresoa-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>{initials}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span className="title" style={{ display: 'block' }}>{name}</span>
-            <span className="sub">{activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}</span>
+            <span className="cresoa-row-title" style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{name}</span>
+            <span className="cresoa-row-meta" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 2 }}>
+              {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
+              {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
+            </span>
           </span>
-          {totalSpent > 0 && <span className="figure atelier-mono">{formatMoney(totalSpent)}</span>}
+          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
         </button>
       )
     })
@@ -362,233 +373,112 @@ function FashionDashboard({ businessId }) {
       const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
       const progress = group.progress
       return (
-        <div key={group.id} onClick={() => navigate(`/dashboard/groups/${group.id}`)} className="atelier-row" style={{ alignItems: 'flex-start' }}>
+        <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
           <span className="cresoa-group-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', fontSize: 14, fontWeight: 'bold', flexShrink: 0 }}>
             {group.name ? group.name.charAt(0).toUpperCase() : 'G'}
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <strong className="title" style={{ display: 'block' }}>{group.name}</strong>
-            <div className="sub" style={{ marginTop: 4 }}>
-              {coordinator ? coordinator.name : 'No coordinator set'}
-              {group.due_date && ` — due ${formatShortDate(group.due_date)}`}
+            <strong className="cresoa-row-title" style={{ fontSize: 13, fontWeight: 600 }}>{group.name}</strong>
+            <div className="cresoa-row-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>
+              {progress !== null ? (
+                <>
+                  <div style={{ height: 4, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4, marginBottom: 4, width: '100%', maxWidth: 200 }}>
+                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
+                  </div>
+                  <span>{progress}% complete</span>
+                </>
+              ) : (
+                <span>Progress unavailable</span>
+              )}
+              {coordinator && ` · ${coordinator.name}`}
+              {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
             </div>
-            {progress !== null ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <div style={{ height: 3, background: 'var(--cresoa-border)', flex: 1, maxWidth: 160 }}>
-                  <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)' }} />
-                </div>
-                <span className="figure atelier-mono">{progress}%</span>
-              </div>
-            ) : (
-              <span className="sub" style={{ display: 'block', marginTop: 4 }}>Progress unavailable</span>
-            )}
           </div>
+          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
         </div>
       )
     })
   }
 
+  // ============================================================
+  // KPI CARDS (CURRENT MONTH DATA, CAPPED PERCENTAGES)
+  // ============================================================
   const kpiCards = [
-    { label: 'Revenue', value: formatMoney(analytics.totalOrderValue), meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Orders', value: String(analytics.orderCount), meta: 'Orders in period', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Collected', value: formatMoney(analytics.collected), meta: `${Math.round(analytics.collectedPercent)}% of total`, onClick: () => navigate('/dashboard/orders?filter=payments') },
-    { label: 'Outstanding', value: formatMoney(analytics.outstanding), meta: `${Math.round(analytics.outstandingPercent)}% of total`, onClick: () => navigate('/dashboard/orders?filter=attention') },
+    { 
+      label: 'Revenue', 
+      value: formatMoney(currentMonthSummary.revenue), 
+      meta: 'Total order value', 
+      onClick: () => navigate('/dashboard/orders'), 
+      isLarge: true 
+    },
+    { 
+      label: 'Orders', 
+      value: String(currentMonthSummary.orders), 
+      meta: 'Orders in period', 
+      onClick: () => navigate('/dashboard/orders') 
+    },
+    { 
+      label: 'Collected', 
+      value: formatMoney(currentMonthSummary.paid), 
+      meta: `${currentMonthSummary.revenue > 0 ? Math.min(Math.round((currentMonthSummary.paid / currentMonthSummary.revenue) * 100), 100) : 0}% of total`, 
+      onClick: () => navigate('/dashboard/orders?filter=payments') 
+    },
+    { 
+      label: 'Outstanding', 
+      value: formatMoney(currentMonthSummary.outstanding), 
+      meta: `${currentMonthSummary.revenue > 0 ? Math.min(Math.round((currentMonthSummary.outstanding / currentMonthSummary.revenue) * 100), 100) : 0}% of total`, 
+      onClick: () => navigate('/dashboard/orders?filter=attention') 
+    },
   ]
 
   return (
     <DashboardShell theme={theme}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-
-        .atelier-shell { font-family: 'IBM Plex Sans', var(--cresoa-font, sans-serif); }
-        .atelier-serif { font-family: 'Fraunces', Georgia, serif; }
-        .atelier-mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
-
-        .atelier-masthead {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          align-items: end;
-          gap: 16px;
-          padding: 20px 16px 18px;
-          border-bottom: 1px solid var(--cresoa-border);
-        }
-        .atelier-masthead h1 {
-          font-weight: 460;
-          font-size: clamp(28px, 8vw, 40px);
-          line-height: 1.02;
-          letter-spacing: -0.01em;
-          color: var(--cresoa-text);
-          margin: 0;
-        }
-        .atelier-masthead .tag {
-          font-size: 11px;
-          letter-spacing: 0.06em;
-          color: var(--cresoa-text-muted);
-        }
-        .atelier-controls { display: flex; gap: 8px; align-items: center; }
-
-        .atelier-kpi {
-          display: grid;
-          grid-template-columns: 1.6fr 1fr;
-          gap: 0;
-          border-bottom: 1px solid var(--cresoa-border);
-        }
-        .atelier-kpi-hero {
-          padding: 22px 16px 22px 16px;
-          border-right: 1px solid var(--cresoa-border);
-          cursor: pointer;
-          background: none;
-          border-top: none; border-bottom: none; border-left: none;
-          text-align: left;
-          display: block;
-        }
-        .atelier-kpi-hero .label {
-          font-size: 12px;
-          color: var(--cresoa-text-muted);
-          font-family: 'IBM Plex Mono', monospace;
-        }
-        .atelier-kpi-hero .value {
-          font-family: 'Fraunces', Georgia, serif;
-          font-weight: 460;
-          font-size: clamp(32px, 9vw, 46px);
-          color: var(--cresoa-text);
-          line-height: 1.05;
-          margin: 6px 0 4px;
-          letter-spacing: -0.01em;
-        }
-        .atelier-kpi-hero .meta {
-          font-size: 12px;
-          color: var(--cresoa-text-muted);
-        }
-        .atelier-kpi-side {
-          display: flex;
-          flex-direction: column;
-        }
-        .atelier-kpi-side button {
-          flex: 1;
-          border: none;
-          border-bottom: 1px solid var(--cresoa-border);
-          background: none;
-          text-align: left;
-          padding: 14px 16px;
-          cursor: pointer;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-        .atelier-kpi-side button:last-child { border-bottom: none; }
-        .atelier-kpi-side .label {
-          font-size: 11px;
-          color: var(--cresoa-text-muted);
-          font-family: 'IBM Plex Mono', monospace;
-        }
-        .atelier-kpi-side .value {
-          font-family: 'IBM Plex Mono', monospace;
-          font-weight: 600;
-          font-size: 15px;
-          color: var(--cresoa-text);
-          margin-top: 3px;
-        }
-        .atelier-kpi-side .meta {
-          font-size: 10px;
-          color: var(--cresoa-text-muted);
-          margin-top: 2px;
-        }
-        @media (max-width: 420px) {
-          .atelier-kpi { grid-template-columns: 1fr; }
-          .atelier-kpi-hero { border-right: none; border-bottom: 1px solid var(--cresoa-border); }
-        }
-
-        .atelier-pipeline {
-          display: flex;
-          align-items: stretch;
-          overflow-x: auto;
-        }
-        .atelier-pipeline-stage {
-          flex: 1;
-          min-width: 78px;
-          border: none;
-          background: none;
-          border-right: 1px solid var(--cresoa-border);
-          padding: 14px 10px;
-          text-align: left;
-          cursor: pointer;
-        }
-        .atelier-pipeline-stage:last-child { border-right: none; }
-        .atelier-pipeline-stage .n {
-          font-family: 'Fraunces', Georgia, serif;
-          font-weight: 460;
-          font-size: 26px;
-          color: var(--cresoa-text);
-          display: block;
-        }
-        .atelier-pipeline-stage .label {
-          font-size: 11px;
-          color: var(--cresoa-text-muted);
-          margin-top: 2px;
-          display: block;
-        }
-
-        .atelier-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          width: 100%;
-          border: none;
-          background: none;
-          text-align: left;
-          cursor: pointer;
-          padding: 13px 0;
-          border-bottom: 1px solid var(--cresoa-border);
-        }
-        .atelier-row:last-child { border-bottom: none; }
-        .atelier-row .title { font-size: 13px; font-weight: 600; color: var(--cresoa-text); }
-        .atelier-row .sub { font-size: 11px; color: var(--cresoa-text-muted); margin-top: 2px; }
-        .atelier-row .figure { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--cresoa-text); white-space: nowrap; }
-      `}</style>
-      <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, width: '100%' }} className="atelier-shell">
+      <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, width: '100%' }}>
 
         <Navigation businessId={businessId} />
 
-        <header className="atelier-masthead">
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, padding: '16px 16px 0' }}>
           <div>
-            <h1 className="atelier-serif">{business?.name || 'Your business'}</h1>
-            <p className="tag atelier-mono" style={{ marginTop: 8 }}>
-              {new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'short' })} — good morning
-            </p>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Cresoa Fashion</p>
+            <h1 style={{ fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: 700, color: 'var(--cresoa-text)', marginTop: 4, lineHeight: 1.1 }}>
+              {business?.name || 'Your business'}
+            </h1>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
           </div>
-          <div className="atelier-controls">
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
             </button>
-            <button onClick={refresh} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
-              <Icon name="refresh-cw" size={16} />
+            <button onClick={refresh} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
+              <Icon name="refresh-cw" size={18} />
             </button>
-            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ height: 34, padding: '0 14px', fontSize: 13, fontWeight: 600 }}>
-              + New order
+            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ height: 36, padding: '0 16px', fontSize: 13, fontWeight: 600 }}>
+              + New Order
             </button>
           </div>
         </header>
 
-        {/* KPI LEDGER — one hero figure (revenue), three ledger lines beside it */}
-        <div className="atelier-kpi" style={{ marginBottom: 16 }}>
-          <button onClick={kpiCards[0].onClick} className="atelier-kpi-hero">
-            <span className="label">{kpiCards[0].label}</span>
-            <strong className="value">{kpiCards[0].value}</strong>
-            <span className="meta">{kpiCards[0].meta}</span>
+        {/* FORCED CARD ARRANGEMENT (Matches Sketch) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
+          
+          {/* Left Column: Revenue */}
+          <button onClick={kpiCards[0].onClick} className="cresoa-metric-card" style={{ gridRow: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 14px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
+            <span className="cresoa-metric-label" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards[0].label}</span>
+            <strong className="cresoa-metric-value" style={{ fontSize: 22, fontWeight: 800, color: 'var(--cresoa-text)', letterSpacing: '-0.5px', margin: '8px 0' }}>{kpiCards[0].value}</strong>
+            <span className="cresoa-metric-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 6 }}>{kpiCards[0].meta}</span>
           </button>
-          <div className="atelier-kpi-side">
-            {kpiCards.slice(1).map(card => (
-              <button key={card.label} onClick={card.onClick}>
-                <span className="label">{card.label}</span>
-                <span className="value">{card.value}</span>
-                <span className="meta">{card.meta}</span>
-              </button>
-            ))}
-          </div>
+
+          {/* Right Column: 3 Small Cards */}
+          {kpiCards.slice(1).map((card, idx) => (
+            <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{card.value}</strong>
+              <span className="cresoa-metric-meta" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)' }}>{card.meta}</span>
+            </button>
+          ))}
         </div>
 
-        {/* BUSINESS HEALTH SCORE */}
+        {/* BUSINESS HEALTH SCORE (STRICTLY CAPPED AT 100%) */}
         <div style={{ padding: '0 16px', marginBottom: 16 }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -616,11 +506,12 @@ function FashionDashboard({ businessId }) {
         <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
-            <div className="atelier-pipeline">
-              {PRODUCTION_STAGES.map(stage => (
-                <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="atelier-pipeline-stage">
-                  <span className="n atelier-serif">{productionCounts[stage] || 0}</span>
-                  <span className="label">{stage}</span>
+            <div className="cresoa-pipeline">
+              {PRODUCTION_STAGES.map((stage, idx) => (
+                <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="cresoa-pipeline-item">
+                  <span className="cresoa-pipeline-number" style={{ fontWeight: 800, fontSize: 16 }}>{productionCounts[stage] || 0}</span>
+                  <span className="cresoa-pipeline-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stage}</span>
+                  {idx < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
                 </button>
               ))}
             </div>
@@ -628,11 +519,11 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* ========================================== */}
-        {/* ANALYTICS SECTION (REAL DATA, SVG CHART)   */}
+        {/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
         {/* ========================================== */}
         <div style={{ marginTop: 24, padding: '0 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-            <h2 className="atelier-serif" style={{ fontSize: 20, fontWeight: 460, color: 'var(--cresoa-text)' }}>Analytics</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
             <select 
               className="cresoa-select" 
               value={period} 
@@ -649,15 +540,15 @@ function FashionDashboard({ businessId }) {
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
                 <div>
-                  <span className="atelier-mono" style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>Revenue</span>
-                  <strong className="atelier-serif" style={{ display: 'block', fontSize: 30, fontWeight: 460, color: 'var(--cresoa-text)', marginTop: 4 }}>{formatMoney(analytics.collected)}</strong>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
+                  <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(analytics.collected)}</strong>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{analytics.orderCount} orders</span>
                 </div>
               </div>
               
-              {/* SVG Line Chart */}
+              {/* Simple Stick Chart */}
               {!analytics.hasOrders ? (
                 <div style={{ height: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
                   <span>No sales data yet.</span>
@@ -676,62 +567,25 @@ function FashionDashboard({ businessId }) {
                     <span>₦0</span>
                   </div>
                   
-                  {/* Chart Area */}
-                  <div style={{ marginLeft: 40, height: '100%', position: 'relative' }}>
-                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                      <defs>
-                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--cresoa-primary)" stopOpacity="0.2" />
-                          <stop offset="100%" stopColor="var(--cresoa-primary)" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {/* Horizontal Grid Lines */}
-                      <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="var(--cresoa-border)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-                      <line x1="0" y1={chartHeight / 2} x2={chartWidth} y2={chartHeight / 2} stroke="var(--cresoa-border)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-                      <line x1="0" y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="var(--cresoa-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                      
-                      {/* Area Fill */}
-                      <path d={areaPath} fill="url(#chartGradient)" />
-                      {/* Smooth Line */}
-                      <path d={linePath} fill="none" stroke="var(--cresoa-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                      
-                      {/* Interactive Data Points */}
-                      {chartPoints.map((p, i) => (
-                        <circle 
-                          key={i} 
-                          cx={p.x} 
-                          cy={p.y} 
-                          r="3" 
-                          fill={activePoint === i ? 'var(--cresoa-primary)' : 'var(--cresoa-surface)'} 
-                          stroke="var(--cresoa-primary)" 
-                          strokeWidth="1.5"
-                          style={{ cursor: 'pointer' }}
-                          onMouseEnter={() => setActivePoint(i)}
-                          onMouseLeave={() => setActivePoint(null)}
-                          onClick={() => setActivePoint(i)}
-                        />
-                      ))}
-                    </svg>
-                    
-                    {/* Tooltip */}
-                    {activePoint !== null && chartPoints[activePoint] && (
-                      <div style={{ position: 'absolute', top: `${(chartPoints[activePoint].y / chartHeight) * 100}%`, left: `${(chartPoints[activePoint].x / chartWidth) * 100}%`, transform: 'translate(-50%, -120%)', background: 'var(--cresoa-text)', color: 'var(--cresoa-surface)', padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10, pointerEvents: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-                        <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 2 }}>{chartPoints[activePoint].label}</div>
-                        <div>{formatMoney(chartPoints[activePoint].value)}</div>
+                  {/* Bars Container */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
+                    {chartPoints.map((point, i) => (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                        <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
                       </div>
-                    )}
-                  </div>
-
-                  {/* X-Axis Labels */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
-                    {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
-                      <span key={i} className="atelier-mono" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
-                        {point.shortLabel}
-                      </span>
                     ))}
                   </div>
                 </div>
               )}
+              
+              {/* X-Axis Labels (Limited to prevent overlap) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
+                {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
+                  <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {point.shortLabel}
+                  </span>
+                ))}
+              </div>
             </div>
 
             {/* Financial Health */}
@@ -836,4 +690,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-    }
+        }
