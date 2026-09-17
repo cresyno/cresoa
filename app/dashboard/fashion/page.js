@@ -167,17 +167,22 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
+  // ---- DEFINED VARIABLES (Fixes the ReferenceError) ----
+  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
+  const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
+  const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
+  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
+  const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
+
   // ---- Analytics Data Transformation (100% Real Data) ----
   const analytics = useMemo(() => {
     const daysMap = { '7': 7, '30': 30, '90': 90 };
     const days = daysMap[period] || 7;
     
-    // Calculate start date (Nigerian Timezone offset compensation)
     const now = new Date();
     const startDate = new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
     startDate.setHours(0, 0, 0, 0);
 
-    // Filter orders strictly within the selected period
     const filteredOrders = orders.filter(o => {
       if (!o.created_at) return false;
       return new Date(o.created_at) >= startDate;
@@ -191,7 +196,6 @@ function FashionDashboard({ businessId }) {
     const collectedPercent = totalOrderValue > 0 ? (collected / totalOrderValue) * 100 : 0;
     const outstandingPercent = totalOrderValue > 0 ? (outstanding / totalOrderValue) * 100 : 0;
 
-    // Generate Chart Data Points
     const chartData = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
@@ -216,8 +220,6 @@ function FashionDashboard({ businessId }) {
     });
 
     const maxRevenue = Math.max(...chartData.map(d => d.collected), 1);
-    
-    // X-axis label logic (show max 6 labels to prevent overlap)
     const labelStep = Math.max(Math.ceil(days / 6), 1);
 
     return {
@@ -281,6 +283,17 @@ function FashionDashboard({ businessId }) {
     
     return { score, label, color };
   }, [analytics, orders]);
+
+  const navigate = (path) => {
+    const sep = path.includes('?') ? '&' : '?'
+    router.push(`${path}${sep}business_id=${businessId}`)
+  }
+
+  const handleActionClick = (item) => {
+    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
+  }
+
+  const handleRetry = () => refresh()
 
   if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
@@ -397,7 +410,7 @@ function FashionDashboard({ businessId }) {
             <h1 style={{ fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: 700, color: 'var(--cresoa-text)', marginTop: 4, lineHeight: 1.1 }}>
               {business?.name || 'Your business'}
             </h1>
-               <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
@@ -672,4 +685,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-              }                                                                            
+              }
