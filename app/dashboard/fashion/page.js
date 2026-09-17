@@ -420,101 +420,101 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* ========================================== */}
-        {/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
-        {/* ========================================== */}
-        <div style={{ marginTop: 24, padding: '0 16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
-            <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)} style={{ fontSize: 12, background: 'transparent', border: 'none', color: 'var(--cresoa-text-muted)', fontWeight: 600, cursor: 'pointer' }}>
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-            </select>
-          </div>
+  {/* ========================================== */}
+{/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
+{/* ========================================== */}
+<div style={{ marginTop: 24, padding: '0 16px' }}>
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
+    <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)} style={{ fontSize: 12, background: 'transparent', border: 'none', color: 'var(--cresoa-text-muted)', fontWeight: 600, cursor: 'pointer' }}>
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+  </div>
 
-          <Card>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
-                <div>
-                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
-                  <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(totalRevenue)}</strong>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
-                </div>
-              </div>
-              
-              {/* Simple Stick Chart */}
-              {totalRevenue === 0 ? (
-                <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
-                  No revenue recorded for this period.
-                </div>
-              ) : (
-                <div style={{ position: 'relative', height: 120, borderBottom: '1px solid var(--cresoa-border)' }}>
-                  {/* Y-Axis Labels */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
-                    <span>{formatMoney(maxRevenue)}</span>
-                    <span>₦0</span>
-                  </div>
-                  
-                  {/* Bars Container */}
-                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
-                    {chartPoints.map((point, i) => (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                        <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* X-Axis Labels (Limited to prevent overlap) */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
-                {chartPoints.filter((_, i) => i % labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
-                  <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    {point.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Financial Health */}
-            <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
-                    <span style={{ fontWeight: 700, color: 'var(--cresoa-text)' }}>{formatMoney(summary.paid)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(collectedPercent)}%)</span></span>
-                  </div>
-                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
-                  </div>
-                </div>
-                
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
-                    <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>{formatMoney(summary.outstanding)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(outstandingPercent)}%)</span></span>
-                  </div>
-                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99, transition: 'width 0.5s ease' }} />
-                  </div>
-                </div>
-              </div>
-              
-              {summary.outstanding > 0 && (
-                <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
-                  {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
-                </div>
-              )}
-            </div>
-          </Card>
+  <Card>
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+        <div>
+          <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
+          <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(totalRevenue)}</strong>
         </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
+        </div>
+      </div>
+      
+      {/* Simple Stick Chart */}
+      {totalRevenue === 0 ? (
+        <div style={{ height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
+          <span>No revenue recorded for this period.</span>
+          <span style={{ fontSize: 11, marginTop: 4 }}>(Try expanding the period to see older orders)</span>
+        </div>
+      ) : (
+        <div style={{ position: 'relative', height: 120, borderBottom: '1px solid var(--cresoa-border)' }}>
+          {/* Y-Axis Labels */}
+          <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
+            <span>{formatMoney(maxRevenue)}</span>
+            <span>₦0</span>
+          </div>
+          
+          {/* Bars Container */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
+            {chartPoints.map((point, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* X-Axis Labels (Limited to prevent overlap) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
+        {chartPoints.filter((_, i) => i % labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
+          <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            {point.label}
+          </span>
+        ))}
+      </div>
+    </div>
 
+    {/* Financial Health */}
+    <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+            <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
+            <span style={{ fontWeight: 700, color: 'var(--cresoa-text)' }}>{formatMoney(summary.paid)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(collectedPercent)}%)</span></span>
+          </div>
+          <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+          </div>
+        </div>
+        
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+            <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
+            <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>{formatMoney(summary.outstanding)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(outstandingPercent)}%)</span></span>
+          </div>
+          <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+          </div>
+        </div>
+      </div>
+      
+      {summary.outstanding > 0 && (
+        <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
+          {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
+        </div>
+      )}
+    </div>
+  </Card>
+</div>
         {/* Recent Orders & Customers – Stacked Vertically for Mobile */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px' }}>
           <Card>
