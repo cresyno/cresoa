@@ -383,6 +383,27 @@ export default function HomepageContent() {
         .wl-success-title { color: #fff; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.4rem; font-family: 'Fraunces', serif; }
         .wl-success-sub { color: rgba(168,184,206,0.9); font-size: 0.88rem; margin: 0; line-height: 1.6; }
 
+
+         .secondary { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
+.secondary-head { max-width: 640px; margin: 0 auto 3.5rem; text-align: center; }
+.secondary-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
+.secondary-head h2 { font-size: 2.2rem; margin: 0; line-height: 1.15; }
+.secondary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1080px; margin: 0 auto; }
+.secondary-card { background: var(--card); border-radius: 20px; overflow: hidden; border: 1px solid var(--border); transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1); }
+.secondary-card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
+.secondary-img { aspect-ratio: 16 / 10; overflow: hidden; background: #EFEAE1; }
+[data-theme="dark"] .secondary-img { background: #1B1B24; }
+.secondary-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
+.secondary-card:hover .secondary-img img { transform: scale(1.02); }
+.secondary-body { padding: 1.6rem 1.7rem 1.8rem; }
+.secondary-body h3 { font-size: 1.2rem; margin: 0.5rem 0 0.6rem; line-height: 1.3; }
+.secondary-body p { color: var(--text-muted); font-size: 0.94rem; margin: 0; line-height: 1.65; }
+@media (max-width: 860px) {
+  .secondary { padding: 4.5rem 1.25rem; }
+  .secondary-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+  .secondary-head h2 { font-size: 1.75rem; }
+}
+
         /* ── Footer ── */
         .footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3.5rem 1.5rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
         .footer-links { display: flex; justify-content: center; gap: 0.4rem 1.2rem; flex-wrap: wrap; margin: 1.4rem 0; }
@@ -555,6 +576,37 @@ export default function HomepageContent() {
           </div>
         </div>
       </section>
+
+      {/* SECONDARY FEATURES — compact 2-col */}
+<section className="secondary" aria-labelledby="secondary-heading">
+  <div className="secondary-head">
+    <span className="eyebrow">And Everything Around It</span>
+    <h2 id="secondary-heading">The details that make it work.</h2>
+  </div>
+  <div className="secondary-grid">
+    <article className="secondary-card" data-reveal>
+      <div className="secondary-img">
+        <img src="/mockups/whatsapp.webp" alt="One-tap WhatsApp customer update" loading="lazy" />
+      </div>
+      <div className="secondary-body">
+        <span className="row-eyebrow">Customer Comms</span>
+        <h3>One-tap WhatsApp updates.</h3>
+        <p>Send tracking links and receipts without leaving Cresoa. Your customers reply to the same thread — nothing gets lost.</p>
+      </div>
+    </article>
+
+    <article className="secondary-card" data-reveal data-delay="1">
+      <div className="secondary-img">
+        <img src="/mockups/support.webp" alt="Tessa AI and human support" loading="lazy" />
+      </div>
+      <div className="secondary-body">
+        <span className="row-eyebrow">Support</span>
+        <h3>Tessa AI + real humans.</h3>
+        <p>Get answers in seconds from Tessa, or talk to a person when it matters. Support that actually responds.</p>
+      </div>
+    </article>
+  </div>
+</section>
 
       {/* INDUSTRIES — dark toggle */}
       <section className="industries" aria-labelledby="industries-heading">
