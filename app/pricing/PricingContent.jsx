@@ -58,13 +58,13 @@ function WaitlistForm() {
           {status === 'sending' ? 'Joining…' : <>Join the Waitlist {ICONS.arrowRight}</>}
         </button>
       </div>
-      <p className="wl-note">Founding Members get Beta access free for 90 days at launch.</p>
+      <p className="wl-note">Founding Members get Beta access free for 30 days at launch.</p>
       {status === 'error' && <p className="wl-error">Something went wrong. Please try again.</p>}
     </form>
   )
 }
 
-// ─── Comparison Data — Corrected ────────────────────
+// ─── Comparison Data ────────────────────────────────
 const COMPARISON = [
   {
     category: 'Customers & Orders',
@@ -129,8 +129,8 @@ const COMPARISON = [
 
 const FAQS = [
   { q: 'When will I be charged?', a: 'Only after Cresoa launches. Joining the waitlist is free, and there is no charge until you choose a paid plan.' },
-  { q: 'What is the Beta plan?', a: 'Beta is a temporary plan available to waitlist members for 90 days after launch. It gives access to higher limits while Cresoa is still being improved. Beta is not a permanent plan.' },
-  { q: 'What happens after the 90-day Beta ends?', a: 'You choose a permanent plan — Free, Starter, or Pro. There is no automatic charge.' },
+  { q: 'What is the Beta plan?', a: 'Beta is a temporary plan available to waitlist members for 30 days after launch. It gives access to higher limits while Cresoa is still being improved. Beta is not a permanent plan.' },
+  { q: 'What happens after the 30-day Beta ends?', a: 'You choose a permanent plan — Free, Starter, or Pro. There is no automatic charge.' },
   { q: 'Do I need a credit card to join the waitlist?', a: 'No. Not to join the waitlist, and not to claim Beta access.' },
   { q: 'Can I switch plans later?', a: 'Yes. You can upgrade or downgrade at any time from your dashboard.' },
 ]
@@ -287,8 +287,7 @@ export default function PricingContent() {
         .plan-features li.muted svg { color: var(--text-muted); }
 
         /* Beta callout */
-
-           .beta-callout { background: var(--bg-alt); padding: 0 1.5rem 6rem; }
+          .beta-callout { background: var(--bg-alt); padding: 0 1.5rem 6rem; }
         .beta-card { max-width: 1080px; margin: 0 auto; background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); border-radius: 20px; padding: 2.5rem 2rem; display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center; position: relative; overflow: hidden; }
         .beta-card::before { content: ''; position: absolute; top: -50%; right: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(201,155,43,0.12), transparent 60%); border-radius: 50%; pointer-events: none; }
         .beta-copy { position: relative; }
@@ -468,7 +467,7 @@ export default function PricingContent() {
         <div className="hero-inner" data-reveal>
           <span className="hero-eyebrow">Pricing</span>
           <h1>Simple, transparent pricing. <em>Built for Nigerian businesses.</em></h1>
-          <p className="subhead">Coming at launch. Reserved for waitlist members first. Waitlist members get Beta access free for 90 days — no credit card required.</p>
+          <p className="subhead">Coming at launch. Reserved for waitlist members first. Waitlist members get Beta access free for 30 days — no credit card required.</p>
           <div id="pricing-waitlist-form">
             <WaitlistForm />
           </div>
@@ -508,7 +507,7 @@ export default function PricingContent() {
           </div>
 
           {/* Starter */}
-          <div className="plan popular" data-reveal data-delay="1">
+            <div className="plan popular" data-reveal data-delay="1">
             <span className="plan-badge">Most Popular</span>
             <p className="plan-name">Starter</p>
             <p className="plan-desc">For growing businesses ready to move faster.</p>
@@ -531,7 +530,7 @@ export default function PricingContent() {
             </ul>
           </div>
 
-                 {/* Pro */}
+          {/* Pro */}
           <div className="plan" data-reveal data-delay="2">
             <p className="plan-name">Pro</p>
             <p className="plan-desc">For established businesses scaling with a team.</p>
@@ -561,8 +560,8 @@ export default function PricingContent() {
         <div className="beta-card" data-reveal>
           <div className="beta-copy">
             <span className="beta-tag">{ICONS.sparkle} Waitlist Exclusive</span>
-            <h3>Beta access — free for 90 days.</h3>
-            <p>Join the waitlist and get access to the Beta plan the moment we launch. Higher limits than Starter. Free for 90 days while we keep improving Cresoa. After that, choose any permanent plan.</p>
+            <h3>Beta access — free for 30 days.</h3>
+            <p>Join the waitlist and get access to the Beta plan the moment we launch. Higher limits than Starter. Free for 30 days while we keep improving Cresoa. After that, choose any permanent plan.</p>
           </div>
           <div className="beta-stats">
             <div className="beta-stat">
@@ -645,7 +644,7 @@ export default function PricingContent() {
             </div>
             <div className="why-point" data-reveal data-delay="2">
               <h3>Beta for the waitlist</h3>
-              <p>Founding Members get Beta access free for 90 days. Higher limits while Cresoa keeps improving.</p>
+              <p>Founding Members get Beta access free for 30 days. Higher limits while Cresoa keeps improving.</p>
             </div>
           </div>
         </div>
@@ -682,8 +681,8 @@ export default function PricingContent() {
       {/* FINAL CTA */}
       <section className="cta" aria-labelledby="cta-heading">
         <div className="cta-inner" data-reveal>
-          <h2 id="cta-heading">Ready to claim your 90 days of Beta?</h2>
-          <p>Join 47 Nigerian founders already on the waitlist. Beta access is free for 90 days — no credit card required.</p>
+          <h2 id="cta-heading">Ready to claim your 30 days of Beta?</h2>
+          <p>Join 47 Nigerian founders already on the waitlist. Beta access is free for 30 days — no credit card required.</p>
           <WaitlistForm />
         </div>
       </section>
@@ -711,4 +710,4 @@ export default function PricingContent() {
       </footer>
     </main>
   )
-      }
+                  }
