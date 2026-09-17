@@ -584,13 +584,22 @@ function FashionDashboard({ businessId }) {
                     <span>{formatMoney(analytics.maxRevenue)}</span>
                     <span>₦0</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
-                    {chartPoints.map((point, i) => (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                        <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
-                      </div>
-                    ))}
-                  </div>
+                  {/* Bars Container (Hardcoded Colors & Guaranteed Visibility) */}
+<div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
+  {chartPoints.map((point, i) => (
+    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+      <div style={{ 
+        width: '100%', 
+        maxWidth: 20, 
+        height: point.height, 
+        minHeight: point.hasData ? 4 : 1, // Guarantees the bar is visible
+        background: point.hasData ? '#D4A04A' : '#E8E4DC', // Hardcoded Gold vs Light Grey
+        borderRadius: '4px 4px 0 0', 
+        transition: 'height 0.3s' 
+      }} />
+    </div>
+  ))}
+</div>
                 </div>
               )}
               
