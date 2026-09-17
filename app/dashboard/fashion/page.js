@@ -26,31 +26,6 @@ function getInitials(name) {
   return name.charAt(0).toUpperCase()
 }
 
-function getDaySeries(orders, days = 7) {
-  const result = []
-  const today = new Date()
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date(today)
-    date.setHours(0,0,0,0)
-    date.setDate(today.getDate() - i)
-    const key = date.toISOString().split('T')[0]
-    const dayOrders = orders.filter(o => {
-      if (!o.created_at) return false;
-      return new Date(o.created_at).toISOString().split('T')[0] === key
-    })
-    const collected = dayOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
-    result.push({ key, label: date.toLocaleDateString('en-NG', { weekday: 'short' }), orders: dayOrders.length, collected })
-  }
-  return result
-}
-
-function getAnalyticsSummary(orders) {
-  const revenue = orders.reduce((s, o) => s + safeAmount(o.price), 0)
-  const paid = orders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
-  const outstanding = orders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
-  return { revenue, paid, outstanding, orders: orders.length }
-}
-
 function getProductionCounts(orders) {
   const counts = {}
   PRODUCTION_STAGES.forEach(s => counts[s] = 0)
@@ -151,7 +126,6 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
-  const [activePoint, setActivePoint] = useState(null)
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -166,23 +140,87 @@ function FashionDashboard({ businessId }) {
   }, [theme])
 
   // ============================================================
-  // 1. CURRENT MONTH DATA (For KPI Cards & Health Score - NOT tied to analytics selector)
+  // 1. CURRENT MONTH & PREVIOUS MONTH DATA (For KPI Cards & Health Score)
   // ============================================================
-  const currentMonthOrders = useMemo(() => {
+  const { currentMonthOrders, previousMonthOrders } = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return orders.filter(o => {
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const current = orders.filter(o => {
       if (!o.created_at) return false;
       const d = new Date(o.created_at);
       return d >= startOfMonth && d <= endOfMonth;
     });
+
+    const previous = orders.filter(o => {
+      if (!o.created_at) return false;
+      const d = new Date(o.created_at);
+      return d >= startOfPrevMonth && d <= endOfPrevMonth;
+    });
+
+    return { currentMonthOrders: current, previousMonthOrders: previous };
   }, [orders]);
 
-  const currentMonthSummary = useMemo(() => getAnalyticsSummary(currentMonthOrders), [currentMonthOrders]);
+  const currentMonthSummary = useMemo(() => {
+    const revenue = currentMonthOrders.reduce((s, o) => s + safeAmount(o.price), 0)
+    const paid = currentMonthOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const outstanding = currentMonthOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
+    return { revenue, paid, outstanding, orders: currentMonthOrders.length }
+  }, [currentMonthOrders]);
+
+  const previousMonthSummary = useMemo(() => {
+    const revenue = previousMonthOrders.reduce((s, o) => s + safeAmount(o.price), 0)
+    const paid = previousMonthOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const outstanding = previousMonthOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
+    return { revenue, paid, outstanding, orders: previousMonthOrders.length }
+  }, [previousMonthOrders]);
+
+  // Calculate dynamic trends for KPI cards
+  const getTrend = (current, previous) => {
+    if (previous === 0 && current === 0) return { text: 'No activity', color: 'var(--cresoa-text-muted)' };
+    if (previous === 0 && current > 0) return { text: '↑ New this month', color: 'var(--cresoa-success)' };
+    const change = ((current - previous) / previous) * 100;
+    if (change > 0) return { text: `↑ ${change.toFixed(1)}% vs last month`, color: 'var(--cresoa-success)' };
+    if (change < 0) return { text: `↓ ${Math.abs(change).toFixed(1)}% vs last month`, color: 'var(--cresoa-danger)' };
+    return { text: `0% vs last month`, color: 'var(--cresoa-text-muted)' };
+  };
+
+  const revenueTrend = getTrend(currentMonthSummary.revenue, previousMonthSummary.revenue);
+  const ordersTrend = getTrend(currentMonthSummary.orders, previousMonthSummary.orders);
+  const collectedTrend = getTrend(currentMonthSummary.paid, previousMonthSummary.paid);
+  const outstandingTrend = getTrend(currentMonthSummary.outstanding, previousMonthSummary.outstanding);
 
   // ============================================================
-  // 2. ANALYTICS DATA (For the Stick Chart - controlled by period selector)
+  // 2. BUSINESS HEALTH SCORE (STRICTLY CAPPED AT 100%)
+  // ============================================================
+  const healthScoreData = useMemo(() => {
+    if (currentMonthSummary.revenue === 0 && currentMonthSummary.orders === 0) {
+      return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' };
+    }
+
+    const rawCollectionRate = currentMonthSummary.revenue > 0 ? (currentMonthSummary.paid / currentMonthSummary.revenue) : 0;
+    const collectionRate = Math.min(Math.max(rawCollectionRate, 0), 1);
+
+    const currentMonthDeliveredCount = currentMonthOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
+    const rawCompletionRate = currentMonthSummary.orders > 0 ? (currentMonthDeliveredCount / currentMonthSummary.orders) : 0;
+    const completionRate = Math.min(Math.max(rawCompletionRate, 0), 1);
+
+    const rawScore = ((collectionRate * 0.5) + (completionRate * 0.5)) * 100;
+    const score = Math.min(Math.round(rawScore), 100);
+
+    let label = 'Needs Attention';
+    let color = 'var(--cresoa-danger)';
+    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)'; }
+    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)'; }
+
+    return { score, label, color };
+  }, [currentMonthSummary, currentMonthOrders]);
+
+  // ============================================================
+  // 3. ANALYTICS DATA (For the Stick Chart - controlled by period selector)
   // ============================================================
   const analytics = useMemo(() => {
     const daysMap = { '7': 7, '30': 30, '90': 90 };
@@ -202,7 +240,6 @@ function FashionDashboard({ businessId }) {
     const outstanding = filteredOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
     const orderCount = filteredOrders.length;
     
-    // Cap percentages at 100% to prevent UI overflow if overpaid
     const collectedPercent = totalOrderValue > 0 ? Math.min((collected / totalOrderValue) * 100, 100) : 0;
     const outstandingPercent = totalOrderValue > 0 ? Math.min((outstanding / totalOrderValue) * 100, 100) : 0;
 
@@ -247,7 +284,6 @@ function FashionDashboard({ businessId }) {
     };
   }, [orders, period]);
 
-  // Stick Chart Data Calculations
   const chartPoints = analytics.chartData.map((d) => {
     const heightPct = analytics.maxRevenue > 0 ? (d.collected / analytics.maxRevenue) * 100 : 0;
     return {
@@ -259,36 +295,6 @@ function FashionDashboard({ businessId }) {
     };
   });
 
-  // ============================================================
-  // 3. BUSINESS HEALTH SCORE (STRICTLY CAPPED AT 100%)
-  // ============================================================
-  const healthScoreData = useMemo(() => {
-    if (currentMonthSummary.revenue === 0 && currentMonthSummary.orders === 0) {
-      return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' };
-    }
-
-    // 1. Collection Rate (Capped at 1.0 to prevent overpayments from inflating the score)
-    const rawCollectionRate = currentMonthSummary.revenue > 0 ? (currentMonthSummary.paid / currentMonthSummary.revenue) : 0;
-    const collectionRate = Math.min(Math.max(rawCollectionRate, 0), 1);
-
-    // 2. Completion Rate (ONLY counts delivered orders from CURRENT MONTH orders, not all historical orders)
-    const currentMonthDeliveredCount = currentMonthOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
-    const rawCompletionRate = currentMonthSummary.orders > 0 ? (currentMonthDeliveredCount / currentMonthSummary.orders) : 0;
-    const completionRate = Math.min(Math.max(rawCompletionRate, 0), 1);
-
-    // 3. Weighted Score (50% Collection, 50% Completion), strictly capped at 100
-    const rawScore = ((collectionRate * 0.5) + (completionRate * 0.5)) * 100;
-    const score = Math.min(Math.round(rawScore), 100);
-
-    let label = 'Needs Attention';
-    let color = 'var(--cresoa-danger)';
-    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)'; }
-    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)'; }
-
-    return { score, label, color };
-  }, [currentMonthSummary, currentMonthOrders]);
-
-  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
   const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
   const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
   const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
@@ -401,31 +407,34 @@ function FashionDashboard({ businessId }) {
   }
 
   // ============================================================
-  // KPI CARDS (CURRENT MONTH DATA, CAPPED PERCENTAGES)
+  // KPI CARDS CONFIGURATION (Hardcoded Inline Styles)
   // ============================================================
   const kpiCards = [
     { 
       label: 'Revenue', 
       value: formatMoney(currentMonthSummary.revenue), 
+      trend: revenueTrend,
       meta: 'Total order value', 
-      onClick: () => navigate('/dashboard/orders'), 
-      isLarge: true 
+      onClick: () => navigate('/dashboard/orders')
     },
     { 
       label: 'Orders', 
       value: String(currentMonthSummary.orders), 
+      trend: ordersTrend,
       meta: 'Orders in period', 
       onClick: () => navigate('/dashboard/orders') 
     },
     { 
       label: 'Collected', 
       value: formatMoney(currentMonthSummary.paid), 
+      trend: collectedTrend,
       meta: `${currentMonthSummary.revenue > 0 ? Math.min(Math.round((currentMonthSummary.paid / currentMonthSummary.revenue) * 100), 100) : 0}% of total`, 
       onClick: () => navigate('/dashboard/orders?filter=payments') 
     },
     { 
       label: 'Outstanding', 
       value: formatMoney(currentMonthSummary.outstanding), 
+      trend: outstandingTrend,
       meta: `${currentMonthSummary.revenue > 0 ? Math.min(Math.round((currentMonthSummary.outstanding / currentMonthSummary.revenue) * 100), 100) : 0}% of total`, 
       onClick: () => navigate('/dashboard/orders?filter=attention') 
     },
@@ -458,27 +467,37 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* FORCED CARD ARRANGEMENT (Matches Sketch) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
+        {/* HARDCODED CARD ARRANGEMENT (Impossible for global CSS to break) */}
+        <div style={{ display: 'flex', gap: 10, padding: '0 16px', marginBottom: 16, flexDirection: 'row' }}>
           
-          {/* Left Column: Revenue */}
-          <button onClick={kpiCards[0].onClick} className="cresoa-metric-card" style={{ gridRow: 'span 3', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 14px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
-            <span className="cresoa-metric-label" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards[0].label}</span>
-            <strong className="cresoa-metric-value" style={{ fontSize: 22, fontWeight: 800, color: 'var(--cresoa-text)', letterSpacing: '-0.5px', margin: '8px 0' }}>{kpiCards[0].value}</strong>
-            <span className="cresoa-metric-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 6 }}>{kpiCards[0].meta}</span>
-          </button>
-
-          {/* Right Column: 3 Small Cards */}
-          {kpiCards.slice(1).map((card, idx) => (
-            <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer' }}>
-              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
-              <strong className="cresoa-metric-value" style={{ fontSize: 18, fontWeight: 800, color: 'var(--cresoa-text)' }}>{card.value}</strong>
-              <span className="cresoa-metric-meta" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)' }}>{card.meta}</span>
+          {/* Left Column: Revenue (Spans full height) */}
+          <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column' }}>
+            <button onClick={kpiCards[0].onClick} className="cresoa-metric-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 14px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{kpiCards[0].label}</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 20, fontWeight: 800, color: 'var(--cresoa-text)', letterSpacing: '-0.5px', margin: '8px 0' }}>{kpiCards[0].value}</strong>
+              <div>
+                <span className="cresoa-metric-trend" style={{ fontSize: 10, color: kpiCards[0].trend.color, fontWeight: 600, display: 'block', marginBottom: 4 }}>{kpiCards[0].trend.text}</span>
+                <span className="cresoa-metric-meta" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)' }}>{kpiCards[0].meta}</span>
+              </div>
             </button>
-          ))}
+          </div>
+
+          {/* Right Column: 3 stacked cards */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {kpiCards.slice(1).map((card, idx) => (
+              <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 10px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
+                <strong className="cresoa-metric-value" style={{ fontSize: 16, fontWeight: 800, color: 'var(--cresoa-text)' }}>{card.value}</strong>
+                <div>
+                  <span className="cresoa-metric-trend" style={{ fontSize: 9, color: card.trend.color, fontWeight: 600, display: 'block', marginBottom: 2 }}>{card.trend.text}</span>
+                  <span className="cresoa-metric-meta" style={{ fontSize: 9, color: 'var(--cresoa-text-muted)' }}>{card.meta}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* BUSINESS HEALTH SCORE (STRICTLY CAPPED AT 100%) */}
+        {/* BUSINESS HEALTH SCORE */}
         <div style={{ padding: '0 16px', marginBottom: 16 }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -519,7 +538,7 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* ========================================== */}
-        {/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
+        {/* ANALYTICS SECTION (STICK CHART)            */}
         {/* ========================================== */}
         <div style={{ marginTop: 24, padding: '0 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
@@ -548,7 +567,7 @@ function FashionDashboard({ businessId }) {
                 </div>
               </div>
               
-              {/* Simple Stick Chart */}
+              {/* Stick Chart */}
               {!analytics.hasOrders ? (
                 <div style={{ height: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
                   <span>No sales data yet.</span>
@@ -561,13 +580,10 @@ function FashionDashboard({ businessId }) {
                 </div>
               ) : (
                 <div style={{ position: 'relative', height: 140 }}>
-                  {/* Y-Axis Labels */}
                   <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)', width: 40 }}>
                     <span>{formatMoney(analytics.maxRevenue)}</span>
                     <span>₦0</span>
                   </div>
-                  
-                  {/* Bars Container */}
                   <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
                     {chartPoints.map((point, i) => (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
@@ -578,7 +594,6 @@ function FashionDashboard({ businessId }) {
                 </div>
               )}
               
-              {/* X-Axis Labels (Limited to prevent overlap) */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
                 {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
                   <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -624,7 +639,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-        {/* Recent Orders & Customers – Stacked Vertically for Mobile */}
+        {/* Recent Orders & Customers */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
@@ -690,4 +705,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-        }
+    }
