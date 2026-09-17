@@ -1,417 +1,584 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
-import Logo from '../../components/Logo'
-import { FREE_TRIAL_DAYS } from '../../lib/planLimits'
-import BusinessSwitcher from '../components/BusinessSwitcher'
-import { Icon } from '../../components/Icon'
-import Banner from '../../components/Banner'
-import SectorMismatch from '../../components/SectorMismatch'
-import { BottomNav } from '../../components/BottomNav'
-import { getNavItemsFor, getDashboardBasePath, getSectorBadge, isNavPathActive, SHARED_DASHBOARD_PATHS, SECTOR_KEYS } from '../../lib/sector-config'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useDashboardData } from '../../../lib/hooks/useDashboardData'
+import { formatMoney, formatShortDate, safeAmount } from '../../../lib/utils'
+import { PRODUCTION_STAGES } from '../../../lib/constants'
+import { Icon } from '../../../components/Icon'
 
-function DashboardLayoutContent({ children }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const [user, setUser] = useState(null)
-  const [business, setBusiness] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [theme, setTheme] = useState('light')
-  const [userRole, setUserRole] = useState(null)
-  const [authChecked, setAuthChecked] = useState(false)
-  const [mismatchInfo, setMismatchInfo] = useState({ sector: '', businessId: '' })
+import { Card } from '../../../components/Card'
+import { SectionHeader } from '../../../components/SectionHeader'
+import { StatusPill } from '../../../components/StatusPill'
+import { ActionCenter } from '../../../components/ActionCenter'
+import { Navigation } from '../../../components/Navigation'
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    document.documentElement.setAttribute('data-theme', newTheme)
-    localStorage.setItem('cresoa-theme', newTheme)
+const THEME_STORAGE_KEY = 'cresoa-theme'
+
+// ============================================================
+// HELPERS (UNTOUCHED LOGIC)
+// ============================================================
+function getInitials(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+  return name.charAt(0).toUpperCase()
+}
+
+function getDaySeries(orders, days = 7) {
+  const result = []
+  const today = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setHours(0,0,0,0)
+    date.setDate(today.getDate() - i)
+    const key = date.toISOString().split('T')[0]
+    const dayOrders = orders.filter(o => new Date(o.created_at).toISOString().split('T')[0] === key)
+    const revenue = dayOrders.reduce((s, o) => s + safeAmount(o.price), 0)
+    result.push({ key, label: date.toLocaleDateString('en-NG', { weekday: 'short' }), orders: dayOrders.length, revenue })
   }
+  return result
+}
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('cresoa-theme')
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.setAttribute('data-theme', savedTheme)
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark')
-      document.documentElement.setAttribute('data-theme', 'dark')
+function getAnalyticsSummary(orders) {
+  const revenue = orders.reduce((s, o) => s + safeAmount(o.price), 0)
+  const paid = orders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+  const outstanding = orders.reduce((s, o) => s + safeAmount(o.balance), 0)
+  return { revenue, paid, outstanding, orders: orders.length }
+}
+
+function getProductionCounts(orders) {
+  const counts = {}
+  PRODUCTION_STAGES.forEach(s => counts[s] = 0)
+  orders.forEach(o => {
+    const status = String(o.current_status || '').trim()
+    if (counts[status] !== undefined) counts[status]++
+  })
+  return counts
+}
+
+function resolveCustomerName(order, customers) {
+  if (!order) return 'Unknown Customer'
+  if (order.customer_name && order.customer_name !== 'Unknown customer' && order.customer_name !== 'Unnamed customer') {
+    return order.customer_name
+  }
+  if (order.customer_id) {
+    const customer = customers.find(c => String(c.id) === String(order.customer_id))
+    if (customer) {
+      const name = customer.full_name || customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
+      if (name && name !== 'Unknown customer' && name !== 'Unnamed customer') return name
     }
-  }, [])
-
-  // ─── SAFE AUTH + BUSINESS LOADING ───
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-          const { data: { session: session2 } } = await supabase.auth.getSession()
-          if (!session2) {
-            router.push('/login')
-            return
-          }
-        }
-
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        if (!authUser) {
-          router.push('/login')
-          return
-        }
-        setUser(authUser)
-
-        const businessIdFromUrl = searchParams.get('business_id')
-        let businessData = null
-
-        if (businessIdFromUrl) {
-          const { data: business, error } = await supabase
-            .from('businesses')
-            .select('*')
-            .eq('id', businessIdFromUrl)
-            .maybeSingle()
-          if (business && !error) businessData = business
-        }
-
-        if (!businessData) {
-          const { data: ownedBusiness } = await supabase
-            .from('businesses')
-            .select('*')
-            .eq('owner_id', authUser.id)
-            .maybeSingle()
-          if (ownedBusiness) businessData = ownedBusiness
-          else {
-            const { data: membershipData } = await supabase
-              .from('business_memberships')
-              .select('business_id, role')
-              .eq('user_id', authUser.id)
-              .maybeSingle()
-            if (membershipData) {
-              const { data: memberBusiness } = await supabase
-                .from('businesses')
-                .select('*')
-                .eq('id', membershipData.business_id)
-                .maybeSingle()
-              if (memberBusiness) {
-                businessData = memberBusiness
-                setUserRole(membershipData.role)
-              }
-            }
-          }
-        }
-
-        if (!businessData) {
-          router.push('/onboarding')
-          return
-        }
-
-        if (businessData && !userRole) {
-          const { data: roleData } = await supabase
-            .from('business_memberships')
-            .select('role')
-            .eq('business_id', businessData.id)
-            .eq('user_id', authUser.id)
-            .maybeSingle()
-          if (roleData) setUserRole(roleData.role)
-          else if (businessData.owner_id === authUser.id) setUserRole('Owner')
-          else setUserRole('Staff')
-        }
-
-        // Beta/trial logic
-        if (businessData) {
-          if (businessData.plan === 'beta' && businessData.beta_expires_at) {
-            const betaExpiry = new Date(businessData.beta_expires_at)
-            const now = new Date()
-            if (betaExpiry < now) {
-              await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
-              businessData.plan = 'free'
-              businessData.plan_status = 'expired'
-            }
-          }
-          if (!businessData.trial_ends_at) {
-            const trialEndsAt = new Date()
-            trialEndsAt.setDate(trialEndsAt.getDate() + FREE_TRIAL_DAYS)
-            await supabase.from('businesses').update({ trial_ends_at: trialEndsAt.toISOString(), trial_starts_at: new Date().toISOString() }).eq('id', businessData.id)
-            businessData.trial_ends_at = trialEndsAt.toISOString()
-          }
-          const now = new Date()
-          if (businessData.plan !== 'free' && businessData.plan !== 'beta' && businessData.subscription_expires_at) {
-            const expiresAt = new Date(businessData.subscription_expires_at)
-            if (expiresAt < now) {
-              await supabase.from('businesses').update({ plan: 'free', plan_status: 'expired' }).eq('id', businessData.id)
-              businessData.plan = 'free'
-              businessData.plan_status = 'expired'
-            }
-          }
-        }
-
-        setBusiness(businessData)
-        localStorage.setItem('cresoa-sector', businessData?.sector || 'fashion')
-      } catch (error) {
-        console.error('Dashboard layout error:', error)
-        router.push('/login')
-      } finally {
-        setLoading(false)
-        setAuthChecked(true)
-      }
-    }
-
-    load()
-  }, [router, searchParams])
-
-  // ─── SECURITY GUARDS (Now sets mismatch instead of redirect) ───
-  useEffect(() => {
-    if (!loading && business) {
-      const urlBusinessId = searchParams.get('business_id')
-      if (urlBusinessId && urlBusinessId !== business.id) {
-        window.location.reload()
-        return
-      }
-
-      const currentSector = business.sector || 'fashion'
-      const sectorPath = pathname?.split('/')[2] // e.g., 'fashion', 'repairs', 'printing'
-
-      // If path is a sector-specific path but doesn't match the business sector
-      if (sectorPath && SECTOR_KEYS.includes(sectorPath) && sectorPath !== currentSector) {
-        setMismatchInfo({ sector: currentSector, businessId: business.id })
-        return
-      }
-
-      // Fashion lives at the bare /dashboard root with no distinguishing
-      // URL segment, so a non-fashion business wandering into fashion-only
-      // paths isn't caught by the segment check above — guard it explicitly.
-      const FASHION_ONLY_PATHS = ['/dashboard/orders', '/dashboard/customers', '/dashboard/inventory', '/dashboard/groups', '/dashboard/production']
-      const onSharedPath = SHARED_DASHBOARD_PATHS.some((p) => pathname?.startsWith(p))
-      if (
-        currentSector !== 'fashion' &&
-        !onSharedPath &&
-        FASHION_ONLY_PATHS.some((p) => pathname?.startsWith(p))
-      ) {
-        router.push(`${getDashboardBasePath(currentSector)}?business_id=${business.id}`)
-        return
-      }
-
-      if (
-        currentSector === 'fashion' &&
-        !onSharedPath &&
-        SECTOR_KEYS.some((key) => key !== 'fashion' && pathname?.startsWith(getDashboardBasePath(key)))
-      ) {
-        router.push(getDashboardBasePath('fashion') + '?business_id=' + business.id)
-        return
-      }
-    }
-  }, [loading, business, pathname, router, searchParams])
-
-  // ─── NAVIGATION ITEMS ───
-  // Sourced entirely from lib/sector-config.js — adding a new sector means
-  // adding one entry there, never touching this file again.
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
   }
+  return 'Unknown Customer'
+}
 
-  const isActive = (path) => isNavPathActive(pathname, path)
+function getOrderTitle(order) {
+  if (order.title) return order.title
+  if (order.order_title) return order.order_title
+  return `Order #${order.id?.slice(0,6) || '?'}`
+}
 
-  const handleNavClick = () => setSidebarOpen(false)
-
-  const getIndustryBadge = () => getSectorBadge(business?.sector || 'fashion')
-
-  const currentSector = business?.sector || 'fashion'
-  const currentNavItems = getNavItemsFor(currentSector)
-
-  if (loading && !authChecked) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .spinner { width: 40px; height: 40px; border: 4px solid var(--color-border); border-top: 4px solid var(--color-accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        `}</style>
-        <div className="spinner" style={{ margin: 'auto', marginTop: '40vh' }} />
-      </div>
-    )
+function getActionItems(orders, customers) {
+  if (!Array.isArray(orders) || !Array.isArray(customers)) return []
+  try {
+    return orders
+      .filter(o => o && typeof o === 'object')
+      .filter(o => {
+        const status = String(o.current_status || '').toLowerCase()
+        return safeAmount(o.balance) > 0 ||
+          status === 'order placed' ||
+          status === 'fitting' ||
+          status === 'alteration'
+      })
+      .slice(0, 5)
+      .map(o => {
+        const customerName = resolveCustomerName(o, customers)
+        const orderRef = getOrderTitle(o)
+        const displayName = `${orderRef} – ${customerName}`
+        return {
+          id: o.id || 'unknown',
+          customerName: displayName,
+          amount: o.balance || 0,
+          reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+          status: o.current_status || 'Unknown',
+          actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+          order: o
+        }
+      })
+  } catch (e) {
+    console.error('getActionItems error:', e)
+    return []
   }
+}
 
-  // ─── Show SectorMismatch if needed ───
-  if (mismatchInfo.sector) {
-    return <SectorMismatch sector={mismatchInfo.sector} businessId={mismatchInfo.businessId} />
-  }
+function getGroupProgress(groups, orders) {
+  if (!Array.isArray(groups) || !Array.isArray(orders)) return []
+  return groups.map(group => {
+    const groupOrders = orders.filter(o => o.group_order_id === group.id)
+    const total = groupOrders.length
+    const delivered = groupOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
+    const progress = total === 0 ? null : Math.round((delivered / total) * 100)
+    return { ...group, totalOrders: total, deliveredOrders: delivered, progress }
+  })
+}
 
-  const isStaff = userRole === 'Staff'
-  const isManager = userRole === 'Manager'
-  const isOwner = userRole === 'Owner'
-
-  const showTeamActivity = !isStaff
-  const showSettingsSection = isOwner || isManager
-  const showBusinessSettings = isOwner
-  const showBilling = isOwner
-  const showProfile = isOwner || isManager
-
-  const baseUrl = (path) => business?.id ? `${path}?business_id=${business.id}` : path
-
+// ============================================================
+// DASHBOARD SHELL
+// ============================================================
+function DashboardShell({ children, theme }) {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <style>{`
-        :root {
-          --color-bg: #F7F5F0;
-          --color-card: #FFFFFF;
-          --color-text: #1A1A1A;
-          --color-text-muted: #8A8A8A;
-          --color-border: #E5E0D8;
-          --color-primary: #0F2B4A;
-          --color-accent: #D4A52A;
-          --color-success: #2E7D5E;
-          --color-danger: #D9534F;
-          --shadow: 0 4px 16px rgba(15,43,74,0.06);
-        }
-        [data-theme="dark"] {
-          --color-bg: #12121A;
-          --color-card: #1E1E2A;
-          --color-text: #E8E8E8;
-          --color-text-muted: #AAAAAA;
-          --color-border: #2A2A3A;
-          --color-primary: #D4A52A;
-          --color-accent: #D4A52A;
-          --color-success: #2E7D5E;
-          --color-danger: #D9534F;
-          --shadow: 0 4px 16px rgba(0,0,0,0.3);
-        }
-        .hamburger { position: fixed; top: 0.8rem; left: 0.8rem; z-index: 1001; background: var(--color-primary); border: none; color: #fff; font-size: 1.3rem; padding: 0.2rem 0.5rem; border-radius: 6px; cursor: pointer; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-        .hamburger:hover { opacity: 0.8; }
-        .sidebar-close-btn { display: none; position: absolute; top: 0.7rem; right: 0.7rem; width: 32px; height: 32px; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); border: none; color: #fff; font-size: 1.1rem; border-radius: 8px; cursor: pointer; z-index: 1002; }
-        .sidebar-close-btn:hover { background: rgba(255,255,255,0.16); }
-        .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 999; }
-        .overlay.open { display: block; }
-        .sidebar { width: 260px; min-height: 100vh; background: #0A1628; padding: 0.8rem 0.8rem; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; transition: transform 0.3s ease; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.04); z-index: 1000; }
-        .sidebar::-webkit-scrollbar { width: 3px; }
-        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-        .sidebar .brand { display: flex; align-items: center; gap: 0.7rem; padding: 0.3rem 0 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 0.7rem; }
-        .sidebar .brand .logo-frame { width: 42px; height: 42px; min-width: 42px; border-radius: 12px; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-        .sidebar .brand .logo-frame img, .sidebar .brand .logo-frame svg { width: 100%; height: 100%; object-fit: contain; }
-        .sidebar .brand .logo-text { color: #fff; font-size: 1.05rem; font-weight: 700; font-family: 'Fraunces', serif; line-height: 1.2; }
-        .sidebar .brand .sub { color: #8899AA; font-size: 0.7rem; line-height: 1.5; margin-top: 0.15rem; }
-        .sidebar .brand .sub .badge { display: inline-block; background: rgba(212,165,42,0.15); color: #D4A52A; padding: 0.08rem 0.45rem; border-radius: 4px; font-size: 0.62rem; font-weight: 600; margin-left: 0.3rem; }
-        .sidebar .brand .sub .plan { display: inline-block; background: #4C7A5E; color: #fff; padding: 0.08rem 0.45rem; border-radius: 4px; font-size: 0.62rem; font-weight: 600; text-transform: uppercase; }
-        .sidebar .nav-section { margin-bottom: 0.2rem; }
-        .sidebar .nav-section .section-label { color: rgba(255,255,255,0.25); font-size: 0.45rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 0.2rem 0.7rem; margin-bottom: 0.1rem; font-weight: 600; }
-        .sidebar .nav-section a { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: all 0.15s ease; }
-        .sidebar .nav-section a:hover { background: rgba(255,255,255,0.04); color: #fff; }
-        .sidebar .nav-section a.active { background: rgba(212,165,42,0.08); color: #D4A52A; font-weight: 600; }
-        .sidebar .nav-section a .icon { font-size: 0.9rem; width: 18px; text-align: center; flex-shrink: 0; }
-        .sidebar .bottom { margin-top: auto; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.4rem; display: flex; flex-direction: column; gap: 0.1rem; }
-        .sidebar .bottom a, .sidebar .bottom button { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0.7rem; border-radius: 6px; color: #8899AA; text-decoration: none; font-size: 0.75rem; font-weight: 500; transition: all 0.15s ease; background: none; border: none; width: 100%; cursor: pointer; text-align: left; }
-        .sidebar .bottom a:hover, .sidebar .bottom button:hover { background: rgba(255,255,255,0.04); color: #fff; }
-        .sidebar .bottom .logout { color: #D9534F; }
-        .sidebar .bottom .logout:hover { background: rgba(217,83,79,0.08); color: #D9534F; }
-        .sidebar .bottom .theme-btn { color: #D4A52A; }
-        .sidebar .bottom .theme-btn:hover { background: rgba(212,165,42,0.06); color: #D4A52A; }
-        .sidebar .bottom .support-link { color: #D4A52A; }
-        .sidebar .bottom .support-link:hover { background: rgba(212,165,42,0.06); color: #D4A52A; }
-        .main-content { flex: 1; min-width: 0; padding: 0; }
-        .dashboard-header { display: flex; justify-content: flex-end; align-items: center; padding: 0.4rem 1.2rem; background: var(--color-card); border-bottom: 1px solid var(--color-border); }
-        .dashboard-header .date { font-size: 0.7rem; color: var(--color-text-muted); }
-        .beta-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.7rem; border-radius: 16px; background: linear-gradient(135deg, #D4A52A, #C79A2B); color: #0F2B4A; font-weight: 700; font-size: 0.65rem; text-decoration: none; box-shadow: 0 2px 8px rgba(212,165,42,0.2); transition: transform 0.1s ease; }
-        .beta-btn:hover { transform: scale(1.02); }
-        @media (min-width: 769px) { .hamburger { display: none !important; } .sidebar { transform: translateX(0) !important; } .overlay { display: none !important; } }
-        @media (max-width: 768px) { .hamburger { display: block; } .sidebar-close-btn { display: flex; } .sidebar { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); width: 260px; z-index: 1000; height: 100vh; } .sidebar.open { transform: translateX(0); } .overlay.open { display: block; } .main-content { padding-top: 3rem; padding-bottom: 64px; } }
-      `}</style>
-
-      {!sidebarOpen && (
-        <button className="hamburger" onClick={() => setSidebarOpen(true)} aria-label="Open menu">☰</button>
-      )}
-      <div className={`overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
-      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
-        <div className="brand">
-          <div className="logo-frame">
-            <Logo variant="dark-bg" size="medium" />
-          </div>
-          <div>
-            <div className="logo-text">Cresoa</div>
-            <div className="sub">
-              {business?.name || 'Your business'}
-              <span className="badge">{getIndustryBadge()}</span>
-              <br />
-              <span className={`plan ${business?.plan === 'beta' ? 'beta' : ''}`}>{business?.plan || 'Free'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ✅ UPDATED: Pass currentSector to BusinessSwitcher */}
-        <div style={{ marginBottom: '0.4rem' }}>
-          <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} currentSector={business?.sector} />
-        </div>
-
-        <div className="nav-section">
-          <div className="section-label">Business</div>
-          {currentNavItems.map((item) => (
-            <a key={item.path} href={baseUrl(item.path)} className={isActive(item.path) ? 'active' : ''} onClick={handleNavClick}>
-              <span className="icon"><Icon name={item.icon} size={16} stroke="currentColor" /></span>
-              {item.name}
-            </a>
-          ))}
-        </div>
-
-        {showTeamActivity && (
-          <div className="nav-section">
-            <div className="section-label">Team & Activity</div>
-            <a href={baseUrl('/dashboard/staff')} className={isActive('/dashboard/staff') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="user-plus" size={16} stroke="currentColor" /></span> Team & Staff</a>
-            <a href={baseUrl('/dashboard/activity')} className={isActive('/dashboard/activity') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="activity" size={16} stroke="currentColor" /></span> Activity Logs</a>
-          </div>
-        )}
-
-          {showSettingsSection && (
-          <div className="nav-section">
-            <div className="section-label">Settings</div>
-            {showBusinessSettings && <a href={baseUrl('/dashboard/settings')} className={isActive('/dashboard/settings') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="settings" size={16} stroke="currentColor" /></span> Business Settings</a>}
-            {showBilling && <a href={baseUrl('/dashboard/subscription')} className={isActive('/dashboard/subscription') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="credit-card" size={16} stroke="currentColor" /></span> Billing & Plan</a>}
-            {showProfile && <a href={baseUrl('/dashboard/profile')} className={isActive('/dashboard/profile') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="user" size={16} stroke="currentColor" /></span> Profile & Settings</a>}
-          </div>
-        )}
-
-      {user?.email === 'taiwoabraham640@gmail.com' && (
-          <div className="nav-section">
-            <div className="section-label">Admin</div>
-            <a href={baseUrl('/admin/support')} className={isActive('/admin') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets</a>
-          </div>
-        )}
-
-        <div className="bottom">
-          <button className="theme-btn" onClick={toggleTheme}><span className="icon"><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} stroke="currentColor" /></span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</button>
-          <a href={baseUrl('/dashboard/support')} className="support-link" onClick={handleNavClick}><span className="icon"><Icon name="message-circle" size={16} stroke="currentColor" /></span> Support Hub</a>
-          <button className="logout" onClick={handleLogout}><span className="icon"><Icon name="log-out" size={16} stroke="currentColor" /></span> Logout</button>
-        </div>
-      </div>
-
-      <div className="main-content">
-        <div className="dashboard-header">
-          <div></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {business && !business.has_applied_for_beta && isOwner && <a href={baseUrl('/dashboard/beta-apply')} className="beta-btn">🧪 Join Beta</a>}
-            <span className="date">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-          </div>
-        </div>
-        <Banner />
-        {children}
-      </div>
-      <BottomNav businessId={business?.id} sector={currentSector} />
-    </div>
+    <main className="cresoa-dashboard cresoa-dashboard-force-mobile" data-theme={theme}>
+      <div className="cresoa-dashboard-shell">{children}</div>
+    </main>
   )
 }
 
-export default function DashboardLayout({ children }) {
+function SafeRender({ children, fallback = null }) {
+  try { return children } catch (e) { console.error('Render error:', e); return fallback }
+}
+
+// ============================================================
+// MAIN DASHBOARD
+// ============================================================
+function FashionDashboard({ businessId }) {
+  const router = useRouter()
+  const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
+  const [theme, setTheme] = useState('light')
+  const [period, setPeriod] = useState('7')
+
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY)
+    const initial = saved === 'dark' ? 'dark' : 'light'
+    setTheme(initial)
+    document.documentElement.dataset.theme = initial
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
+
+  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
+  const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
+  const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
+  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
+  const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
+
+  const navigate = (path) => {
+    const sep = path.includes('?') ? '&' : '?'
+    router.push(`${path}${sep}business_id=${businessId}`)
+  }
+
+  const handleActionClick = (item) => {
+    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
+  }
+
+  const handleRetry = () => refresh()
+
+  // ---- Total Health Score Calculation (100% Real Data) ----
+  const healthScoreData = useMemo(() => {
+    if (summary.revenue === 0 && summary.orders === 0) return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' }
+    
+    // Collection Rate: How much of total revenue has been paid (50% weight)
+    const collectionRate = summary.revenue > 0 ? (summary.paid / summary.revenue) : 0
+    
+    // Completion Rate: How many orders have been delivered (50% weight)
+    const deliveredOrders = orders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
+    const completionRate = summary.orders > 0 ? (deliveredOrders / summary.orders) : 0
+    
+    const score = Math.round(((collectionRate * 0.5) + (completionRate * 0.5)) * 100)
+    
+    let label = 'Needs Attention'
+    let color = 'var(--cresoa-danger)'
+    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)' }
+    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)' } // Fallback to hex if warning var missing
+    
+    return { score, label, color }
+  }, [summary, orders])
+
+  if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
+  if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
+
+  // ---- Render functions ----
+  const renderOrderRows = (ordersList) => {
+    if (!ordersList || ordersList.length === 0) {
+      return (
+        <div className="elegant-empty" style={{ padding: '24px 0', textAlign: 'center' }}>
+          <h4 style={{ fontSize: 16, fontStyle: 'italic', marginBottom: 4 }}>No orders yet</h4>
+          <p style={{ fontSize: 13, color: 'var(--cresoa-text-muted)' }}>Create your first order to get started.</p>
+        </div>
+      )
+    }
+    return ordersList.slice(0, 4).map(order => {
+      const customerName = resolveCustomerName(order, customers)
+      const orderRef = getOrderTitle(order)
+      const displayName = `${orderRef} – ${customerName}`
+      const initials = getInitials(customerName)
+      return (
+        <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact" style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)', textAlign: 'left', cursor: 'pointer' }}>
+          <span className="cresoa-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>{initials}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="cresoa-row-title" style={{ display: 'block', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</span>
+            <span className="cresoa-row-meta" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 2 }}>
+              {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
+            </span>
+          </span>
+          <StatusPill status={order.current_status || 'Order placed'} />
+        </button>
+      )
+    })
+  }
+
+  const renderCustomerRows = (customersList) => {
+    if (!customersList || customersList.length === 0) {
+      return (
+        <div className="elegant-empty" style={{ padding: '24px 0', textAlign: 'center' }}>
+          <h4 style={{ fontSize: 16, fontStyle: 'italic', marginBottom: 4 }}>No customers yet</h4>
+          <p style={{ fontSize: 13, color: 'var(--cresoa-text-muted)' }}>Add customers to see them here.</p>
+        </div>
+      )
+    }
+    return customersList.slice(0, 4).map(customer => {
+      const name = customer.name || 'Unnamed'
+      const customerOrders = orders ? orders.filter(o => o.customer_id === customer.id) : []
+      const totalSpent = customerOrders.reduce((sum, o) => sum + safeAmount(o.price), 0)
+      const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
+      const initials = getInitials(name)
+      return (
+        <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact" style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)', textAlign: 'left', cursor: 'pointer' }}>
+          <span className="cresoa-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', color: 'var(--cresoa-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>{initials}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="cresoa-row-title" style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{name}</span>
+            <span className="cresoa-row-meta" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 2 }}>
+              {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
+              {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
+            </span>
+          </span>
+          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
+        </button>
+      )
+    })
+  }
+
+  const renderGroupCards = (groupsList) => {
+    return groupsList.slice(0, 4).map(group => {
+      const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
+      const progress = group.progress
+      return (
+        <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+          <span className="cresoa-group-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', fontSize: 14, fontWeight: 'bold', flexShrink: 0 }}>
+            {group.name ? group.name.charAt(0).toUpperCase() : 'G'}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <strong className="cresoa-row-title" style={{ fontSize: 13, fontWeight: 600 }}>{group.name}</strong>
+            <div className="cresoa-row-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>
+              {progress !== null ? (
+                <>
+                  <div style={{ height: 4, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4, marginBottom: 4, width: '100%', maxWidth: 200 }}>
+                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
+                  </div>
+                  <span>{progress}% complete</span>
+                </>
+              ) : (
+                <span>Progress unavailable</span>
+              )}
+              {coordinator && ` · ${coordinator.name}`}
+              {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
+            </div>
+          </div>
+          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
+        </div>
+      )
+    })
+  }
+
+  // ---- Analytics & Chart Calculations ----
+  const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
+  const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
+  const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
+
+  // Simple Stick Chart Data (Height Percentage)
+  const chartPoints = series.map(d => {
+    const revenue = safeAmount(d.revenue)
+    return {
+      label: d.label,
+      height: maxRevenue > 0 ? `${Math.max((revenue / maxRevenue) * 100, 2)}%` : '2%',
+      value: revenue,
+      hasData: revenue > 0
+    }
+  })
+
+  const labelStep = Math.ceil(series.length / 5)
+  
+  // KPI Cards with 100% Real Data (No Placeholders)
+  const kpiCards = [
+    { 
+      label: 'Revenue', 
+      value: formatMoney(summary.revenue), 
+      meta: 'Total order value', 
+      onClick: () => navigate('/dashboard/orders') 
+    },
+    { 
+      label: 'Orders', 
+      value: String(summary.orders), 
+      meta: 'Orders in period', 
+      onClick: () => navigate('/dashboard/orders') 
+    },
+    { 
+      label: 'Collected', 
+      value: formatMoney(summary.paid), 
+      meta: summary.revenue > 0 ? `${Math.round((summary.paid / summary.revenue) * 100)}% of total` : '0% of total', 
+      onClick: () => navigate('/dashboard/orders?filter=payments') 
+    },
+    { 
+      label: 'Outstanding', 
+      value: formatMoney(summary.outstanding), 
+      meta: summary.revenue > 0 ? `${Math.round((summary.outstanding / summary.revenue) * 100)}% of total` : '0% of total', 
+      onClick: () => navigate('/dashboard/orders?filter=attention') 
+    },
+  ]
+
+  const collectedPercent = summary.revenue ? Math.min((summary.paid / summary.revenue) * 100, 100) : 0
+  const outstandingPercent = summary.revenue ? Math.min((summary.outstanding / summary.revenue) * 100, 100) : 0
+
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'var(--color-text-muted)' }}>Loading...</div>
+    <DashboardShell theme={theme}>
+      <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, width: '100%' }}>
+
+        <Navigation businessId={businessId} />
+
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, padding: '16px 16px 0' }}>
+          <div>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Cresoa Fashion</p>
+            <h1 style={{ fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: 700, color: 'var(--cresoa-text)', marginTop: 4, lineHeight: 1.1 }}>
+              {business?.name || 'Your business'}
+            </h1>
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+            </button>
+            <button onClick={refresh} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
+              <Icon name="refresh-cw" size={18} />
+            </button>
+            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ height: 36, padding: '0 16px', fontSize: 13, fontWeight: 600 }}>
+              + New Order
+            </button>
+          </div>
+        </header>
+
+        {/* 2x2 KPI GRID (No Icons, No Placeholders) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
+          {kpiCards.map(card => (
+            <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', padding: '16px 12px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
+              <strong className="cresoa-metric-value" style={{ fontSize: 16, fontWeight: 800, color: 'var(--cresoa-text)', margin: '6px 0' }}>{card.value}</strong>
+              <span className="cresoa-metric-meta" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>{card.meta}</span>
+            </button>
+          ))}
+        </div>
+
+          {/* BUSINESS HEALTH SCORE (100% Real Data) */}
+        <div style={{ padding: '0 16px', marginBottom: 16 }}>
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)' }}>Business Health Score</h3>
+              <span style={{ fontSize: 14, fontWeight: 800, color: healthScoreData.color }}>{healthScoreData.score}%</span>
+            </div>
+            <div style={{ height: 10, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ width: `${healthScoreData.score}%`, height: '100%', background: healthScoreData.color, borderRadius: 99, transition: 'width 0.5s ease' }} />
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>
+              {healthScoreData.label} — Based on collection rate ({summary.revenue > 0 ? Math.round((summary.paid / summary.revenue) * 100) : 0}%) and delivery completion.
+            </p>
+          </Card>
+        </div>
+
+        {/* Action Center */}
+        <div style={{ marginTop: 16, padding: '0 16px' }}>
+          <Card>
+            <SectionHeader title="Action Required" subtitle={`${actionItems.length} items need attention`} action="View all" onAction={() => navigate('/dashboard/orders')} />
+            <ActionCenter items={actionItems} onActionClick={handleActionClick} onViewAll={() => navigate('/dashboard/orders')} />
+          </Card>
+        </div>
+
+        {/* Production Pipeline */}
+        <div style={{ marginTop: 16, padding: '0 16px' }}>
+          <Card>
+            <SectionHeader title="Production" subtitle="What's moving through your workshop" />
+            <div className="cresoa-pipeline">
+              {PRODUCTION_STAGES.map((stage, idx) => (
+                <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="cresoa-pipeline-item">
+                  <span className="cresoa-pipeline-number" style={{ fontWeight: 800, fontSize: 16 }}>{productionCounts[stage] || 0}</span>
+                  <span className="cresoa-pipeline-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stage}</span>
+                  {idx < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* ========================================== */}
+        {/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
+        {/* ========================================== */}
+        <div style={{ marginTop: 24, padding: '0 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
+            <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)} style={{ fontSize: 12, background: 'transparent', border: 'none', color: 'var(--cresoa-text-muted)', fontWeight: 600, cursor: 'pointer' }}>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
+
+          <Card>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
+                  <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(totalRevenue)}</strong>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
+                </div>
+              </div>
+              
+              {/* Simple Stick Chart */}
+              {totalRevenue === 0 ? (
+                <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
+                  No revenue recorded for this period.
+                </div>
+              ) : (
+                <div style={{ position: 'relative', height: 120, borderBottom: '1px solid var(--cresoa-border)' }}>
+                  {/* Y-Axis Labels */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
+                    <span>{formatMoney(maxRevenue)}</span>
+                    <span>₦0</span>
+                  </div>
+                  
+                  {/* Bars Container */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
+                    {chartPoints.map((point, i) => (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                        <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* X-Axis Labels (Limited to prevent overlap) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
+                {chartPoints.filter((_, i) => i % labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
+                  <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {point.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Financial Health */}
+            <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
+                    <span style={{ fontWeight: 700, color: 'var(--cresoa-text)' }}>{formatMoney(summary.paid)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(collectedPercent)}%)</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+                
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
+                    <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>{formatMoney(summary.outstanding)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(outstandingPercent)}%)</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              </div>
+              
+              {summary.outstanding > 0 && (
+                <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
+                  {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Recent Orders & Customers – Stacked Vertically for Mobile */}
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px' }}>
+          <Card>
+            <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
+            <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load orders</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
+              {renderOrderRows(orders)}
+            </SafeRender>
+          </Card>
+
+          <Card>
+            <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
+            <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load customers</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
+              {renderCustomerRows(customers)}
+            </SafeRender>
+          </Card>
+        </div>
+
+        {/* Group Orders */}
+        <div style={{ marginTop: 16, padding: '0 16px' }}>
+          <Card>
+            <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
+            <SafeRender fallback={<div style={{ padding: '16px', textAlign: 'center' }}><p style={{ color: 'var(--cresoa-text-muted)' }}>Couldn't load groups</p><button onClick={handleRetry} className="cresoa-primary-button" style={{ marginTop: 8 }}>Try again</button></div>}>
+              {groupsWithProgress.length === 0 ? (
+                <div className="elegant-empty" style={{ padding: '24px 0', textAlign: 'center' }}>
+                  <h4 style={{ fontSize: 16, fontStyle: 'italic', marginBottom: 4 }}>No group orders</h4>
+                  <p style={{ fontSize: 13, color: 'var(--cresoa-text-muted)', marginBottom: 20 }}>Create a group to manage coordinated outfits.</p>
+                  <button 
+                    onClick={() => navigate('/dashboard/groups/new')} 
+                    className="cresoa-primary-button" 
+                    style={{ width: '100%', maxWidth: 280, padding: '12px 24px', fontSize: 14, fontWeight: 600, borderRadius: 8, margin: '0 auto', display: 'block' }}
+                  >
+                    + New Group Order
+                  </button>
+                </div>
+              ) : (
+                renderGroupCards(groupsWithProgress)
+              )}
+            </SafeRender>
+          </Card>
+        </div>
+
+        <div style={{ marginTop: 24, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <Navigation businessId={businessId} />
+        </div>
+
       </div>
-    }>
-      <div className="cresoa-dashboard-page">
-        <DashboardLayoutContent>{children}</DashboardLayoutContent>
-      </div>
-    </Suspense>
+    </DashboardShell>
   )
-                                                                                                                                                                                                       }
+}
+
+// ============================================================
+// ENTRY
+// ============================================================
+export default function Page() {
+  const searchParams = useSearchParams()
+  const businessId = searchParams?.get('business_id') || searchParams?.get('businessId') || null
+
+  if (!businessId) {
+    return (
+      <DashboardShell theme="light">
+        <Card><h2>Business account required</h2><p>Select a business to view its dashboard.</p></Card>
+      </DashboardShell>
+    )
+  }
+
+  return <FashionDashboard businessId={businessId} />
+}
