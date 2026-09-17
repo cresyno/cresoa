@@ -314,15 +314,16 @@ function FashionDashboard({ businessId }) {
       const displayName = `${orderRef} – ${customerName}`
       const initials = getInitials(customerName)
       return (
-        <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="cresoa-list-row compact" style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)', textAlign: 'left', cursor: 'pointer' }}>
+        <button key={order.id} onClick={() => order.id && navigate(`/dashboard/orders/${order.id}`)} className="atelier-row">
           <span className="cresoa-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--cresoa-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>{initials}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span className="cresoa-row-title" style={{ display: 'block', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</span>
-            <span className="cresoa-row-meta" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 2 }}>
-              {order.created_at ? formatShortDate(order.created_at) : 'Unknown date'} · {formatMoney(order.price || 0)}
-            </span>
+            <span className="title" style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</span>
+            <span className="sub">{order.created_at ? formatShortDate(order.created_at) : 'Unknown date'}</span>
           </span>
-          <StatusPill status={order.current_status || 'Order placed'} />
+          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+            <span className="figure atelier-mono">{formatMoney(order.price || 0)}</span>
+            <StatusPill status={order.current_status || 'Order placed'} />
+          </span>
         </button>
       )
     })
@@ -344,16 +345,13 @@ function FashionDashboard({ businessId }) {
       const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
       const initials = getInitials(name)
       return (
-        <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="cresoa-list-row compact" style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)', textAlign: 'left', cursor: 'pointer' }}>
+        <button key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="atelier-row">
           <span className="cresoa-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', color: 'var(--cresoa-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold', flexShrink: 0 }}>{initials}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span className="cresoa-row-title" style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>{name}</span>
-            <span className="cresoa-row-meta" style={{ display: 'block', fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 2 }}>
-              {activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}
-              {totalSpent > 0 && ` · ${formatMoney(totalSpent)}`}
-            </span>
+            <span className="title" style={{ display: 'block' }}>{name}</span>
+            <span className="sub">{activeOrders > 0 ? `${activeOrders} active order${activeOrders > 1 ? 's' : ''}` : 'No active orders'}</span>
           </span>
-          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
+          {totalSpent > 0 && <span className="figure atelier-mono">{formatMoney(totalSpent)}</span>}
         </button>
       )
     })
@@ -364,28 +362,27 @@ function FashionDashboard({ businessId }) {
       const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
       const progress = group.progress
       return (
-        <div key={group.id} className="cresoa-group-card" onClick={() => navigate(`/dashboard/groups/${group.id}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--cresoa-border)' }}>
+        <div key={group.id} onClick={() => navigate(`/dashboard/groups/${group.id}`)} className="atelier-row" style={{ alignItems: 'flex-start' }}>
           <span className="cresoa-group-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--cresoa-surface-muted)', fontSize: 14, fontWeight: 'bold', flexShrink: 0 }}>
             {group.name ? group.name.charAt(0).toUpperCase() : 'G'}
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <strong className="cresoa-row-title" style={{ fontSize: 13, fontWeight: 600 }}>{group.name}</strong>
-            <div className="cresoa-row-meta" style={{ fontSize: 11, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>
-              {progress !== null ? (
-                <>
-                  <div style={{ height: 4, background: 'var(--cresoa-border)', borderRadius: 99, marginTop: 4, marginBottom: 4, width: '100%', maxWidth: 200 }}>
-                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99 }} />
-                  </div>
-                  <span>{progress}% complete</span>
-                </>
-              ) : (
-                <span>Progress unavailable</span>
-              )}
-              {coordinator && ` · ${coordinator.name}`}
-              {group.due_date && ` · Due ${formatShortDate(group.due_date)}`}
+            <strong className="title" style={{ display: 'block' }}>{group.name}</strong>
+            <div className="sub" style={{ marginTop: 4 }}>
+              {coordinator ? coordinator.name : 'No coordinator set'}
+              {group.due_date && ` — due ${formatShortDate(group.due_date)}`}
             </div>
+            {progress !== null ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <div style={{ height: 3, background: 'var(--cresoa-border)', flex: 1, maxWidth: 160 }}>
+                  <div style={{ width: `${progress}%`, height: '100%', background: 'var(--cresoa-success)' }} />
+                </div>
+                <span className="figure atelier-mono">{progress}%</span>
+              </div>
+            ) : (
+              <span className="sub" style={{ display: 'block', marginTop: 4 }}>Progress unavailable</span>
+            )}
           </div>
-          <span className="cresoa-row-arrow" style={{ fontSize: 18, color: 'var(--cresoa-text-muted)' }}>›</span>
         </div>
       )
     })
@@ -400,40 +397,195 @@ function FashionDashboard({ businessId }) {
 
   return (
     <DashboardShell theme={theme}>
-      <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, width: '100%' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,340;9..144,460;9..144,560&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+        .atelier-shell { font-family: 'IBM Plex Sans', var(--cresoa-font, sans-serif); }
+        .atelier-serif { font-family: 'Fraunces', Georgia, serif; }
+        .atelier-mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+        .atelier-masthead {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: end;
+          gap: 16px;
+          padding: 20px 16px 18px;
+          border-bottom: 1px solid var(--cresoa-border);
+        }
+        .atelier-masthead h1 {
+          font-weight: 460;
+          font-size: clamp(28px, 8vw, 40px);
+          line-height: 1.02;
+          letter-spacing: -0.01em;
+          color: var(--cresoa-text);
+          margin: 0;
+        }
+        .atelier-masthead .tag {
+          font-size: 11px;
+          letter-spacing: 0.06em;
+          color: var(--cresoa-text-muted);
+        }
+        .atelier-controls { display: flex; gap: 8px; align-items: center; }
+
+        .atelier-kpi {
+          display: grid;
+          grid-template-columns: 1.6fr 1fr;
+          gap: 0;
+          border-bottom: 1px solid var(--cresoa-border);
+        }
+        .atelier-kpi-hero {
+          padding: 22px 16px 22px 16px;
+          border-right: 1px solid var(--cresoa-border);
+          cursor: pointer;
+          background: none;
+          border-top: none; border-bottom: none; border-left: none;
+          text-align: left;
+          display: block;
+        }
+        .atelier-kpi-hero .label {
+          font-size: 12px;
+          color: var(--cresoa-text-muted);
+          font-family: 'IBM Plex Mono', monospace;
+        }
+        .atelier-kpi-hero .value {
+          font-family: 'Fraunces', Georgia, serif;
+          font-weight: 460;
+          font-size: clamp(32px, 9vw, 46px);
+          color: var(--cresoa-text);
+          line-height: 1.05;
+          margin: 6px 0 4px;
+          letter-spacing: -0.01em;
+        }
+        .atelier-kpi-hero .meta {
+          font-size: 12px;
+          color: var(--cresoa-text-muted);
+        }
+        .atelier-kpi-side {
+          display: flex;
+          flex-direction: column;
+        }
+        .atelier-kpi-side button {
+          flex: 1;
+          border: none;
+          border-bottom: 1px solid var(--cresoa-border);
+          background: none;
+          text-align: left;
+          padding: 14px 16px;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .atelier-kpi-side button:last-child { border-bottom: none; }
+        .atelier-kpi-side .label {
+          font-size: 11px;
+          color: var(--cresoa-text-muted);
+          font-family: 'IBM Plex Mono', monospace;
+        }
+        .atelier-kpi-side .value {
+          font-family: 'IBM Plex Mono', monospace;
+          font-weight: 600;
+          font-size: 15px;
+          color: var(--cresoa-text);
+          margin-top: 3px;
+        }
+        .atelier-kpi-side .meta {
+          font-size: 10px;
+          color: var(--cresoa-text-muted);
+          margin-top: 2px;
+        }
+        @media (max-width: 420px) {
+          .atelier-kpi { grid-template-columns: 1fr; }
+          .atelier-kpi-hero { border-right: none; border-bottom: 1px solid var(--cresoa-border); }
+        }
+
+        .atelier-pipeline {
+          display: flex;
+          align-items: stretch;
+          overflow-x: auto;
+        }
+        .atelier-pipeline-stage {
+          flex: 1;
+          min-width: 78px;
+          border: none;
+          background: none;
+          border-right: 1px solid var(--cresoa-border);
+          padding: 14px 10px;
+          text-align: left;
+          cursor: pointer;
+        }
+        .atelier-pipeline-stage:last-child { border-right: none; }
+        .atelier-pipeline-stage .n {
+          font-family: 'Fraunces', Georgia, serif;
+          font-weight: 460;
+          font-size: 26px;
+          color: var(--cresoa-text);
+          display: block;
+        }
+        .atelier-pipeline-stage .label {
+          font-size: 11px;
+          color: var(--cresoa-text-muted);
+          margin-top: 2px;
+          display: block;
+        }
+
+        .atelier-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          border: none;
+          background: none;
+          text-align: left;
+          cursor: pointer;
+          padding: 13px 0;
+          border-bottom: 1px solid var(--cresoa-border);
+        }
+        .atelier-row:last-child { border-bottom: none; }
+        .atelier-row .title { font-size: 13px; font-weight: 600; color: var(--cresoa-text); }
+        .atelier-row .sub { font-size: 11px; color: var(--cresoa-text-muted); margin-top: 2px; }
+        .atelier-row .figure { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--cresoa-text); white-space: nowrap; }
+      `}</style>
+      <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 80, width: '100%' }} className="atelier-shell">
 
         <Navigation businessId={businessId} />
 
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, padding: '16px 16px 0' }}>
+        <header className="atelier-masthead">
           <div>
-            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Cresoa Fashion</p>
-            <h1 style={{ fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: 700, color: 'var(--cresoa-text)', marginTop: 4, lineHeight: 1.1 }}>
-              {business?.name || 'Your business'}
-            </h1>
-           <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+            <h1 className="atelier-serif">{business?.name || 'Your business'}</h1>
+            <p className="tag atelier-mono" style={{ marginTop: 8 }}>
+              {new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'short' })} — good morning
+            </p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+          <div className="atelier-controls">
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
             </button>
-            <button onClick={refresh} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
-              <Icon name="refresh-cw" size={18} />
+            <button onClick={refresh} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
+              <Icon name="refresh-cw" size={16} />
             </button>
-            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ height: 36, padding: '0 16px', fontSize: 13, fontWeight: 600 }}>
-              + New Order
+            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ height: 34, padding: '0 14px', fontSize: 13, fontWeight: 600 }}>
+              + New order
             </button>
           </div>
         </header>
 
-        {/* 2x2 KPI GRID */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
-          {kpiCards.map(card => (
-            <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', padding: '16px 12px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-              <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
-              <strong className="cresoa-metric-value" style={{ fontSize: 16, fontWeight: 800, color: 'var(--cresoa-text)', margin: '6px 0' }}>{card.value}</strong>
-              <span className="cresoa-metric-meta" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>{card.meta}</span>
-            </button>
-          ))}
+        {/* KPI LEDGER — one hero figure (revenue), three ledger lines beside it */}
+        <div className="atelier-kpi" style={{ marginBottom: 16 }}>
+          <button onClick={kpiCards[0].onClick} className="atelier-kpi-hero">
+            <span className="label">{kpiCards[0].label}</span>
+            <strong className="value">{kpiCards[0].value}</strong>
+            <span className="meta">{kpiCards[0].meta}</span>
+          </button>
+          <div className="atelier-kpi-side">
+            {kpiCards.slice(1).map(card => (
+              <button key={card.label} onClick={card.onClick}>
+                <span className="label">{card.label}</span>
+                <span className="value">{card.value}</span>
+                <span className="meta">{card.meta}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* BUSINESS HEALTH SCORE */}
@@ -464,12 +616,11 @@ function FashionDashboard({ businessId }) {
         <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
-            <div className="cresoa-pipeline">
-              {PRODUCTION_STAGES.map((stage, idx) => (
-                <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="cresoa-pipeline-item">
-                  <span className="cresoa-pipeline-number" style={{ fontWeight: 800, fontSize: 16 }}>{productionCounts[stage] || 0}</span>
-                  <span className="cresoa-pipeline-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stage}</span>
-                  {idx < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
+            <div className="atelier-pipeline">
+              {PRODUCTION_STAGES.map(stage => (
+                <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="atelier-pipeline-stage">
+                  <span className="n atelier-serif">{productionCounts[stage] || 0}</span>
+                  <span className="label">{stage}</span>
                 </button>
               ))}
             </div>
@@ -481,7 +632,7 @@ function FashionDashboard({ businessId }) {
         {/* ========================================== */}
         <div style={{ marginTop: 24, padding: '0 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
+            <h2 className="atelier-serif" style={{ fontSize: 20, fontWeight: 460, color: 'var(--cresoa-text)' }}>Analytics</h2>
             <select 
               className="cresoa-select" 
               value={period} 
@@ -498,8 +649,8 @@ function FashionDashboard({ businessId }) {
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
                 <div>
-                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
-                  <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(analytics.collected)}</strong>
+                  <span className="atelier-mono" style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>Revenue</span>
+                  <strong className="atelier-serif" style={{ display: 'block', fontSize: 30, fontWeight: 460, color: 'var(--cresoa-text)', marginTop: 4 }}>{formatMoney(analytics.collected)}</strong>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{analytics.orderCount} orders</span>
@@ -574,7 +725,7 @@ function FashionDashboard({ businessId }) {
                   {/* X-Axis Labels */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
                     {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
-                      <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <span key={i} className="atelier-mono" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
                         {point.shortLabel}
                       </span>
                     ))}
@@ -685,4 +836,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-              }
+    }
