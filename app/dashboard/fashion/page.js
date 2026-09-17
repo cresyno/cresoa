@@ -34,9 +34,13 @@ function getDaySeries(orders, days = 7) {
     date.setHours(0,0,0,0)
     date.setDate(today.getDate() - i)
     const key = date.toISOString().split('T')[0]
-    const dayOrders = orders.filter(o => new Date(o.created_at).toISOString().split('T')[0] === key)
-    const revenue = dayOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    result.push({ key, label: date.toLocaleDateString('en-NG', { weekday: 'short' }), orders: dayOrders.length, revenue })
+    const dayOrders = orders.filter(o => {
+      if (!o.created_at) return false;
+      return new Date(o.created_at).toISOString().split('T')[0] === key
+    })
+    // Chart shows Collected Revenue (amount_paid)
+    const collected = dayOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    result.push({ key, label: date.toLocaleDateString('en-NG', { weekday: 'short' }), orders: dayOrders.length, collected })
   }
   return result
 }
@@ -44,7 +48,8 @@ function getDaySeries(orders, days = 7) {
 function getAnalyticsSummary(orders) {
   const revenue = orders.reduce((s, o) => s + safeAmount(o.price), 0)
   const paid = orders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
-  const outstanding = orders.reduce((s, o) => s + safeAmount(o.balance), 0)
+  // Outstanding is price - amount_paid, ensuring it doesn't go below 0
+  const outstanding = orders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
   return { revenue, paid, outstanding, orders: orders.length }
 }
 
@@ -86,7 +91,8 @@ function getActionItems(orders, customers) {
       .filter(o => o && typeof o === 'object')
       .filter(o => {
         const status = String(o.current_status || '').toLowerCase()
-        return safeAmount(o.balance) > 0 ||
+        const balance = safeAmount(o.price) - safeAmount(o.amount_paid)
+        return balance > 0 ||
           status === 'order placed' ||
           status === 'fitting' ||
           status === 'alteration'
@@ -96,13 +102,14 @@ function getActionItems(orders, customers) {
         const customerName = resolveCustomerName(o, customers)
         const orderRef = getOrderTitle(o)
         const displayName = `${orderRef} – ${customerName}`
+        const balance = Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid))
         return {
           id: o.id || 'unknown',
           customerName: displayName,
-          amount: o.balance || 0,
-          reason: o.balance > 0 ? 'Payment overdue' : 'Awaiting action',
+          amount: balance,
+          reason: balance > 0 ? 'Payment overdue' : 'Awaiting action',
           status: o.current_status || 'Unknown',
-          actionLabel: o.balance > 0 ? 'Collect payment' : 'View order',
+          actionLabel: balance > 0 ? 'Collect payment' : 'View order',
           order: o
         }
       })
@@ -146,6 +153,7 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
+  const [activePoint, setActivePoint] = useState(null)
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -159,43 +167,120 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  const series = useMemo(() => getDaySeries(orders, Number(period)), [orders, period])
-  const summary = useMemo(() => getAnalyticsSummary(orders), [orders])
-  const productionCounts = useMemo(() => getProductionCounts(orders), [orders])
-  const actionItems = useMemo(() => getActionItems(orders, customers), [orders, customers])
-  const groupsWithProgress = useMemo(() => getGroupProgress(groups, orders), [groups, orders])
+  // ---- Analytics Data Transformation (100% Real Data) ----
+  const analytics = useMemo(() => {
+    const daysMap = { '7': 7, '30': 30, '90': 90 };
+    const days = daysMap[period] || 7;
+    
+    // Calculate start date (Nigerian Timezone offset compensation)
+    const now = new Date();
+    const startDate = new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    startDate.setHours(0, 0, 0, 0);
 
-  const navigate = (path) => {
-    const sep = path.includes('?') ? '&' : '?'
-    router.push(`${path}${sep}business_id=${businessId}`)
-  }
+    // Filter orders strictly within the selected period
+    const filteredOrders = orders.filter(o => {
+      if (!o.created_at) return false;
+      return new Date(o.created_at) >= startDate;
+    });
 
-  const handleActionClick = (item) => {
-    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
-  }
+    const totalOrderValue = filteredOrders.reduce((sum, o) => sum + safeAmount(o.price), 0);
+    const collected = filteredOrders.reduce((sum, o) => sum + safeAmount(o.amount_paid), 0);
+    const outstanding = filteredOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
+    const orderCount = filteredOrders.length;
+    
+    const collectedPercent = totalOrderValue > 0 ? (collected / totalOrderValue) * 100 : 0;
+    const outstandingPercent = totalOrderValue > 0 ? (outstanding / totalOrderValue) * 100 : 0;
 
-  const handleRetry = () => refresh()
+    // Generate Chart Data Points
+    const chartData = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      chartData.push({
+        dateStr,
+        label: d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }),
+        shortLabel: d.toLocaleDateString('en-NG', { weekday: 'short' }),
+        collected: 0,
+        orders: 0
+      });
+    }
 
-  // ---- Total Health Score Calculation (100% Real Data) ----
+    filteredOrders.forEach(o => {
+      const dateStr = new Date(o.created_at).toISOString().split('T')[0];
+      const dayObj = chartData.find(d => d.dateStr === dateStr);
+      if (dayObj) {
+        dayObj.collected += safeAmount(o.amount_paid);
+        dayObj.orders += 1;
+      }
+    });
+
+    const maxRevenue = Math.max(...chartData.map(d => d.collected), 1);
+    
+    // X-axis label logic (show max 6 labels to prevent overlap)
+    const labelStep = Math.max(Math.ceil(days / 6), 1);
+
+    return {
+      totalOrderValue,
+      collected,
+      outstanding,
+      orderCount,
+      collectedPercent,
+      outstandingPercent,
+      chartData,
+      maxRevenue,
+      labelStep,
+      hasOrders: orders.length > 0,
+      hasFilteredOrders: filteredOrders.length > 0
+    };
+  }, [orders, period]);
+
+  // SVG Chart Calculations
+  const chartWidth = 100;
+  const chartHeight = 40;
+  
+  const chartPoints = analytics.chartData.map((d, i) => {
+    const x = analytics.chartData.length > 1 ? (i / (analytics.chartData.length - 1)) * chartWidth : chartWidth / 2;
+    const y = chartHeight - (d.collected / analytics.maxRevenue) * chartHeight;
+    return { x, y, value: d.collected, label: d.label, shortLabel: d.shortLabel };
+  });
+
+  const getSmoothPath = (pts) => {
+    if (pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const cp1x = p0.x + (p1.x - p0.x) / 3;
+      const cp1y = p0.y;
+      const cp2x = p1.x - (p1.x - p0.x) / 3;
+      const cp2y = p1.y;
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  };
+
+  const linePath = getSmoothPath(chartPoints);
+  const areaPath = `${linePath} L ${chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].x : chartWidth} ${chartHeight} L ${chartPoints.length > 0 ? chartPoints[0].x : 0} ${chartHeight} Z`;
+
+  // ---- Health Score ----
   const healthScoreData = useMemo(() => {
-    if (summary.revenue === 0 && summary.orders === 0) return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' }
+    if (analytics.totalOrderValue === 0 && analytics.orderCount === 0) return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' }
     
-    // Collection Rate: How much of total revenue has been paid (50% weight)
-    const collectionRate = summary.revenue > 0 ? (summary.paid / summary.revenue) : 0
+    const collectionRate = analytics.totalOrderValue > 0 ? (analytics.collected / analytics.totalOrderValue) : 0;
+    const deliveredOrders = orders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
+    const completionRate = analytics.orderCount > 0 ? (deliveredOrders / analytics.orderCount) : 0;
     
-    // Completion Rate: How many orders have been delivered (50% weight)
-    const deliveredOrders = orders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
-    const completionRate = summary.orders > 0 ? (deliveredOrders / summary.orders) : 0
+    const score = Math.round(((collectionRate * 0.5) + (completionRate * 0.5)) * 100);
     
-    const score = Math.round(((collectionRate * 0.5) + (completionRate * 0.5)) * 100)
-    
-    let label = 'Needs Attention'
-    let color = 'var(--cresoa-danger)'
+    let label = 'Needs Attention';
+    let color = 'var(--cresoa-danger)';
     if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)' }
-    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)' } // Fallback to hex if warning var missing
+    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)' }
     
-    return { score, label, color }
-  }, [summary, orders])
+    return { score, label, color };
+  }, [analytics, orders]);
 
   if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
@@ -293,54 +378,12 @@ function FashionDashboard({ businessId }) {
     })
   }
 
-  // ---- Analytics & Chart Calculations ----
-  const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
-  const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
-  const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
-
-  // Simple Stick Chart Data (Height Percentage)
-  const chartPoints = series.map(d => {
-    const revenue = safeAmount(d.revenue)
-    return {
-      label: d.label,
-      height: maxRevenue > 0 ? `${Math.max((revenue / maxRevenue) * 100, 2)}%` : '2%',
-      value: revenue,
-      hasData: revenue > 0
-    }
-  })
-
-  const labelStep = Math.ceil(series.length / 5)
-  
-  // KPI Cards with 100% Real Data (No Placeholders)
   const kpiCards = [
-    { 
-      label: 'Revenue', 
-      value: formatMoney(summary.revenue), 
-      meta: 'Total order value', 
-      onClick: () => navigate('/dashboard/orders') 
-    },
-    { 
-      label: 'Orders', 
-      value: String(summary.orders), 
-      meta: 'Orders in period', 
-      onClick: () => navigate('/dashboard/orders') 
-    },
-    { 
-      label: 'Collected', 
-      value: formatMoney(summary.paid), 
-      meta: summary.revenue > 0 ? `${Math.round((summary.paid / summary.revenue) * 100)}% of total` : '0% of total', 
-      onClick: () => navigate('/dashboard/orders?filter=payments') 
-    },
-    { 
-      label: 'Outstanding', 
-      value: formatMoney(summary.outstanding), 
-      meta: summary.revenue > 0 ? `${Math.round((summary.outstanding / summary.revenue) * 100)}% of total` : '0% of total', 
-      onClick: () => navigate('/dashboard/orders?filter=attention') 
-    },
+    { label: 'Revenue', value: formatMoney(analytics.totalOrderValue), meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Orders', value: String(analytics.orderCount), meta: 'Orders in period', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Collected', value: formatMoney(analytics.collected), meta: `${Math.round(analytics.collectedPercent)}% of total`, onClick: () => navigate('/dashboard/orders?filter=payments') },
+    { label: 'Outstanding', value: formatMoney(analytics.outstanding), meta: `${Math.round(analytics.outstandingPercent)}% of total`, onClick: () => navigate('/dashboard/orders?filter=attention') },
   ]
-
-  const collectedPercent = summary.revenue ? Math.min((summary.paid / summary.revenue) * 100, 100) : 0
-  const outstandingPercent = summary.revenue ? Math.min((summary.outstanding / summary.revenue) * 100, 100) : 0
 
   return (
     <DashboardShell theme={theme}>
@@ -354,7 +397,7 @@ function FashionDashboard({ businessId }) {
             <h1 style={{ fontSize: 'clamp(24px, 6vw, 32px)', fontWeight: 700, color: 'var(--cresoa-text)', marginTop: 4, lineHeight: 1.1 }}>
               {business?.name || 'Your business'}
             </h1>
-            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+               <p style={{ color: 'var(--cresoa-text-muted)', fontSize: 13, marginTop: 6 }}>Good morning 👋 <br /> {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="cresoa-icon-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', cursor: 'pointer' }}>
@@ -369,7 +412,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* 2x2 KPI GRID (No Icons, No Placeholders) */}
+        {/* 2x2 KPI GRID */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
           {kpiCards.map(card => (
             <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', padding: '16px 12px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
@@ -380,7 +423,7 @@ function FashionDashboard({ businessId }) {
           ))}
         </div>
 
-     {/* BUSINESS HEALTH SCORE (100% Real Data) */}
+        {/* BUSINESS HEALTH SCORE */}
         <div style={{ padding: '0 16px', marginBottom: 16 }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -391,7 +434,7 @@ function FashionDashboard({ businessId }) {
               <div style={{ width: `${healthScoreData.score}%`, height: '100%', background: healthScoreData.color, borderRadius: 99, transition: 'width 0.5s ease' }} />
             </div>
             <p style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>
-              {healthScoreData.label} — Based on collection rate ({summary.revenue > 0 ? Math.round((summary.paid / summary.revenue) * 100) : 0}%) and delivery completion.
+              {healthScoreData.label} — Based on collection rate and delivery completion.
             </p>
           </Card>
         </div>
@@ -420,101 +463,149 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
-  {/* ========================================== */}
-{/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
-{/* ========================================== */}
-<div style={{ marginTop: 24, padding: '0 16px' }}>
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
-    <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)} style={{ fontSize: 12, background: 'transparent', border: 'none', color: 'var(--cresoa-text-muted)', fontWeight: 600, cursor: 'pointer' }}>
-      <option value="7">Last 7 days</option>
-      <option value="30">Last 30 days</option>
-      <option value="90">Last 90 days</option>
-    </select>
-  </div>
-
-  <Card>
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
-        <div>
-          <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
-          <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(totalRevenue)}</strong>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
-        </div>
-      </div>
-      
-      {/* Simple Stick Chart */}
-      {totalRevenue === 0 ? (
-        <div style={{ height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
-          <span>No revenue recorded for this period.</span>
-          <span style={{ fontSize: 11, marginTop: 4 }}>(Try expanding the period to see older orders)</span>
-        </div>
-      ) : (
-        <div style={{ position: 'relative', height: 120, borderBottom: '1px solid var(--cresoa-border)' }}>
-          {/* Y-Axis Labels */}
-          <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
-            <span>{formatMoney(maxRevenue)}</span>
-            <span>₦0</span>
+        {/* ========================================== */}
+        {/* ANALYTICS SECTION (REAL DATA, SVG CHART)   */}
+        {/* ========================================== */}
+        <div style={{ marginTop: 24, padding: '0 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--cresoa-text)', letterSpacing: '-0.3px' }}>Analytics</h2>
+            <select 
+              className="cresoa-select" 
+              value={period} 
+              onChange={e => setPeriod(e.target.value)} 
+              style={{ fontSize: 12, background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', padding: '6px 12px', borderRadius: 8, color: 'var(--cresoa-text)', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
           </div>
-          
-          {/* Bars Container */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
-            {chartPoints.map((point, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
+
+          <Card>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Revenue</span>
+                  <strong style={{ display: 'block', fontSize: 26, fontWeight: 800, color: 'var(--cresoa-text)', marginTop: 4, letterSpacing: '-0.5px' }}>{formatMoney(analytics.collected)}</strong>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{analytics.orderCount} orders</span>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* X-Axis Labels (Limited to prevent overlap) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
-        {chartPoints.filter((_, i) => i % labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
-          <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {point.label}
-          </span>
-        ))}
-      </div>
-    </div>
+              
+              {/* SVG Line Chart */}
+              {!analytics.hasOrders ? (
+                <div style={{ height: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
+                  <span>No sales data yet.</span>
+                  <span style={{ fontSize: 11, marginTop: 4 }}>Your analytics will appear here once customers start placing orders.</span>
+                </div>
+              ) : !analytics.hasFilteredOrders ? (
+                <div style={{ height: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
+                  <span>No revenue in this period.</span>
+                  <span style={{ fontSize: 11, marginTop: 4 }}>Try a longer period to see more activity.</span>
+                </div>
+              ) : (
+                <div style={{ position: 'relative', height: 140 }}>
+                  {/* Y-Axis Labels */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)', width: 40 }}>
+                    <span>{formatMoney(analytics.maxRevenue)}</span>
+                    <span>₦0</span>
+                  </div>
+                  
+                  {/* Chart Area */}
+                  <div style={{ marginLeft: 40, height: '100%', position: 'relative' }}>
+                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--cresoa-primary)" stopOpacity="0.2" />
+                          <stop offset="100%" stopColor="var(--cresoa-primary)" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      {/* Horizontal Grid Lines */}
+                      <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="var(--cresoa-border)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+                      <line x1="0" y1={chartHeight / 2} x2={chartWidth} y2={chartHeight / 2} stroke="var(--cresoa-border)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
+                      <line x1="0" y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="var(--cresoa-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                      
+                      {/* Area Fill */}
+                      <path d={areaPath} fill="url(#chartGradient)" />
+                      {/* Smooth Line */}
+                      <path d={linePath} fill="none" stroke="var(--cresoa-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                      
+                      {/* Interactive Data Points */}
+                      {chartPoints.map((p, i) => (
+                        <circle 
+                          key={i} 
+                          cx={p.x} 
+                          cy={p.y} 
+                          r="3" 
+                          fill={activePoint === i ? 'var(--cresoa-primary)' : 'var(--cresoa-surface)'} 
+                          stroke="var(--cresoa-primary)" 
+                          strokeWidth="1.5"
+                          style={{ cursor: 'pointer' }}
+                          onMouseEnter={() => setActivePoint(i)}
+                          onMouseLeave={() => setActivePoint(null)}
+                          onClick={() => setActivePoint(i)}
+                        />
+                      ))}
+                    </svg>
+                    
+                    {/* Tooltip */}
+                    {activePoint !== null && chartPoints[activePoint] && (
+                      <div style={{ position: 'absolute', top: `${(chartPoints[activePoint].y / chartHeight) * 100}%`, left: `${(chartPoints[activePoint].x / chartWidth) * 100}%`, transform: 'translate(-50%, -120%)', background: 'var(--cresoa-text)', color: 'var(--cresoa-surface)', padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10, pointerEvents: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                        <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 2 }}>{chartPoints[activePoint].label}</div>
+                        <div>{formatMoney(chartPoints[activePoint].value)}</div>
+                      </div>
+                    )}
+                  </div>
 
-    {/* Financial Health */}
-    <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-            <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
-            <span style={{ fontWeight: 700, color: 'var(--cresoa-text)' }}>{formatMoney(summary.paid)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(collectedPercent)}%)</span></span>
-          </div>
-          <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ width: `${collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
-          </div>
+                  {/* X-Axis Labels */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
+                    {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
+                      <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {point.shortLabel}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Financial Health */}
+            <div style={{ borderTop: '1px solid var(--cresoa-border)', paddingTop: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)', marginBottom: 16 }}>Financial Health</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Collected</span>
+                    <span style={{ fontWeight: 700, color: 'var(--cresoa-text)' }}>{formatMoney(analytics.collected)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(analytics.collectedPercent)}%)</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${analytics.collectedPercent}%`, height: '100%', background: 'var(--cresoa-success)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+                
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
+                    <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>{formatMoney(analytics.outstanding)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(analytics.outstandingPercent)}%)</span></span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ width: `${analytics.outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              </div>
+              
+              {analytics.outstanding > 0 && (
+                <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
+                  {formatMoney(analytics.outstanding)} outstanding across {analytics.orderCount} orders
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
-        
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-            <span style={{ color: 'var(--cresoa-text-muted)' }}>Outstanding</span>
-            <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>{formatMoney(summary.outstanding)} <span style={{ color: 'var(--cresoa-text-muted)', fontWeight: 400 }}>({Math.round(outstandingPercent)}%)</span></span>
-          </div>
-          <div style={{ height: 8, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ width: `${outstandingPercent}%`, height: '100%', background: 'var(--cresoa-danger)', borderRadius: 99, transition: 'width 0.5s ease' }} />
-          </div>
-        </div>
-      </div>
-      
-      {summary.outstanding > 0 && (
-        <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--cresoa-danger-soft)', borderRadius: 8, color: 'var(--cresoa-danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cresoa-danger)', display: 'inline-block' }}></span>
-          {formatMoney(summary.outstanding)} outstanding across {summary.orders} orders
-        </div>
-      )}
-    </div>
-  </Card>
-</div>
+
         {/* Recent Orders & Customers – Stacked Vertically for Mobile */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 16px' }}>
           <Card>
@@ -581,4 +672,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-          }
+              }                                                                            
