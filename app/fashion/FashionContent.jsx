@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import Script from 'next/script'
 import Logo from '../../components/Logo'
 import ThemeToggle from '../../components/ThemeToggle'
+import WaitlistForm from '../../components/WaitlistForm'
 
 const ICONS = {
   menu: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
@@ -12,10 +12,6 @@ const ICONS = {
   check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   arrowRight: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-  clipboard: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>,
-  invoice: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-  fabric: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.38 3.46L16 2l-4 4-4-4-4.38 1.46a2 2 0 0 0-1.28 2.25L3.6 9.6a2 2 0 0 0 1.46 1.34l2.34.52V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-8.54l2.34-.52a2 2 0 0 0 1.46-1.34l1.26-3.89a2 2 0 0 0-1.28-2.25z"/></svg>,
-  group: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   scissors: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>,
   palette: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>,
   users: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
@@ -24,62 +20,13 @@ const ICONS = {
   printer: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
 }
 
-function WaitlistForm() {
-  const [status, setStatus] = useState('idle')
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault()
-    const form = e.target
-    const data = new FormData(form)
-    setStatus('sending')
-    try {
-      const res = await fetch('/api/waitlist', { method: 'POST', body: data })
-      const json = await res.json()
-      if (json.ok) { setStatus('success'); form.reset() } else setStatus('error')
-    } catch { setStatus('error') }
-  }, [])
-
-  if (status === 'success') {
-    return (
-      <div className="wl-form">
-        <div className="wl-success">
-          <div className="wl-success-icon">{ICONS.check}</div>
-          <p className="wl-success-title">You're on the list.</p>
-          <p className="wl-success-sub">Check your inbox to confirm. If it's not in Primary, check Promotions and drag it there.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="wl-form" noValidate>
-      <div className="wl-fields">
-        <input type="email" name="email_address" placeholder="Email address" aria-label="Email address" required autoComplete="email" className="wl-input" />
-        <input type="text" name="fields[first_name]" placeholder="First name" aria-label="First name" required autoComplete="given-name" className="wl-input" />
-        <div className="wl-select-wrap">
-          <select name="tags[]" required aria-label="Business type" className="wl-select" defaultValue="23510464">
-            <option value="23510464">Fashion & Tailoring</option>
-            <option value="23510466">Repairs & Technical</option>
-            <option value="23510467">Printing & Signage</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <button type="submit" className="wl-submit" disabled={status === 'sending'}>
-          {status === 'sending' ? 'Joining…' : <>Join the Waitlist {ICONS.arrowRight}</>}
-        </button>
-      </div>
-      <p className="wl-note">Founding Members get 30 days of Pro features free at launch.</p>
-      {status === 'error' && <p className="wl-error">Something went wrong. Please try again.</p>}
-    </form>
-  )
-}
-
 const FAQS = [
   { q: 'Can I track Aso-Ebi group orders in Cresoa?', a: 'Yes. Create a group, add the coordinator, and keep every member and their individual order organised in one place. Perfect for bulk clothing orders.' },
   { q: 'Can I store customer measurements?', a: 'Yes. Every customer profile has space for waist, bust, shoulder, arm length, and any custom measurements you need. Reuse them for every future order — no more searching through WhatsApp.' },
   { q: 'Can my customers track their own order status?', a: 'Yes. Each order gets a private tracking link you can share via WhatsApp. Your customer sees the current stage without calling or messaging you.' },
   { q: 'Do I need a laptop, or can I use my phone?', a: 'Your phone is enough. Cresoa is built mobile-first — because that is where Nigerian fashion businesses actually work.' },
   { q: 'Can I send invoices via WhatsApp?', a: 'Yes. Create a professional invoice with your logo, bank details, and payment breakdown. Share it directly through WhatsApp in one tap.' },
-  { q: 'When does Cresoa launch for fashion businesses?', a: 'In 6 months. Join the waitlist to become a Founding Member and get 30 days of Pro features free at launch.' },
+  { q: 'When does Cresoa launch for fashion businesses?', a: 'In 6 months. Join the waitlist to become a Founding Member and get Beta access free for 30 days at launch.' },
 ]
 
 export default function FashionContent() {
@@ -87,12 +34,6 @@ export default function FashionContent() {
   const [openFaqIndex, setOpenFaqIndex] = useState(null)
 
   const closeMobileMenu = () => setMobileMenuOpen(false)
-
-  const scrollToSection = (e, id) => {
-    e.preventDefault()
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    closeMobileMenu()
-  }
 
   const scrollToForm = (e) => {
     if (e) e.preventDefault()
@@ -113,12 +54,14 @@ export default function FashionContent() {
         if (entry.isIntersecting) entry.target.classList.add('reveal-in')
         else entry.target.classList.remove('reveal-in')
       })
-    }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' })
+    }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' })
     els.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
   }, [])
 
-  const toggleFaq = (i) => setOpenFaqIndex(openFaqIndex === i ? null : i)
+  const toggleFaq = useCallback((i) => {
+    setOpenFaqIndex((prev) => (prev === i ? null : i))
+  }, [])
 
   return (
     <main className="page">
@@ -133,7 +76,6 @@ export default function FashionContent() {
           --text-muted: #6B6F76;
           --border: #E7E2D9;
           --border-strong: #D6CFC1;
-          --border-dark: rgba(255,255,255,0.08);
           --gold: #C99B2B;
           --gold-bright: #E5B84B;
         }
@@ -148,16 +90,17 @@ export default function FashionContent() {
         }
         html { scroll-behavior: smooth; }
         html.js-ready [data-reveal] {
-          opacity: 0; transform: translateY(24px);
-          transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+          opacity: 0;
+          transform: translateY(22px);
+          transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
         }
         html.js-ready [data-reveal].reveal-in { opacity: 1; transform: translateY(0); }
-        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.1s; }
-        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.2s; }
+        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.09s; }
+        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.18s; }
+        html.js-ready [data-reveal][data-delay="3"] { transition-delay: 0.27s; }
         @media (prefers-reduced-motion: reduce) {
           html.js-ready [data-reveal], html.js-ready [data-reveal].reveal-in { opacity: 1 !important; transform: none !important; transition: none !important; }
         }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .page { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
         .page h1, .page h2, .page h3, .page h4 { font-family: 'Fraunces', 'Georgia', serif; font-weight: 700; letter-spacing: -0.025em; color: inherit; }
@@ -173,6 +116,7 @@ export default function FashionContent() {
         .login-link:hover { color: var(--gold); }
         .nav-link { padding: 0.55rem 0.95rem; border-radius: 8px; font-size: 0.9rem; font-weight: 500; color: var(--text); text-decoration: none; transition: color 0.2s; background: none; border: none; cursor: pointer; font-family: inherit; }
         .nav-link:hover { color: var(--gold); }
+        .nav-link.active { color: var(--gold); }
         .nav-cta { background: var(--bg-dark); color: #fff; padding: 0.6rem 1.25rem; border-radius: 9px; font-size: 0.87rem; font-weight: 600; border: none; cursor: pointer; font-family: inherit; transition: transform 0.2s, background 0.2s; }
         .nav-cta:hover { background: #1A3F66; transform: translateY(-1px); }
 
@@ -247,7 +191,7 @@ export default function FashionContent() {
         .secondary-img img { width: 100%; max-width: 220px; height: auto; display: block; border-radius: 14px 14px 0 0; box-shadow: 0 -8px 40px rgba(15,43,74,0.12); transition: transform 0.5s cubic-bezier(0.16,1,0.3,1); }
         .secondary-card:hover .secondary-img img { transform: translateY(-6px); }
         .secondary-body { padding: 1.6rem 1.7rem 1.8rem; }
-           .secondary-body h3 { font-size: 1.2rem; margin: 0.5rem 0 0.6rem; line-height: 1.3; }
+        .secondary-body h3 { font-size: 1.2rem; margin: 0.5rem 0 0.6rem; line-height: 1.3; }
         .secondary-body p { color: var(--text-muted); font-size: 0.94rem; margin: 0; line-height: 1.65; }
 
         /* Audience */
@@ -276,7 +220,7 @@ export default function FashionContent() {
         .mobile-image { width: 100%; max-width: 300px; border-radius: 26px; box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06); display: block; }
 
         /* FAQ */
-        .faq { background: var(--bg); padding: 7rem 1.5rem; }
+             .faq { background: var(--bg); padding: 7rem 1.5rem; }
         .faq-inner { max-width: 760px; margin: 0 auto; }
         .faq-head { text-align: center; margin-bottom: 3.5rem; }
         .faq-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
@@ -288,6 +232,22 @@ export default function FashionContent() {
         .faq-header .arrow.open { transform: rotate(45deg); color: var(--gold); }
         .faq-answer { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s, padding 0.3s; color: var(--text-muted); font-size: 0.94rem; line-height: 1.8; }
         .faq-answer.open { max-height: 400px; opacity: 1; padding: 0 0 1.5rem; }
+
+        .faq-more { text-align: center; margin-top: 2.8rem; }
+        .faq-more-btn {
+          display: inline-flex; align-items: center; gap: 0.5rem;
+          padding: 0.85rem 1.6rem; border-radius: 10px;
+          background: transparent; color: var(--gold);
+          border: 1px solid var(--border-strong);
+          font-weight: 600; font-size: 0.9rem; text-decoration: none;
+          transition: border-color 0.25s, color 0.25s, background 0.2s, transform 0.25s;
+          font-family: inherit;
+        }
+        .faq-more-btn:hover {
+          border-color: var(--gold);
+          background: rgba(201,155,43,0.05);
+          transform: translateY(-1px);
+        }
 
         /* Cross-sell */
         .cross-sell { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
@@ -312,26 +272,6 @@ export default function FashionContent() {
         .cta h2 { color: #fff; font-size: 2.4rem; margin: 0 0 1.2rem; line-height: 1.15; letter-spacing: -0.025em; }
         .cta p { color: #A8B8CE; font-size: 1.05rem; margin: 0 0 2.4rem; line-height: 1.7; }
         .cta p a { color: var(--gold-bright); font-weight: 600; text-decoration: underline; }
-
-        /* Waitlist form */
-        .wl-form { width: 100%; max-width: 440px; margin: 0 auto; }
-        .wl-fields { display: grid; gap: 0.65rem; }
-        .wl-input, .wl-select { width: 100%; padding: 0.95rem 1rem; border-radius: 10px; font-family: inherit; font-size: 0.95rem; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; appearance: none; }
-        .wl-input::placeholder { color: rgba(168,184,206,0.6); }
-        .wl-input:focus, .wl-select:focus { outline: none; border-color: var(--gold-bright); background: rgba(255,255,255,0.08); box-shadow: 0 0 0 3px rgba(201,155,43,0.18); }
-        .wl-select-wrap { position: relative; }
-        .wl-select-wrap::after { content: ''; position: absolute; top: 50%; right: 1rem; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-70%) rotate(45deg); pointer-events: none; opacity: 0.5; color: #fff; }
-        .wl-select { padding-right: 2.4rem; cursor: pointer; }
-        .wl-select option { color: #1A1A1A; background: #fff; }
-        .wl-submit { width: 100%; padding: 1rem 1.5rem; border-radius: 10px; background: var(--gold); color: var(--bg-dark); font-weight: 700; font-size: 0.95rem; font-family: inherit; border: none; cursor: pointer; margin-top: 0.3rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background 0.2s, transform 0.25s, box-shadow 0.25s; }
-        .wl-submit:hover:not(:disabled) { background: var(--gold-bright); transform: translateY(-1px); box-shadow: 0 14px 30px rgba(201,155,43,0.35); }
-        .wl-submit:disabled { opacity: 0.7; cursor: wait; }
-        .wl-note { color: rgba(168,184,206,0.65); font-size: 0.78rem; line-height: 1.5; margin-top: 1rem; text-align: center; }
-        .wl-error { color: #FF8B6F; font-size: 0.82rem; margin-top: 0.6rem; text-align: center; }
-        .wl-success { background: rgba(201,155,43,0.08); border: 1px solid rgba(201,155,43,0.25); border-radius: 14px; padding: 1.8rem 1.4rem; text-align: center; animation: fadeUp 0.5s ease; }
-        .wl-success-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--gold); color: var(--bg-dark); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
-        .wl-success-title { color: #fff; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.4rem; font-family: 'Fraunces', serif; }
-        .wl-success-sub { color: rgba(168,184,206,0.9); font-size: 0.88rem; margin: 0; line-height: 1.6; }
 
         /* Footer */
         .footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3.5rem 1.5rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
@@ -397,12 +337,14 @@ export default function FashionContent() {
           <Logo variant="primary" size="large" />
         </Link>
         <nav className="nav-links" aria-label="Primary">
-          <Link href="/fashion" className="nav-link">Fashion</Link>
+          <Link href="/" className="nav-link">Home</Link>
+          <Link href="/fashion" className="nav-link active">Fashion</Link>
           <Link href="/repairs" className="nav-link">Repairs</Link>
           <Link href="/printing" className="nav-link">Printing</Link>
+          <Link href="/pricing" className="nav-link">Pricing</Link>
           <Link href="/blog" className="nav-link">Blog</Link>
           <Link href="/support" className="nav-link">Support</Link>
-          <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-link">FAQ</button>
+          <Link href="/faq" className="nav-link">FAQ</Link>
         </nav>
         <div className="nav-actions">
           <ThemeToggle />
@@ -416,12 +358,14 @@ export default function FashionContent() {
       <div className={`mobile-overlay ${mobileMenuOpen ? 'open' : ''}`} onClick={closeMobileMenu} />
       <div className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="close-btn" onClick={closeMobileMenu} aria-label="Close menu">{ICONS.x}</button>
+        <Link href="/" className="nav-link" onClick={closeMobileMenu}>Home</Link>
         <Link href="/fashion" className="nav-link" onClick={closeMobileMenu}>Fashion</Link>
         <Link href="/repairs" className="nav-link" onClick={closeMobileMenu}>Repairs</Link>
         <Link href="/printing" className="nav-link" onClick={closeMobileMenu}>Printing</Link>
+        <Link href="/pricing" className="nav-link" onClick={closeMobileMenu}>Pricing</Link>
         <Link href="/blog" className="nav-link" onClick={closeMobileMenu}>Blog</Link>
         <Link href="/support" className="nav-link" onClick={closeMobileMenu}>Support</Link>
-        <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-link">FAQ</button>
+        <Link href="/faq" className="nav-link" onClick={closeMobileMenu}>FAQ</Link>
         <Link href="/login" className="nav-link" onClick={closeMobileMenu}>Log in</Link>
         <button onClick={scrollToForm} className="nav-cta" style={{ marginTop: '0.8rem', padding: '0.85rem 1rem', width: '100%' }}>Join Waitlist</button>
       </div>
@@ -439,14 +383,14 @@ export default function FashionContent() {
       <section className="hero">
         <div className="hero-grid">
           <div className="hero-left">
-            <span className="hero-eyebrow">Cresoa for Fashion</span>
-            <h1>Run Your Fashion Business <em>Without the Stress.</em></h1>
-            <p className="subhead">Orders, customers, measurements, production, invoices, and inventory — all organised in one place.</p>
-            <div id="fashion-waitlist-form">
-              <WaitlistForm />
+            <span className="hero-eyebrow" data-reveal>Cresoa for Fashion</span>
+            <h1 data-reveal data-delay="1">Run Your Fashion Business <em>Without the Stress.</em></h1>
+            <p className="subhead" data-reveal data-delay="2">Orders, customers, measurements, production, invoices, and inventory — all organised in one place.</p>
+            <div id="fashion-waitlist-form" data-reveal data-delay="3">
+              <WaitlistForm defaultBusinessType="23510464" />
             </div>
           </div>
-          <div className="hero-right">
+          <div className="hero-right" data-reveal data-delay="2">
             <div className="hero-mockup-wrap">
               <img src="/mockups/fashion-hero.webp" alt="Cresoa fashion dashboard" className="hero-mockup" loading="eager" />
             </div>
@@ -467,7 +411,7 @@ export default function FashionContent() {
           </div>
           <div className="trust-item">
             <div className="big">{ICONS.check} WhatsApp ready</div>
-            <div className="lbl">Send updates & invoices</div>
+            <div className="lbl">Send updates &amp; invoices</div>
           </div>
           <div className="trust-item">
             <div className="big">{ICONS.check} Free to join</div>
@@ -513,7 +457,6 @@ export default function FashionContent() {
         </div>
       </section>
 
-      
       {/* SHOWCASE ROW 3 — GROUP ORDERS */}
       <section className="showcase" aria-labelledby="group-heading" style={{ paddingTop: 0 }}>
         <div className="row">
@@ -590,7 +533,7 @@ export default function FashionContent() {
         </div>
       </section>
 
-      {/* MOBILE-FIRST */}
+         {/* MOBILE-FIRST */}
       <section className="mobile-section" aria-labelledby="mobile-heading">
         <div className="mobile-grid">
           <div className="mobile-text" data-reveal>
@@ -614,13 +557,26 @@ export default function FashionContent() {
           <div data-reveal data-delay="1">
             {FAQS.map((item, i) => (
               <div key={i} className="faq-item">
-                <div className="faq-header" onClick={() => toggleFaq(i)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleFaq(i) }} aria-expanded={openFaqIndex === i}>
+                <div
+                  className="faq-header"
+                  onClick={() => toggleFaq(i)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleFaq(i) }}
+                  aria-expanded={openFaqIndex === i}
+                >
                   {item.q}
                   <span className={`arrow ${openFaqIndex === i ? 'open' : ''}`}>+</span>
                 </div>
                 <div className={`faq-answer ${openFaqIndex === i ? 'open' : ''}`}>{item.a}</div>
               </div>
             ))}
+          </div>
+
+          <div className="faq-more" data-reveal data-delay="2">
+            <Link href="/faq" className="faq-more-btn">
+              See all frequently asked questions {ICONS.arrowRight}
+            </Link>
           </div>
         </div>
       </section>
@@ -653,10 +609,12 @@ export default function FashionContent() {
 
       {/* FINAL CTA */}
       <section className="cta" aria-labelledby="cta-heading">
-        <div className="cta-inner" data-reveal>
-          <h2 id="cta-heading">Ready to Put Your Fashion Business in Order?</h2>
-          <p>Stop relying on scattered notebooks, chats and memory. Bring your customers, orders, production, inventory and invoices together with <Link href="/">Cresoa</Link>.</p>
-          <WaitlistForm />
+        <div className="cta-inner">
+          <h2 id="cta-heading" data-reveal>Ready to Put Your Fashion Business in Order?</h2>
+          <p data-reveal data-delay="1">Stop relying on scattered notebooks, chats and memory. Bring your customers, orders, production, inventory and invoices together with <Link href="/">Cresoa</Link>.</p>
+          <div data-reveal data-delay="2">
+            <WaitlistForm defaultBusinessType="23510464" />
+          </div>
         </div>
       </section>
 
@@ -675,7 +633,7 @@ export default function FashionContent() {
             <Link href="/blog">Blog</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/support">Support</Link>
-            <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
+            <Link href="/faq">FAQ</Link>
             <button onClick={scrollToForm}>Join Waitlist</button>
           </nav>
           <p style={{ opacity: 0.6, fontSize: '0.72rem', marginTop: '0.8rem' }}>© {new Date().getFullYear()} Cresoa · All rights reserved.</p>
@@ -683,4 +641,4 @@ export default function FashionContent() {
       </footer>
     </main>
   )
-      }
+}
