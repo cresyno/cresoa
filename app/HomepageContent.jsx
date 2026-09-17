@@ -55,6 +55,7 @@ function WaitlistForm({ theme = 'dark' }) {
             <option value="23510464">Fashion & Tailoring</option>
             <option value="23510466">Repairs & Technical</option>
             <option value="23510467">Printing & Signage</option>
+            <option value="other">Other</option>
           </select>
         </div>
         <button type="submit" className="wl-submit" disabled={status === 'sending'}>
@@ -67,13 +68,72 @@ function WaitlistForm({ theme = 'dark' }) {
   )
 }
 
+const INDUSTRIES = [
+  {
+    id: 'fashion',
+    label: 'Fashion & Tailoring',
+    status: 'live',
+    title: 'For tailors and fashion designers.',
+    desc: 'Manage measurements, fabric choices, Aso-Ebi group orders, and production deadlines — all in one workspace.',
+    image: '/mockups/fashion.webp',
+    alt: 'Cresoa fashion workspace',
+  },
+  {
+    id: 'repairs',
+    label: 'Repairs & Technical',
+    status: 'live',
+    title: 'For phone, laptop, and electronics repair.',
+    desc: 'Track devices, parts inventory, pickup dates, and payment balances without losing a single job.',
+    image: '/mockups/repairs.webp',
+    alt: 'Cresoa repairs workspace',
+  },
+  {
+    id: 'printing',
+    label: 'Printing & Signage',
+    status: 'live',
+    title: 'For print shops and signage businesses.',
+    desc: 'Queue print jobs, track paper stock, and notify customers the moment their order is ready.',
+    image: '/mockups/printing.webp',
+    alt: 'Cresoa printing workspace',
+  },
+  {
+    id: 'logistics',
+    label: 'Logistics & Delivery',
+    status: 'soon',
+    title: 'For logistics and delivery businesses.',
+    desc: 'Manage pickups, dispatch riders, tracking numbers, and cash-on-delivery payments — all from one dashboard.',
+    image: null,
+    alt: '',
+  },
+  {
+    id: 'manufacturing',
+    label: 'Custom Manufacturing',
+    status: 'soon',
+    title: 'For furniture, metal, and custom product makers.',
+    desc: 'Track projects, materials, workshop stages, and delivery timelines without spreadsheets.',
+    image: null,
+    alt: '',
+  },
+  {
+    id: 'salons',
+    label: 'Salons & Spa',
+    status: 'soon',
+    title: 'For salons, spas, and beauty studios.',
+    desc: 'Manage appointments, client preferences, product stock, and recurring bookings in one place.',
+    image: null,
+    alt: '',
+  },
+]
+
 export default function HomepageContent() {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [counts, setCounts] = useState({ members: 0, industries: 0, months: 0 })
-  const [activeTab, setActiveTab] = useState('fashion')
+  const [activeIndustry, setActiveIndustry] = useState(0)
+  const [industriesPaused, setIndustriesPaused] = useState(false)
   const [openFaqIndex, setOpenFaqIndex] = useState(null)
   const statsRef = useRef(null)
+  const industriesIntervalRef = useRef(null)
 
   const closeMobileMenu = () => setMobileMenuOpen(false)
   const navigateTo = (path) => { router.push(path); closeMobileMenu() }
@@ -96,11 +156,12 @@ export default function HomepageContent() {
 
   useEffect(() => { document.documentElement.classList.add('js-ready') }, [])
 
+  // Count-up
   useEffect(() => {
     if (!statsRef.current) return
     const observer = new IntersectionObserver((entries) => {
       if (!entries[0].isIntersecting) return
-      const targets = { members: 47, industries: 3, months: 6 }
+      const targets = { members: 47, industries: 6, months: 6 }
       const steps = 90
       let step = 0
       const interval = setInterval(() => {
@@ -118,34 +179,40 @@ export default function HomepageContent() {
     return () => observer.disconnect()
   }, [])
 
+  // Reveal animations — re-trigger on every scroll into view
   useEffect(() => {
     const els = document.querySelectorAll('[data-reveal]')
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) { entry.target.classList.add('reveal-in'); observer.unobserve(entry.target) }
+        if (entry.isIntersecting) entry.target.classList.add('reveal-in')
+        else entry.target.classList.remove('reveal-in')
       })
-    }, { threshold: 0.08, rootMargin: '0px 0px -60px 0px' })
+    }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' })
     els.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
   }, [])
+
+  // Auto-advance industries
+  useEffect(() => {
+    if (industriesPaused) return
+    industriesIntervalRef.current = setInterval(() => {
+      setActiveIndustry((prev) => (prev + 1) % INDUSTRIES.length)
+    }, 5000)
+    return () => clearInterval(industriesIntervalRef.current)
+  }, [industriesPaused])
 
   const toggleFaq = (i) => setOpenFaqIndex(openFaqIndex === i ? null : i)
 
   const faqs = [
     { q: 'What is Cresoa?', a: 'Cresoa is a business management platform built for Nigerian SMEs. It brings customers, orders, payments, and production into one workspace.' },
     { q: 'When is Cresoa launching?', a: 'In 6 months. Waitlist members hear first and get 30 days of Pro features completely free at launch.' },
-    { q: 'What happens when I join the waitlist?', a: 'You become a Founding Member. You get early access at launch, 30 days of Pro features free, and email updates only when there is something worth sharing.' },
+    { q: 'What happens when I join the waitlist?', a: 'You become a Founding Member. You get early access at launch, 30 days of Pro features free, and email updates only when there is something worth sharing. No spam, no weekly fluff.' },
     { q: 'How much does it cost?', a: 'Free plan forever. Starter at ₦3,500/month. Pro at ₦9,500/month. Founding Members do not pay for the first 30 days.' },
-    { q: 'What industries does Cresoa support?', a: 'Fashion & Custom Wear, Repairs & Technical Services, and Printing & Signage are ready. More industries follow after launch.' },
+    { q: 'What industries does Cresoa support?', a: 'Fashion & Custom Wear, Repairs & Technical Services, and Printing & Signage are live. Logistics & Delivery, Custom Manufacturing, and Salons & Spa are coming next. More industries follow after launch.' },
     { q: 'Can I use Cresoa on my phone?', a: 'Yes. Cresoa is designed mobile-first — because that is where Nigerian businesses actually work.' },
   ]
 
-  const industryData = {
-    fashion: { label: 'Fashion & Tailoring', title: 'For tailors and fashion designers.', desc: 'Manage measurements, fabric choices, Aso-Ebi group orders, and production deadlines — all in one workspace.', image: '/mockups/fashion.webp', alt: 'Cresoa fashion workspace' },
-    repairs: { label: 'Repairs & Technical', title: 'For phone, laptop, and electronics repair.', desc: 'Track devices, parts inventory, pickup dates, and payment balances without losing a single job.', image: '/mockups/repairs.webp', alt: 'Cresoa repairs workspace' },
-    printing: { label: 'Printing & Signage', title: 'For print shops and signage businesses.', desc: 'Queue print jobs, track paper stock, and notify customers the moment their order is ready.', image: '/mockups/printing.webp', alt: 'Cresoa printing workspace' },
-  }
-  const activeIndustry = industryData[activeTab]
+  const currentIndustry = INDUSTRIES[activeIndustry]
 
   return (
     <main className="page">
@@ -158,9 +225,8 @@ export default function HomepageContent() {
           --card: #FFFFFF;
           --text: #0E1116;
           --text-muted: #6B6F76;
-          --text-on-dark: #FFFFFF;
-          --text-muted-dark: #8C9DB6;
           --border: #E7E2D9;
+          --border-strong: #D6CFC1;
           --border-dark: rgba(255,255,255,0.08);
           --gold: #C99B2B;
           --gold-bright: #E5B84B;
@@ -172,6 +238,7 @@ export default function HomepageContent() {
           --text: #ECECEC;
           --text-muted: #9A9AA8;
           --border: #26262F;
+          --border-strong: #34343F;
         }
         html { scroll-behavior: smooth; }
         html.js-ready [data-reveal] {
@@ -179,35 +246,21 @@ export default function HomepageContent() {
           transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
         html.js-ready [data-reveal].reveal-in { opacity: 1; transform: translateY(0); }
-        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.08s; }
-        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.16s; }
-        html.js-ready [data-reveal][data-delay="3"] { transition-delay: 0.24s; }
+        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.1s; }
+        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.2s; }
         @media (prefers-reduced-motion: reduce) {
           html.js-ready [data-reveal], html.js-ready [data-reveal].reveal-in { opacity: 1 !important; transform: none !important; transition: none !important; }
+          .ind-tab, .ind-content { animation: none !important; transition: none !important; }
         }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes indFade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-        .page {
-          min-height: 100vh;
-          background: var(--bg);
-          color: var(--text);
-          font-family: 'Inter', system-ui, -apple-system, sans-serif;
-          -webkit-font-smoothing: antialiased;
-          overflow-x: hidden;
-        }
+        .page { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
         .page h1, .page h2, .page h3, .page h4 { font-family: 'Fraunces', 'Georgia', serif; font-weight: 700; letter-spacing: -0.025em; color: inherit; }
-
         .shell { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
 
-        /* ── Navbar ── */
-        .navbar {
-          background: rgba(255,255,255,0.9);
-          border-bottom: 1px solid var(--border);
-          padding: 0.85rem 1.5rem;
-          display: flex; justify-content: space-between; align-items: center;
-          position: sticky; top: 0; z-index: 1000;
-          backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-        }
+        /* Navbar */
+        .navbar { background: rgba(255,255,255,0.9); border-bottom: 1px solid var(--border); padding: 0.85rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
         [data-theme="dark"] .navbar { background: rgba(15,15,22,0.9); }
         .navbar .nav-links { display: flex; gap: 0.1rem; align-items: center; }
         .navbar .nav-actions { display: flex; align-items: center; gap: 0.7rem; }
@@ -219,7 +272,7 @@ export default function HomepageContent() {
         .nav-cta { background: var(--bg-dark); color: #fff; padding: 0.6rem 1.25rem; border-radius: 9px; font-size: 0.87rem; font-weight: 600; border: none; cursor: pointer; font-family: inherit; transition: transform 0.2s, background 0.2s; }
         .nav-cta:hover { background: #1A3F66; transform: translateY(-1px); }
 
-        /* ── Mobile drawer ── */
+        /* Mobile drawer */
         .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 998; opacity: 0; transition: opacity 0.3s; }
         .mobile-overlay.open { display: block; opacity: 1; }
         .mobile-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 290px; background: var(--card); padding: 1.5rem; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); z-index: 999; display: flex; flex-direction: column; gap: 0.2rem; border-left: 1px solid var(--border); overflow-y: auto; }
@@ -227,17 +280,9 @@ export default function HomepageContent() {
         .mobile-drawer .close-btn { align-self: flex-end; background: none; border: none; color: var(--text); cursor: pointer; padding: 0.5rem; margin-bottom: 0.5rem; }
         .mobile-drawer .nav-link { padding: 0.9rem 1rem; font-size: 1rem; width: 100%; text-align: left; }
 
-        /* ── Hero ── */
-        .hero {
-          background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%);
-          padding: 7rem 1.5rem 7rem; position: relative; overflow: hidden;
-        }
-        .hero::before {
-          content: ''; position: absolute; top: -35%; right: -15%;
-          width: 900px; height: 900px;
-          background: radial-gradient(circle, rgba(201,155,43,0.14) 0%, transparent 55%);
-          border-radius: 50%; pointer-events: none;
-        }
+        /* Hero */
+        .hero { background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); padding: 7rem 1.5rem; position: relative; overflow: hidden; }
+        .hero::before { content: ''; position: absolute; top: -35%; right: -15%; width: 900px; height: 900px; background: radial-gradient(circle, rgba(201,155,43,0.14) 0%, transparent 55%); border-radius: 50%; pointer-events: none; }
         .hero-grid { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; }
         .hero-left { max-width: 560px; }
         .hero-eyebrow { display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-bright); margin-bottom: 1.8rem; }
@@ -248,27 +293,23 @@ export default function HomepageContent() {
         .hero-mockup-wrap { position: relative; width: 100%; max-width: 420px; }
         .hero-mockup { width: 100%; border-radius: 22px; box-shadow: 0 50px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06); display: block; }
 
-        /* ── Trust strip ── */
+        /* Trust strip */
         .trust { background: var(--bg-darkest); padding: 2.4rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
-        .trust-inner { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; text-align: left; }
+        .trust-inner { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
         .trust-item { padding-left: 1rem; border-left: 1px solid rgba(255,255,255,0.08); }
         .trust-item .num { color: #fff; font-size: 1.7rem; font-weight: 700; font-family: 'Fraunces', serif; letter-spacing: -0.03em; display: flex; align-items: center; gap: 0.5rem; }
         .trust-item .num svg { color: var(--gold-bright); }
         .trust-item .lbl { color: #7C8CA5; font-size: 0.72rem; margin-top: 0.35rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
 
-        /* ── Statement (quiet section) ── */
+        /* Statement */
         .statement { background: var(--bg); padding: 8rem 1.5rem; text-align: center; }
-        .statement-inner { max-width: 780px; margin: 0 auto; }
+        .statement-inner { max-width: 800px; margin: 0 auto; }
         .statement p { font-family: 'Fraunces', serif; font-weight: 500; font-size: 2.2rem; line-height: 1.35; letter-spacing: -0.02em; color: var(--text); margin: 0; }
         .statement p em { color: var(--gold); font-style: italic; font-weight: 400; }
 
-        /* ── Showcase (alternating rows) ── */
+        /* Showcase */
         .showcase { background: var(--bg-alt); }
-        .row {
-          display: grid; grid-template-columns: 1fr 1fr; align-items: center;
-          gap: 5rem; padding: 7rem 1.5rem; max-width: 1180px; margin: 0 auto;
-          border-bottom: 1px solid var(--border);
-        }
+        .row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 5rem; padding: 7rem 1.5rem; max-width: 1180px; margin: 0 auto; border-bottom: 1px solid var(--border); }
         .row:last-child { border-bottom: none; }
         .row-text { max-width: 460px; }
         .row.alt .row-text { order: 2; margin-left: auto; }
@@ -277,32 +318,67 @@ export default function HomepageContent() {
         .row-text h3 { font-size: 2.2rem; margin: 0 0 1rem; line-height: 1.15; letter-spacing: -0.025em; }
         .row-text p { color: var(--text-muted); font-size: 1.02rem; line-height: 1.75; margin: 0; }
         .row-image { display: flex; justify-content: center; }
-        .row-image img {
-          width: 100%; max-width: 460px; border-radius: 20px;
-          box-shadow: 0 30px 70px rgba(15,43,74,0.15), 0 0 0 1px var(--border);
-          display: block;
-        }
+        .row-image img { width: 100%; max-width: 460px; border-radius: 20px; box-shadow: 0 30px 70px rgba(15,43,74,0.15), 0 0 0 1px var(--border); display: block; }
 
-        /* ── Toggle (dark full-bleed) ── */
+        /* Secondary features */
+         .secondary { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
+        .secondary-head { max-width: 640px; margin: 0 auto 3.5rem; text-align: center; }
+        .secondary-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
+        .secondary-head h2 { font-size: 2.2rem; margin: 0; line-height: 1.15; }
+        .secondary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1080px; margin: 0 auto; }
+        .secondary-card { background: var(--card); border-radius: 20px; overflow: hidden; border: 1px solid var(--border); transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1); }
+        .secondary-card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
+        .secondary-img { aspect-ratio: 16 / 10; overflow: hidden; background: #EFEAE1; }
+        [data-theme="dark"] .secondary-img { background: #1B1B24; }
+        .secondary-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
+        .secondary-card:hover .secondary-img img { transform: scale(1.02); }
+        .secondary-body { padding: 1.6rem 1.7rem 1.8rem; }
+        .secondary-body h3 { font-size: 1.2rem; margin: 0.5rem 0 0.6rem; line-height: 1.3; }
+        .secondary-body p { color: var(--text-muted); font-size: 0.94rem; margin: 0; line-height: 1.65; }
+
+        /* Steps */
+        .steps { background: var(--bg); padding: 8rem 1.5rem; }
+        .steps-head { max-width: 640px; margin: 0 auto 4rem; text-align: center; }
+        .steps-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
+        .steps-head h2 { font-size: 2.4rem; margin: 0 0 0.9rem; line-height: 1.15; }
+        .steps-head p { color: var(--text-muted); font-size: 1.03rem; margin: 0; line-height: 1.65; }
+        .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; max-width: 1080px; margin: 0 auto; }
+        .step { padding-top: 1.5rem; border-top: 2px solid var(--border); }
+        .step-num { font-family: 'Fraunces', serif; font-size: 2.2rem; font-weight: 700; color: var(--gold); letter-spacing: -0.03em; line-height: 1; margin-bottom: 1rem; }
+        .step h4 { font-size: 1.15rem; margin: 0 0 0.6rem; line-height: 1.3; }
+        .step p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.7; margin: 0; }
+
+        /* Industries */
         .industries { background: linear-gradient(180deg, #0F2B4A 0%, #061A2E 100%); padding: 7rem 1.5rem; }
-        .industries-head { max-width: 640px; margin: 0 auto 4rem; text-align: center; }
+        .industries-head { max-width: 720px; margin: 0 auto 4rem; text-align: center; }
         .industries-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-bright); margin-bottom: 1.1rem; }
-        .industries-head h2 { color: #fff; font-size: 2.6rem; margin: 0; line-height: 1.15; }
-        .industries-wrap { max-width: 1080px; margin: 0 auto; border-radius: 22px; overflow: hidden; border: 1px solid var(--border-dark); background: rgba(255,255,255,0.02); backdrop-filter: blur(20px); }
-        .toggle-tabs { display: flex; border-bottom: 1px solid var(--border-dark); overflow-x: auto; scrollbar-width: none; }
-        .toggle-tabs::-webkit-scrollbar { display: none; }
-        .toggle-tab { flex: 1; min-width: 160px; padding: 1.3rem 1.5rem; background: transparent; border: none; cursor: pointer; font-family: inherit; font-size: 0.92rem; font-weight: 600; color: #7C8CA5; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; white-space: nowrap; text-align: left; }
-        .toggle-tab:hover { color: #fff; }
-        .toggle-tab.active { color: #fff; border-bottom-color: var(--gold-bright); }
-        .toggle-content { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
-        .toggle-text { padding: 3.5rem 2rem 3.5rem 3.5rem; animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-        .toggle-text h3 { color: #fff; font-size: 1.7rem; margin: 0 0 0.9rem; line-height: 1.2; letter-spacing: -0.02em; }
-        .toggle-text p { color: #A8B8CE; font-size: 1rem; line-height: 1.75; margin: 0 0 2rem; max-width: 420px; }
-        .toggle-image-wrap { padding: 2.5rem; display: flex; align-items: center; justify-content: center; min-height: 400px; }
-        .toggle-image { width: 100%; max-width: 340px; border-radius: 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.4); animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); display: block; }
+        .industries-head h2 { color: #fff; font-size: 2.6rem; margin: 0 0 1rem; line-height: 1.15; }
+        .industries-head p { color: #A8B8CE; font-size: 1.02rem; margin: 0; line-height: 1.65; }
 
-        /* ── Founder ── */
-          .founder { background: var(--bg); padding: 8rem 1.5rem; }
+        .ind-wrap { max-width: 1080px; margin: 0 auto; border-radius: 22px; overflow: hidden; border: 1px solid var(--border-dark); background: rgba(255,255,255,0.02); backdrop-filter: blur(20px); }
+        .ind-tabs { display: flex; gap: 0.5rem; padding: 1.2rem 1.4rem; border-bottom: 1px solid var(--border-dark); overflow-x: auto; scrollbar-width: none; }
+        .ind-tabs::-webkit-scrollbar { display: none; }
+        .ind-tab { flex-shrink: 0; padding: 0.65rem 1.15rem; border-radius: 100px; background: transparent; border: 1px solid rgba(255,255,255,0.12); color: #A8B8CE; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.5rem; transition: background 0.25s, color 0.25s, border-color 0.25s; }
+        .ind-tab:hover { color: #fff; border-color: rgba(255,255,255,0.25); }
+        .ind-tab.active { background: var(--gold-bright); color: var(--bg-darkest); border-color: var(--gold-bright); }
+        .ind-tab .pill { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 100px; background: rgba(255,255,255,0.12); color: inherit; }
+        .ind-tab.active .pill { background: rgba(15,43,74,0.18); }
+        .ind-tab.soon .pill { background: rgba(201,155,43,0.18); color: var(--gold-bright); }
+        .ind-tab.active.soon .pill { background: rgba(15,43,74,0.18); color: var(--bg-darkest); }
+
+        .ind-content { display: grid; grid-template-columns: 1fr 1fr; align-items: center; min-height: 440px; }
+        .ind-text { padding: 3.5rem 2rem 3.5rem 3.5rem; animation: indFade 0.55s cubic-bezier(0.16, 1, 0.3, 1); }
+        .ind-text h3 { color: #fff; font-size: 1.75rem; margin: 0 0 0.9rem; line-height: 1.2; letter-spacing: -0.02em; }
+        .ind-text p { color: #A8B8CE; font-size: 1rem; line-height: 1.75; margin: 0 0 2rem; max-width: 420px; }
+        .ind-image-wrap { padding: 2.5rem; display: flex; align-items: center; justify-content: center; min-height: 440px; }
+        .ind-image { width: 100%; max-width: 340px; border-radius: 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.4); display: block; animation: indFade 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .ind-placeholder { width: 100%; max-width: 340px; aspect-ratio: 3 / 4; border-radius: 14px; border: 1px dashed rgba(255,255,255,0.15); background: rgba(255,255,255,0.02); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.9rem; text-align: center; padding: 2rem; animation: indFade 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .ind-placeholder-badge { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-bright); padding: 0.3rem 0.9rem; border-radius: 100px; border: 1px solid rgba(229,184,75,0.35); }
+        .ind-placeholder-name { font-family: 'Fraunces', serif; font-size: 1.6rem; font-weight: 700; color: #fff; line-height: 1.2; letter-spacing: -0.02em; max-width: 200px; }
+        .ind-placeholder-note { color: #7C8CA5; font-size: 0.82rem; margin: 0; line-height: 1.55; max-width: 220px; }
+
+        /* Founder */
+        .founder { background: var(--bg); padding: 8rem 1.5rem; }
         .founder-grid { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 5rem; align-items: center; }
         .founder-photo { width: 100%; border-radius: 20px; aspect-ratio: 4 / 5; object-fit: cover; box-shadow: 0 40px 80px rgba(15,43,74,0.15); }
         .founder-copy .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.3rem; }
@@ -311,7 +387,7 @@ export default function HomepageContent() {
         .founder-sign { color: var(--text); font-weight: 700; font-size: 1.05rem; margin-top: 1.6rem; font-family: 'Fraunces', serif; }
         .founder-title { color: var(--text-muted); font-size: 0.88rem; margin-top: 0.25rem; }
 
-        /* ── Pricing ── */
+        /* Pricing */
         .pricing { background: var(--bg-alt); padding: 8rem 1.5rem; }
         .pricing-head { max-width: 640px; margin: 0 auto 4rem; text-align: center; }
         .pricing-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
@@ -320,7 +396,7 @@ export default function HomepageContent() {
         .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; max-width: 1020px; margin: 0 auto; }
         .price-col { padding: 2.5rem 1.8rem 2rem; border-left: 1px solid var(--border); }
         .price-col:first-child { border-left: none; }
-        .price-col.popular { background: rgba(201,155,43,0.04); border-left: 1px solid transparent; border-right: 1px solid transparent; border-radius: 18px; position: relative; }
+        .price-col.popular { background: rgba(201,155,43,0.05); border-radius: 18px; }
         .price-badge { background: var(--bg-dark); color: #fff; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.28rem 0.85rem; border-radius: 20px; display: inline-block; margin-bottom: 1.2rem; }
         .plan-name { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; letter-spacing: -0.01em; }
         .price { font-size: 3rem; font-weight: 700; color: var(--text); margin: 0.6rem 0; font-family: 'Fraunces', serif; letter-spacing: -0.04em; }
@@ -331,6 +407,7 @@ export default function HomepageContent() {
         .price-col ul li svg { flex-shrink: 0; color: var(--gold); }
         .price-col ul li.muted { color: var(--text-muted); opacity: 0.55; }
         .price-col ul li.muted svg { color: var(--text-muted); }
+        .pricing-note { text-align: center; color: var(--text-muted); font-size: 0.88rem; margin-top: 3rem; line-height: 1.6; }
 
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.85rem 1.7rem; border-radius: 10px; font-weight: 600; font-size: 0.92rem; text-decoration: none; border: none; cursor: pointer; font-family: inherit; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s, box-shadow 0.25s; }
         .btn-navy { background: var(--bg-dark); color: #fff; }
@@ -340,7 +417,7 @@ export default function HomepageContent() {
         .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); box-shadow: none; }
         .btn-ghost:hover { background: var(--card); border-color: var(--text); }
 
-        /* ── FAQ ── */
+        /* FAQ */
         .faq { background: var(--bg); padding: 8rem 1.5rem; }
         .faq-inner { max-width: 760px; margin: 0 auto; }
         .faq-head { text-align: center; margin-bottom: 3.5rem; }
@@ -354,14 +431,14 @@ export default function HomepageContent() {
         .faq-answer { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s, padding 0.3s; color: var(--text-muted); font-size: 0.95rem; line-height: 1.8; }
         .faq-answer.open { max-height: 400px; opacity: 1; padding: 0 0 1.5rem; }
 
-        /* ── Final CTA ── */
+        /* Final CTA */
         .cta { background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); padding: 8rem 1.5rem; text-align: center; position: relative; overflow: hidden; }
         .cta::before { content: ''; position: absolute; top: -40%; left: 50%; transform: translateX(-50%); width: 800px; height: 800px; background: radial-gradient(circle, rgba(201,155,43,0.12), transparent 60%); border-radius: 50%; pointer-events: none; }
         .cta-inner { position: relative; max-width: 620px; margin: 0 auto; }
         .cta h2 { color: #fff; font-size: 2.8rem; margin: 0 0 1.1rem; line-height: 1.12; letter-spacing: -0.03em; }
-        .cta > .cta-inner > p { color: #A8B8CE; font-size: 1.05rem; margin: 0 0 2.4rem; line-height: 1.65; }
+        .cta p { color: #A8B8CE; font-size: 1.05rem; margin: 0 0 2.4rem; line-height: 1.65; }
 
-        /* ── Waitlist form ── */
+        /* Waitlist form */
         .wl-form { width: 100%; max-width: 440px; margin: 0 auto; }
         .wl-fields { display: grid; gap: 0.65rem; }
         .wl-input, .wl-select { width: 100%; padding: 0.95rem 1rem; border-radius: 10px; font-family: inherit; font-size: 0.95rem; color: var(--text); background: var(--card); border: 1px solid var(--border); transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; appearance: none; }
@@ -383,34 +460,13 @@ export default function HomepageContent() {
         .wl-success-title { color: #fff; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.4rem; font-family: 'Fraunces', serif; }
         .wl-success-sub { color: rgba(168,184,206,0.9); font-size: 0.88rem; margin: 0; line-height: 1.6; }
 
-
-         .secondary { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
-.secondary-head { max-width: 640px; margin: 0 auto 3.5rem; text-align: center; }
-.secondary-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
-.secondary-head h2 { font-size: 2.2rem; margin: 0; line-height: 1.15; }
-.secondary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1080px; margin: 0 auto; }
-.secondary-card { background: var(--card); border-radius: 20px; overflow: hidden; border: 1px solid var(--border); transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1); }
-.secondary-card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
-.secondary-img { aspect-ratio: 16 / 10; overflow: hidden; background: #EFEAE1; }
-[data-theme="dark"] .secondary-img { background: #1B1B24; }
-.secondary-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
-.secondary-card:hover .secondary-img img { transform: scale(1.02); }
-.secondary-body { padding: 1.6rem 1.7rem 1.8rem; }
-.secondary-body h3 { font-size: 1.2rem; margin: 0.5rem 0 0.6rem; line-height: 1.3; }
-.secondary-body p { color: var(--text-muted); font-size: 0.94rem; margin: 0; line-height: 1.65; }
-@media (max-width: 860px) {
-  .secondary { padding: 4.5rem 1.25rem; }
-  .secondary-grid { grid-template-columns: 1fr; gap: 1.5rem; }
-  .secondary-head h2 { font-size: 1.75rem; }
-}
-
-        /* ── Footer ── */
+        /* Footer */
         .footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3.5rem 1.5rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
         .footer-links { display: flex; justify-content: center; gap: 0.4rem 1.2rem; flex-wrap: wrap; margin: 1.4rem 0; }
         .footer-links a, .footer-links button { color: var(--text); text-decoration: none; transition: color 0.2s; background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.3rem; font-family: inherit; }
         .footer-links a:hover, .footer-links button:hover { color: var(--gold); }
 
-        /* ── Responsive ── */
+        /* Responsive */
         @media (max-width: 960px) {
           .hero { padding: 5rem 1.25rem; }
           .hero-grid { grid-template-columns: 1fr; gap: 3.5rem; }
@@ -425,19 +481,32 @@ export default function HomepageContent() {
           .row.alt .row-image { order: 2; }
           .row-text { max-width: 100%; }
           .row-text h3 { font-size: 1.75rem; }
-          .industries, .founder, .pricing, .faq, .cta { padding: 5.5rem 1.25rem; }
-          .industries-head h2, .pricing-head h2, .faq-head h2, .cta h2 { font-size: 2rem; }
-          .toggle-content { grid-template-columns: 1fr; }
-          .toggle-text { padding: 2rem 1.5rem 1rem; }
-          .toggle-image-wrap { padding: 1.6rem; min-height: auto; }
+          .secondary { padding: 4.5rem 1.25rem; }
+          .secondary-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+          .secondary-head h2 { font-size: 1.75rem; }
+          .steps { padding: 5.5rem 1.25rem; }
+          .steps-head h2 { font-size: 1.9rem; }
+          .steps-grid { grid-template-columns: 1fr; gap: 2rem; }
+          .industries { padding: 5.5rem 1.25rem; }
+          .industries-head h2 { font-size: 2rem; }
+          .ind-content { grid-template-columns: 1fr; }
+          .ind-text { padding: 2rem 1.5rem 1rem; }
+          .ind-image-wrap { padding: 1.5rem 1.5rem 2.5rem; min-height: auto; }
+          .founder { padding: 5.5rem 1.25rem; }
           .founder-grid { grid-template-columns: 1fr; gap: 2.5rem; }
           .founder-photo { max-width: 260px; margin: 0 auto; aspect-ratio: 1 / 1; }
           .founder-copy h2 { font-size: 1.75rem; }
+          .pricing { padding: 5.5rem 1.25rem; }
+          .pricing-head h2 { font-size: 2rem; }
           .pricing-grid { grid-template-columns: 1fr; gap: 1.5rem; }
           .price-col { border-left: none; border-top: 1px solid var(--border); padding: 2rem 1.5rem 1.5rem; }
           .price-col:first-child { border-top: none; }
           .price-col.popular { border-radius: 16px; }
           .price { font-size: 2.4rem; }
+          .faq { padding: 5.5rem 1.25rem; }
+          .faq-head h2 { font-size: 2rem; }
+          .cta { padding: 5.5rem 1.25rem; }
+          .cta h2 { font-size: 2rem; }
         }
         @media (max-width: 720px) {
           .navbar .nav-links { display: none; }
@@ -448,8 +517,8 @@ export default function HomepageContent() {
           .trust-item .num { font-size: 1.35rem; }
           .statement p { font-size: 1.4rem; }
           .row-text h3 { font-size: 1.5rem; }
-          .toggle-text h3 { font-size: 1.35rem; }
-          .industries-head h2, .pricing-head h2, .faq-head h2, .cta h2 { font-size: 1.75rem; }
+          .ind-text h3 { font-size: 1.4rem; }
+          .industries-head h2, .pricing-head h2, .faq-head h2, .cta h2, .steps-head h2, .secondary-head h2 { font-size: 1.75rem; }
           .founder-copy h2 { font-size: 1.5rem; }
         }
         @media (max-width: 420px) {
@@ -499,7 +568,7 @@ export default function HomepageContent() {
           <div className="hero-left">
             <span className="hero-eyebrow">Cresoa — Launching in 6 months</span>
             <h1>Run your Nigerian business <em>from one place.</em></h1>
-            <p className="subhead">Track orders, collect payments, update customers on WhatsApp — without spreadsheets, notebooks, or lost DMs. Built for Fashion, Repairs, and Printing businesses across Nigeria.</p>
+            <p className="subhead">Track orders, collect payments, update customers on WhatsApp — without spreadsheets, notebooks, or lost DMs. Launching soon for Fashion, Repairs, and Printing businesses across Nigeria, with more industries to follow.</p>
             <div id="waitlist-form">
               <WaitlistForm theme="dark" />
             </div>
@@ -534,14 +603,14 @@ export default function HomepageContent() {
         </div>
       </section>
 
-      {/* STATEMENT — quiet section, no cards */}
+      {/* STATEMENT */}
       <section className="statement">
         <div className="statement-inner" data-reveal>
           <p>Running a Nigerian business shouldn't feel like <em>juggling notebooks, WhatsApp, and hope.</em></p>
         </div>
       </section>
 
-      {/* SHOWCASE — alternating rows */}
+      {/* SHOWCASE */}
       <section className="showcase" aria-labelledby="showcase-heading">
         <div className="row">
           <div className="row-text" data-reveal>
@@ -577,61 +646,110 @@ export default function HomepageContent() {
         </div>
       </section>
 
-      {/* SECONDARY FEATURES — compact 2-col */}
-<section className="secondary" aria-labelledby="secondary-heading">
-  <div className="secondary-head">
-    <span className="eyebrow">And Everything Around It</span>
-    <h2 id="secondary-heading">The details that make it work.</h2>
-  </div>
-  <div className="secondary-grid">
-    <article className="secondary-card" data-reveal>
-      <div className="secondary-img">
-        <img src="/mockups/whatsapp.webp" alt="One-tap WhatsApp customer update" loading="lazy" />
-      </div>
-      <div className="secondary-body">
-        <span className="row-eyebrow">Customer Comms</span>
-        <h3>One-tap WhatsApp updates.</h3>
-        <p>Send tracking links and receipts without leaving Cresoa. Your customers reply to the same thread — nothing gets lost.</p>
-      </div>
-    </article>
+      {/* SECONDARY */}
+      <section className="secondary" aria-labelledby="secondary-heading">
+        <div className="secondary-head" data-reveal>
+          <span className="eyebrow">And Everything Around It</span>
+          <h2 id="secondary-heading">The details that make it work.</h2>
+        </div>
+        <div className="secondary-grid">
+          <article className="secondary-card" data-reveal>
+            <div className="secondary-img">
+              <img src="/mockups/whatsapp.webp" alt="One-tap WhatsApp customer update" loading="lazy" />
+            </div>
+            <div className="secondary-body">
+              <span className="row-eyebrow">Customer Comms</span>
+              <h3>One-tap WhatsApp updates.</h3>
+              <p>Send tracking links and receipts without leaving Cresoa. Your customers reply to the same thread — nothing gets lost.</p>
+            </div>
+          </article>
 
-    <article className="secondary-card" data-reveal data-delay="1">
-      <div className="secondary-img">
-        <img src="/mockups/support.webp" alt="Tessa AI and human support" loading="lazy" />
-      </div>
-      <div className="secondary-body">
-        <span className="row-eyebrow">Support</span>
-        <h3>Tessa AI + real humans.</h3>
-        <p>Get answers in seconds from Tessa, or talk to a person when it matters. Support that actually responds.</p>
-      </div>
-    </article>
-  </div>
-</section>
+          <article className="secondary-card" data-reveal data-delay="1">
+            <div className="secondary-img">
+              <img src="/mockups/support.webp" alt="Tessa AI and human support" loading="lazy" />
+            </div>
+            <div className="secondary-body">
+              <span className="row-eyebrow">Support</span>
+              <h3>Tessa AI + real humans.</h3>
+              <p>Get answers in seconds from Tessa, or talk to a person when it matters. Support that actually responds.</p>
+            </div>
+          </article>
+        </div>
+      </section>
 
-      {/* INDUSTRIES — dark toggle */}
-      <section className="industries" aria-labelledby="industries-heading">
+      {/* STEPS */}
+      <section className="steps" aria-labelledby="steps-heading">
+        <div className="steps-head" data-reveal>
+          <span className="eyebrow">How It Works</span>
+          <h2 id="steps-heading">Get started in 3 simple steps</h2>
+          <p>From signup to running your business in minutes.</p>
+        </div>
+        <div className="steps-grid">
+          <div className="step" data-reveal>
+            <div className="step-num">1</div>
+            <h4>Join the waitlist</h4>
+            <p>Join free and choose your business type — Fashion, Repairs, Printing, or Other.</p>
+          </div>
+          <div className="step" data-reveal data-delay="1">
+            <div className="step-num">2</div>
+            <h4>We build while you wait</h4>
+            <p>I'm building Cresoa solo. Fashion, Repairs, and Printing are live. More industries follow.</p>
+          </div>
+          <div className="step" data-reveal data-delay="2">
+            <div className="step-num">3</div>
+            <h4>You launch with Pro — free</h4>
+            <p>When Cresoa launches, you become a Founding Member with 30 days of Pro features free.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* INDUSTRIES */}
+      <section
+        className="industries"
+        aria-labelledby="industries-heading"
+        onMouseEnter={() => setIndustriesPaused(true)}
+        onMouseLeave={() => setIndustriesPaused(false)}
+        onTouchStart={() => setIndustriesPaused(true)}
+        onTouchEnd={() => setIndustriesPaused(false)}
+      >
         <div className="industries-head" data-reveal>
           <span className="eyebrow">Built for Your Industry</span>
-          <h2 id="industries-heading">Cresoa adapts to how you work.</h2>
+          <h2 id="industries-heading">Cresoa adapts to your industry — not the other way around.</h2>
+          <p>Live today: Fashion, Repairs, and Printing. Coming next: Logistics, Manufacturing, and Salons & Spa.</p>
         </div>
-        <div className="industries-wrap" data-reveal data-delay="1">
-          <div className="toggle-tabs" role="tablist">
-            {Object.keys(industryData).map((key) => (
-              <button key={key} role="tab" aria-selected={activeTab === key} onClick={() => setActiveTab(key)} className={`toggle-tab ${activeTab === key ? 'active' : ''}`}>
-                {industryData[key].label}
+        <div className="ind-wrap" data-reveal data-delay="1">
+          <div className="ind-tabs" role="tablist">
+            {INDUSTRIES.map((ind, i) => (
+              <button
+                key={ind.id}
+                role="tab"
+                aria-selected={activeIndustry === i}
+                onClick={() => setActiveIndustry(i)}
+                className={`ind-tab ${activeIndustry === i ? 'active' : ''} ${ind.status === 'soon' ? 'soon' : ''}`}
+              >
+                {ind.label}
+                <span className="pill">{ind.status === 'live' ? 'Live' : 'Soon'}</span>
               </button>
             ))}
           </div>
-          <div className="toggle-content" key={activeTab}>
-            <div className="toggle-text">
-              <h3>{activeIndustry.title}</h3>
-              <p>{activeIndustry.desc}</p>
+          <div className="ind-content" key={currentIndustry.id}>
+            <div className="ind-text">
+              <h3>{currentIndustry.title}</h3>
+              <p>{currentIndustry.desc}</p>
               <button onClick={scrollToForm} className="btn btn-gold" style={{ padding: '0.8rem 1.6rem', fontSize: '0.9rem' }}>
                 Join the Waitlist {ICONS.arrowRight}
               </button>
             </div>
-            <div className="toggle-image-wrap">
-              <img src={activeIndustry.image} alt={activeIndustry.alt} className="toggle-image" loading="lazy" />
+            <div className="ind-image-wrap">
+              {currentIndustry.image ? (
+                <img src={currentIndustry.image} alt={currentIndustry.alt} className="ind-image" loading="lazy" />
+              ) : (
+                <div className="ind-placeholder">
+                  <span className="ind-placeholder-badge">Coming soon</span>
+                  <span className="ind-placeholder-name">{currentIndustry.label}</span>
+                  <p className="ind-placeholder-note">Join the waitlist to be the first to know when this launches.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -646,6 +764,7 @@ export default function HomepageContent() {
             <h2 id="founder-heading">Built solo, for Nigerian businesses.</h2>
             <p>Hi, I'm Taiwo. I'm building Cresoa solo because I watched too many great Nigerian businesses run on WhatsApp screenshots and paper notebooks — and I know we deserve better software.</p>
             <p>I've been building in the open for 3 months. Fashion, Repairs, and Printing modules are live. More industries follow. But I'm not launching until the product is right.</p>
+            <p>Join the waitlist. Follow the journey. Get 30 days of Pro features free when we launch.</p>
             <div className="founder-sign">— Taiwo A. Feranmi</div>
             <div className="founder-title">Founder, Cresoa</div>
           </div>
@@ -701,6 +820,9 @@ export default function HomepageContent() {
             <button onClick={scrollToForm} className="btn btn-navy" style={{ width: '100%' }}>Reserve Pro Access</button>
           </div>
         </div>
+        <p className="pricing-note" data-reveal>
+          Founding Members get 30 days of Pro features completely free at launch. No credit card needed.
+        </p>
       </section>
 
       {/* FAQ */}
@@ -708,7 +830,7 @@ export default function HomepageContent() {
         <div className="faq-inner">
           <div className="faq-head" data-reveal>
             <span className="eyebrow">Questions</span>
-            <h2 id="faq-heading">Frequently asked.</h2>
+            <h2 id="faq-heading">Frequently asked questions</h2>
           </div>
           <div data-reveal data-delay="1">
             {faqs.map((item, i) => (
@@ -756,4 +878,4 @@ export default function HomepageContent() {
       </footer>
     </main>
   )
-}
+            }
