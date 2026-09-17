@@ -328,10 +328,28 @@ export default function HomepageContent() {
         .secondary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1080px; margin: 0 auto; }
         .secondary-card { background: var(--card); border-radius: 20px; overflow: hidden; border: 1px solid var(--border); transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1); }
         .secondary-card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
-        .secondary-img { aspect-ratio: 16 / 10; overflow: hidden; background: #EFEAE1; }
-        [data-theme="dark"] .secondary-img { background: #1B1B24; }
-        .secondary-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
-        .secondary-card:hover .secondary-img img { transform: scale(1.02); }
+        
+      .secondary-img {
+  background: #EFEAE1;
+  padding: 2rem 1.5rem 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  max-height: 340px;
+}
+[data-theme="dark"] .secondary-img { background: #1B1B24; }
+.secondary-img img {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  display: block;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -8px 40px rgba(15,43,74,0.12);
+  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.secondary-card:hover .secondary-img img { transform: translateY(-6px); }
+        
         .secondary-body { padding: 1.6rem 1.7rem 1.8rem; }
         .secondary-body h3 { font-size: 1.2rem; margin: 0.5rem 0 0.6rem; line-height: 1.3; }
         .secondary-body p { color: var(--text-muted); font-size: 0.94rem; margin: 0; line-height: 1.65; }
