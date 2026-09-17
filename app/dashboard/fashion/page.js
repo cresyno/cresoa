@@ -146,7 +146,6 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
-  const [activePoint, setActivePoint] = useState(null)
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -176,6 +175,27 @@ function FashionDashboard({ businessId }) {
   }
 
   const handleRetry = () => refresh()
+
+  // ---- Total Health Score Calculation (100% Real Data) ----
+  const healthScoreData = useMemo(() => {
+    if (summary.revenue === 0 && summary.orders === 0) return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' }
+    
+    // Collection Rate: How much of total revenue has been paid (50% weight)
+    const collectionRate = summary.revenue > 0 ? (summary.paid / summary.revenue) : 0
+    
+    // Completion Rate: How many orders have been delivered (50% weight)
+    const deliveredOrders = orders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length
+    const completionRate = summary.orders > 0 ? (deliveredOrders / summary.orders) : 0
+    
+    const score = Math.round(((collectionRate * 0.5) + (completionRate * 0.5)) * 100)
+    
+    let label = 'Needs Attention'
+    let color = 'var(--cresoa-danger)'
+    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)' }
+    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)' } // Fallback to hex if warning var missing
+    
+    return { score, label, color }
+  }, [summary, orders])
 
   if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
@@ -273,52 +293,50 @@ function FashionDashboard({ businessId }) {
     })
   }
 
-  // ---- Analytics & Chart Calculations (Smooth SVG Line Chart) ----
+  // ---- Analytics & Chart Calculations ----
   const maxRevenue = Math.max(...series.map(d => safeAmount(d.revenue)), 1)
   const totalRevenue = series.reduce((s, d) => s + safeAmount(d.revenue), 0)
   const totalOrders = series.reduce((s, d) => s + safeAmount(d.orders), 0)
 
-  // SVG Dimensions
-  const chartWidth = 100
-  const chartHeight = 40
-  
-  // Calculate points
-  const points = series.map((d, i) => {
-    const x = series.length > 1 ? (i / (series.length - 1)) * chartWidth : chartWidth / 2
-    const y = chartHeight - (safeAmount(d.revenue) / maxRevenue) * chartHeight
-    return { x, y, value: d.revenue, label: d.label }
+  // Simple Stick Chart Data (Height Percentage)
+  const chartPoints = series.map(d => {
+    const revenue = safeAmount(d.revenue)
+    return {
+      label: d.label,
+      height: maxRevenue > 0 ? `${Math.max((revenue / maxRevenue) * 100, 2)}%` : '2%',
+      value: revenue,
+      hasData: revenue > 0
+    }
   })
 
-  // Generate Smooth Path (Cubic Bezier)
-  const getSmoothPath = (pts) => {
-    if (pts.length === 0) return ''
-    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`
-    
-    let d = `M ${pts[0].x} ${pts[0].y}`
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i]
-      const p1 = pts[i + 1]
-      const cp1x = p0.x + (p1.x - p0.x) / 3
-      const cp1y = p0.y
-      const cp2x = p1.x - (p1.x - p0.x) / 3
-      const cp2y = p1.y
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`
-    }
-    return d
-  }
-
-  const linePath = getSmoothPath(points)
-  const areaPath = `${linePath} L ${points.length > 0 ? points[points.length - 1].x : chartWidth} ${chartHeight} L ${points.length > 0 ? points[0].x : 0} ${chartHeight} Z`
-
-  // Dynamic X-axis labels (only show a maximum of 5 labels to prevent overlap)
-  const labelStep = Math.max(Math.ceil(series.length / 5), 1)
-  const xLabels = series.filter((_, i) => i % labelStep === 0 || i === series.length - 1)
-
+  const labelStep = Math.ceil(series.length / 5)
+  
+  // KPI Cards with 100% Real Data (No Placeholders)
   const kpiCards = [
-    { label: 'Revenue', value: formatMoney(summary.revenue), trend: '↑ 14.2% vs last month', meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Orders', value: String(summary.orders), trend: '↑ 3 today', meta: 'Orders in period', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Collected', value: formatMoney(summary.paid), trend: `${summary.orders ? Math.round((summary.paid / summary.revenue) * 100) : 0}% collected`, meta: 'Payments received', onClick: () => navigate('/dashboard/orders?filter=payments') },
-    { label: 'Outstanding', value: formatMoney(summary.outstanding), trend: `${summary.outstanding > 0 ? '3 need action' : 'All clear'}`, meta: 'Balance to collect', onClick: () => navigate('/dashboard/orders?filter=attention') },
+    { 
+      label: 'Revenue', 
+      value: formatMoney(summary.revenue), 
+      meta: 'Total order value', 
+      onClick: () => navigate('/dashboard/orders') 
+    },
+    { 
+      label: 'Orders', 
+      value: String(summary.orders), 
+      meta: 'Orders in period', 
+      onClick: () => navigate('/dashboard/orders') 
+    },
+    { 
+      label: 'Collected', 
+      value: formatMoney(summary.paid), 
+      meta: summary.revenue > 0 ? `${Math.round((summary.paid / summary.revenue) * 100)}% of total` : '0% of total', 
+      onClick: () => navigate('/dashboard/orders?filter=payments') 
+    },
+    { 
+      label: 'Outstanding', 
+      value: formatMoney(summary.outstanding), 
+      meta: summary.revenue > 0 ? `${Math.round((summary.outstanding / summary.revenue) * 100)}% of total` : '0% of total', 
+      onClick: () => navigate('/dashboard/orders?filter=attention') 
+    },
   ]
 
   const collectedPercent = summary.revenue ? Math.min((summary.paid / summary.revenue) * 100, 100) : 0
@@ -351,18 +369,34 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-            {/* BULLETPROOF 2x2 KPI GRID */}
+        {/* 2x2 KPI GRID (No Icons, No Placeholders) */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '0 16px', marginBottom: 16 }}>
           {kpiCards.map(card => (
             <button key={card.label} onClick={card.onClick} className="cresoa-metric-card" style={{ display: 'flex', flexDirection: 'column', padding: '16px 12px', border: '1px solid var(--cresoa-border)', borderRadius: 12, background: 'var(--cresoa-surface)', textAlign: 'left', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
               <span className="cresoa-metric-label" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{card.label}</span>
               <strong className="cresoa-metric-value" style={{ fontSize: 16, fontWeight: 800, color: 'var(--cresoa-text)', margin: '6px 0' }}>{card.value}</strong>
-              <span className="cresoa-metric-trend" style={{ fontSize: 10, color: card.label === 'Outstanding' ? 'var(--cresoa-danger)' : 'var(--cresoa-success)', fontWeight: 600 }}>{card.trend}</span>
               <span className="cresoa-metric-meta" style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', marginTop: 4 }}>{card.meta}</span>
             </button>
           ))}
         </div>
 
+     {/* BUSINESS HEALTH SCORE (100% Real Data) */}
+        <div style={{ padding: '0 16px', marginBottom: 16 }}>
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cresoa-text)' }}>Business Health Score</h3>
+              <span style={{ fontSize: 14, fontWeight: 800, color: healthScoreData.color }}>{healthScoreData.score}%</span>
+            </div>
+            <div style={{ height: 10, background: 'var(--cresoa-border)', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ width: `${healthScoreData.score}%`, height: '100%', background: healthScoreData.color, borderRadius: 99, transition: 'width 0.5s ease' }} />
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>
+              {healthScoreData.label} — Based on collection rate ({summary.revenue > 0 ? Math.round((summary.paid / summary.revenue) * 100) : 0}%) and delivery completion.
+            </p>
+          </Card>
+        </div>
+
+        {/* Action Center */}
         <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Action Required" subtitle={`${actionItems.length} items need attention`} action="View all" onAction={() => navigate('/dashboard/orders')} />
@@ -370,6 +404,7 @@ function FashionDashboard({ businessId }) {
           </Card>
         </div>
 
+        {/* Production Pipeline */}
         <div style={{ marginTop: 16, padding: '0 16px' }}>
           <Card>
             <SectionHeader title="Production" subtitle="What's moving through your workshop" />
@@ -386,7 +421,7 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* ========================================== */}
-        {/* AWARD-WINNING ANALYTICS CHART (GSC INSPIRED) */}
+        {/* ANALYTICS SECTION (SIMPLE STICK CHART)     */}
         {/* ========================================== */}
         <div style={{ marginTop: 24, padding: '0 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
@@ -407,78 +442,41 @@ function FashionDashboard({ businessId }) {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: 12, color: 'var(--cresoa-text-muted)' }}>{totalOrders} orders</span>
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--cresoa-success)', fontWeight: 600, marginTop: 2 }}>↑ 18% vs previous</span>
                 </div>
               </div>
               
-              {/* GSC-Style Smooth Line Chart */}
+              {/* Simple Stick Chart */}
               {totalRevenue === 0 ? (
                 <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--cresoa-border)', color: 'var(--cresoa-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
                   No revenue recorded for this period.
                 </div>
               ) : (
-                <div style={{ position: 'relative', width: '100%', height: 120 }}>
+                <div style={{ position: 'relative', height: 120, borderBottom: '1px solid var(--cresoa-border)' }}>
                   {/* Y-Axis Labels */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', fontSize: 10, color: 'var(--cresoa-text-muted)' }}>
                     <span>{formatMoney(maxRevenue)}</span>
                     <span>₦0</span>
                   </div>
                   
-                  {/* Chart Area */}
-                  <div style={{ marginLeft: 40, height: '100%', position: 'relative' }}>
-                    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                      <defs>
-                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--cresoa-primary)" stopOpacity="0.15" />
-                          <stop offset="100%" stopColor="var(--cresoa-primary)" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {/* Horizontal Grid Lines */}
-                      <line x1="0" y1="0" x2={chartWidth} y2="0" stroke="var(--cresoa-border)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-                      <line x1="0" y1={chartHeight / 2} x2={chartWidth} y2={chartHeight / 2} stroke="var(--cresoa-border)" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />
-                      <line x1="0" y1={chartHeight} x2={chartWidth} y2={chartHeight} stroke="var(--cresoa-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                      
-                      {/* Area Fill */}
-                      <path d={areaPath} fill="url(#chartGradient)" />
-                      {/* Smooth Line */}
-                      <path d={linePath} fill="none" stroke="var(--cresoa-primary)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                      
-                      {/* Interactive Data Points */}
-                      {points.map((p, i) => (
-                        <circle 
-                          key={i} 
-                          cx={p.x} 
-                          cy={p.y} 
-                          r="3" 
-                          fill={activePoint === i ? 'var(--cresoa-primary)' : 'var(--cresoa-surface)'} 
-                          stroke="var(--cresoa-primary)" 
-                          strokeWidth="1.5"
-                          style={{ cursor: 'pointer' }}
-                          onMouseEnter={() => setActivePoint(i)}
-                          onMouseLeave={() => setActivePoint(null)}
-                          onClick={() => setActivePoint(i)}
-                        />
-                      ))}
-                    </svg>
-                    
-                    {/* Tooltip */}
-                    {activePoint !== null && points[activePoint] && (
-                      <div style={{ position: 'absolute', top: `${(points[activePoint].y / chartHeight) * 100}%`, left: `${(points[activePoint].x / chartWidth) * 100}%`, transform: 'translate(-50%, -120%)', background: 'var(--cresoa-text)', color: 'var(--cresoa-surface)', padding: '4px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', zIndex: 10, pointerEvents: 'none' }}>
-                        {formatMoney(points[activePoint].value)}
+                  {/* Bars Container */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', paddingLeft: 40, gap: 4 }}>
+                    {chartPoints.map((point, i) => (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                        <div style={{ width: '100%', maxWidth: 20, height: point.height, background: point.hasData ? 'var(--cresoa-primary)' : 'var(--cresoa-border)', borderRadius: '4px 4px 0 0', transition: 'height 0.3s' }} />
                       </div>
-                    )}
-                  </div>
-
-                  {/* X-Axis Labels */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
-                    {xLabels.map((day, i) => (
-                      <span key={day.key} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        {day.label}
-                      </span>
                     ))}
                   </div>
                 </div>
               )}
+              
+              {/* X-Axis Labels (Limited to prevent overlap) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '0 0 0 40px' }}>
+                {chartPoints.filter((_, i) => i % labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
+                  <span key={i} style={{ fontSize: 10, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {point.label}
+                  </span>
+                ))}
+              </div>
             </div>
 
             {/* Financial Health */}
@@ -542,8 +540,12 @@ function FashionDashboard({ businessId }) {
               {groupsWithProgress.length === 0 ? (
                 <div className="elegant-empty" style={{ padding: '24px 0', textAlign: 'center' }}>
                   <h4 style={{ fontSize: 16, fontStyle: 'italic', marginBottom: 4 }}>No group orders</h4>
-                  <p style={{ fontSize: 13, color: 'var(--cresoa-text-muted)' }}>Create a group to manage coordinated outfits.</p>
-                  <button onClick={() => navigate('/dashboard/groups/new')} className="cresoa-primary-button" style={{ marginTop: 16, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
+                  <p style={{ fontSize: 13, color: 'var(--cresoa-text-muted)', marginBottom: 20 }}>Create a group to manage coordinated outfits.</p>
+                  <button 
+                    onClick={() => navigate('/dashboard/groups/new')} 
+                    className="cresoa-primary-button" 
+                    style={{ width: '100%', maxWidth: 280, padding: '12px 24px', fontSize: 14, fontWeight: 600, borderRadius: 8, margin: '0 auto', display: 'block' }}
+                  >
                     + New Group Order
                   </button>
                 </div>
@@ -579,4 +581,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+          }
