@@ -2,11 +2,11 @@ import PricingContent from './PricingContent'
 
 export const metadata = {
   title: 'Pricing | Cresoa — Simple, transparent pricing for Nigerian businesses',
-  description: 'Free plan forever. Starter at ₦3,500/month. Pro at ₦9,500/month. Waitlist members get Beta access free for 90 days. No credit card required.',
+  description: 'Free plan forever. Starter at ₦3,500/month. Pro at ₦9,500/month. Waitlist members get Beta access free for 30 days. No credit card required.',
   keywords: ['Cresoa pricing', 'business management software Nigeria pricing', 'tailor app pricing Nigeria', 'affordable SME software Nigeria'],
   openGraph: {
     title: 'Pricing | Cresoa',
-    description: 'Free plan forever. Starter ₦3,500/mo. Pro ₦9,500/mo. Waitlist members get Beta access free for 90 days.',
+    description: 'Free plan forever. Starter ₦3,500/mo. Pro ₦9,500/mo. Waitlist members get Beta access free for 30 days.',
     type: 'website',
     url: 'https://cresoa.com.ng/pricing',
     siteName: 'Cresoa',
@@ -25,8 +25,8 @@ const faqSchema = {
   '@type': 'FAQPage',
   mainEntity: [
     { '@type': 'Question', name: 'When will I be charged?', acceptedAnswer: { '@type': 'Answer', text: 'Only after Cresoa launches. Joining the waitlist is free, and there is no charge until you choose a paid plan.' } },
-    { '@type': 'Question', name: 'What is the Beta plan?', acceptedAnswer: { '@type': 'Answer', text: 'Beta is a temporary plan available to waitlist members for 90 days after launch. It gives access to higher limits while Cresoa is still being improved. Beta is not a permanent plan.' } },
-    { '@type': 'Question', name: 'What happens after the 90-day Beta ends?', acceptedAnswer: { '@type': 'Answer', text: 'You choose a permanent plan — Free, Starter, or Pro. There is no automatic charge.' } },
+    { '@type': 'Question', name: 'What is the Beta plan?', acceptedAnswer: { '@type': 'Answer', text: 'Beta is a temporary plan available to waitlist members for 30 days after launch. It gives access to higher limits while Cresoa is still being improved. Beta is not a permanent plan.' } },
+    { '@type': 'Question', name: 'What happens after the 30-day Beta ends?', acceptedAnswer: { '@type': 'Answer', text: 'You choose a permanent plan — Free, Starter, or Pro. There is no automatic charge.' } },
     { '@type': 'Question', name: 'Do I need a credit card to join the waitlist?', acceptedAnswer: { '@type': 'Answer', text: 'No. Not to join the waitlist, and not to claim Beta access.' } },
     { '@type': 'Question', name: 'Can I switch plans later?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. You can upgrade or downgrade at any time from your dashboard.' } },
   ],
