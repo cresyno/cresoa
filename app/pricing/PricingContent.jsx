@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import Link from 'next/link'
 import Logo from '../../components/Logo'
 import ThemeToggle from '../../components/ThemeToggle'
@@ -11,10 +11,10 @@ const ICONS = {
   check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   dash: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   arrowRight: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  sparkle: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6l2.1-2.1"/></svg>,
 }
 
-// ─── Waitlist Form ────────────────────────────────
-function WaitlistForm({ theme = 'dark' }) {
+function WaitlistForm() {
   const [status, setStatus] = useState('idle')
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
@@ -30,7 +30,7 @@ function WaitlistForm({ theme = 'dark' }) {
 
   if (status === 'success') {
     return (
-      <div className={`wl-form wl-form--${theme}`}>
+      <div className="wl-form">
         <div className="wl-success">
           <div className="wl-success-icon">{ICONS.check}</div>
           <p className="wl-success-title">You&apos;re on the list.</p>
@@ -41,7 +41,7 @@ function WaitlistForm({ theme = 'dark' }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`wl-form wl-form--${theme}`} noValidate>
+    <form onSubmit={handleSubmit} className="wl-form" noValidate>
       <div className="wl-fields">
         <input type="email" name="email_address" placeholder="Email address" aria-label="Email address" required autoComplete="email" className="wl-input" />
         <input type="text" name="fields[first_name]" placeholder="First name" aria-label="First name" required autoComplete="given-name" className="wl-input" />
@@ -58,85 +58,85 @@ function WaitlistForm({ theme = 'dark' }) {
           {status === 'sending' ? 'Joining…' : <>Join the Waitlist {ICONS.arrowRight}</>}
         </button>
       </div>
-      <p className="wl-note">Founding Members get 30 days of Pro features free at launch.</p>
+      <p className="wl-note">Founding Members get Beta access free for 90 days at launch.</p>
       {status === 'error' && <p className="wl-error">Something went wrong. Please try again.</p>}
     </form>
   )
 }
 
-// ─── Comparison Table Data ─────────────────────────
+// ─── Comparison Data — Corrected ────────────────────
 const COMPARISON = [
   {
     category: 'Customers & Orders',
     rows: [
-      { feature: 'Customers', free: '20', starter: 'Unlimited', pro: 'Unlimited' },
-      { feature: 'Orders', free: '50', starter: 'Unlimited', pro: 'Unlimited' },
-      { feature: 'Basic order tracking', free: true, starter: true, pro: true },
-      { feature: 'Production stage tracking', free: true, starter: true, pro: true },
-      { feature: 'Customer tracking links', free: false, starter: true, pro: true },
-      { feature: 'Group / Aso-Ebi orders', free: false, starter: true, pro: true },
-    ],
-  },
-  {
-    category: 'Payments & Invoices',
-    rows: [
-      { feature: 'Professional invoices', free: true, starter: true, pro: true },
-      { feature: 'Deposit & balance tracking', free: true, starter: true, pro: true },
-      { feature: 'Bank details on invoice', free: true, starter: true, pro: true },
-      { feature: 'Multi-item invoices', free: false, starter: true, pro: true },
-      { feature: 'CAC / TIN on invoice', free: false, starter: true, pro: true },
-    ],
-  },
-  {
-    category: 'Team & Staff',
-    rows: [
-      { feature: 'Staff accounts', free: false, starter: '2', pro: '10' },
-    ],
-  },
-  {
-    category: 'Communication',
-    rows: [
-      { feature: 'WhatsApp invoice sharing', free: false, starter: true, pro: true },
-      { feature: 'WhatsApp customer updates', free: false, starter: true, pro: true },
+      { feature: 'Customers', free: '20', starter: '200', beta: '500', pro: 'Unlimited' },
+      { feature: 'Orders / jobs', free: '50', starter: '500', beta: '1,000', pro: 'Unlimited' },
+      { feature: 'Basic order tracking', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Production stage tracking', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Customer tracking links', free: false, starter: true, beta: true, pro: true },
+      { feature: 'Group / Aso-Ebi orders', free: false, starter: true, beta: true, pro: true },
     ],
   },
   {
     category: 'Inventory',
     rows: [
-      { feature: 'Inventory management', free: false, starter: true, pro: true },
-      { feature: 'Low-stock alerts', free: false, starter: false, pro: true },
+      { feature: 'Inventory items', free: '20', starter: '100', beta: '500', pro: 'Unlimited' },
+      { feature: 'Inventory management', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Low-stock alerts', free: false, starter: false, beta: true, pro: true },
     ],
   },
   {
-    category: 'Analytics & Reports',
+    category: 'Team',
     rows: [
-      { feature: 'Business dashboard', free: true, starter: true, pro: true },
-      { feature: 'Business health score', free: true, starter: true, pro: true },
-      { feature: 'Revenue trends', free: false, starter: true, pro: true },
-      { feature: 'Advanced analytics', free: false, starter: false, pro: true },
+      { feature: 'Staff accounts', free: '0', starter: '2', beta: '10', pro: '10' },
     ],
   },
   {
-    category: 'Data & Support',
+    category: 'Tessa AI',
     rows: [
-      { feature: 'Data export (Excel / PDF)', free: false, starter: false, pro: true },
-      { feature: 'Help centre access', free: true, starter: true, pro: true },
-      { feature: 'Tessa AI assistant', free: true, starter: true, pro: true },
-      { feature: 'Priority support', free: false, starter: false, pro: true },
+      { feature: 'Tessa AI assistant', free: false, starter: true, beta: '200 actions', pro: 'Unlimited' },
+    ],
+  },
+  {
+    category: 'Payments & Invoices',
+    rows: [
+      { feature: 'Professional invoices', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Deposit & balance tracking', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Bank details on invoice', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Multi-item invoices', free: false, starter: true, beta: true, pro: true },
+      { feature: 'CAC / TIN on invoice', free: false, starter: true, beta: true, pro: true },
+    ],
+  },
+  {
+    category: 'Communication',
+    rows: [
+      { feature: 'WhatsApp invoice sharing', free: false, starter: true, beta: true, pro: true },
+      { feature: 'WhatsApp customer updates', free: false, starter: true, beta: true, pro: true },
+    ],
+  },
+  {
+    category: 'Analytics & Support',
+    rows: [
+      { feature: 'Business dashboard', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Business health score', free: true, starter: true, beta: true, pro: true },
+      { feature: 'Revenue trends', free: false, starter: true, beta: true, pro: true },
+      { feature: 'Advanced analytics', free: false, starter: false, beta: false, pro: true },
+      { feature: 'Data export (Excel / PDF)', free: false, starter: false, beta: false, pro: true },
+      { feature: 'Priority support', free: false, starter: false, beta: false, pro: true },
     ],
   },
 ]
 
 const FAQS = [
-  { q: 'When will I be charged?', a: 'Only after Cresoa launches. Joining the waitlist is free, and there is no charge until you choose a plan.' },
-  { q: 'What happens after the 30 days of Pro free?', a: 'You choose a paid plan or continue on the Free plan. No automatic charge, no credit card on file.' },
-  { q: 'Do I need a credit card to join the waitlist?', a: 'No. Not to join the waitlist, and not to claim your 30 days of Pro features free at launch.' },
+  { q: 'When will I be charged?', a: 'Only after Cresoa launches. Joining the waitlist is free, and there is no charge until you choose a paid plan.' },
+  { q: 'What is the Beta plan?', a: 'Beta is a temporary plan available to waitlist members for 90 days after launch. It gives access to higher limits while Cresoa is still being improved. Beta is not a permanent plan.' },
+  { q: 'What happens after the 90-day Beta ends?', a: 'You choose a permanent plan — Free, Starter, or Pro. There is no automatic charge.' },
+  { q: 'Do I need a credit card to join the waitlist?', a: 'No. Not to join the waitlist, and not to claim Beta access.' },
   { q: 'Can I switch plans later?', a: 'Yes. You can upgrade or downgrade at any time from your dashboard.' },
-  { q: 'Is there a plan for larger teams?', a: 'The Pro plan supports up to 10 staff accounts. If you need more, reach out to us after launch and we will work something out.' },
 ]
 
-function CellValue({ value }) {
-  if (value === true) return <span className="tick">{ICONS.check}</span>
+function CellValue({ value, highlight }) {
+  if (value === true) return <span className={`tick ${highlight ? 'tick--gold' : ''}`}>{ICONS.check}</span>
   if (value === false) return <span className="dash">{ICONS.dash}</span>
   return <span className="text-val">{value}</span>
 }
@@ -154,12 +154,6 @@ export default function PricingContent() {
       const top = el.getBoundingClientRect().top + window.scrollY - 80
       window.scrollTo({ top, behavior: 'smooth' })
     }
-    closeMobileMenu()
-  }
-
-  const scrollToSection = (e, id) => {
-    e.preventDefault()
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     closeMobileMenu()
   }
 
@@ -192,7 +186,6 @@ export default function PricingContent() {
           --text-muted: #6B6F76;
           --border: #E7E2D9;
           --border-strong: #D6CFC1;
-          --border-dark: rgba(255,255,255,0.08);
           --gold: #C99B2B;
           --gold-bright: #E5B84B;
         }
@@ -274,7 +267,7 @@ export default function PricingContent() {
         .plan:hover { border-color: var(--border-strong); transform: translateY(-4px); box-shadow: 0 24px 50px rgba(15,43,74,0.08); }
         .plan.popular { border-color: var(--gold); background: rgba(201,155,43,0.03); }
         [data-theme="dark"] .plan.popular { background: rgba(201,155,43,0.05); }
-        .plan-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--gold); color: var(--bg-dark); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.9rem; border-radius: 20px; }
+        .plan-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--gold); color: var(--bg-dark); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.9rem; border-radius: 20px; white-space: nowrap; }
         .plan-name { font-size: 1.05rem; font-weight: 600; color: var(--text); margin: 0; letter-spacing: -0.01em; }
         .plan-desc { color: var(--text-muted); font-size: 0.88rem; margin: 0.4rem 0 1.6rem; min-height: 2.6rem; }
         .plan-price { font-size: 3rem; font-weight: 700; color: var(--text); margin: 0 0 0.4rem; font-family: 'Fraunces', serif; letter-spacing: -0.04em; line-height: 1; }
@@ -293,25 +286,44 @@ export default function PricingContent() {
         .plan-features li.muted { color: var(--text-muted); opacity: 0.65; }
         .plan-features li.muted svg { color: var(--text-muted); }
 
+        /* Beta callout */
+
+           .beta-callout { background: var(--bg-alt); padding: 0 1.5rem 6rem; }
+        .beta-card { max-width: 1080px; margin: 0 auto; background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); border-radius: 20px; padding: 2.5rem 2rem; display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center; position: relative; overflow: hidden; }
+        .beta-card::before { content: ''; position: absolute; top: -50%; right: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(201,155,43,0.12), transparent 60%); border-radius: 50%; pointer-events: none; }
+        .beta-copy { position: relative; }
+        .beta-tag { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold-bright); padding: 0.3rem 0.8rem; border-radius: 100px; border: 1px solid rgba(229,184,75,0.35); margin-bottom: 1rem; }
+        .beta-copy h3 { color: #fff; font-size: 1.5rem; margin: 0 0 0.7rem; line-height: 1.25; letter-spacing: -0.02em; }
+        .beta-copy p { color: #A8B8CE; font-size: 0.98rem; line-height: 1.65; margin: 0; max-width: 620px; }
+        .beta-stats { position: relative; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .beta-stat { text-align: center; }
+        .beta-stat .num { color: var(--gold-bright); font-family: 'Fraunces', serif; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+        .beta-stat .lbl { color: #7C8CA5; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 0.4rem; }
+
         /* Comparison table */
-         .comparison { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
+        .comparison { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
         .table-wrap { max-width: 1080px; margin: 0 auto; overflow-x: auto; border-radius: 16px; border: 1px solid var(--border); background: var(--card); }
-        .comparison table { width: 100%; border-collapse: collapse; min-width: 640px; }
+        .comparison table { width: 100%; border-collapse: collapse; min-width: 720px; }
         .comparison thead { background: var(--bg); }
         .comparison th { padding: 1.2rem 1.4rem; text-align: left; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
         .comparison th:first-child { color: var(--text); }
         .comparison th.col-plan { text-align: center; color: var(--text); font-size: 0.92rem; letter-spacing: 0; text-transform: none; font-weight: 700; }
         .comparison th.col-plan.pop { color: var(--gold); }
-        .comparison td { padding: 0.95rem 1.4rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--text); vertical-align: top; }
+        .comparison th.col-plan.beta { color: var(--gold); position: relative; }
+        .comparison th.col-plan.beta::after { content: 'Waitlist only'; display: block; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-top: 0.35rem; }
+        .comparison td { padding: 0.95rem 1.4rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; color: var(--text); vertical-align: middle; }
         .comparison td:first-child { font-weight: 500; }
         .comparison td.cell { text-align: center; }
+        .comparison td.beta-cell { background: rgba(201,155,43,0.03); }
+        [data-theme="dark"] .comparison td.beta-cell { background: rgba(201,155,43,0.05); }
         .comparison tr:last-child td { border-bottom: none; }
-        .comparison tr.category-row td { background: var(--bg); font-weight: 700; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); padding: 0.7rem 1.4rem; border-bottom: 1px solid var(--border); }
+        .comparison tr.category-row td { background: var(--bg); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); padding: 0.75rem 1.4rem; border-bottom: 1px solid var(--border); }
         .tick { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(201,155,43,0.12); color: var(--gold); }
-        .dash { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: var(--text-muted); opacity: 0.5; }
+        .tick--gold { background: rgba(201,155,43,0.18); }
+        .dash { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: var(--text-muted); opacity: 0.4; }
         .text-val { font-weight: 600; color: var(--text); font-size: 0.88rem; }
 
-        /* Why these prices */
+        /* Why */
         .why { background: var(--bg); padding: 6rem 1.5rem; }
         .why-inner { max-width: 800px; margin: 0 auto; text-align: center; }
         .why h2 { font-size: 2.2rem; margin: 0 0 1.4rem; line-height: 1.15; letter-spacing: -0.025em; }
@@ -375,6 +387,9 @@ export default function PricingContent() {
           .plans { padding: 4.5rem 1.25rem; }
           .plans-grid { grid-template-columns: 1fr; gap: 1.5rem; max-width: 480px; }
           .plan.popular { order: -1; }
+          .beta-callout { padding: 0 1.25rem 4.5rem; }
+          .beta-card { grid-template-columns: 1fr; padding: 2rem 1.5rem; gap: 1.5rem; }
+          .beta-copy h3 { font-size: 1.3rem; }
           .comparison { padding: 4.5rem 1.25rem; }
           .why { padding: 4.5rem 1.25rem; }
           .why h2 { font-size: 1.75rem; }
@@ -392,8 +407,9 @@ export default function PricingContent() {
           .hero h1 { font-size: 2rem; }
           .plan { padding: 2rem 1.5rem 1.7rem; }
           .plan-price { font-size: 2.4rem; }
-          .comparison table { font-size: 0.82rem; }
-          .comparison th, .comparison td { padding: 0.8rem 0.9rem; }
+          .comparison table { font-size: 0.82rem; min-width: 640px; }
+          .comparison th, .comparison td { padding: 0.8rem 0.8rem; }
+          .comparison tr.category-row td { padding: 0.6rem 0.8rem; }
           .why h2 { font-size: 1.5rem; }
           .section-head h2 { font-size: 1.6rem; }
         }
@@ -452,7 +468,7 @@ export default function PricingContent() {
         <div className="hero-inner" data-reveal>
           <span className="hero-eyebrow">Pricing</span>
           <h1>Simple, transparent pricing. <em>Built for Nigerian businesses.</em></h1>
-          <p className="subhead">Coming at launch. Reserved for waitlist members first. Founding Members get 30 days of Pro features completely free — no credit card required.</p>
+          <p className="subhead">Coming at launch. Reserved for waitlist members first. Waitlist members get Beta access free for 90 days — no credit card required.</p>
           <div id="pricing-waitlist-form">
             <WaitlistForm />
           </div>
@@ -462,7 +478,7 @@ export default function PricingContent() {
       {/* PLANS */}
       <section className="plans" aria-labelledby="plans-heading">
         <div className="section-head" data-reveal>
-          <span className="eyebrow">Three Plans</span>
+          <span className="eyebrow">Three Tiers</span>
           <h2 id="plans-heading">Pick the plan that fits.</h2>
           <p>Start free. Upgrade when your business grows.</p>
         </div>
@@ -471,20 +487,20 @@ export default function PricingContent() {
           {/* Free */}
           <div className="plan" data-reveal>
             <p className="plan-name">Free</p>
-            <p className="plan-desc">Perfect for getting started and testing the waters.</p>
+            <p className="plan-desc">For new businesses getting a feel for Cresoa.</p>
             <div className="plan-price">₦0</div>
             <p className="plan-price-note">Free forever</p>
             <button onClick={scrollToForm} className="plan-cta ghost">
               Join Waitlist
             </button>
             <ul className="plan-features">
-              <li>{ICONS.check} Up to 20 customers</li>
-              <li>{ICONS.check} Up to 50 orders</li>
+              <li>{ICONS.check} 20 customers</li>
+              <li>{ICONS.check} 50 orders / jobs</li>
+              <li>{ICONS.check} 20 inventory items</li>
               <li>{ICONS.check} Basic order tracking</li>
               <li>{ICONS.check} Production stage tracking</li>
               <li>{ICONS.check} Professional invoices</li>
               <li>{ICONS.check} Deposit &amp; balance tracking</li>
-              <li>{ICONS.check} Business dashboard</li>
               <li className="muted">{ICONS.dash} No staff accounts</li>
               <li className="muted">{ICONS.dash} No WhatsApp integration</li>
               <li className="muted">{ICONS.dash} No customer tracking links</li>
@@ -502,20 +518,20 @@ export default function PricingContent() {
               Reserve Starter Access
             </button>
             <ul className="plan-features">
-              <li>{ICONS.check} Unlimited customers</li>
-              <li>{ICONS.check} Unlimited orders</li>
+              <li>{ICONS.check} 200 customers</li>
+              <li>{ICONS.check} 500 orders / jobs</li>
+              <li>{ICONS.check} 100 inventory items</li>
               <li>{ICONS.check} Customer tracking links</li>
               <li>{ICONS.check} Group / Aso-Ebi orders</li>
               <li>{ICONS.check} Multi-item invoices</li>
               <li>{ICONS.check} CAC / TIN on invoice</li>
               <li>{ICONS.check} WhatsApp integration</li>
-              <li>{ICONS.check} Inventory management</li>
-              <li>{ICONS.check} Revenue trends</li>
               <li>{ICONS.check} 2 staff accounts</li>
+              <li>{ICONS.check} Tessa AI assistant</li>
             </ul>
           </div>
 
-          {/* Pro */}
+                 {/* Pro */}
           <div className="plan" data-reveal data-delay="2">
             <p className="plan-name">Pro</p>
             <p className="plan-desc">For established businesses scaling with a team.</p>
@@ -525,8 +541,11 @@ export default function PricingContent() {
               Reserve Pro Access
             </button>
             <ul className="plan-features">
-              <li>{ICONS.check} Everything in Starter</li>
+              <li>{ICONS.check} Unlimited customers</li>
+              <li>{ICONS.check} Unlimited orders / jobs</li>
+              <li>{ICONS.check} Unlimited inventory</li>
               <li>{ICONS.check} 10 staff accounts</li>
+              <li>{ICONS.check} Tessa AI assistant</li>
               <li>{ICONS.check} Low-stock alerts</li>
               <li>{ICONS.check} Advanced analytics</li>
               <li>{ICONS.check} Data export (Excel / PDF)</li>
@@ -535,10 +554,35 @@ export default function PricingContent() {
             </ul>
           </div>
         </div>
+      </section>
 
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', marginTop: '2.5rem', lineHeight: 1.6, maxWidth: '640px', marginLeft: 'auto', marginRight: 'auto' }}>
-          Founding Members get <strong style={{ color: 'var(--text)' }}>30 days of Pro features completely free</strong> at launch. No credit card needed. No automatic charge.
-        </p>
+      {/* BETA CALLOUT */}
+      <section className="beta-callout">
+        <div className="beta-card" data-reveal>
+          <div className="beta-copy">
+            <span className="beta-tag">{ICONS.sparkle} Waitlist Exclusive</span>
+            <h3>Beta access — free for 90 days.</h3>
+            <p>Join the waitlist and get access to the Beta plan the moment we launch. Higher limits than Starter. Free for 90 days while we keep improving Cresoa. After that, choose any permanent plan.</p>
+          </div>
+          <div className="beta-stats">
+            <div className="beta-stat">
+              <div className="num">500</div>
+              <div className="lbl">Customers</div>
+            </div>
+            <div className="beta-stat">
+              <div className="num">1,000</div>
+              <div className="lbl">Orders</div>
+            </div>
+            <div className="beta-stat">
+              <div className="num">10</div>
+              <div className="lbl">Staff</div>
+            </div>
+            <div className="beta-stat">
+              <div className="num">200</div>
+              <div className="lbl">Tessa actions</div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* COMPARISON TABLE */}
@@ -556,24 +600,26 @@ export default function PricingContent() {
                 <th>Feature</th>
                 <th className="col-plan">Free</th>
                 <th className="col-plan pop">Starter</th>
+                <th className="col-plan beta">Beta</th>
                 <th className="col-plan">Pro</th>
               </tr>
             </thead>
             <tbody>
               {COMPARISON.map((group) => (
-                <>
-                  <tr className="category-row" key={group.category}>
-                    <td colSpan={4}>{group.category}</td>
+                <Fragment key={group.category}>
+                  <tr className="category-row">
+                    <td colSpan={5}>{group.category}</td>
                   </tr>
                   {group.rows.map((row, i) => (
                     <tr key={`${group.category}-${i}`}>
                       <td>{row.feature}</td>
                       <td className="cell"><CellValue value={row.free} /></td>
-                      <td className="cell"><CellValue value={row.starter} /></td>
+                      <td className="cell"><CellValue value={row.starter} highlight /></td>
+                      <td className="cell beta-cell"><CellValue value={row.beta} highlight /></td>
                       <td className="cell"><CellValue value={row.pro} /></td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -598,8 +644,8 @@ export default function PricingContent() {
               <p>Every price is in Naira. No dollar conversion, no exchange-rate surprises, no hidden international fees.</p>
             </div>
             <div className="why-point" data-reveal data-delay="2">
-              <h3>Simple monthly billing</h3>
-              <p>One monthly charge. Cancel anytime. Upgrade or downgrade whenever your business needs change.</p>
+              <h3>Beta for the waitlist</h3>
+              <p>Founding Members get Beta access free for 90 days. Higher limits while Cresoa keeps improving.</p>
             </div>
           </div>
         </div>
@@ -636,11 +682,9 @@ export default function PricingContent() {
       {/* FINAL CTA */}
       <section className="cta" aria-labelledby="cta-heading">
         <div className="cta-inner" data-reveal>
-          <h2 id="cta-heading">Ready to claim your 30 free days of Pro?</h2>
-          <p>Join 47 Nigerian founders already on the waitlist. Founding Members get 30 days of Pro features free at launch — no credit card required.</p>
-          <div id="pricing-waitlist-form">
-            <WaitlistForm />
-          </div>
+          <h2 id="cta-heading">Ready to claim your 90 days of Beta?</h2>
+          <p>Join 47 Nigerian founders already on the waitlist. Beta access is free for 90 days — no credit card required.</p>
+          <WaitlistForm />
         </div>
       </section>
 
@@ -667,7 +711,4 @@ export default function PricingContent() {
       </footer>
     </main>
   )
-}
-
-
-     
+      }
