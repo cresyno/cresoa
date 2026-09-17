@@ -1577,3 +1577,12 @@ h1, h2, h3, .font-serif {
 .cresoa-dashboard-force-mobile .forced-grid-class { /* Replace with the actual class that's forcing the layout if you know it */
   display: block !important;
 }
+
+.cresoa-dashboard-force-mobile {
+  display: block !important;
+}
+.cresoa-dashboard-force-mobile .cresoa-dashboard-shell {
+  display: block !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+}
