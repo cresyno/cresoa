@@ -9,7 +9,7 @@ const ICONS = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export default function WaitlistForm() {
+export default function WaitlistForm({ defaultBusinessType = '' }) {
   const [status, setStatus] = useState('idle')
   const [errors, setErrors] = useState({})
 
@@ -36,7 +36,6 @@ export default function WaitlistForm() {
 
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
-      // Focus the first errored field
       const order = ['email', 'firstName', 'businessType']
       const sel = {
         email: 'input[name="email_address"]',
@@ -227,7 +226,7 @@ export default function WaitlistForm() {
                 name="tags[]"
                 aria-label="Business type"
                 className={`wl-select ${errors.businessType ? 'wl-select--error' : ''}`}
-                defaultValue=""
+                defaultValue={defaultBusinessType}
                 aria-invalid={!!errors.businessType}
                 onChange={() => clearError('businessType')}
               >
@@ -251,4 +250,4 @@ export default function WaitlistForm() {
       </form>
     </>
   )
-        }
+}
