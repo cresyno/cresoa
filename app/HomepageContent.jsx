@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'
 import WaitlistForm from '../components/WaitlistForm'
+import { SITE_CONFIG } from '../lib/siteConfig'
 
 const ICONS = {
   menu: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
@@ -118,7 +119,11 @@ export default function HomepageContent() {
     if (!statsRef.current) return
     const observer = new IntersectionObserver((entries) => {
       if (!entries[0].isIntersecting) return
-      const targets = { members: 47, industries: 6, months: 6 }
+      const targets = {
+  members: SITE_CONFIG.foundingMembers,
+  industries: SITE_CONFIG.industriesTotal,
+  months: SITE_CONFIG.monthsToLaunch,
+      }
       const steps = 90
       let step = 0
       const interval = setInterval(() => {
@@ -882,7 +887,7 @@ export default function HomepageContent() {
       <section className="cta" aria-labelledby="cta-heading">
         <div className="cta-inner">
           <h2 id="cta-heading" data-reveal>Ready to bring order to your business?</h2>
-          <p data-reveal data-delay="1">Join 47 Nigerian founders already on the waitlist. Beta access is free for 30 days at launch.</p>
+          <p data-reveal data-delay="1"> Join {SITE_CONFIG.foundingMembers} Nigerian founders already on the waitlist. Beta access is free for 30 days at launch.</p>
           <div data-reveal data-delay="2">
             <WaitlistForm />
           </div>
