@@ -23,8 +23,8 @@ export const metadata = {
     'Nigerian Business OS',
   ],
   icons: {
-    icon: [{ url: '/cresoa-icon.svg', type: 'image/svg+xml' }],
-    apple: '/cresoa-icon.svg',
+    icon: '/favicon.png',
+    apple: '/apple-touch-icon.png',
   },
   openGraph: {
     title: 'Cresoa | Business OS for Nigerian SMEs',
@@ -34,7 +34,12 @@ export const metadata = {
     type: 'website',
     locale: 'en_NG',
     images: [
-      { url: '/og-image.png', width: 1200, height: 630, alt: 'Cresoa — Run your Nigerian business from one place' },
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Cresoa — Run your Nigerian business from one place',
+      },
     ],
   },
   twitter: {
@@ -56,6 +61,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+        {/* Organization Schema — declares Cresoa as a brand entity */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -65,16 +71,25 @@ export default function RootLayout({ children }) {
               "name": "Cresoa",
               "alternateName": "Cresoa Business OS",
               "url": "https://www.cresoa.com.ng",
-              "logo": "https://www.cresoa.com.ng/cresoa-icon.svg",
+              "logo": "https://www.cresoa.com.ng/favicon.png",
               "description": "Business management software built for Nigerian SMEs. Fashion, Repairs, and Printing.",
-              "founder": { "@type": "Person", "name": "Taiwo Abraham Feranmi" },
-              "foundingLocation": { "@type": "Place", "name": "Nigeria" },
-              "areaServed": { "@type": "Country", "name": "Nigeria" },
-              
+              "founder": {
+                "@type": "Person",
+                "name": "Taiwo Abraham Feranmi"
+              },
+              "foundingLocation": {
+                "@type": "Place",
+                "name": "Nigeria"
+              },
+              "areaServed": {
+                "@type": "Country",
+                "name": "Nigeria"
+              }
             })
           }}
         />
 
+        {/* SoftwareApplication Schema */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -92,8 +107,15 @@ export default function RootLayout({ children }) {
                 "highPrice": "9500",
                 "priceCurrency": "NGN"
               },
-              "author": { "@type": "Person", "name": "Taiwo Abraham Feranmi" },
-              "publisher": { "@type": "Organization", "name": "Cresoa", "url": "https://www.cresoa.com.ng" }
+              "author": {
+                "@type": "Person",
+                "name": "Taiwo Abraham Feranmi"
+              },
+              "publisher": {
+                "@type": "Organization",
+                "name": "Cresoa",
+                "url": "https://www.cresoa.com.ng"
+              }
             })
           }}
         />
@@ -103,4 +125,4 @@ export default function RootLayout({ children }) {
       </body>
     </html>
   )
-}
+            }
