@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 300" fill="none">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@700&amp;display=swap');
+    .cresoa-word { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; font-weight: 700; font-size: 220px; letter-spacing: -8px; }
+  </style>
+  <text x="40" y="220" class="cresoa-word" fill="#0F2B4A">CRESO</text>
+  <text x="780" y="220" class="cresoa-word" fill="#0F2B4A">A</text>
+  <circle cx="810" cy="188" r="16" fill="#C99B2B"/>
+</svg>
