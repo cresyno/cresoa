@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Logo from '../../components/Logo'
 import ThemeToggle from '../../components/ThemeToggle'
+import WaitlistForm from '../../components/WaitlistForm'
 
 const ICONS = {
   menu: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
   x: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   arrowRight: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   scissors: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>,
   tool: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
@@ -28,56 +28,6 @@ function getCategoryColor(category) {
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function WaitlistForm() {
-  const [status, setStatus] = useState('idle')
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault()
-    const form = e.target
-    const data = new FormData(form)
-    setStatus('sending')
-    try {
-      const res = await fetch('/api/waitlist', { method: 'POST', body: data })
-      const json = await res.json()
-      if (json.ok) { setStatus('success'); form.reset() } else setStatus('error')
-    } catch { setStatus('error') }
-  }, [])
-
-  if (status === 'success') {
-    return (
-      <div className="wl-form">
-        <div className="wl-success">
-          <div className="wl-success-icon">{ICONS.check}</div>
-          <p className="wl-success-title">You&apos;re on the list.</p>
-          <p className="wl-success-sub">Check your inbox to confirm. If it&apos;s not in Primary, check Promotions and drag it there.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="wl-form" noValidate>
-      <div className="wl-fields">
-        <input type="email" name="email_address" placeholder="Email address" aria-label="Email address" required autoComplete="email" className="wl-input" />
-        <input type="text" name="fields[first_name]" placeholder="First name" aria-label="First name" required autoComplete="given-name" className="wl-input" />
-        <div className="wl-select-wrap">
-          <select name="tags[]" required aria-label="Business type" className="wl-select" defaultValue="">
-            <option value="" disabled>What do you do?</option>
-            <option value="23510464">Fashion & Tailoring</option>
-            <option value="23510466">Repairs & Technical</option>
-            <option value="23510467">Printing & Signage</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <button type="submit" className="wl-submit" disabled={status === 'sending'}>
-          {status === 'sending' ? 'Joining…' : <>Join the Waitlist {ICONS.arrowRight}</>}
-        </button>
-      </div>
-      <p className="wl-note">Founding Members get 30 days of Pro features free at launch.</p>
-      {status === 'error' && <p className="wl-error">Something went wrong. Please try again.</p>}
-    </form>
-  )
 }
 
 function PostCover({ post, size = 'default' }) {
@@ -110,12 +60,6 @@ export default function BlogContent({ posts }) {
   const [activeCategory, setActiveCategory] = useState('All')
 
   const closeMobileMenu = () => setMobileMenuOpen(false)
-
-  const scrollToSection = (e, id) => {
-    e.preventDefault()
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    closeMobileMenu()
-  }
 
   const scrollToForm = (e) => {
     if (e) e.preventDefault()
@@ -165,7 +109,6 @@ export default function BlogContent({ posts }) {
           --text-muted: #6B6F76;
           --border: #E7E2D9;
           --border-strong: #D6CFC1;
-          --border-dark: rgba(255,255,255,0.08);
           --gold: #C99B2B;
           --gold-bright: #E5B84B;
         }
@@ -180,16 +123,17 @@ export default function BlogContent({ posts }) {
         }
         html { scroll-behavior: smooth; }
         html.js-ready [data-reveal] {
-          opacity: 0; transform: translateY(20px);
-          transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+          opacity: 0;
+          transform: translateY(22px);
+          transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
         }
         html.js-ready [data-reveal].reveal-in { opacity: 1; transform: translateY(0); }
-        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.08s; }
-        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.16s; }
+        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.09s; }
+        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.18s; }
+        html.js-ready [data-reveal][data-delay="3"] { transition-delay: 0.27s; }
         @media (prefers-reduced-motion: reduce) {
           html.js-ready [data-reveal], html.js-ready [data-reveal].reveal-in { opacity: 1 !important; transform: none !important; transition: none !important; }
         }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .page { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
         .page h1, .page h2, .page h3, .page h4 { font-family: 'Fraunces', 'Georgia', serif; font-weight: 700; letter-spacing: -0.025em; color: inherit; }
@@ -235,17 +179,34 @@ export default function BlogContent({ posts }) {
         /* Filter */
         .filter { background: var(--bg); padding: 1.75rem 1.5rem 0.5rem; position: sticky; top: 60px; z-index: 100; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         [data-theme="dark"] .filter { background: rgba(10,10,15,0.9); }
-        .filter-inner { max-width: 1180px; margin: 0 auto; display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+        .filter-inner {
+          max-width: 1180px; margin: 0 auto; display: flex; gap: 0.5rem;
+          overflow-x: auto; scrollbar-width: none;
+          scroll-snap-type: x proximity;
+          padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);
+        }
         .filter-inner::-webkit-scrollbar { display: none; }
-        .filter-pill { flex-shrink: 0; padding: 0.55rem 1.1rem; border-radius: 100px; background: transparent; border: 1px solid var(--border-strong); color: var(--text-muted); font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s; }
-        .filter-pill:hover { color: var(--text); border-color: var(--text); }
+        .filter-pill {
+          flex-shrink: 0; scroll-snap-align: start;
+          padding: 0.55rem 1.1rem; border-radius: 100px;
+          background: transparent; border: 1px solid var(--border-strong);
+          color: var(--text-muted); font-family: inherit; font-size: 0.85rem; font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+        }
+        .filter-pill:hover { color: var(--text); border-color: var(--text); transform: translateY(-1px); }
         .filter-pill.active { background: var(--bg-dark); color: #fff; border-color: var(--bg-dark); }
         [data-theme="dark"] .filter-pill.active { background: var(--gold); color: var(--bg-darkest); border-color: var(--gold); }
 
         /* Featured */
         .featured { background: var(--bg); padding: 3rem 1.5rem 1rem; }
         .featured-inner { max-width: 1180px; margin: 0 auto; }
-        .featured-card { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 0; background: var(--card); border: 1px solid var(--border); border-radius: 22px; overflow: hidden; text-decoration: none; color: inherit; transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s; }
+        .featured-card {
+          display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 0;
+          background: var(--card); border: 1px solid var(--border); border-radius: 22px;
+          overflow: hidden; text-decoration: none; color: inherit;
+          transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s;
+        }
         .featured-card:hover { border-color: var(--border-strong); transform: translateY(-3px); box-shadow: 0 30px 60px rgba(15,43,74,0.10); }
         .featured-content { padding: 3rem 2.5rem; display: flex; flex-direction: column; justify-content: center; }
         .featured-badge { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.2rem; }
@@ -273,7 +234,12 @@ export default function BlogContent({ posts }) {
         .grid-head h2 { font-size: 1.5rem; margin: 0; color: var(--text); }
         .grid-head .count { color: var(--text-muted); font-size: 0.85rem; }
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-        .card { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; text-decoration: none; color: inherit; transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s; }
+        .card {
+          display: flex; flex-direction: column;
+          background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+          overflow: hidden; text-decoration: none; color: inherit;
+          transition: border-color 0.3s, transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s;
+        }
         .card:hover { border-color: var(--border-strong); transform: translateY(-4px); box-shadow: 0 24px 50px rgba(15,43,74,0.10); }
         .card:hover h3 { color: var(--gold); }
         .card-body { padding: 1.6rem 1.6rem 1.7rem; display: flex; flex-direction: column; flex: 1; }
@@ -295,7 +261,7 @@ export default function BlogContent({ posts }) {
         .waitlist-strip > .waitlist-inner > p { color: #A8B8CE; font-size: 1rem; margin: 0 0 2.2rem; line-height: 1.7; }
 
         /* Cross-sell */
-           .cross { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
+        .cross { background: var(--bg-alt); padding: 6rem 1.5rem; border-top: 1px solid var(--border); }
         .cross-head { max-width: 640px; margin: 0 auto 3rem; text-align: center; }
         .cross-head .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.1rem; }
         .cross-head h2 { font-size: 2rem; margin: 0 0 0.9rem; line-height: 1.2; }
@@ -309,30 +275,11 @@ export default function BlogContent({ posts }) {
         .cross-arrow { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--gold); font-weight: 600; font-size: 0.85rem; }
 
         /* Final CTA */
-        .cta { background: var(--bg); padding: 6rem 1.5rem 7rem; text-align: center; }
-        .cta-inner { max-width: 620px; margin: 0 auto; }
-        .cta h2 { font-size: 2.2rem; margin: 0 0 1rem; line-height: 1.15; letter-spacing: -0.03em; }
-        .cta p { color: var(--text-muted); font-size: 1.05rem; margin: 0 0 2.4rem; line-height: 1.7; }
-
-        /* Waitlist form */
-        .wl-form { width: 100%; max-width: 440px; margin: 0 auto; }
-        .wl-fields { display: grid; gap: 0.65rem; }
-        .wl-input, .wl-select { width: 100%; padding: 0.95rem 1rem; border-radius: 10px; font-family: inherit; font-size: 0.95rem; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; appearance: none; }
-        .wl-input::placeholder { color: rgba(168,184,206,0.6); }
-        .wl-input:focus, .wl-select:focus { outline: none; border-color: var(--gold-bright); background: rgba(255,255,255,0.08); box-shadow: 0 0 0 3px rgba(201,155,43,0.18); }
-        .wl-select-wrap { position: relative; }
-        .wl-select-wrap::after { content: ''; position: absolute; top: 50%; right: 1rem; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-70%) rotate(45deg); pointer-events: none; opacity: 0.5; color: #fff; }
-        .wl-select { padding-right: 2.4rem; cursor: pointer; }
-        .wl-select option { color: #1A1A1A; background: #fff; }
-        .wl-submit { width: 100%; padding: 1rem 1.5rem; border-radius: 10px; background: var(--gold); color: var(--bg-dark); font-weight: 700; font-size: 0.95rem; font-family: inherit; border: none; cursor: pointer; margin-top: 0.3rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background 0.2s, transform 0.25s, box-shadow 0.25s; }
-        .wl-submit:hover:not(:disabled) { background: var(--gold-bright); transform: translateY(-1px); box-shadow: 0 14px 30px rgba(201,155,43,0.35); }
-        .wl-submit:disabled { opacity: 0.7; cursor: wait; }
-        .wl-note { color: rgba(168,184,206,0.65); font-size: 0.78rem; line-height: 1.5; margin-top: 1rem; text-align: center; }
-        .wl-error { color: #FF8B6F; font-size: 0.82rem; margin-top: 0.6rem; text-align: center; }
-        .wl-success { background: rgba(201,155,43,0.08); border: 1px solid rgba(201,155,43,0.25); border-radius: 14px; padding: 1.8rem 1.4rem; text-align: center; animation: fadeUp 0.5s ease; }
-        .wl-success-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--gold); color: var(--bg-dark); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
-        .wl-success-title { color: #fff; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.4rem; font-family: 'Fraunces', serif; }
-        .wl-success-sub { color: rgba(168,184,206,0.9); font-size: 0.88rem; margin: 0; line-height: 1.6; }
+        .cta { background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); padding: 7rem 1.5rem; text-align: center; position: relative; overflow: hidden; }
+        .cta::before { content: ''; position: absolute; top: -40%; left: 50%; transform: translateX(-50%); width: 800px; height: 800px; background: radial-gradient(circle, rgba(201,155,43,0.12), transparent 60%); border-radius: 50%; pointer-events: none; }
+        .cta-inner { position: relative; max-width: 620px; margin: 0 auto; }
+        .cta h2 { color: #fff; font-size: 2.2rem; margin: 0 0 1rem; line-height: 1.15; letter-spacing: -0.03em; }
+        .cta p { color: #A8B8CE; font-size: 1.05rem; margin: 0 0 2.4rem; line-height: 1.7; }
 
         /* Footer */
         .footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3.5rem 1.5rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
@@ -341,7 +288,7 @@ export default function BlogContent({ posts }) {
         .footer-links a:hover, .footer-links button:hover { color: var(--gold); }
 
         /* Responsive */
-        @media (max-width: 960px) {
+           @media (max-width: 960px) {
           .hero h1 { font-size: 2.4rem; }
           .featured-card { grid-template-columns: 1fr; }
           .cover--featured { aspect-ratio: 16 / 10; min-height: auto; }
@@ -353,7 +300,7 @@ export default function BlogContent({ posts }) {
           .waitlist-strip h2 { font-size: 1.7rem; }
           .cross { padding: 5rem 1.25rem; }
           .cross-head h2 { font-size: 1.7rem; }
-          .cta { padding: 5rem 1.25rem 6rem; }
+          .cta { padding: 5rem 1.25rem; }
           .cta h2 { font-size: 1.75rem; }
         }
         @media (max-width: 720px) {
@@ -375,12 +322,14 @@ export default function BlogContent({ posts }) {
           <Logo variant="primary" size="large" />
         </Link>
         <nav className="nav-links" aria-label="Primary">
+          <Link href="/" className="nav-link">Home</Link>
           <Link href="/fashion" className="nav-link">Fashion</Link>
           <Link href="/repairs" className="nav-link">Repairs</Link>
           <Link href="/printing" className="nav-link">Printing</Link>
+          <Link href="/pricing" className="nav-link">Pricing</Link>
           <Link href="/blog" className="nav-link active">Blog</Link>
           <Link href="/support" className="nav-link">Support</Link>
-          <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-link">FAQ</button>
+          <Link href="/faq" className="nav-link">FAQ</Link>
         </nav>
         <div className="nav-actions">
           <ThemeToggle />
@@ -394,12 +343,14 @@ export default function BlogContent({ posts }) {
       <div className={`mobile-overlay ${mobileMenuOpen ? 'open' : ''}`} onClick={closeMobileMenu} />
       <div className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="close-btn" onClick={closeMobileMenu} aria-label="Close menu">{ICONS.x}</button>
+        <Link href="/" className="nav-link" onClick={closeMobileMenu}>Home</Link>
         <Link href="/fashion" className="nav-link" onClick={closeMobileMenu}>Fashion</Link>
         <Link href="/repairs" className="nav-link" onClick={closeMobileMenu}>Repairs</Link>
         <Link href="/printing" className="nav-link" onClick={closeMobileMenu}>Printing</Link>
+        <Link href="/pricing" className="nav-link" onClick={closeMobileMenu}>Pricing</Link>
         <Link href="/blog" className="nav-link" onClick={closeMobileMenu}>Blog</Link>
         <Link href="/support" className="nav-link" onClick={closeMobileMenu}>Support</Link>
-        <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-link">FAQ</button>
+        <Link href="/faq" className="nav-link" onClick={closeMobileMenu}>FAQ</Link>
         <Link href="/login" className="nav-link" onClick={closeMobileMenu}>Log in</Link>
         <button onClick={scrollToForm} className="nav-cta" style={{ marginTop: '0.8rem', padding: '0.85rem 1rem', width: '100%' }}>Join Waitlist</button>
       </div>
@@ -415,10 +366,10 @@ export default function BlogContent({ posts }) {
 
       {/* HERO */}
       <section className="hero">
-        <div className="hero-inner" data-reveal>
-          <span className="hero-eyebrow">Cresoa Blog</span>
-          <h1>Business guides for Nigerian SMEs</h1>
-          <p>Practical, no-fluff guides on running a business in Nigeria — from invoices to customer retention to scaling your shop.</p>
+        <div className="hero-inner">
+          <span className="hero-eyebrow" data-reveal>Cresoa Blog</span>
+          <h1 data-reveal data-delay="1">Business guides for Nigerian SMEs</h1>
+          <p data-reveal data-delay="2">Practical, no-fluff guides on running a business in Nigeria — from invoices to customer retention to scaling your shop.</p>
         </div>
       </section>
 
@@ -509,11 +460,11 @@ export default function BlogContent({ posts }) {
 
       {/* WAITLIST STRIP */}
       <section className="waitlist-strip" aria-labelledby="waitlist-heading">
-        <div className="waitlist-inner" data-reveal>
-          <span className="eyebrow">Join the Waitlist</span>
-          <h2 id="waitlist-heading">We&apos;re building Cresoa for Nigerian businesses.</h2>
-          <p>Join the waitlist for early access and 30 days of Pro features free at launch. No spam — only real updates.</p>
-          <div id="blog-waitlist-form">
+        <div className="waitlist-inner">
+          <span className="eyebrow" data-reveal>Join the Waitlist</span>
+          <h2 id="waitlist-heading" data-reveal data-delay="1">We&apos;re building Cresoa for Nigerian businesses.</h2>
+          <p data-reveal data-delay="2">Join the waitlist for early access and Beta access free for 30 days at launch. No spam — only real updates.</p>
+          <div id="blog-waitlist-form" data-reveal data-delay="3">
             <WaitlistForm />
           </div>
         </div>
@@ -550,10 +501,12 @@ export default function BlogContent({ posts }) {
 
       {/* FINAL CTA */}
       <section className="cta" aria-labelledby="cta-heading">
-        <div className="cta-inner" data-reveal>
-          <h2 id="cta-heading">Ready to bring order to your business?</h2>
-          <p>Join 47 Nigerian founders already on the waitlist. Founding Members get 30 days of Pro features free at launch.</p>
-          <WaitlistForm />
+        <div className="cta-inner">
+          <h2 id="cta-heading" data-reveal>Ready to bring order to your business?</h2>
+          <p data-reveal data-delay="1">Join 47 Nigerian founders already on the waitlist. Beta access is free for 30 days at launch.</p>
+          <div data-reveal data-delay="2">
+            <WaitlistForm />
+          </div>
         </div>
       </section>
 
@@ -572,7 +525,7 @@ export default function BlogContent({ posts }) {
             <Link href="/blog">Blog</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/support">Support</Link>
-            <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
+            <Link href="/faq">FAQ</Link>
             <button onClick={scrollToForm}>Join Waitlist</button>
           </nav>
           <p style={{ opacity: 0.6, fontSize: '0.72rem', marginTop: '0.8rem' }}>© {new Date().getFullYear()} Cresoa · All rights reserved.</p>
@@ -580,4 +533,4 @@ export default function BlogContent({ posts }) {
       </footer>
     </main>
   )
-      }
+          }
