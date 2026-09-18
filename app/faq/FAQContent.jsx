@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Logo from '../../components/Logo'
 import ThemeToggle from '../../components/ThemeToggle'
+import { SITE_CONFIG } from '../lib/siteConfig'
 
 const ICONS = {
   menu: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
@@ -503,7 +504,7 @@ export default function FAQContent() {
       <section className="cta" aria-labelledby="cta-heading">
         <div className="cta-inner" data-reveal>
           <h2 id="cta-heading">Ready to claim your 30 days of Beta?</h2>
-          <p>Join 47 Nigerian founders already on the waitlist. Beta access is free for 30 days — no credit card required.</p>
+          <p>Join {SITE_CONFIG.foundingMembers} Nigerian founders already on the waitlist. Beta access is free for 30 days at launch.</p>
           <div id="faq-waitlist-form">
             <WaitlistForm />
           </div>
