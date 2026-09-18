@@ -1,15 +1,18 @@
 'use client';
 
+import { useState } from 'react';
+
 export default function Logo({ variant = 'primary', size = 'medium', className, style }) {
-  // Heights for wordmark (aspect ~4.13:1) and icon (1:1)
+  const [error, setError] = useState(false);
+
   const heights = {
     small: 22,
-    medium: 30,
-    large: 40,
+    medium: 32,
+    large: 42,
   };
   const h = heights[size] || heights.medium;
 
-  // Icon — "A" with gold dot on navy rounded square
+  // Icon variant — "A" with gold dot on navy square
   if (variant === 'icon' || variant === 'favicon' || variant === 'app') {
     return (
       <svg
@@ -25,60 +28,59 @@ export default function Logo({ variant = 'primary', size = 'medium', className, 
         <rect width="512" height="512" rx="110" fill="#0F2B4A" />
         <text
           x="256"
-          y="390"
+          y="380"
           textAnchor="middle"
           fontFamily="Fraunces, Georgia, 'Times New Roman', serif"
           fontWeight="700"
-          fontSize="380"
+          fontSize="360"
           fill="#FFFFFF"
         >
           A
         </text>
-        <circle cx="256" cy="345" r="24" fill="#C99B2B" />
+        <circle cx="256" cy="335" r="22" fill="#C99B2B" />
       </svg>
     );
   }
 
-  // Wordmark — navy on light, white on dark
+  // Wordmark variant — PNG. White version rendered on dark backgrounds via CSS filter.
   const isDark = variant === 'dark-bg' || variant === 'monochromeLight';
-  const textColor = isDark ? '#FFFFFF' : '#0F2B4A';
-  const goldColor = isDark ? '#E5B84B' : '#C99B2B';
-  const w = h * (1240 / 300); // preserve aspect ratio
+  const src = '/cresoa-wordmark.png';
+
+  if (error) {
+    return (
+      <span
+        style={{
+          fontFamily: 'Fraunces, serif',
+          fontWeight: 700,
+          fontSize: `${h}px`,
+          color: isDark ? '#fff' : '#0F2B4A',
+          letterSpacing: '-0.03em',
+          lineHeight: 1,
+        }}
+      >
+        Cresoa<span style={{ color: '#C99B2B' }}>.</span>
+      </span>
+    );
+  }
 
   return (
-    <svg
-      viewBox="0 0 1240 300"
-      width={w}
+    <img
+      src={src}
+      alt="Cresoa"
       height={h}
       className={className}
-      style={style}
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Cresoa"
-      role="img"
-    >
-      <text
-        x="40"
-        y="220"
-        fontFamily="Fraunces, Georgia, 'Times New Roman', serif"
-        fontWeight="700"
-        fontSize="220"
-        letterSpacing="-8"
-        fill={textColor}
-      >
-        CRESO
-      </text>
-      <text
-        x="780"
-        y="220"
-        fontFamily="Fraunces, Georgia, 'Times New Roman', serif"
-        fontWeight="700"
-        fontSize="220"
-        letterSpacing="-8"
-        fill={textColor}
-      >
-        A
-      </text>
-      <circle cx="810" cy="188" r="16" fill={goldColor} />
-    </svg>
+      style={{
+        height: h,
+        width: 'auto',
+        display: 'block',
+        objectFit: 'contain',
+        filter: isDark ? 'brightness(0) invert(1)' : 'none',
+        ...style,
+      }}
+      onError={(e) => {
+        console.error('Logo failed to load:', src);
+        setError(true);
+      }}
+    />
   );
 }
