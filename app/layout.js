@@ -70,8 +70,7 @@ export default function RootLayout({ children }) {
               "founder": { "@type": "Person", "name": "Taiwo Abraham Feranmi" },
               "foundingLocation": { "@type": "Place", "name": "Nigeria" },
               "areaServed": { "@type": "Country", "name": "Nigeria" },
-            
-              ]
+              
             })
           }}
         />
