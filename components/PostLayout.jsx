@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
+import WaitlistForm from './WaitlistForm'
 
 const ICONS = {
   menu: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
   x: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   arrowRight: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   whatsapp: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>,
   twitter: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>,
@@ -28,56 +28,6 @@ function getCategoryColor(category) {
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-function WaitlistForm() {
-  const [status, setStatus] = useState('idle')
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault()
-    const form = e.target
-    const data = new FormData(form)
-    setStatus('sending')
-    try {
-      const res = await fetch('/api/waitlist', { method: 'POST', body: data })
-      const json = await res.json()
-      if (json.ok) { setStatus('success'); form.reset() } else setStatus('error')
-    } catch { setStatus('error') }
-  }, [])
-
-  if (status === 'success') {
-    return (
-      <div className="wl-form">
-        <div className="wl-success">
-          <div className="wl-success-icon">{ICONS.check}</div>
-          <p className="wl-success-title">You&apos;re on the list.</p>
-          <p className="wl-success-sub">Check your inbox to confirm. If it&apos;s not in Primary, check Promotions and drag it there.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="wl-form" noValidate>
-      <div className="wl-fields">
-        <input type="email" name="email_address" placeholder="Email address" aria-label="Email address" required autoComplete="email" className="wl-input" />
-        <input type="text" name="fields[first_name]" placeholder="First name" aria-label="First name" required autoComplete="given-name" className="wl-input" />
-        <div className="wl-select-wrap">
-          <select name="tags[]" required aria-label="Business type" className="wl-select" defaultValue="">
-            <option value="" disabled>What do you do?</option>
-            <option value="23510464">Fashion & Tailoring</option>
-            <option value="23510466">Repairs & Technical</option>
-            <option value="23510467">Printing & Signage</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <button type="submit" className="wl-submit" disabled={status === 'sending'}>
-          {status === 'sending' ? 'Joining…' : <>Join the Waitlist {ICONS.arrowRight}</>}
-        </button>
-      </div>
-      <p className="wl-note">Founding Members get 30 days of Pro features free at launch.</p>
-      {status === 'error' && <p className="wl-error">Something went wrong. Please try again.</p>}
-    </form>
-  )
 }
 
 function ShareRow({ title }) {
@@ -141,12 +91,6 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const closeMobileMenu = () => setMobileMenuOpen(false)
 
-  const scrollToSection = (e, id) => {
-    e.preventDefault()
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    closeMobileMenu()
-  }
-
   const scrollToForm = (e) => {
     if (e) e.preventDefault()
     const el = document.getElementById('post-waitlist-form')
@@ -200,14 +144,17 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
         }
         html { scroll-behavior: smooth; }
         html.js-ready [data-reveal] {
-          opacity: 0; transform: translateY(20px);
-          transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+          opacity: 0;
+          transform: translateY(22px);
+          transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1), transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
         }
         html.js-ready [data-reveal].reveal-in { opacity: 1; transform: translateY(0); }
+        html.js-ready [data-reveal][data-delay="1"] { transition-delay: 0.09s; }
+        html.js-ready [data-reveal][data-delay="2"] { transition-delay: 0.18s; }
+        html.js-ready [data-reveal][data-delay="3"] { transition-delay: 0.27s; }
         @media (prefers-reduced-motion: reduce) {
           html.js-ready [data-reveal], html.js-ready [data-reveal].reveal-in { opacity: 1 !important; transform: none !important; transition: none !important; }
         }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .page { min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
         .page h1, .page h2, .page h3, .page h4 { font-family: 'Fraunces', 'Georgia', serif; font-weight: 700; letter-spacing: -0.025em; color: inherit; }
@@ -313,7 +260,7 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
         .author a { color: var(--gold); font-weight: 600; text-decoration: underline; }
 
         /* Related */
-            .related { background: var(--bg-alt); padding: 0 1.5rem 6rem; border-bottom: 1px solid var(--border); }
+        .related { background: var(--bg-alt); padding: 0 1.5rem 6rem; border-bottom: 1px solid var(--border); }
         .related-inner { max-width: 1180px; margin: 0 auto; padding-top: 4rem; border-top: 1px solid var(--border); }
         .related-head { margin-bottom: 2.5rem; }
         .related-head .eyebrow { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.9rem; }
@@ -332,33 +279,13 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
         .rel-meta { color: var(--text-muted); font-size: 0.76rem; display: flex; gap: 0.4rem; flex-wrap: wrap; padding-top: 0.9rem; border-top: 1px solid var(--border); }
         .rel-meta .dot { opacity: 0.4; }
 
-        /* Waitlist */
+        /* Waitlist strip */
         .waitlist-strip { background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); padding: 6rem 1.5rem; text-align: center; position: relative; overflow: hidden; }
         .waitlist-strip::before { content: ''; position: absolute; top: -40%; left: 50%; transform: translateX(-50%); width: 700px; height: 700px; background: radial-gradient(circle, rgba(201,155,43,0.10), transparent 60%); border-radius: 50%; pointer-events: none; }
         .waitlist-inner { position: relative; max-width: 620px; margin: 0 auto; }
         .waitlist-strip .eyebrow { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-bright); margin-bottom: 1.1rem; }
         .waitlist-strip h2 { color: #fff; font-size: 2rem; margin: 0 0 1rem; line-height: 1.2; letter-spacing: -0.025em; }
         .waitlist-strip > .waitlist-inner > p { color: #A8B8CE; font-size: 1rem; margin: 0 0 2.2rem; line-height: 1.7; }
-
-        /* Waitlist form */
-        .wl-form { width: 100%; max-width: 440px; margin: 0 auto; }
-        .wl-fields { display: grid; gap: 0.65rem; }
-        .wl-input, .wl-select { width: 100%; padding: 0.95rem 1rem; border-radius: 10px; font-family: inherit; font-size: 0.95rem; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; appearance: none; }
-        .wl-input::placeholder { color: rgba(168,184,206,0.6); }
-        .wl-input:focus, .wl-select:focus { outline: none; border-color: var(--gold-bright); background: rgba(255,255,255,0.08); box-shadow: 0 0 0 3px rgba(201,155,43,0.18); }
-        .wl-select-wrap { position: relative; }
-        .wl-select-wrap::after { content: ''; position: absolute; top: 50%; right: 1rem; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-70%) rotate(45deg); pointer-events: none; opacity: 0.5; color: #fff; }
-        .wl-select { padding-right: 2.4rem; cursor: pointer; }
-        .wl-select option { color: #1A1A1A; background: #fff; }
-        .wl-submit { width: 100%; padding: 1rem 1.5rem; border-radius: 10px; background: var(--gold); color: var(--bg-dark); font-weight: 700; font-size: 0.95rem; font-family: inherit; border: none; cursor: pointer; margin-top: 0.3rem; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background 0.2s, transform 0.25s, box-shadow 0.25s; }
-        .wl-submit:hover:not(:disabled) { background: var(--gold-bright); transform: translateY(-1px); box-shadow: 0 14px 30px rgba(201,155,43,0.35); }
-        .wl-submit:disabled { opacity: 0.7; cursor: wait; }
-        .wl-note { color: rgba(168,184,206,0.65); font-size: 0.78rem; line-height: 1.5; margin-top: 1rem; text-align: center; }
-        .wl-error { color: #FF8B6F; font-size: 0.82rem; margin-top: 0.6rem; text-align: center; }
-        .wl-success { background: rgba(201,155,43,0.08); border: 1px solid rgba(201,155,43,0.25); border-radius: 14px; padding: 1.8rem 1.4rem; text-align: center; animation: fadeUp 0.5s ease; }
-        .wl-success-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--gold); color: var(--bg-dark); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
-        .wl-success-title { color: #fff; font-size: 1.1rem; font-weight: 700; margin: 0 0 0.4rem; font-family: 'Fraunces', serif; }
-        .wl-success-sub { color: rgba(168,184,206,0.9); font-size: 0.88rem; margin: 0; line-height: 1.6; }
 
         /* Footer */
         .footer { background: var(--bg); border-top: 1px solid var(--border); padding: 3.5rem 1.5rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.82rem; }
@@ -399,12 +326,14 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
           <Logo variant="primary" size="large" />
         </Link>
         <nav className="nav-links" aria-label="Primary">
+          <Link href="/" className="nav-link">Home</Link>
           <Link href="/fashion" className="nav-link">Fashion</Link>
           <Link href="/repairs" className="nav-link">Repairs</Link>
           <Link href="/printing" className="nav-link">Printing</Link>
+          <Link href="/pricing" className="nav-link">Pricing</Link>
           <Link href="/blog" className="nav-link">Blog</Link>
           <Link href="/support" className="nav-link">Support</Link>
-          <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-link">FAQ</button>
+          <Link href="/faq" className="nav-link">FAQ</Link>
         </nav>
         <div className="nav-actions">
           <ThemeToggle />
@@ -418,12 +347,14 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
       <div className={`mobile-overlay ${mobileMenuOpen ? 'open' : ''}`} onClick={closeMobileMenu} />
       <div className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <button className="close-btn" onClick={closeMobileMenu} aria-label="Close menu">{ICONS.x}</button>
+        <Link href="/" className="nav-link" onClick={closeMobileMenu}>Home</Link>
         <Link href="/fashion" className="nav-link" onClick={closeMobileMenu}>Fashion</Link>
         <Link href="/repairs" className="nav-link" onClick={closeMobileMenu}>Repairs</Link>
         <Link href="/printing" className="nav-link" onClick={closeMobileMenu}>Printing</Link>
+        <Link href="/pricing" className="nav-link" onClick={closeMobileMenu}>Pricing</Link>
         <Link href="/blog" className="nav-link" onClick={closeMobileMenu}>Blog</Link>
         <Link href="/support" className="nav-link" onClick={closeMobileMenu}>Support</Link>
-        <button onClick={(e) => scrollToSection(e, 'faq')} className="nav-link">FAQ</button>
+        <Link href="/faq" className="nav-link" onClick={closeMobileMenu}>FAQ</Link>
         <Link href="/login" className="nav-link" onClick={closeMobileMenu}>Log in</Link>
         <button onClick={scrollToForm} className="nav-cta" style={{ marginTop: '0.8rem', padding: '0.85rem 1rem', width: '100%' }}>Join Waitlist</button>
       </div>
@@ -442,9 +373,9 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
       {/* POST HERO */}
       <section className="post-hero">
         <div className="post-hero-inner">
-          <span className="post-category" style={{ color: categoryColor }}>{post.category}</span>
-          <h1 className="post-title">{post.title}</h1>
-          <div className="post-meta">
+          <span className="post-category" style={{ color: categoryColor }} data-reveal>{post.category}</span>
+          <h1 className="post-title" data-reveal data-delay="1">{post.title}</h1>
+          <div className="post-meta" data-reveal data-delay="2">
             <span className="byline">By Taiwo A. Feranmi</span>
             <span className="dot">·</span>
             <span>{formatDate(post.date)}</span>
@@ -455,7 +386,7 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
       </section>
 
       {/* COVER */}
-      <div className="post-cover-wrap">
+      <div className="post-cover-wrap" data-reveal>
         <PostCover post={post} />
       </div>
 
@@ -465,12 +396,14 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
           {children}
         </div>
 
-        <ShareRow title={post.title} />
+        <div data-reveal>
+          <ShareRow title={post.title} />
+        </div>
       </section>
 
       {/* AUTHOR */}
       <section className="author">
-        <div className="author-inner">
+        <div className="author-inner" data-reveal>
           <img src="/mockups/founder.webp" alt="Taiwo A. Feranmi" className="author-photo" loading="lazy" />
           <div>
             <span className="author-label">Written by</span>
@@ -486,15 +419,21 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
       {relatedPosts && relatedPosts.length > 0 && (
         <section className="related">
           <div className="related-inner">
-            <div className="related-head">
+            <div className="related-head" data-reveal>
               <span className="eyebrow">Keep Reading</span>
               <h2>More guides like this</h2>
             </div>
             <div className="related-grid">
-              {relatedPosts.map((rp) => {
+              {relatedPosts.map((rp, i) => {
                 const rc = getCategoryColor(rp.category)
                 return (
-                  <Link key={rp.slug} href={`/blog/${rp.slug}`} className="rel-card">
+                  <Link
+                    key={rp.slug}
+                    href={`/blog/${rp.slug}`}
+                    className="rel-card"
+                    data-reveal
+                    data-delay={i === 1 ? '1' : i === 2 ? '2' : undefined}
+                  >
                     <div className="rel-cover" style={{ background: rp.image ? '#EFEAE1' : `linear-gradient(135deg, ${rc}, ${rc}dd)` }}>
                       {rp.image ? (
                         <img src={rp.image} alt={rp.title} loading="lazy" />
@@ -523,11 +462,11 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
 
       {/* WAITLIST */}
       <section className="waitlist-strip" aria-labelledby="post-waitlist-heading">
-        <div className="waitlist-inner" data-reveal>
-          <span className="eyebrow">Join the Waitlist</span>
-          <h2 id="post-waitlist-heading">We&apos;re building Cresoa for Nigerian businesses.</h2>
-          <p>Join the waitlist for early access and 30 days of Pro features free at launch.</p>
-          <div id="post-waitlist-form">
+        <div className="waitlist-inner">
+          <span className="eyebrow" data-reveal>Join the Waitlist</span>
+          <h2 id="post-waitlist-heading" data-reveal data-delay="1">We&apos;re building Cresoa for Nigerian businesses.</h2>
+          <p data-reveal data-delay="2">Join the waitlist for early access and Beta access free for 30 days at launch.</p>
+          <div id="post-waitlist-form" data-reveal data-delay="3">
             <WaitlistForm />
           </div>
         </div>
@@ -548,7 +487,7 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
             <Link href="/blog">Blog</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/support">Support</Link>
-            <button onClick={(e) => scrollToSection(e, 'faq')}>FAQ</button>
+            <Link href="/faq">FAQ</Link>
             <button onClick={scrollToForm}>Join Waitlist</button>
           </nav>
           <p style={{ opacity: 0.6, fontSize: '0.72rem', marginTop: '0.8rem' }}>© {new Date().getFullYear()} Cresoa · All rights reserved.</p>
@@ -556,4 +495,4 @@ export default function PostLayout({ post, faqs, relatedPosts, children }) {
       </footer>
     </main>
   )
-          }
+                      }
