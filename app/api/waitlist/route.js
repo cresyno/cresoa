@@ -8,12 +8,10 @@ export async function POST(req) {
     const tag = formData.get('tags[]')?.toString().trim()
     const otherIndustry = formData.get('fields[other_industry]')?.toString().trim()
 
-  
     if (!email) {
       return Response.json({ ok: false, status: 400, kitMessage: 'Email is required.' }, { status: 400 })
     }
 
-    // Build the V3 API payload
     const payload = {
       api_key: process.env.KIT_API_KEY,
       email,
@@ -22,7 +20,7 @@ export async function POST(req) {
         phone: phone || undefined,
         other_industry: otherIndustry || undefined,
       },
-      tags: tag ? [tag] : undefined,
+      tags: tag ? [Number(tag)] : undefined,
     }
 
     console.log('Sending to Kit V3:', JSON.stringify({ ...payload, api_key: '***' }, null, 2))
