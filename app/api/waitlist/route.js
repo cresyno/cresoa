@@ -8,6 +8,7 @@ export async function POST(req) {
     const tag = formData.get('tags[]')?.toString().trim()
     const otherIndustry = formData.get('fields[other_industry]')?.toString().trim()
 
+  
     if (!email) {
       return Response.json({ ok: false, status: 400, kitMessage: 'Email is required.' }, { status: 400 })
     }
