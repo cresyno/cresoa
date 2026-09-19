@@ -8,13 +8,13 @@ const ICONS = {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-// Accepts: 07012345678, 0701 234 5678, +2347012345678, 2347012345678
 const PHONE_REGEX = /^(?:\+?234|0)[789]\d{9}$/
 
 export default function WaitlistForm({ defaultBusinessType = '' }) {
   const [status, setStatus] = useState('idle')
   const [errors, setErrors] = useState({})
   const [businessType, setBusinessType] = useState(defaultBusinessType)
+  const [debugError, setDebugError] = useState(null)
   const isOther = businessType === 'other'
 
   const validate = (form) => {
@@ -64,21 +64,31 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
     }
 
     setErrors({})
+    setDebugError(null)
     setStatus('sending')
     const data = new FormData(form)
 
     try {
       const res = await fetch('/api/waitlist', { method: 'POST', body: data })
       const json = await res.json()
+
       if (json.ok) {
         setStatus('success')
         form.reset()
         setBusinessType(defaultBusinessType)
       } else {
         setStatus('error')
+        setDebugError({
+          status: json.status || res.status,
+          message: json.kitMessage || 'Unknown error',
+        })
       }
-    } catch {
+    } catch (err) {
       setStatus('error')
+      setDebugError({
+        status: 'network',
+        message: err?.message || 'Could not reach the server.',
+      })
     }
   }, [defaultBusinessType])
 
@@ -104,7 +114,10 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
         <div className="wl-success">
           <div className="wl-success-icon">{ICONS.check}</div>
           <p className="wl-success-title">You&apos;re on the list.</p>
-          <p className="wl-success-sub">Thanks for joining. We&apos;ll be in touch when there&apos;s something worth sharing.</p>
+          <p className="wl-success-sub">
+            If you&apos;ve signed up before, you&apos;re already on our list.
+            Either way, we&apos;ll be in touch when there&apos;s something worth sharing.
+          </p>
         </div>
       </div>
     )
@@ -117,9 +130,7 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
         .wl-fields { display: grid; gap: 0.85rem; }
         .wl-field { display: flex; flex-direction: column; gap: 0.35rem; }
 
-        .wl-field--animate {
-          animation: wlSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
+        .wl-field--animate { animation: wlSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes wlSlideIn {
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
@@ -194,6 +205,27 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
           line-height: 1.5; margin-top: 1rem; text-align: center;
         }
         .wl-error { color: #FF8B6F; font-size: 0.82rem; margin-top: 0.6rem; text-align: center; }
+
+        .wl-debug {
+          margin-top: 0.8rem;
+          padding: 0.9rem 1rem;
+          border-radius: 10px;
+          background: rgba(255,139,111,0.08);
+          border: 1px solid rgba(255,139,111,0.3);
+          color: #FFB4A0;
+          font-size: 0.78rem;
+          line-height: 1.5;
+          font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+        .wl-debug-label {
+          display: block;
+          font-weight: 700;
+          color: #FF8B6F;
+          margin-bottom: 0.4rem;
+          font-family: inherit;
+        }
 
         .wl-success {
           background: rgba(201,155,43,0.08);
@@ -307,8 +339,14 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
         </div>
 
         <p className="wl-note">Founding Members get Beta access free for 30 days at launch.</p>
-        {status === 'error' && <p className="wl-error">Something went wrong. Please try again.</p>}
+
+        {status === 'error' && debugError && (
+          <div className="wl-debug">
+            <span className="wl-debug-label">Submission failed — Status {debugError.status}</span>
+            {debugError.message}
+          </div>
+        )}
       </form>
     </>
   )
-              }
+}
