@@ -312,7 +312,7 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
                 <option value="23510464">Fashion & Tailoring</option>
                 <option value="23510466">Repairs & Technical</option>
                 <option value="23510467">Printing & Signage</option>
-                <option value="other">Other</option>
+                <option value="23521383">Other</option>
               </select>
             </div>
             {errors.businessType && <span className="wl-error-msg">{errors.businessType}</span>}
