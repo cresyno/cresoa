@@ -8,23 +8,37 @@ const ICONS = {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Accepts: 07012345678, 0701 234 5678, +2347012345678, 2347012345678
+const PHONE_REGEX = /^(?:\+?234|0)[789]\d{9}$/
 
 export default function WaitlistForm({ defaultBusinessType = '' }) {
   const [status, setStatus] = useState('idle')
   const [errors, setErrors] = useState({})
+  const [businessType, setBusinessType] = useState(defaultBusinessType)
+  const isOther = businessType === 'other'
 
   const validate = (form) => {
     const errs = {}
     const email = form.querySelector('input[name="email_address"]')?.value?.trim() || ''
     const firstName = form.querySelector('input[name="fields[first_name]"]')?.value?.trim() || ''
-    const businessType = form.querySelector('select[name="tags[]"]')?.value || ''
+    const phone = form.querySelector('input[name="fields[phone]"]')?.value?.trim() || ''
+    const businessTypeVal = form.querySelector('select[name="tags[]"]')?.value || ''
 
     if (!email) errs.email = 'Email address is required.'
     else if (!EMAIL_REGEX.test(email)) errs.email = 'Please enter a valid email address.'
 
     if (!firstName) errs.firstName = 'First name is required.'
 
-    if (!businessType) errs.businessType = 'Please select your business type.'
+    const cleanedPhone = phone.replace(/[\s\-()]/g, '')
+    if (!phone) errs.phone = 'Phone number is required.'
+    else if (!PHONE_REGEX.test(cleanedPhone)) errs.phone = 'Enter a valid Nigerian phone number.'
+
+    if (!businessTypeVal) errs.businessType = 'Please select your business type.'
+
+    if (businessTypeVal === 'other') {
+      const otherIndustry = form.querySelector('input[name="fields[other_industry]"]')?.value?.trim() || ''
+      if (!otherIndustry) errs.otherIndustry = 'Please specify your industry.'
+    }
 
     return errs
   }
@@ -36,11 +50,13 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
 
     if (Object.keys(errs).length > 0) {
       setErrors(errs)
-      const order = ['email', 'firstName', 'businessType']
+      const order = ['email', 'firstName', 'phone', 'businessType', 'otherIndustry']
       const sel = {
         email: 'input[name="email_address"]',
         firstName: 'input[name="fields[first_name]"]',
+        phone: 'input[name="fields[phone]"]',
         businessType: 'select[name="tags[]"]',
+        otherIndustry: 'input[name="fields[other_industry]"]',
       }
       const first = order.find((f) => errs[f])
       if (first) form.querySelector(sel[first])?.focus()
@@ -57,13 +73,14 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
       if (json.ok) {
         setStatus('success')
         form.reset()
+        setBusinessType(defaultBusinessType)
       } else {
         setStatus('error')
       }
     } catch {
       setStatus('error')
     }
-  }, [])
+  }, [defaultBusinessType])
 
   const clearError = (field) => {
     if (errors[field]) {
@@ -75,13 +92,19 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
     }
   }
 
+  const handleBusinessTypeChange = (e) => {
+    setBusinessType(e.target.value)
+    clearError('businessType')
+    if (e.target.value !== 'other') clearError('otherIndustry')
+  }
+
   if (status === 'success') {
     return (
       <div className="wl-form">
         <div className="wl-success">
           <div className="wl-success-icon">{ICONS.check}</div>
           <p className="wl-success-title">You&apos;re on the list.</p>
-          <p className="wl-success-sub">Check your inbox to confirm. If it&apos;s not in Primary, check Promotions and drag it there.</p>
+          <p className="wl-success-sub">Thanks for joining. We&apos;ll be in touch when there&apos;s something worth sharing.</p>
         </div>
       </div>
     )
@@ -93,6 +116,14 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
         .wl-form { width: 100%; max-width: 440px; margin: 0 auto; }
         .wl-fields { display: grid; gap: 0.85rem; }
         .wl-field { display: flex; flex-direction: column; gap: 0.35rem; }
+
+        .wl-field--animate {
+          animation: wlSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes wlSlideIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         .wl-input, .wl-select {
           width: 100%; padding: 0.95rem 1rem; border-radius: 10px;
@@ -221,14 +252,29 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
           </div>
 
           <div className="wl-field">
+            <input
+              type="tel"
+              name="fields[phone]"
+              placeholder="Phone number"
+              aria-label="Phone number"
+              autoComplete="tel"
+              inputMode="tel"
+              className={`wl-input ${errors.phone ? 'wl-input--error' : ''}`}
+              aria-invalid={!!errors.phone}
+              onChange={() => clearError('phone')}
+            />
+            {errors.phone && <span className="wl-error-msg">{errors.phone}</span>}
+          </div>
+
+          <div className="wl-field">
             <div className="wl-select-wrap">
               <select
                 name="tags[]"
                 aria-label="Business type"
                 className={`wl-select ${errors.businessType ? 'wl-select--error' : ''}`}
-                defaultValue={defaultBusinessType}
+                value={businessType}
                 aria-invalid={!!errors.businessType}
-                onChange={() => clearError('businessType')}
+                onChange={handleBusinessTypeChange}
               >
                 <option value="" disabled>What do you do?</option>
                 <option value="23510464">Fashion & Tailoring</option>
@@ -240,6 +286,21 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
             {errors.businessType && <span className="wl-error-msg">{errors.businessType}</span>}
           </div>
 
+          {isOther && (
+            <div className="wl-field wl-field--animate">
+              <input
+                type="text"
+                name="fields[other_industry]"
+                placeholder="Specify your industry"
+                aria-label="Specify your industry"
+                className={`wl-input ${errors.otherIndustry ? 'wl-input--error' : ''}`}
+                aria-invalid={!!errors.otherIndustry}
+                onChange={() => clearError('otherIndustry')}
+              />
+              {errors.otherIndustry && <span className="wl-error-msg">{errors.otherIndustry}</span>}
+            </div>
+          )}
+
           <button type="submit" className="wl-submit" disabled={status === 'sending'}>
             {status === 'sending' ? 'Joining…' : <>Join the Waitlist {ICONS.arrowRight}</>}
           </button>
@@ -250,4 +311,4 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
       </form>
     </>
   )
-}
+              }
