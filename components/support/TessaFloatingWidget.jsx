@@ -3,23 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import TessaBottomSheet from './TessaBottomSheet';
+import TessaLogo from './TessaLogo';
 
-const TessaLogo = ({ size = 24 }) => {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} fill="none">
-      <defs>
-        <linearGradient id="gold" x1="20" y1="10" x2="50" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#D9A72E" />
-          <stop offset="1" stopColor="#F0C75E" />
-        </linearGradient>
-      </defs>
-      <path d="M32 8 L34 14 L40 16 L34 18 L32 24 L30 18 L24 16 L30 14 Z" fill="url(#gold)" />
-      <path d="M20 22 H44 C42 26 40 28 36 28 H34 V48 C32 50 30 50 28 48 V28 H26 C22 28 20 26 20 22 Z" fill="url(#gold)" />
-      <path d="M16 26 C6 32 6 44 16 50 C22 54 28 52 30 48 C22 50 16 44 16 36 Z" fill="#11161D" />
-      <path d="M48 26 C58 32 58 44 48 50 C42 54 36 52 34 48 C42 50 48 44 48 36 Z" fill="url(#gold)" />
-    </svg>
-  );
-};
+// Bottom-right no longer covers your top banner. To put it back at the top,
+// swap to: { top: '60px', right: '20px' }
+const POSITION = { bottom: 'calc(24px + env(safe-area-inset-bottom))', right: '16px' };
 
 export default function TessaFloatingWidget() {
   const searchParams = useSearchParams();
@@ -35,41 +23,47 @@ export default function TessaFloatingWidget() {
     setBusinessId(urlBiz || storedBiz || null);
   }, [searchParams]);
 
-  const handleClick = () => setIsOpen(true);
-
   if (!mounted) return null;
 
   return (
     <>
-      <div
-        onClick={handleClick}
+      <button
+        type="button"
+        className="tessa-fab"
+        onClick={() => setIsOpen(true)}
+        aria-label="Open Tessa AI assistant"
         style={{
           position: 'fixed',
-          top: '60px',
-          right: '20px',
+          ...POSITION,
           zIndex: 998,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          background: 'none',
+          border: 0,
+          padding: 0,
           cursor: 'pointer',
           userSelect: 'none',
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <div style={{ position: 'relative', width: '56px', height: '56px' }}>
-          <div
+        <span style={{ position: 'relative', width: 58, height: 58, display: 'block' }}>
+          <span
+            className="tessa-fab-ring"
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'conic-gradient(from 0deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
               borderRadius: '50%',
-              boxShadow: '0 0 12px rgba(255,255,255,0.3)',
+              background:
+                'conic-gradient(from 0deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
+              boxShadow: '0 6px 20px rgba(6,14,28,0.35)',
               animation: 'tessaSpin 4s linear infinite',
             }}
           />
-          <div
+          <span
             style={{
               position: 'absolute',
-              inset: '2px',
+              inset: 2.5,
               background: '#0F2B4A',
               borderRadius: '50%',
               display: 'flex',
@@ -77,31 +71,31 @@ export default function TessaFloatingWidget() {
               justifyContent: 'center',
             }}
           >
-            <TessaLogo size={24} />
-          </div>
-        </div>
+            <TessaLogo size={28} />
+          </span>
+        </span>
         <span
           style={{
-            marginTop: '4px',
-            fontSize: '0.6rem',
+            marginTop: 5,
+            fontSize: '0.62rem',
             fontWeight: 700,
             color: '#fff',
-            textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-            letterSpacing: '0.5px',
-            background: 'rgba(15, 43, 74, 0.9)',
-            padding: '2px 8px',
-            borderRadius: '10px',
+            letterSpacing: '0.4px',
+            background: '#0F2B4A',
+            padding: '2px 9px',
+            borderRadius: 10,
+            boxShadow: '0 2px 8px rgba(6,14,28,0.3)',
           }}
         >
           Tessa AI
         </span>
-      </div>
+      </button>
 
       <style>{`
-        @keyframes tessaSpin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
+        @keyframes tessaSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .tessa-fab:active { transform: scale(0.94); }
+        .tessa-fab:focus-visible { outline: 2px solid #D9A72E; outline-offset: 4px; border-radius: 16px; }
+        @media (prefers-reduced-motion: reduce) { .tessa-fab-ring { animation: none !important; } }
       `}</style>
 
       <TessaBottomSheet
