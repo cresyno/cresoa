@@ -7,7 +7,7 @@ import TessaLogo from './TessaLogo';
 
 // Bottom-right no longer covers your top banner. To put it back at the top,
 // swap to: { top: '60px', right: '20px' }
-const POSITION = { bottom: 'calc(24px + env(safe-area-inset-bottom))', right: '16px' };
+const POSITION = { bottom: 'calc(100px + env(safe-area-inset-bottom))', right: '16px' };
 
 export default function TessaFloatingWidget() {
   const searchParams = useSearchParams();
