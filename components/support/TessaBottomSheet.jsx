@@ -32,7 +32,7 @@ const normSugg = (s) =>
     : { ...s, prompt: s.prompt || s.label };
 
 /* ------------------------------------------------------------------ */
-/*  Icons (Only what is needed)                                        */
+/*  Icons (Minimal)                                                    */
 /* ------------------------------------------------------------------ */
 
 const ICONS = {
@@ -410,7 +410,6 @@ export default function TessaBottomSheet({
   businessId,
   suggestions = DEFAULT_SUGGESTIONS,
   pageContext, 
-  theme = 'light', // 'light' or 'dark' - CONTROLLED BY YOU
 }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -692,7 +691,7 @@ export default function TessaBottomSheet({
   const suggs = suggestions.map(normSugg);
 
   return (
-    <div className={`tsa-root theme-${theme} ${entered ? 'is-in' : ''}`} style={{ top: vv.top, height: vv.h }}>
+    <div className={`tsa-root ${entered ? 'is-in' : ''}`} style={{ top: vv.top, height: vv.h }}>
       <div className="tsa-backdrop" onClick={onClose} />
 
       <div className={`tsa-sheet ${dragging ? 'is-dragging' : ''}`} style={{ height }} role="dialog" aria-modal="true">
@@ -807,7 +806,7 @@ export default function TessaBottomSheet({
 
 const CSS = `
 /* --------------------------------------------------------- */
-/*  THEME VARIABLES (Controlled via .theme-light / .theme-dark) */
+/*  THEME VARIABLES (Inherits Global App Theme)              */
 /* --------------------------------------------------------- */
 .tsa-root {
   --tsa-bg: #FFFFFF;
@@ -825,7 +824,10 @@ const CSS = `
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.tsa-root.theme-dark {
+/* Inherit Dark Mode from the app's global .dark class (Tailwind/Next.js standard) */
+.dark .tsa-root,
+[data-theme="dark"] .tsa-root,
+html.dark .tsa-root {
   --tsa-bg: #1A1A1A;
   --tsa-text: #EDEDED;
   --tsa-text-muted: #9CA3AF;
@@ -857,7 +859,7 @@ const CSS = `
 .tsa-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 16px; }
 .tsa-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
 .tsa-status { font-size: 0.78rem; color: var(--tsa-brand-navy); font-weight: 600; margin-top: 2px; }
-.theme-dark .tsa-status { color: var(--tsa-brand-gold); }
+.dark .tsa-status, [data-theme="dark"] .tsa-status { color: var(--tsa-brand-gold); }
 .tsa-text-btn { color: var(--tsa-text-muted); font-size: 0.85rem; font-weight: 600; padding: 8px; }
 .tsa-text-btn:active { color: var(--tsa-text); }
 .tsa-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-user-bubble-bg); display: flex; align-items: center; justify-content: center; color: var(--tsa-text); }
@@ -909,7 +911,7 @@ const CSS = `
 .tsa-rich p { margin: 0; }
 .tsa-rich strong { font-weight: 700; }
 .tsa-rich a { color: var(--tsa-brand-navy); font-weight: 600; text-decoration: underline; }
-.theme-dark .tsa-rich a { color: var(--tsa-brand-gold); }
+.dark .tsa-rich a, [data-theme="dark"] .tsa-rich a { color: var(--tsa-brand-gold); }
 .tsa-rich code { background: var(--tsa-user-bubble-bg); padding: 2px 4px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
 .tsa-h { margin: 0; font-weight: 700; color: var(--tsa-text); }
 .tsa-h[data-l="1"] { font-size: 1.15rem; }
@@ -919,7 +921,7 @@ const CSS = `
 .tsa-rich pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--tsa-user-bubble-bg); overflow-x: auto; font-size: 0.85rem; }
 .tsa-list ul, .tsa-list ol { margin: 0; padding-left: 1.2rem; }
 .tsa-list li::marker { color: var(--tsa-brand-navy); }
-.theme-dark .tsa-list li::marker { color: var(--tsa-brand-gold); }
+.dark .tsa-list li::marker, [data-theme="dark"] .tsa-list li::marker { color: var(--tsa-brand-gold); }
 
 /* Table */
 .tsa-tablewrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--tsa-border); }
@@ -944,7 +946,7 @@ const CSS = `
 .tsa-action:active { transform: scale(0.92); }
 .tsa-action--send { background: transparent; color: var(--tsa-text-muted); transition: all 0.2s; }
 .tsa-action--send.is-active { background: var(--tsa-brand-navy); color: #fff; }
-.theme-dark .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; }
+.dark .tsa-action--send.is-active, [data-theme="dark"] .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; }
 .tsa-action--send:disabled { cursor: default; }
 .tsa-action--mic { background: transparent; color: var(--tsa-text-muted); }
 .tsa-action--stop { background: #EF4444; color: #fff; }
@@ -955,4 +957,3 @@ const CSS = `
   .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 `;
-    
