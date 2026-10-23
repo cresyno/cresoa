@@ -1,134 +1,128 @@
 /* ============================================================
-   CRESOA – Global Styles & Design System
-   Version: 1.0
+   CRESOA – Global Styles & Design System (Clean Flat Edition)
    ============================================================ */
 
-/* ===== CSS Variables ===== */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+/* ===== CSS Variables (Light Mode Default) ===== */
 :root {
-  /* Core Colours */
-  --color-primary: #0F2B4A;
-  --color-primary-dark: #0A1628;
-  --color-primary-light: #1A3F66;
-  --color-accent: #D4A52A;
-  --color-accent-dark: #C79A2B;
-  --color-secondary: #2E7D5E;
-  --color-secondary-dark: #1E5A44;
-  --color-danger: #D9534F;
-  --color-danger-dark: #C0392B;
+  /* Brand Colors (From Logo) */
+  --color-primary: #0B2C5E;      /* Navy */
+  --color-primary-dark: #082142;
+  --color-primary-light: #1A4685;
+  --color-accent: #FDB515;       /* Gold */
+  --color-accent-dark: #E0A010;
+  --color-secondary: #00A651;    /* Green */
+  --color-secondary-dark: #008C43;
+  --color-danger: #EF4444;       /* Red */
+  --color-danger-dark: #DC2626;
 
-  /* Neutral Colours */
-  --color-bg: #F8F6F2;
-  --color-bg-dark: #12121A;
-  --color-card: #FFFFFF;
-  --color-card-dark: #1E1E2A;
-  --color-text: #1A1A1A;
-  --color-text-secondary: #8A8A8A;
-  --color-text-muted: #C8C0B5;
-  --color-border: #E5E0D8;
-  --color-border-dark: #2A2A3A;
+  /* Neutral Colors (Crisp Slate/White) */
+  --color-bg: #FFFFFF;
+  --color-bg-dark: #F8FAFC;
+  --color-card: #F8FAFC;
+  --color-card-dark: #F1F5F9;
+  --color-text: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-border: #E2E8F0;
+  --color-border-dark: #CBD5E1;
 
-  /* Status Colours */
-  --color-success: #2E7D5E;
-  --color-warning: #D4A52A;
-  --color-error: #D9534F;
-  --color-info: #0F2B4A;
-  --color-neutral: #6B6255;
+  /* Status Colors */
+  --color-success: #00A651;
+  --color-warning: #FDB515;
+  --color-error: #EF4444;
+  --color-info: #0B2C5E;
+  --color-neutral: #64748B;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(15, 43, 74, 0.04);
-  --shadow-md: 0 4px 16px rgba(15, 43, 74, 0.06);
-  --shadow-lg: 0 8px 32px rgba(15, 43, 74, 0.08);
-  --shadow-xl: 0 12px 48px rgba(15, 43, 74, 0.12);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #0F2B4A, #1A3F66);
-  --gradient-accent: linear-gradient(135deg, #D4A52A, #C79A2B);
-  --gradient-success: linear-gradient(135deg, #2E7D5E, #1E5A44);
-  --gradient-danger: linear-gradient(135deg, #D9534F, #C0392B);
-
-  /* ===== Cresoa Dashboard Variables (mapped to official palette) ===== */
+  /* Cresoa Dashboard Mappings */
   --cresoa-bg: var(--color-bg);
   --cresoa-surface: var(--color-card);
-  --cresoa-surface-soft: #F1EFEA;
+  --cresoa-surface-soft: #F1F5F9;
   --cresoa-text: var(--color-text);
   --cresoa-text-muted: var(--color-text-secondary);
   --cresoa-text-soft: var(--color-text-muted);
   --cresoa-border: var(--color-border);
   --cresoa-accent: var(--color-accent);
-  --cresoa-accent-soft: #FBF3E0;
+  --cresoa-accent-soft: #FEF3C7;
   --cresoa-success: var(--color-success);
-  --cresoa-success-soft: #EAF5EF;
+  --cresoa-success-soft: #D1FAE5;
   --cresoa-warning: var(--color-warning);
-  --cresoa-warning-soft: #FBF3E0;
+  --cresoa-warning-soft: #FEF3C7;
   --cresoa-danger: var(--color-danger);
-  --cresoa-danger-soft: #FCEAEA;
+  --cresoa-danger-soft: #FEE2E2;
   --cresoa-info: var(--color-info);
-  --cresoa-info-soft: #E8EEF5;
+  --cresoa-info-soft: #E0E7FF;
 }
 
 /* ============================================================
-   DARK THEME
+   DARK THEME (Premium Slate/Navy)
    ============================================================ */
-
 [data-theme="dark"] {
-  /* Core Colours (dark mode – accent stays gold, others adapt) */
-  --color-primary: #D4A52A;
-  --color-primary-dark: #0A1628;
-  --color-primary-light: #1A3F66;
-  --color-accent: #D4A52A;
-  --color-accent-dark: #C79A2B;
-  --color-secondary: #2E7D5E;
-  --color-secondary-dark: #1E5A44;
-  --color-danger: #D9534F;
-  --color-danger-dark: #C0392B;
+  /* Brand Colors */
+  --color-primary: #FDB515;      /* Gold becomes primary action in dark mode */
+  --color-primary-dark: #E0A010;
+  --color-primary-light: #FFC84A;
+  --color-accent: #FDB515;
+  --color-accent-dark: #E0A010;
+  --color-secondary: #00A651;
+  --color-secondary-dark: #008C43;
+  --color-danger: #EF4444;
+  --color-danger-dark: #DC2626;
 
-  /* Neutral Colours (dark) */
-  --color-bg: #12121A;
-  --color-bg-dark: #0A0A10;
-  --color-card: #1E1E2A;
-  --color-card-dark: #2A2A3A;
-  --color-text: #E8E8E8;
-  --color-text-secondary: #AAAAAA;
-  --color-text-muted: #6B6B7A;
-  --color-border: #2A2A3A;
-  --color-border-dark: #3A3A4A;
+  /* Neutral Colors (Deep Slate) */
+  --color-bg: #0F172A;
+  --color-bg-dark: #020617;
+  --color-card: #1E293B;
+  --color-card-dark: #0F172A;
+  --color-text: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-border: #334155;
+  --color-border-dark: #1E293B;
 
-  /* Shadows (dark) */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.6);
+  /* Status Colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+  --color-neutral: #94A3B8;
 
-  /* Gradients (dark) */
-  --gradient-primary: linear-gradient(135deg, #1A3F66, #0F2B4A);
-  --gradient-accent: linear-gradient(135deg, #D4A52A, #B8921F);
-  --gradient-success: linear-gradient(135deg, #2E7D5E, #1E5A44);
-  --gradient-danger: linear-gradient(135deg, #D9534F, #B53A37);
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
 
   /* Cresoa Variables (dark) */
   --cresoa-bg: var(--color-bg);
   --cresoa-surface: var(--color-card);
-  --cresoa-surface-soft: #2A2A3A;
+  --cresoa-surface-soft: #0F172A;
   --cresoa-text: var(--color-text);
   --cresoa-text-muted: var(--color-text-secondary);
   --cresoa-text-soft: var(--color-text-muted);
   --cresoa-border: var(--color-border);
   --cresoa-accent: var(--color-accent);
-  --cresoa-accent-soft: #3A3020;
+  --cresoa-accent-soft: #422006;
   --cresoa-success: var(--color-success);
-  --cresoa-success-soft: #1A2D25;
+  --cresoa-success-soft: #064E3B;
   --cresoa-warning: var(--color-warning);
-  --cresoa-warning-soft: #3A3020;
+  --cresoa-warning-soft: #422006;
   --cresoa-danger: var(--color-danger);
-  --cresoa-danger-soft: #3A2020;
-  --cresoa-info: #80B5D4;
-  --cresoa-info-soft: #1A2A3A;
+  --cresoa-danger-soft: #7F1D1D;
+  --cresoa-info: #60A5FA;
+  --cresoa-info-soft: #1E3A8A;
 }
 
 /* ============================================================
    RESET & BASE
    ============================================================ */
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -141,17 +135,20 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   background: var(--cresoa-bg);
   color: var(--cresoa-text);
   transition: background-color 0.2s ease, color 0.2s ease;
   line-height: 1.6;
 }
 
+h1, h2, h3, .font-serif {
+  font-family: 'Lora', serif;
+}
+
 /* ============================================================
    DASHBOARD LAYOUT
    ============================================================ */
-
 .cresoa-dashboard {
   width: 100%;
   min-height: 100vh;
@@ -176,24 +173,22 @@ body {
 /* ============================================================
    CARD
    ============================================================ */
-
 .cresoa-card {
   background: var(--cresoa-surface);
   border: 1px solid var(--cresoa-border);
-  border-radius: 20px;
-  box-shadow: var(--shadow-md);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
   padding: 20px;
   transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
 }
 
 .cresoa-card:hover {
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 /* ============================================================
    SECTION HEADER
    ============================================================ */
-
 .cresoa-section-header {
   display: flex;
   align-items: flex-start;
@@ -233,14 +228,13 @@ body {
 }
 
 /* ============================================================
-   BUTTONS
+   BUTTONS (No Gradients)
    ============================================================ */
-
 .cresoa-icon-button {
   width: 38px;
   height: 38px;
   border: 1px solid var(--cresoa-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--cresoa-surface);
   color: var(--cresoa-text);
   display: grid;
@@ -265,8 +259,8 @@ body {
   min-height: 38px;
   padding: 0 18px;
   border: 0;
-  border-radius: 12px;
-  background: var(--gradient-accent);
+  border-radius: 10px;
+  background: var(--color-primary); /* Solid Navy */
   color: #FFFFFF;
   display: inline-flex;
   align-items: center;
@@ -283,10 +277,11 @@ body {
 .cresoa-primary-button:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+  opacity: 0.9;
 }
 
 .cresoa-primary-button:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
 }
 
 .cresoa-primary-button:disabled {
@@ -295,10 +290,15 @@ body {
   transform: none;
 }
 
+/* Dark Mode Primary Button (Gold with dark text) */
+[data-theme="dark"] .cresoa-primary-button {
+  background: var(--color-accent);
+  color: #0F172A;
+}
+
 /* ============================================================
    METRIC CARDS
    ============================================================ */
-
 .cresoa-metric-card {
   width: 100%;
   min-width: 0;
@@ -317,9 +317,13 @@ body {
 }
 
 .cresoa-metric-card:hover {
-  border-color: var(--cresoa-accent);
+  border-color: var(--color-primary);
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
+}
+
+[data-theme="dark"] .cresoa-metric-card:hover {
+  border-color: var(--color-accent);
 }
 
 .cresoa-metric-icon {
@@ -328,11 +332,15 @@ body {
   flex: 0 0 38px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--cresoa-accent-soft);
-  color: var(--cresoa-accent);
+  color: var(--color-primary);
   font-size: 16px;
   font-weight: 900;
+}
+
+[data-theme="dark"] .cresoa-metric-icon {
+  color: var(--color-accent);
 }
 
 .cresoa-metric-label,
@@ -366,7 +374,6 @@ body {
 /* ============================================================
    LIST ROWS
    ============================================================ */
-
 .cresoa-list-row {
   width: 100%;
   min-width: 0;
@@ -399,7 +406,7 @@ body {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--gradient-primary);
+  background: var(--color-primary); /* Solid Navy */
   color: #FFFFFF;
   font-size: 11px;
   font-weight: 800;
@@ -440,14 +447,13 @@ body {
 /* ============================================================
    STATUS PILLS
    ============================================================ */
-
 .cresoa-status {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
   padding: 0 10px;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
   letter-spacing: 0.3px;
@@ -477,7 +483,6 @@ body {
 /* ============================================================
    PRODUCTION PIPELINE
    ============================================================ */
-
 .cresoa-pipeline {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -493,7 +498,7 @@ body {
   color: var(--cresoa-text);
   cursor: pointer;
   transition: all 0.2s ease;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .cresoa-pipeline-item:hover {
@@ -507,7 +512,7 @@ body {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--gradient-primary);
+  background: var(--color-primary); /* Solid Navy */
   color: #FFFFFF;
   font-size: 14px;
   font-weight: 900;
@@ -515,7 +520,8 @@ body {
 }
 
 .cresoa-pipeline-item:hover .cresoa-pipeline-number {
-  background: var(--gradient-accent);
+  background: var(--color-accent); /* Solid Gold */
+  color: var(--color-text);
   transform: scale(1.05);
 }
 
@@ -541,7 +547,6 @@ body {
 /* ============================================================
    ANALYTICS CHART
    ============================================================ */
-
 .cresoa-chart {
   height: 190px;
   display: flex;
@@ -586,7 +591,7 @@ body {
   width: min(20px, 70%);
   min-height: 2px;
   border-radius: 8px 8px 4px 4px;
-  background: var(--gradient-accent);
+  background: var(--color-accent); /* Solid Gold */
   transition: height 0.4s ease;
   box-shadow: var(--shadow-sm);
 }
@@ -594,7 +599,6 @@ body {
 /* ============================================================
    SELECT
    ============================================================ */
-
 .cresoa-select {
   min-height: 34px;
   padding: 0 12px;
@@ -610,14 +614,13 @@ body {
 }
 
 .cresoa-select:focus {
-  border-color: var(--cresoa-accent);
+  border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--cresoa-accent-soft);
 }
 
 /* ============================================================
    BUSINESS SNAPSHOT
    ============================================================ */
-
 .cresoa-snapshot-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -626,7 +629,7 @@ body {
 
 .cresoa-snapshot-item {
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--cresoa-surface-soft);
   border: 1px solid var(--cresoa-border);
 }
@@ -654,7 +657,6 @@ body {
 /* ============================================================
    GROUP ORDERS
    ============================================================ */
-
 .cresoa-groups-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -665,7 +667,7 @@ body {
   min-width: 0;
   padding: 12px 14px;
   border: 1px solid var(--cresoa-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--cresoa-surface-soft);
   color: var(--cresoa-text);
   display: flex;
@@ -677,7 +679,7 @@ body {
 }
 
 .cresoa-group-card:hover {
-  border-color: var(--cresoa-accent);
+  border-color: var(--color-accent);
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
@@ -688,8 +690,8 @@ body {
   flex: 0 0 32px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: var(--gradient-primary);
+  border-radius: 8px;
+  background: var(--color-primary); /* Solid Navy */
   color: #FFFFFF;
   font-size: 14px;
 }
@@ -721,8 +723,8 @@ body {
   margin-top: 4px;
   padding: 6px 14px;
   border: 0;
-  border-radius: 10px;
-  background: var(--gradient-primary);
+  border-radius: 8px;
+  background: var(--color-primary); /* Solid Navy */
   color: #FFFFFF;
   font-size: 12px;
   font-weight: 600;
@@ -757,11 +759,13 @@ body {
 .cresoa-group-progress-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: var(--gradient-success);
+  background: var(--color-secondary); /* Solid Green */
   transition: width 0.4s ease;
 }
 
-/* ─── Measurement Form ──────────────────────────────────── */
+/* ============================================================
+   MEASUREMENT FORM
+   ============================================================ */
 .measurement-form {
   background: var(--cresoa-surface);
   padding: 1rem;
@@ -808,9 +812,9 @@ body {
 }
 
 .measurement-field input:focus {
-  border-color: var(--cresoa-accent);
+  border-color: var(--color-accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(212,165,42,0.1);
+  box-shadow: 0 0 0 3px var(--cresoa-accent-soft);
 }
 
 .measurement-field input.read-only {
@@ -819,7 +823,6 @@ body {
   cursor: default;
 }
 
-/* ─── Custom Measurements ──────────────────────────────── */
 .measurement-custom-section {
   margin-top: 0.8rem;
   padding-top: 0.8rem;
@@ -856,8 +859,8 @@ body {
 }
 
 .measurement-add-custom:hover {
-  border-color: var(--cresoa-accent);
-  color: var(--cresoa-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .measurement-custom-list {
@@ -892,7 +895,7 @@ body {
 }
 
 .measurement-custom-item input:focus {
-  border-color: var(--cresoa-accent);
+  border-color: var(--color-accent);
   outline: none;
 }
 
@@ -908,7 +911,7 @@ body {
   padding: 0.1rem 0.3rem;
   border: none;
   background: transparent;
-  color: var(--cresoa-danger);
+  color: var(--color-danger);
   cursor: pointer;
   border-radius: 4px;
 }
@@ -923,7 +926,6 @@ body {
   padding: 0.2rem 0;
 }
 
-/* ─── Notes ────────────────────────────────────────────── */
 .measurement-notes {
   margin-top: 0.8rem;
 }
@@ -950,7 +952,7 @@ body {
 }
 
 .measurement-notes textarea:focus {
-  border-color: var(--cresoa-accent);
+  border-color: var(--color-accent);
   outline: none;
 }
 
@@ -960,29 +962,9 @@ body {
   cursor: default;
 }
 
-/* ─── Responsive ────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .measurement-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem;
-  }
-
-  .measurement-field input {
-    padding: 0.3rem 0.4rem;
-    font-size: 0.8rem;
-  }
-
-  .measurement-custom-item {
-    flex-wrap: wrap;
-  }
-
-  .measurement-custom-item input {
-    flex: 1 1 60px;
-    min-width: 50px;
-  }
-}
-
-/* --- Support Hub UI Fixes --- */
+/* ============================================================
+   SUPPORT HUB UI
+   ============================================================ */
 .support-hub-title {
   color: var(--color-text);
 }
@@ -1055,7 +1037,7 @@ body {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 1.25rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 /* --- Quick Help Hub Styles --- */
@@ -1067,11 +1049,11 @@ body {
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  box-shadow: var(--shadow-sm);
 }
 .support-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-md);
   border-color: var(--color-accent);
 }
 .support-card-icon {
@@ -1082,7 +1064,7 @@ body {
   align-items: center;
   justify-content: center;
   margin: 0 auto 0.75rem auto;
-  background: rgba(212, 165, 42, 0.1);
+  background: var(--cresoa-accent-soft);
 }
 .support-card-title { font-weight: 600; color: var(--color-text); font-size: 1rem; margin: 0 0 0.25rem 0; }
 .support-card-desc { color: var(--color-text-muted); font-size: 0.85rem; line-height: 1.4; }
@@ -1100,7 +1082,7 @@ body {
   border-radius: 20px;
   max-width: 400px; width: 100%;
   padding: 2rem;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-xl);
   animation: modalFadeIn 0.2s ease-out;
 }
 @keyframes modalFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -1143,7 +1125,7 @@ body {
   border-radius: 1rem 1rem 0 1rem;
   max-width: 80%;
   word-wrap: break-word;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: var(--shadow-sm);
 }
 .tessa-msg-ai {
   background: var(--color-card);
@@ -1153,7 +1135,7 @@ body {
   border-radius: 1rem 1rem 1rem 0;
   max-width: 80%;
   word-wrap: break-word;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: var(--shadow-sm);
 }
 .tessa-input {
   flex: 1;
@@ -1166,7 +1148,7 @@ body {
   outline: none;
   transition: all 0.2s ease;
 }
-.tessa-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(212, 165, 42, 0.1); }
+.tessa-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--cresoa-accent-soft); }
 .tessa-send-btn {
   background: var(--color-primary);
   color: #fff;
@@ -1184,7 +1166,7 @@ body {
 .dot-bounce {
   display: inline-block;
   width: 6px; height: 6px;
-  background: #9ca3af;
+  background: var(--color-text-muted);
   border-radius: 50%;
   animation: bounce 1.4s infinite ease-in-out both;
 }
@@ -1193,29 +1175,9 @@ body {
   40% { transform: scale(1); }
 }
 
-/* --- Animated Multicolor Send Button --- */
-.rainbow-glow-btn-wrapper {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  padding: 3px;
-  background: conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
-  animation: spin 3s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
-}
 /* ============================================================
-   LOADING SKELETONS
+   LOADING SKELETONS & EMPTY STATES
    ============================================================ */
-
 .cresoa-loading-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1238,58 +1200,31 @@ body {
   animation: cresoa-pulse 1.2s ease-in-out infinite;
 }
 
-.cresoa-skeleton.short {
-  width: 30%;
-}
-
-.cresoa-skeleton.medium {
-  width: 55%;
-}
-
-.cresoa-skeleton.long {
-  width: 80%;
-  height: 28px;
-}
+.cresoa-skeleton.short { width: 30%; }
+.cresoa-skeleton.medium { width: 55%; }
+.cresoa-skeleton.long { width: 80%; height: 28px; }
 
 @keyframes cresoa-pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-  100% {
-    opacity: 1;
-  }
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
 }
 
 @keyframes cresoa-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-/* ============================================================
-   EMPTY STATE
-   ============================================================ */
 
 .cresoa-empty-state {
   padding: 30px 10px;
   text-align: center;
 }
-
 .cresoa-empty-state-title {
   display: block;
   color: var(--cresoa-text);
   font-size: 14px;
   font-weight: 700;
 }
-
 .cresoa-empty-state-message {
   display: block;
   margin-top: 6px;
@@ -1301,70 +1236,28 @@ body {
 /* ============================================================
    RESPONSIVE
    ============================================================ */
-
 @media (max-width: 760px) {
-  .cresoa-dashboard-shell {
-    padding: 14px;
-  }
-
-  .cresoa-card {
-    padding: 16px;
-  }
-
-  .cresoa-main-grid,
-  .cresoa-two-column {
-    grid-template-columns: 1fr !important;
-  }
-
-  .cresoa-pipeline {
-    overflow-x: auto;
-    grid-template-columns: repeat(5, minmax(72px, 1fr));
-  }
-
-  .cresoa-groups-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .cresoa-snapshot-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  .cresoa-dashboard-shell { padding: 14px; }
+  .cresoa-card { padding: 16px; }
+  .cresoa-main-grid, .cresoa-two-column { grid-template-columns: 1fr !important; }
+  .cresoa-pipeline { overflow-x: auto; grid-template-columns: repeat(5, minmax(72px, 1fr)); }
+  .cresoa-groups-grid { grid-template-columns: 1fr; }
+  .cresoa-snapshot-grid { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 480px) {
-  .cresoa-dashboard-shell {
-    padding: 11px;
-  }
-
-  .cresoa-new-order-text {
-    display: none;
-  }
-
-  .cresoa-primary-button {
-    width: 38px;
-    padding: 0;
-  }
-
-  .cresoa-metric-value {
-    font-size: 15px;
-  }
-
-  .cresoa-metric-card {
-    padding: 12px;
-  }
-
-  .cresoa-chart {
-    height: 175px;
-  }
-
-  .cresoa-snapshot-grid {
-    grid-template-columns: 1fr;
-  }
+  .cresoa-dashboard-shell { padding: 11px; }
+  .cresoa-new-order-text { display: none; }
+  .cresoa-primary-button { width: 38px; padding: 0; }
+  .cresoa-metric-value { font-size: 15px; }
+  .cresoa-metric-card { padding: 12px; }
+  .cresoa-chart { height: 175px; }
+  .cresoa-snapshot-grid { grid-template-columns: 1fr; }
 }
 
 /* ============================================================
-   UTILITY – GRID LAYOUTS (used in page.js)
+   UTILITY – GRID LAYOUTS
    ============================================================ */
-
 .cresoa-main-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
@@ -1378,124 +1271,34 @@ body {
 }
 
 /* ============================================================
-   SCROLLBAR (optional polish)
+   SCROLLBAR
    ============================================================ */
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--cresoa-surface-soft);
-  border-radius: 99px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--cresoa-border);
-  border-radius: 99px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--cresoa-text-muted);
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--cresoa-surface-soft); border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: var(--cresoa-border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cresoa-text-muted); }
 
 /* ============================================================
-   GLOBAL MOBILE-FIRST RESPONSIVE SYSTEM (ALL DASHBOARD PAGES)
+   GLOBAL MOBILE-FIRST RESPONSIVE SYSTEM
    ============================================================ */
+.cresoa-dashboard-page { padding-bottom: 120px !important; }
+.cresoa-dashboard-page > * { max-width: 100%; }
 
-/* Fix "Ask Tessa" floating button overlap on every page */
-.cresoa-dashboard-page {
-  padding-bottom: 120px !important;
-}
-
-/* Make all content containers responsive */
-.cresoa-dashboard-page > * {
-  max-width: 100%;
-}
-
-/* Grids that break on mobile (force single column) */
 @media (max-width: 768px) {
-  .cresoa-dashboard-page {
-    padding: 1rem !important;
-  }
-
-  /* All grid layouts inside dashboard become single column on mobile */
-  .cresoa-dashboard-page [style*="grid"] {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Force all primary buttons to be full width and not wrap */
-  .cresoa-primary-button {
-    white-space: nowrap;
-    width: 100% !important;
-    justify-content: center;
-    padding: 0.75rem !important;
-  }
-
-  /* Prevent text overflow on cards and headers */
-  .cresoa-dashboard-page h1,
-  .cresoa-dashboard-page h2,
-  .cresoa-dashboard-page h3,
-  .cresoa-dashboard-page p {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Prevent inputs from overflowing */
-  .cresoa-dashboard-page input,
-  .cresoa-dashboard-page textarea,
-  .cresoa-dashboard-page select {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
+  .cresoa-dashboard-page { padding: 1rem !important; }
+  .cresoa-dashboard-page [style*="grid"] { grid-template-columns: 1fr !important; }
+  .cresoa-primary-button { white-space: nowrap; width: 100% !important; justify-content: center; padding: 0.75rem !important; }
+  .cresoa-dashboard-page h1, .cresoa-dashboard-page h2, .cresoa-dashboard-page h3, .cresoa-dashboard-page p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cresoa-dashboard-page input, .cresoa-dashboard-page textarea, .cresoa-dashboard-page select { max-width: 100% !important; box-sizing: border-box !important; }
 }
 
-/* Desktop-specific tweaks (if needed) */
 @media (min-width: 769px) {
-  .cresoa-dashboard-page {
-    padding: 1.5rem !important;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-}
-
-/* Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap');
-
-body, .cresoa-dashboard {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-
-h1, h2, h3, .font-serif {
-  font-family: 'Lora', serif;
+  .cresoa-dashboard-page { padding: 1.5rem !important; max-width: 1200px; margin: 0 auto; }
 }
 
 /* Micro-interactions */
-.cresoa-metric-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.cresoa-metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  border-color: var(--cresoa-primary);
-}
-.cresoa-list-row {
-  transition: background-color 0.2s ease;
-}
-.cresoa-list-row:hover {
-  background-color: var(--cresoa-surface-muted);
-}
-.cresoa-primary-button {
-  transition: opacity 0.2s ease, transform 0.1s ease;
-}
-.cresoa-primary-button:hover {
-  opacity: 0.9;
-}
-.cresoa-primary-button:active {
-  transform: scale(0.98);
-}
+.cresoa-list-row { transition: background-color 0.2s ease; }
+.cresoa-list-row:hover { background-color: var(--cresoa-surface-soft); }
 
 /* Chart Tooltips */
 .chart-bar-wrapper {
@@ -1511,7 +1314,7 @@ h1, h2, h3, .font-serif {
   position: absolute;
   top: -30px;
   background: var(--cresoa-text);
-  color: var(--cresoa-surface);
+  color: var(--cresoa-bg);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 10px;
@@ -1565,24 +1368,6 @@ h1, h2, h3, .font-serif {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Add this to your globals.css to stop the forced desktop layout ONLY on this page */
-.cresoa-dashboard-force-mobile {
-  display: block !important;
-}
-.cresoa-dashboard-force-mobile .cresoa-dashboard-shell {
-  display: block !important;
-  max-width: 100% !important;
-  padding: 0 !important;
-}
-.cresoa-dashboard-force-mobile .forced-grid-class { /* Replace with the actual class that's forcing the layout if you know it */
-  display: block !important;
-}
-
-.cresoa-dashboard-force-mobile {
-  display: block !important;
-}
-.cresoa-dashboard-force-mobile .cresoa-dashboard-shell {
-  display: block !important;
-  max-width: 100% !important;
-  padding: 0 !important;
-}
+/* Utilities */
+.cresoa-dashboard-force-mobile { display: block !important; }
+.cresoa-dashboard-force-mobile .cresoa-dashboard-shell { display: block !important; max-width: 100% !important; padding: 0 !important; }
