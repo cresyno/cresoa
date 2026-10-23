@@ -147,7 +147,6 @@ const Icon = ({ name, size = 20, sw = 2 }) => (
 /*  Brand marks                                                        */
 /* ------------------------------------------------------------------ */
 
-// Rainbow ring + navy disc + your logo. Ring spins while Tessa is thinking.
 function TessaOrb({ size = 40, ring = 2, spinning = false }) {
   return (
     <div
@@ -162,7 +161,6 @@ function TessaOrb({ size = 40, ring = 2, spinning = false }) {
   );
 }
 
-// Quiet version used next to answers.
 function LogoBadge({ size = 22 }) {
   return (
     <span className="tsa-badge" style={{ '--s': `${size}px` }} aria-hidden="true">
@@ -172,7 +170,7 @@ function LogoBadge({ size = 22 }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Markdown: inline                                                   */
+/*  Markdown Parsing (Unchanged)                                       */
 /* ------------------------------------------------------------------ */
 
 const INLINE_RE =
@@ -203,11 +201,6 @@ function inline(text, depth = 0) {
     return part;
   });
 }
-
-/* ------------------------------------------------------------------ */
-/*  Markdown: blocks (headings, lists, tables, quotes, code, rules)    */
-/*  Tolerant on purpose: handles tables with blank lines between rows  */
-/* ------------------------------------------------------------------ */
 
 const LIST_RE = /^(\s*)([-*•+]|\d+[.)])\s+(.*)$/;
 const SEP_CELL = /^:?-+:?$/;
@@ -243,7 +236,6 @@ function parseBlocks(src) {
       continue;
     }
 
-    // fenced code
     if (/^\s*```/.test(line)) {
       const buf = [];
       i++;
@@ -253,7 +245,6 @@ function parseBlocks(src) {
       continue;
     }
 
-    // table
     if (isTableLine(line)) {
       const rows = [];
       let j = i;
@@ -288,7 +279,6 @@ function parseBlocks(src) {
       continue;
     }
 
-    // heading
     const hm = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/);
     if (hm) {
       blocks.push({ type: 'h', level: hm[1].length, text: hm[2] });
@@ -296,14 +286,12 @@ function parseBlocks(src) {
       continue;
     }
 
-    // rule
     if (isHr(line)) {
       blocks.push({ type: 'hr' });
       i++;
       continue;
     }
 
-    // quote
     if (/^\s*>/.test(line)) {
       const buf = [];
       while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ''));
@@ -311,7 +299,6 @@ function parseBlocks(src) {
       continue;
     }
 
-    // list (nested by indent, tolerates blank lines between items)
     if (LIST_RE.test(line)) {
       const items = [];
       let j = i;
@@ -340,7 +327,6 @@ function parseBlocks(src) {
       continue;
     }
 
-    // paragraph
     const buf = [line];
     i++;
     while (i < lines.length && lines[i].trim() && !startsBlock(lines[i])) buf.push(lines[i++]);
@@ -531,7 +517,7 @@ export default function TessaBottomSheet({
   onClose,
   businessId,
   suggestions = DEFAULT_SUGGESTIONS,
-  pageContext, // optional: sent to the API as page_context
+  pageContext, 
 }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -572,7 +558,6 @@ export default function TessaBottomSheet({
     noticeTimer.current = setTimeout(() => setNotice(''), 3200);
   }, []);
 
-  /* ---------- enter / exit ---------- */
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
@@ -594,7 +579,6 @@ export default function TessaBottomSheet({
     };
   }, [mounted]);
 
-  /* ---------- keyboard-safe viewport ---------- */
   useEffect(() => {
     if (!mounted) return;
     const vp = window.visualViewport;
@@ -621,7 +605,6 @@ export default function TessaBottomSheet({
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
-  /* ---------- optional history ---------- */
   useEffect(() => {
     if (!isOpen || !businessId || HISTORY_LIMIT <= 0) return;
     if (newConvoRef.current || messages.length > 0) return;
@@ -645,9 +628,8 @@ export default function TessaBottomSheet({
       } catch {}
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, businessId]);
+    }, [isOpen, businessId]);
 
-  /* ---------- clear "fresh" flags so animations don't replay on reopen ---------- */
   useEffect(() => {
     if (!messages.some((m) => m.fresh)) return;
     const t = setTimeout(
@@ -657,7 +639,6 @@ export default function TessaBottomSheet({
     return () => clearTimeout(t);
   }, [messages]);
 
-  /* ---------- scrolling ---------- */
   const scrollToBottom = useCallback((smooth = false) => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
@@ -671,7 +652,6 @@ export default function TessaBottomSheet({
     setShowJump(dist > 220);
   };
 
-  // Long answers: land at the START of the reply, not the end. Short ones: stick to bottom.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -687,7 +667,6 @@ export default function TessaBottomSheet({
     if (stick.current) scrollToBottom(true);
   }, [messages, isLoading, scrollToBottom]);
 
-  /* ---------- composer auto-grow ---------- */
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -695,7 +674,6 @@ export default function TessaBottomSheet({
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, [input, isRecording, mounted]);
 
-  /* ---------- send ---------- */
   const send = useCallback(
     async (raw, { retry = false } = {}) => {
       const text = (raw ?? '').trim();
@@ -772,7 +750,6 @@ export default function TessaBottomSheet({
     stick.current = true;
   };
 
-  /* ---------- voice ---------- */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     coarse.current = window.matchMedia?.('(pointer: coarse)').matches ?? false;
@@ -781,7 +758,7 @@ export default function TessaBottomSheet({
     setSpeechSupported(true);
 
     const rec = new SR();
-    rec.lang = 'en-US'; // more reliable than en-NG on many Android browsers
+    rec.lang = 'en-US'; 
     rec.interimResults = true;
     rec.maxAlternatives = 1;
 
@@ -819,7 +796,6 @@ export default function TessaBottomSheet({
     }
   };
 
-  /* ---------- sheet geometry + dragging ---------- */
   const fullH = Math.round(vv.h * 0.94);
   const halfH = Math.min(Math.round(vv.h * 0.66), fullH);
   const height = dragHeight ?? (snap === 'full' ? fullH : halfH);
@@ -868,7 +844,6 @@ export default function TessaBottomSheet({
     setSnap(Math.abs(projected - fullH) < Math.abs(projected - halfH) ? 'full' : 'half');
   };
 
-  /* ---------- composer ---------- */
   const hasText = input.trim().length > 0;
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !coarse.current) {
@@ -893,7 +868,6 @@ export default function TessaBottomSheet({
         aria-modal="true"
         aria-label="Tessa AI assistant"
       >
-        {/* Brand header (also the drag zone) */}
         <div
           className="tsa-grab"
           onPointerDown={onGrabDown}
@@ -913,16 +887,20 @@ export default function TessaBottomSheet({
                 {isLoading ? 'Thinking…' : 'Online'}
               </div>
             </div>
-            <button type="button" className="tsa-pill" onClick={newChat} aria-label="Start a new chat">
-              <Icon name="edit" size={15} /> New chat
-            </button>
-            <button type="button" className="tsa-iconbtn" onClick={onClose} aria-label="Close">
-              <Icon name="close" size={18} />
-            </button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {!isEmpty && (
+                <button type="button" className="tsa-pill" onClick={newChat} aria-label="Start a new chat">
+                  New Chat
+                </button>
+              )}
+              <button type="button" className="tsa-iconbtn" onClick={onClose} aria-label="Close">
+                <Icon name="close" size={18} />
+              </button>
+            </div>
           </header>
         </div>
 
-        {/* Conversation */}
         <div className="tsa-body">
           <div className="tsa-scroll" ref={scrollRef} onScroll={onScroll} role="log" aria-live="polite">
             {isEmpty && !isLoading ? (
@@ -990,7 +968,6 @@ export default function TessaBottomSheet({
           )}
         </div>
 
-        {/* Composer */}
         <div className="tsa-composer">
           {notice && (
             <div className="tsa-notice" role="status">
@@ -1050,8 +1027,7 @@ export default function TessaBottomSheet({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Styles — brand colours are fixed (from your logo); surface, text   */
-/*  and border colours come from your existing CSS variables.          */
+/*  Styles                                                             */
 /* ------------------------------------------------------------------ */
 
 const CSS = `
