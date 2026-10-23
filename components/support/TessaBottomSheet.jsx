@@ -26,16 +26,13 @@ const uid = () => `m${Date.now()}-${_id++}`;
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 const fmtTime = (ts) =>
   new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' &&
-  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const normSugg = (s) =>
   typeof s === 'string'
     ? { label: s, prompt: s }
     : { ...s, prompt: s.prompt || s.label };
 
 /* ------------------------------------------------------------------ */
-/*  Icons (Strictly Minimal)                                           */
+/*  Icons (Minimal)                                                    */
 /* ------------------------------------------------------------------ */
 
 const ICONS = {
@@ -85,7 +82,7 @@ const Icon = ({ name, size = 20, sw = 2 }) => (
 );
 
 /* ------------------------------------------------------------------ */
-/*  Brand marks (Flat, No Gradients)                                   */
+/*  Brand marks                                                        */
 /* ------------------------------------------------------------------ */
 
 function TessaOrb({ size = 40, spinning = false }) {
@@ -101,7 +98,8 @@ function TessaOrb({ size = 40, spinning = false }) {
         alignItems: 'center',
         justifyContent: 'center',
         opacity: spinning ? 0.7 : 1,
-        transition: 'opacity 0.3s ease'
+        transition: 'opacity 0.3s ease',
+        flexShrink: 0
       }}
       aria-hidden="true"
     >
@@ -298,7 +296,7 @@ function ListView({ nodes }) {
   );
 }
 
-function Blocks({ blocks, fresh }) {
+function Blocks({ blocks }) {
   return blocks.map((b, i) => {
     switch (b.type) {
       case 'h': return <h4 key={i} className="tsa-h" data-l={Math.min(b.level, 3)}>{inline(b.text)}</h4>;
@@ -341,7 +339,7 @@ function RichText({ text }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Message row (Bespoke, Clean)                                       */
+/*  Message row (DeepSeek Style)                                       */
 /* ------------------------------------------------------------------ */
 
 function MessageRow({ msg, isStart, isEnd, onRetry }) {
@@ -358,15 +356,8 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
 
   return (
     <div className={`tsa-row ${isUser ? 'tsa-row--user' : 'tsa-row--ai'} ${isStart ? 'is-start' : ''}`}>
-      {!isUser && isStart && (
-        <div className="tsa-sender">
-          <LogoBadge size={22} />
-          <span>Tessa</span>
-        </div>
-      )}
-
       {isUser ? (
-        <div className="tsa-bub">{msg.text}</div>
+        <div className="tsa-bubble-user">{msg.text}</div>
       ) : msg.error ? (
         <div className="tsa-err" role="alert">
           <Icon name="alert" size={18} />
@@ -376,7 +367,13 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
           </div>
         </div>
       ) : (
-        <div className="tsa-bub-ai">
+        <div className="tsa-ai-content">
+          {isStart && (
+            <div className="tsa-ai-header">
+              <LogoBadge size={20} />
+              <span>Tessa</span>
+            </div>
+          )}
           <RichText text={msg.text} />
         </div>
       )}
@@ -696,16 +693,16 @@ export default function TessaBottomSheet({
           <div className="tsa-handle"><i /></div>
           <header className="tsa-head">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <TessaOrb size={42} spinning={isLoading} />
+              <TessaOrb size={38} spinning={isLoading} />
               <div>
                 <div className="tsa-title">Tessa</div>
-                <div className="tsa-status">{isLoading ? 'Typing...' : 'Online'}</div>
+                <div className="tsa-status">{isLoading ? 'Thinking...' : 'Online'}</div>
               </div>
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {!isEmpty && (
-                <button type="button" className="tsa-text-btn" onClick={newChat}>Clear</button>
+                <button type="button" className="tsa-text-btn" onClick={newChat}>New Chat</button>
               )}
               <button type="button" className="tsa-icon-btn" onClick={onClose}><Icon name="close" size={20} /></button>
             </div>
@@ -717,8 +714,8 @@ export default function TessaBottomSheet({
           <div className="tsa-scroll" ref={scrollRef} onScroll={onScroll} role="log">
             {isEmpty && !isLoading ? (
               <div className="tsa-empty">
-                <h2>Hi, I'm Tessa</h2>
-                <p>I can help you manage your business. Pick a question below or type your own.</p>
+                <TessaOrb size={64} />
+                <h2>How can I help you today?</h2>
                 <div className="tsa-suggs">
                   {suggs.map((s, i) => (
                     <button key={i} type="button" className="tsa-sugg" onClick={() => send(s.prompt)}>
@@ -734,11 +731,13 @@ export default function TessaBottomSheet({
                 ))}
                 {isLoading && (
                   <div className="tsa-row tsa-row--ai is-start">
-                    <div className="tsa-sender"><LogoBadge size={22} /><span>Tessa</span></div>
-                    <div className="tsa-bub-ai" style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '44px' }}>
-                      <i className="tsa-dot" style={{ animationDelay: '0s' }} />
-                      <i className="tsa-dot" style={{ animationDelay: '0.2s' }} />
-                      <i className="tsa-dot" style={{ animationDelay: '0.4s' }} />
+                    <div className="tsa-ai-content">
+                      <div className="tsa-ai-header"><LogoBadge size={20} /><span>Tessa</span></div>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '24px' }}>
+                        <i className="tsa-dot" style={{ animationDelay: '0s' }} />
+                        <i className="tsa-dot" style={{ animationDelay: '0.2s' }} />
+                        <i className="tsa-dot" style={{ animationDelay: '0.4s' }} />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -775,16 +774,19 @@ export default function TessaBottomSheet({
             )}
 
             {isRecording ? (
-              <button type="button" className="tsa-action tsa-action--stop" onClick={toggleRecording}><Icon name="stop" size={16} /></button>
-            ) : hasText ? (
-              <button type="button" className="tsa-action tsa-action--send" onClick={() => send(input)} disabled={!hasText || isLoading}>
+              <button type="button" className="tsa-action tsa-action--stop" onClick={toggleRecording}>
+                <Icon name="stop" size={16} />
+              </button>
+            ) : (
+              <button 
+                type="button" 
+                className={`tsa-action tsa-action--send ${hasText ? 'is-active' : ''}`} 
+                onClick={() => send(input)} 
+                disabled={!hasText || isLoading}
+              >
                 <Icon name="arrowUp" size={20} sw={2.5} />
               </button>
-            ) : speechSupported ? (
-              <button type="button" className="tsa-action tsa-action--mic" onClick={toggleRecording} disabled={isLoading}>
-                <Icon name="mic" size={20} />
-              </button>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
@@ -795,27 +797,45 @@ export default function TessaBottomSheet({
 }
 
 const CSS = `
+/* --------------------------------------------------------- */
+/*  THEME VARIABLES (Light / Dark Mode)                      */
+/* --------------------------------------------------------- */
 .tsa-root {
-  --navy: #0B2C5E;
-  --gold: #FDB515;
-  --green: #00A651;
-  --bg: #FFFFFF;
-  --chat-bg: #F9FAFB;
-  --text: #111827;
-  --muted: #6B7280;
-  --line: #E5E7EB;
+  --tsa-bg: #FFFFFF;
+  --tsa-text: #111827;
+  --tsa-text-muted: #6B7280;
+  --tsa-border: #E5E7EB;
+  --tsa-user-bubble-bg: #F3F4F6;
+  --tsa-user-bubble-text: #111827;
+  --tsa-input-bg: #F3F4F6;
+  --tsa-overlay: rgba(0, 0, 0, 0.5);
+  --tsa-brand-navy: #0B2C5E;
+  --tsa-brand-gold: #FDB515;
+
   position: fixed; left: 0; right: 0; z-index: 999; overflow: hidden;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-.tsa-root button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; border: none; background: none; }
-.tsa-root button:focus-visible, .tsa-root textarea:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
-.tsa-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); opacity: 0; transition: opacity 0.3s ease; }
+@media (prefers-color-scheme: dark) {
+  .tsa-root {
+    --tsa-bg: #1A1A1A;
+    --tsa-text: #EDEDED;
+    --tsa-text-muted: #9CA3AF;
+    --tsa-border: #333333;
+    --tsa-user-bubble-bg: #2D2D2D;
+    --tsa-user-bubble-text: #EDEDED;
+    --tsa-input-bg: #2D2D2D;
+    --tsa-overlay: rgba(0, 0, 0, 0.8);
+  }
+}
+
+.tsa-root button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; border: none; background: none; outline: none; }
+.tsa-backdrop { position: absolute; inset: 0; background: var(--tsa-overlay); opacity: 0; transition: opacity 0.3s ease; }
 .tsa-root.is-in .tsa-backdrop { opacity: 1; }
 
 .tsa-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: 640px;
-  background: var(--bg); color: var(--text);
+  background: var(--tsa-bg); color: var(--tsa-text);
   border-radius: 20px 20px 0 0; box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
   display: flex; flex-direction: column; overflow: hidden;
   transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.3s ease;
@@ -824,92 +844,109 @@ const CSS = `
 .tsa-sheet.is-dragging { transition: transform 0.3s ease; }
 
 /* Header */
-.tsa-grab { flex-shrink: 0; touch-action: none; user-select: none; background: var(--navy); color: #fff; }
+.tsa-grab { flex-shrink: 0; touch-action: none; user-select: none; background: var(--tsa-bg); border-bottom: 1px solid var(--tsa-border); }
 .tsa-handle { display: flex; justify-content: center; padding: 12px 0 6px; }
-.tsa-handle i { width: 36px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.3); }
+.tsa-handle i { width: 36px; height: 4px; border-radius: 2px; background: var(--tsa-border); }
 .tsa-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 16px; }
 .tsa-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
-.tsa-status { font-size: 0.78rem; color: var(--gold); font-weight: 500; margin-top: 2px; }
-.tsa-text-btn { color: rgba(255, 255, 255, 0.8); font-size: 0.85rem; font-weight: 600; padding: 8px; }
-.tsa-text-btn:active { color: #fff; }
-.tsa-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; color: #fff; }
-.tsa-icon-btn:active { background: rgba(255, 255, 255, 0.2); }
+.tsa-status { font-size: 0.78rem; color: var(--tsa-brand-navy); font-weight: 600; margin-top: 2px; }
+@media (prefers-color-scheme: dark) { .tsa-status { color: var(--tsa-brand-gold); } }
+.tsa-text-btn { color: var(--tsa-text-muted); font-size: 0.85rem; font-weight: 600; padding: 8px; }
+.tsa-text-btn:active { color: var(--tsa-text); }
+.tsa-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-user-bubble-bg); display: flex; align-items: center; justify-content: center; color: var(--tsa-text); }
+.tsa-icon-btn:active { opacity: 0.7; }
 
 /* Body */
-.tsa-body { position: relative; flex: 1; min-height: 0; background: var(--chat-bg); }
-.tsa-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; }
+.tsa-body { position: relative; flex: 1; min-height: 0; background: var(--tsa-bg); }
+.tsa-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 16px 16px 32px; display: flex; flex-direction: column; }
 
 /* Empty State */
-.tsa-empty { margin: auto; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.tsa-empty h2 { margin: 0 0 8px; font-size: 1.3rem; font-weight: 700; color: var(--navy); }
-.tsa-empty p { margin: 0 0 24px; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+.tsa-empty { margin: auto; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 20px; }
+.tsa-empty h2 { margin: 16px 0 24px; font-size: 1.4rem; font-weight: 600; color: var(--tsa-text); }
 .tsa-suggs { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-.tsa-sugg { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); color: var(--navy); font-size: 0.9rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
-.tsa-sugg:active { background: #F3F4F6; border-color: var(--navy); }
+.tsa-sugg { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; background: var(--tsa-bg); border: 1px solid var(--tsa-border); color: var(--tsa-text); font-size: 0.9rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
+.tsa-sugg:active { background: var(--tsa-user-bubble-bg); border-color: var(--tsa-text-muted); }
 
-/* Chat Rows */
-.tsa-row { display: flex; flex-direction: column; margin-top: 8px; }
-.tsa-row.is-start { margin-top: 20px; }
+/* Chat Rows (DeepSeek Style) */
+.tsa-row { display: flex; flex-direction: column; margin-top: 8px; width: 100%; }
+.tsa-row.is-start { margin-top: 24px; }
 .tsa-row--user { align-items: flex-end; }
-.tsa-sender { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.tsa-row--ai { align-items: flex-start; }
 
-.tsa-bub { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--navy); color: #fff; font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-.tsa-row--user.is-start .tsa-bub { border-top-right-radius: 4px; }
+/* User Bubble */
+.tsa-bubble-user { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--tsa-user-bubble-bg); color: var(--tsa-user-bubble-text); font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 
-.tsa-bub-ai { max-width: 90%; padding: 12px 16px; border-radius: 16px; background: var(--bg); color: var(--text); font-size: 0.95rem; line-height: 1.45; border: 1px solid var(--line); }
-.tsa-row--ai.is-start .tsa-bub-ai { border-top-left-radius: 4px; }
+/* AI Content (No Bubble) */
+.tsa-ai-content { width: 100%; max-width: 100%; display: flex; flex-direction: column; }
+.tsa-ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.85rem; font-weight: 600; color: var(--tsa-text-muted); }
 
-.tsa-meta { display: flex; align-items: center; gap: 8px; margin: 6px 2px 0; font-size: 0.72rem; color: var(--muted); }
+/* Meta */
+.tsa-meta { display: flex; align-items: center; gap: 8px; margin: 8px 2px 0; font-size: 0.72rem; color: var(--tsa-text-muted); }
 .tsa-row--user .tsa-meta { justify-content: flex-end; }
-.tsa-meta button { color: var(--muted); font-weight: 500; padding: 0; font-size: 0.72rem; }
-.tsa-meta button:active { color: var(--navy); }
+.tsa-meta button { color: var(--tsa-text-muted); font-weight: 500; padding: 0; font-size: 0.72rem; text-decoration: underline; text-underline-offset: 2px; }
+.tsa-meta button:active { color: var(--tsa-text); }
 
 /* Loading Dots */
-.tsa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: tsa-bounce 1.4s infinite ease-in-out both; }
+.tsa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--tsa-text-muted); animation: tsa-bounce 1.4s infinite ease-in-out both; }
 @keyframes tsa-bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
 /* Error */
-.tsa-err { display: flex; gap: 10px; padding: 12px 16px; border-radius: 16px; background: #FEF2F2; border: 1px solid #FECACA; max-width: 90%; }
+.tsa-err { display: flex; gap: 10px; padding: 12px 16px; border-radius: 12px; background: #FEF2F2; border: 1px solid #FECACA; max-width: 90%; }
 .tsa-err svg { color: #EF4444; flex-shrink: 0; }
 .tsa-err p { margin: 0; font-size: 0.9rem; color: #991B1B; }
 .tsa-err button { margin-top: 8px; color: #991B1B; font-weight: 700; font-size: 0.85rem; padding: 0; }
 
-/* Rich Text overrides */
-.tsa-rich { min-width: 0; overflow-wrap: anywhere; }
-.tsa-rich > * + * { margin-top: 8px; }
+/* --------------------------------------------------------- */
+/*  RICH TEXT (DeepSeek Typography)                          */
+/* --------------------------------------------------------- */
+.tsa-rich { min-width: 0; overflow-wrap: anywhere; font-size: 0.95rem; line-height: 1.65; color: var(--tsa-text); }
+.tsa-rich > * + * { margin-top: 12px; }
 .tsa-rich p { margin: 0; }
 .tsa-rich strong { font-weight: 700; }
-.tsa-rich a { color: var(--navy); font-weight: 600; text-decoration: underline; }
-.tsa-rich code { background: #F3F4F6; padding: 2px 4px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
-.tsa-h { margin: 0; font-weight: 700; color: var(--navy); }
+.tsa-rich a { color: var(--tsa-brand-navy); font-weight: 600; text-decoration: underline; }
+@media (prefers-color-scheme: dark) { .tsa-rich a { color: var(--tsa-brand-gold); } }
+.tsa-rich code { background: var(--tsa-user-bubble-bg); padding: 2px 4px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
+.tsa-h { margin: 0; font-weight: 700; color: var(--tsa-text); }
 .tsa-h[data-l="1"] { font-size: 1.15rem; }
 .tsa-h[data-l="2"] { font-size: 1.05rem; }
 .tsa-h[data-l="3"] { font-size: 0.95rem; }
+.tsa-rich blockquote { margin: 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--tsa-border); color: var(--tsa-text-muted); }
+.tsa-rich pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--tsa-user-bubble-bg); overflow-x: auto; font-size: 0.85rem; }
 .tsa-list ul, .tsa-list ol { margin: 0; padding-left: 1.2rem; }
-.tsa-list li::marker { color: var(--navy); }
-.tsa-tablewrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--line); }
+.tsa-list li::marker { color: var(--tsa-brand-navy); }
+@media (prefers-color-scheme: dark) { .tsa-list li::marker { color: var(--tsa-brand-gold); } }
+
+/* Table */
+.tsa-tablewrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--tsa-border); }
 .tsa-tablewrap table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.tsa-tablewrap th { padding: 8px; background: #F9FAFB; text-align: left; border-bottom: 1px solid var(--line); color: var(--navy); }
-.tsa-tablewrap td { padding: 8px; border-bottom: 1px solid var(--line); }
+.tsa-tablewrap th { padding: 10px; background: var(--tsa-user-bubble-bg); text-align: left; border-bottom: 1px solid var(--tsa-border); color: var(--tsa-text); font-weight: 600; }
+.tsa-tablewrap td { padding: 10px; border-bottom: 1px solid var(--tsa-border); }
+.tsa-tablewrap td:first-child { font-weight: 600; white-space: nowrap; }
 
 /* Jump Button */
-.tsa-jump { position: absolute; right: 16px; bottom: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--bg); color: var(--navy); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 1px solid var(--line); }
+.tsa-jump { position: absolute; right: 16px; bottom: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-bg); color: var(--tsa-text); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 1px solid var(--tsa-border); }
 
-/* Composer */
-.tsa-composer { flex-shrink: 0; padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
-.tsa-field { display: flex; align-items: flex-end; gap: 8px; background: #F3F4F6; border-radius: 24px; padding: 6px 6px 6px 16px; border: 1px solid transparent; transition: border-color 0.2s; }
-.tsa-field:focus-within { border-color: var(--navy); background: #fff; box-shadow: 0 0 0 2px rgba(11, 44, 94, 0.1); }
-.tsa-field.is-rec { border-color: #EF4444; background: #FEF2F2; }
-.tsa-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 16px; line-height: 1.4; resize: none; padding: 8px 0; max-height: 120px; }
-.tsa-input::placeholder { color: var(--muted); }
-.tsa-action { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.2s; }
+/* --------------------------------------------------------- */
+/*  COMPOSER (Floating Pill)                                 */
+/* --------------------------------------------------------- */
+.tsa-composer { flex-shrink: 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--tsa-bg); }
+.tsa-field { display: flex; align-items: flex-end; gap: 8px; background: var(--tsa-input-bg); border-radius: 24px; padding: 6px; border: 1px solid transparent; transition: border-color 0.2s; min-height: 52px; box-sizing: border-box; }
+.tsa-field:focus-within { border-color: var(--tsa-text-muted); }
+.tsa-field.is-rec { border-color: #EF4444; }
+
+.tsa-input { flex: 1; min-width: 0; border: 0; outline: none !important; box-shadow: none !important; background: transparent; color: var(--tsa-text); font-size: 16px; line-height: 1.4; resize: none; padding: 10px 8px 10px 14px; max-height: 120px; font-family: inherit; }
+.tsa-input::placeholder { color: var(--tsa-text-muted); }
+
+.tsa-action { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.2s; margin-bottom: 2px; }
 .tsa-action:active { transform: scale(0.92); }
-.tsa-action--send { background: var(--navy); color: #fff; }
-.tsa-action--send:disabled { background: #D1D5DB; color: #fff; cursor: default; }
-.tsa-action--mic { background: transparent; color: var(--muted); }
+.tsa-action--send { background: transparent; color: var(--tsa-text-muted); transition: all 0.2s; }
+.tsa-action--send.is-active { background: var(--tsa-brand-navy); color: #fff; }
+@media (prefers-color-scheme: dark) { .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; } }
+.tsa-action--send:disabled { cursor: default; }
+.tsa-action--mic { background: transparent; color: var(--tsa-text-muted); }
 .tsa-action--stop { background: #EF4444; color: #fff; }
-.tsa-rec { flex: 1; display: flex; align-items: center; min-height: 38px; font-size: 0.9rem; }
-.tsa-notice { position: absolute; left: 16px; right: 16px; bottom: calc(100% + 8px); background: var(--navy); color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.tsa-rec { flex: 1; display: flex; align-items: center; min-height: 40px; padding-left: 12px; font-size: 0.9rem; }
+.tsa-notice { position: absolute; left: 16px; right: 16px; bottom: calc(100% + 8px); background: var(--tsa-brand-navy); color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 
 @media (prefers-reduced-motion: reduce) {
   .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
