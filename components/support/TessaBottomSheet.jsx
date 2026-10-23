@@ -8,15 +8,13 @@ import TessaLogo from './TessaLogo';
 /*  Config                                                             */
 /* ------------------------------------------------------------------ */
 
-// Set > 0 to restore past messages when the sheet opens (was .limit(0) = off).
 const HISTORY_LIMIT = 0;
 
-// icon: users | doc | box | chart | sparkle | plus
 const DEFAULT_SUGGESTIONS = [
-  { icon: 'doc', label: 'Create an invoice', prompt: 'How do I create an invoice?' },
-  { icon: 'box', label: 'Track my stock', prompt: 'How do I track my stock?' },
-  { icon: 'users', label: 'Invite a team member', prompt: 'How do I invite a team member?' },
-  { icon: 'chart', label: 'See my reports', prompt: 'What reports can I run?' },
+  { label: 'How do I create an invoice?', prompt: 'How do I create an invoice?' },
+  { label: 'How do I track my stock?', prompt: 'How do I track my stock?' },
+  { label: 'How do I invite a team member?', prompt: 'How do I invite a team member?' },
+  { label: 'What reports can I run?', prompt: 'What reports can I run?' },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -33,11 +31,11 @@ const prefersReducedMotion = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const normSugg = (s) =>
   typeof s === 'string'
-    ? { icon: 'sparkle', label: s, prompt: s }
-    : { icon: 'sparkle', ...s, prompt: s.prompt || s.label };
+    ? { label: s, prompt: s }
+    : { ...s, prompt: s.prompt || s.label };
 
 /* ------------------------------------------------------------------ */
-/*  Icons                                                              */
+/*  Icons (Strictly Minimal)                                           */
 /* ------------------------------------------------------------------ */
 
 const ICONS = {
@@ -55,30 +53,10 @@ const ICONS = {
       <polyline points="5 12 12 5 19 12" />
     </>
   ),
-  edit: (
-    <>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </>
-  ),
   close: (
     <>
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
-    </>
-  ),
-  copy: (
-    <>
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </>
-  ),
-  check: <polyline points="20 6 9 17 4 12" />,
-  chevronDown: <polyline points="6 9 12 15 18 9" />,
-  retry: (
-    <>
-      <polyline points="23 4 23 10 17 10" />
-      <path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10" />
     </>
   ),
   alert: (
@@ -88,43 +66,6 @@ const ICONS = {
       <line x1="12" y1="16" x2="12.01" y2="16" />
     </>
   ),
-  users: (
-    <>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </>
-  ),
-  chart: (
-    <>
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </>
-  ),
-  doc: (
-    <>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </>
-  ),
-  box: (
-    <>
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
-    </>
-  ),
-  plus: (
-    <>
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </>
-  ),
-  sparkle: <path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z" />,
 };
 
 const Icon = ({ name, size = 20, sw = 2 }) => (
@@ -139,32 +80,52 @@ const Icon = ({ name, size = 20, sw = 2 }) => (
     strokeLinejoin="round"
     aria-hidden="true"
   >
-    {ICONS[name] || ICONS.sparkle}
+    {ICONS[name]}
   </svg>
 );
 
 /* ------------------------------------------------------------------ */
-/*  Brand marks                                                        */
+/*  Brand marks (Flat, No Gradients)                                   */
 /* ------------------------------------------------------------------ */
 
-function TessaOrb({ size = 40, ring = 2, spinning = false }) {
+function TessaOrb({ size = 40, spinning = false }) {
   return (
     <div
-      className={`tsa-orb ${spinning ? 'is-spin' : ''}`}
-      style={{ '--s': `${size}px`, '--ring': `${ring}px` }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        backgroundColor: '#0B2C5E',
+        border: '2px solid #FDB515',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: spinning ? 0.7 : 1,
+        transition: 'opacity 0.3s ease'
+      }}
       aria-hidden="true"
     >
-      <div className="tsa-orb-core">
-        <TessaLogo size={Math.round(size * 0.56)} />
-      </div>
+      <TessaLogo size={Math.round(size * 0.55)} />
     </div>
   );
 }
 
 function LogoBadge({ size = 22 }) {
   return (
-    <span className="tsa-badge" style={{ '--s': `${size}px` }} aria-hidden="true">
-      <TessaLogo size={Math.round(size * 0.66)} />
+    <span
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        backgroundColor: '#0B2C5E',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}
+      aria-hidden="true"
+    >
+      <TessaLogo size={Math.round(size * 0.6)} />
     </span>
   );
 }
@@ -231,10 +192,7 @@ function parseBlocks(src) {
 
   while (i < lines.length) {
     const line = lines[i];
-    if (!line.trim()) {
-      i++;
-      continue;
-    }
+    if (!line.trim()) { i++; continue; }
 
     if (/^\s*```/.test(line)) {
       const buf = [];
@@ -249,10 +207,8 @@ function parseBlocks(src) {
       const rows = [];
       let j = i;
       while (j < lines.length) {
-        if (isTableLine(lines[j])) {
-          rows.push(splitRow(lines[j]));
-          j++;
-        } else if (!lines[j].trim()) {
+        if (isTableLine(lines[j])) { rows.push(splitRow(lines[j])); j++; }
+        else if (!lines[j].trim()) {
           let k = j;
           while (k < lines.length && !lines[k].trim()) k++;
           if (k < lines.length && isTableLine(lines[k])) j = k;
@@ -260,16 +216,11 @@ function parseBlocks(src) {
         } else break;
       }
       i = j;
-      if (rows.length < 2) {
-        blocks.push({ type: 'p', lines: [rows[0].join(' ')] });
-        continue;
-      }
+      if (rows.length < 2) { blocks.push({ type: 'p', lines: [rows[0].join(' ')] }); continue; }
       let align = [];
       let body = rows.slice(1);
       if (isSepRow(rows[1])) {
-        align = rows[1].map((c) =>
-          c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left'
-        );
+        align = rows[1].map((c) => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : 'left');
         body = rows.slice(2);
       }
       body = body.filter((r) => !isSepRow(r));
@@ -280,17 +231,8 @@ function parseBlocks(src) {
     }
 
     const hm = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/);
-    if (hm) {
-      blocks.push({ type: 'h', level: hm[1].length, text: hm[2] });
-      i++;
-      continue;
-    }
-
-    if (isHr(line)) {
-      blocks.push({ type: 'hr' });
-      i++;
-      continue;
-    }
+    if (hm) { blocks.push({ type: 'h', level: hm[1].length, text: hm[2] }); i++; continue; }
+    if (isHr(line)) { blocks.push({ type: 'hr' }); i++; continue; }
 
     if (/^\s*>/.test(line)) {
       const buf = [];
@@ -305,16 +247,10 @@ function parseBlocks(src) {
       while (j < lines.length) {
         const m = lines[j].match(LIST_RE);
         if (m && !isHr(lines[j])) {
-          items.push({
-            indent: m[1].replace(/\t/g, '  ').length,
-            ordered: /\d/.test(m[2]),
-            num: parseInt(m[2], 10),
-            text: m[3],
-          });
+          items.push({ indent: m[1].replace(/\t/g, '  ').length, ordered: /\d/.test(m[2]), num: parseInt(m[2], 10), text: m[3] });
           j++;
         } else if (lines[j].trim() && /^\s{2,}\S/.test(lines[j]) && items.length && !isTableLine(lines[j])) {
-          items[items.length - 1].text += ' ' + lines[j].trim();
-          j++;
+          items[items.length - 1].text += ' ' + lines[j].trim(); j++;
         } else if (!lines[j].trim()) {
           let k = j;
           while (k < lines.length && !lines[k].trim()) k++;
@@ -364,89 +300,48 @@ function ListView({ nodes }) {
 
 function Blocks({ blocks, fresh }) {
   return blocks.map((b, i) => {
-    const anim = fresh
-      ? { className: 'tsa-blk', style: { '--d': `${Math.min(i * 70, 700)}ms` } }
-      : {};
     switch (b.type) {
-      case 'h':
-        return (
-          <h4 key={i} className={`tsa-h ${anim.className || ''}`} style={anim.style} data-l={Math.min(b.level, 3)}>
-            {inline(b.text)}
-          </h4>
-        );
-      case 'hr':
-        return <hr key={i} className={anim.className} style={anim.style} />;
-      case 'code':
-        return (
-          <pre key={i} className={anim.className} style={anim.style}>
-            <code>{b.text}</code>
-          </pre>
-        );
-      case 'quote':
-        return (
-          <blockquote key={i} className={anim.className} style={anim.style}>
-            <Blocks blocks={parseBlocks(b.text)} />
-          </blockquote>
-        );
-      case 'list':
-        return (
-          <div key={i} className={`tsa-list ${anim.className || ''}`} style={anim.style}>
-            <ListView nodes={b.nodes} />
-          </div>
-        );
-      case 'table':
-        return (
-          <div key={i} className={`tsa-tablewrap ${anim.className || ''}`} style={anim.style}>
-            <table>
-              <thead>
-                <tr>
-                  {Array.from({ length: b.cols }).map((_, c) => (
-                    <th key={c} style={{ textAlign: b.align[c] || 'left' }}>
-                      {inline(b.head[c] ?? '')}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {b.body.map((r, ri) => (
-                  <tr key={ri}>
-                    {Array.from({ length: b.cols }).map((_, c) => (
-                      <td key={c} style={{ textAlign: b.align[c] || 'left' }}>
-                        {inline(r[c] ?? '')}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      default:
-        return (
-          <p key={i} className={anim.className} style={anim.style}>
-            {b.lines.map((l, li) => (
-              <span key={li}>
-                {li > 0 && <br />}
-                {inline(l.trim())}
-              </span>
-            ))}
-          </p>
-        );
+      case 'h': return <h4 key={i} className="tsa-h" data-l={Math.min(b.level, 3)}>{inline(b.text)}</h4>;
+      case 'hr': return <hr key={i} />;
+      case 'code': return <pre key={i}><code>{b.text}</code></pre>;
+      case 'quote': return <blockquote key={i}><Blocks blocks={parseBlocks(b.text)} /></blockquote>;
+      case 'list': return <div key={i} className="tsa-list"><ListView nodes={b.nodes} /></div>;
+      case 'table': return (
+        <div key={i} className="tsa-tablewrap">
+          <table>
+            <thead>
+              <tr>{Array.from({ length: b.cols }).map((_, c) => <th key={c} style={{ textAlign: b.align[c] || 'left' }}>{inline(b.head[c] ?? '')}</th>)}</tr>
+            </thead>
+            <tbody>
+              {b.body.map((r, ri) => (
+                <tr key={ri}>{Array.from({ length: b.cols }).map((_, c) => <td key={c} style={{ textAlign: b.align[c] || 'left' }}>{inline(r[c] ?? '')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      default: return (
+        <p key={i}>
+          {b.lines.map((l, li) => (
+            <span key={li}>{li > 0 && <br />}{inline(l.trim())}</span>
+          ))}
+        </p>
+      );
     }
   });
 }
 
-function RichText({ text, fresh }) {
+function RichText({ text }) {
   const blocks = useMemo(() => parseBlocks(text), [text]);
   return (
     <div className="tsa-rich">
-      <Blocks blocks={blocks} fresh={fresh} />
+      <Blocks blocks={blocks} />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Message row                                                        */
+/*  Message row (Bespoke, Clean)                                       */
 /* ------------------------------------------------------------------ */
 
 function MessageRow({ msg, isStart, isEnd, onRetry }) {
@@ -462,15 +357,7 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
   };
 
   return (
-    <div
-      data-mid={msg.id}
-      className={[
-        'tsa-row',
-        isUser ? 'tsa-row--user' : 'tsa-row--ai',
-        isStart ? 'is-start' : '',
-        msg.fresh ? 'is-fresh' : '',
-      ].join(' ')}
-    >
+    <div className={`tsa-row ${isUser ? 'tsa-row--user' : 'tsa-row--ai'} ${isStart ? 'is-start' : ''}`}>
       {!isUser && isStart && (
         <div className="tsa-sender">
           <LogoBadge size={22} />
@@ -479,19 +366,19 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
       )}
 
       {isUser ? (
-        <div className={`tsa-bub ${isStart ? 'is-start' : ''}`}>{msg.text}</div>
+        <div className="tsa-bub">{msg.text}</div>
       ) : msg.error ? (
         <div className="tsa-err" role="alert">
           <Icon name="alert" size={18} />
           <div>
             <p>{msg.text}</p>
-            <button type="button" onClick={() => onRetry(msg)}>
-              <Icon name="retry" size={14} /> Retry
-            </button>
+            <button type="button" onClick={() => onRetry(msg)}>Retry</button>
           </div>
         </div>
       ) : (
-        <RichText text={msg.text} fresh={msg.animate} />
+        <div className="tsa-bub-ai">
+          <RichText text={msg.text} />
+        </div>
       )}
 
       {isEnd && !msg.error && (
@@ -499,7 +386,7 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
           <time>{fmtTime(msg.ts)}</time>
           {!isUser && (
             <button type="button" onClick={copy}>
-              <Icon name={copied ? 'check' : 'copy'} size={13} /> {copied ? 'Copied' : 'Copy'}
+              {copied ? 'Copied' : 'Copy'}
             </button>
           )}
         </div>
@@ -574,19 +461,13 @@ export default function TessaBottomSheet({
 
   useEffect(() => {
     document.body.style.overflow = mounted ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
+    return () => { document.body.style.overflow = ''; };
   }, [mounted]);
 
   useEffect(() => {
     if (!mounted) return;
     const vp = window.visualViewport;
-    const update = () =>
-      setVv({
-        h: Math.round(vp?.height ?? window.innerHeight),
-        top: Math.round(vp?.offsetTop ?? 0),
-      });
+    const update = () => setVv({ h: Math.round(vp?.height ?? window.innerHeight), top: Math.round(vp?.offsetTop ?? 0) });
     update();
     vp?.addEventListener('resize', update);
     vp?.addEventListener('scroll', update);
@@ -610,32 +491,16 @@ export default function TessaBottomSheet({
     if (newConvoRef.current || messages.length > 0) return;
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('support_messages')
-          .select('sender_type, message, created_at')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false })
-          .limit(HISTORY_LIMIT);
+        const { data, error } = await supabase.from('support_messages').select('sender_type, message, created_at').eq('business_id', businessId).order('created_at', { ascending: false }).limit(HISTORY_LIMIT);
         if (error || !data?.length) return;
-        setMessages(
-          data.reverse().map((m) => ({
-            id: uid(),
-            role: m.sender_type === 'user' ? 'user' : 'assistant',
-            text: m.message,
-            ts: new Date(m.created_at).getTime() || Date.now(),
-          }))
-        );
+        setMessages(data.reverse().map((m) => ({ id: uid(), role: m.sender_type === 'user' ? 'user' : 'assistant', text: m.message, ts: new Date(m.created_at).getTime() || Date.now() })));
       } catch {}
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, businessId]);
+  }, [isOpen, businessId]);
 
   useEffect(() => {
     if (!messages.some((m) => m.fresh)) return;
-    const t = setTimeout(
-      () => setMessages((p) => p.map((m) => (m.fresh ? { ...m, fresh: false, animate: false } : m))),
-      1800
-    );
+    const t = setTimeout(() => setMessages((p) => p.map((m) => (m.fresh ? { ...m, fresh: false } : m))), 1800);
     return () => clearTimeout(t);
   }, [messages]);
 
@@ -680,29 +545,18 @@ export default function TessaBottomSheet({
       if (!text || loadingRef.current) return;
 
       stick.current = true;
-      if (!retry)
-        setMessages((p) => [...p, { id: uid(), role: 'user', text, ts: Date.now(), fresh: true }]);
+      if (!retry) setMessages((p) => [...p, { id: uid(), role: 'user', text, ts: Date.now(), fresh: true }]);
       setInput('');
       setLoading(true);
       const myReq = ++reqId.current;
-      const animate = !prefersReducedMotion();
-
-      const pushAi = (extra) =>
-        setMessages((p) => [
-          ...p,
-          { id: uid(), role: 'assistant', ts: Date.now(), fresh: true, ...extra },
-        ]);
+      
+      const pushAi = (extra) => setMessages((p) => [...p, { id: uid(), role: 'assistant', ts: Date.now(), fresh: true, ...extra }]);
 
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch('/api/support/message', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
             message: text,
             business_id: businessId,
@@ -712,21 +566,13 @@ export default function TessaBottomSheet({
         });
         const data = await res.json().catch(() => ({}));
         if (myReq !== reqId.current) return;
-        if (data.answer) pushAi({ text: data.answer, animate });
-        else
-          pushAi({
-            text: "Tessa didn't return an answer. Tap Retry to ask again.",
-            error: true,
-            retryText: text,
-          });
+        
+        if (data.answer) pushAi({ text: data.answer });
+        else pushAi({ text: "Tessa didn't return an answer. Tap Retry to ask again.", error: true, retryText: text });
+        
         newConvoRef.current = false;
       } catch {
-        if (myReq === reqId.current)
-          pushAi({
-            text: "Couldn't reach Tessa. Check your connection, then tap Retry.",
-            error: true,
-            retryText: text,
-          });
+        if (myReq === reqId.current) pushAi({ text: "Couldn't reach Tessa. Check your connection, then tap Retry.", error: true, retryText: text });
       } finally {
         if (myReq === reqId.current) setLoading(false);
       }
@@ -763,15 +609,11 @@ export default function TessaBottomSheet({
     rec.maxAlternatives = 1;
 
     rec.onstart = () => setIsRecording(true);
-    rec.onend = () => {
-      setIsRecording(false);
-      setInterim('');
-    };
+    rec.onend = () => { setIsRecording(false); setInterim(''); };
     rec.onerror = (e) => {
       setIsRecording(false);
       setInterim('');
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed')
-        flash('Microphone is blocked. Allow it in your browser settings.');
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') flash('Microphone is blocked. Allow it in your browser settings.');
       else if (e.error === 'no-speech') flash("Didn't catch that. Tap the mic and try again.");
       else if (e.error !== 'aborted') flash('Voice input failed. Type your message instead.');
     };
@@ -788,12 +630,7 @@ export default function TessaBottomSheet({
     const rec = recognitionRef.current;
     if (!rec) return flash('Voice input is not supported here. Type your message instead.');
     if (isRecording) rec.stop();
-    else {
-      setInput('');
-      try {
-        rec.start();
-      } catch {}
-    }
+    else { setInput(''); try { rec.start(); } catch {} }
   };
 
   const fullH = Math.round(vv.h * 0.94);
@@ -802,16 +639,7 @@ export default function TessaBottomSheet({
 
   const onGrabDown = (e) => {
     if (e.target.closest('button')) return;
-    drag.current = {
-      startY: e.clientY,
-      startH: height,
-      h: height,
-      lastY: e.clientY,
-      lastT: performance.now(),
-      v: 0,
-      moved: false,
-      onHandle: !!e.target.closest('.tsa-handle'),
-    };
+    drag.current = { startY: e.clientY, startH: height, h: height, lastY: e.clientY, lastT: performance.now(), v: 0, moved: false, onHandle: !!e.target.closest('.tsa-handle') };
     e.currentTarget.setPointerCapture?.(e.pointerId);
     setDragging(true);
   };
@@ -861,66 +689,40 @@ export default function TessaBottomSheet({
     <div className={`tsa-root ${entered ? 'is-in' : ''}`} style={{ top: vv.top, height: vv.h }}>
       <div className="tsa-backdrop" onClick={onClose} />
 
-      <div
-        className={`tsa-sheet ${dragging ? 'is-dragging' : ''}`}
-        style={{ height }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Tessa AI assistant"
-      >
-        <div
-          className="tsa-grab"
-          onPointerDown={onGrabDown}
-          onPointerMove={onGrabMove}
-          onPointerUp={onGrabUp}
-          onPointerCancel={onGrabUp}
-        >
-          <div className="tsa-handle">
-            <i />
-          </div>
+      <div className={`tsa-sheet ${dragging ? 'is-dragging' : ''}`} style={{ height }} role="dialog" aria-modal="true">
+        
+        {/* HEADER */}
+        <div className="tsa-grab" onPointerDown={onGrabDown} onPointerMove={onGrabMove} onPointerUp={onGrabUp} onPointerCancel={onGrabUp}>
+          <div className="tsa-handle"><i /></div>
           <header className="tsa-head">
-            <TessaOrb size={42} ring={2} spinning={isLoading} />
-            <div className="tsa-who">
-              <div className="tsa-title">Tessa</div>
-              <div className="tsa-status">
-                <span className={`tsa-dot ${isLoading ? 'is-busy' : ''}`} />
-                {isLoading ? 'Thinking…' : 'Online'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <TessaOrb size={42} spinning={isLoading} />
+              <div>
+                <div className="tsa-title">Tessa</div>
+                <div className="tsa-status">{isLoading ? 'Typing...' : 'Online'}</div>
               </div>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {!isEmpty && (
-                <button type="button" className="tsa-pill" onClick={newChat} aria-label="Start a new chat">
-                  New Chat
-                </button>
+                <button type="button" className="tsa-text-btn" onClick={newChat}>Clear</button>
               )}
-              <button type="button" className="tsa-iconbtn" onClick={onClose} aria-label="Close">
-                <Icon name="close" size={18} />
-              </button>
+              <button type="button" className="tsa-icon-btn" onClick={onClose}><Icon name="close" size={20} /></button>
             </div>
           </header>
         </div>
 
+        {/* BODY */}
         <div className="tsa-body">
-          <div className="tsa-scroll" ref={scrollRef} onScroll={onScroll} role="log" aria-live="polite">
+          <div className="tsa-scroll" ref={scrollRef} onScroll={onScroll} role="log">
             {isEmpty && !isLoading ? (
               <div className="tsa-empty">
-                <TessaOrb size={68} ring={3} />
                 <h2>Hi, I'm Tessa</h2>
-                <p>Your support assistant. Ask how to do anything in your workspace.</p>
+                <p>I can help you manage your business. Pick a question below or type your own.</p>
                 <div className="tsa-suggs">
                   {suggs.map((s, i) => (
-                    <button
-                      key={s.label}
-                      type="button"
-                      className="tsa-sugg"
-                      style={{ '--i': i }}
-                      onClick={() => send(s.prompt)}
-                    >
-                      <span className="tsa-sugg-ic">
-                        <Icon name={s.icon} size={18} />
-                      </span>
-                      <span className="tsa-sugg-t">{s.label}</span>
+                    <button key={i} type="button" className="tsa-sugg" onClick={() => send(s.prompt)}>
+                      {s.label}
                     </button>
                   ))}
                 </div>
@@ -928,24 +730,15 @@ export default function TessaBottomSheet({
             ) : (
               <>
                 {messages.map((m, i) => (
-                  <MessageRow
-                    key={m.id}
-                    msg={m}
-                    isStart={messages[i - 1]?.role !== m.role}
-                    isEnd={messages[i + 1]?.role !== m.role}
-                    onRetry={retry}
-                  />
+                  <MessageRow key={m.id} msg={m} isStart={messages[i - 1]?.role !== m.role} isEnd={messages[i + 1]?.role !== m.role} onRetry={retry} />
                 ))}
                 {isLoading && (
-                  <div className="tsa-row tsa-row--ai is-start" aria-label="Tessa is thinking">
-                    <div className="tsa-sender">
-                      <LogoBadge size={22} />
-                      <span>Tessa</span>
-                    </div>
-                    <div className="tsa-skel">
-                      <i style={{ width: '92%' }} />
-                      <i style={{ width: '76%' }} />
-                      <i style={{ width: '48%' }} />
+                  <div className="tsa-row tsa-row--ai is-start">
+                    <div className="tsa-sender"><LogoBadge size={22} /><span>Tessa</span></div>
+                    <div className="tsa-bub-ai" style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '44px' }}>
+                      <i className="tsa-dot" style={{ animationDelay: '0s' }} />
+                      <i className="tsa-dot" style={{ animationDelay: '0.2s' }} />
+                      <i className="tsa-dot" style={{ animationDelay: '0.4s' }} />
                     </div>
                   </div>
                 )}
@@ -954,35 +747,19 @@ export default function TessaBottomSheet({
           </div>
 
           {showJump && (
-            <button
-              type="button"
-              className="tsa-jump"
-              onClick={() => {
-                stick.current = true;
-                scrollToBottom(true);
-              }}
-              aria-label="Jump to latest message"
-            >
-              <Icon name="chevronDown" size={18} />
+            <button type="button" className="tsa-jump" onClick={() => { stick.current = true; scrollToBottom(true); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
           )}
         </div>
 
+        {/* COMPOSER */}
         <div className="tsa-composer">
-          {notice && (
-            <div className="tsa-notice" role="status">
-              {notice}
-            </div>
-          )}
+          {notice && <div className="tsa-notice">{notice}</div>}
           <div className={`tsa-field ${isRecording ? 'is-rec' : ''}`}>
             {isRecording ? (
               <div className="tsa-rec">
-                <span className="tsa-wave">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <i key={i} style={{ animationDelay: `${i * 0.12}s` }} />
-                  ))}
-                </span>
-                <span className="tsa-rec-text">{interim || 'Listening…'}</span>
+                <span style={{ fontWeight: 600, color: '#EF4444' }}>{interim || 'Listening...'}</span>
               </div>
             ) : (
               <textarea
@@ -993,30 +770,21 @@ export default function TessaBottomSheet({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
                 onFocus={() => setSnap('full')}
-                placeholder="Message Tessa"
-                aria-label="Message Tessa"
+                placeholder="Message Tessa..."
               />
             )}
 
             {isRecording ? (
-              <button type="button" className="tsa-action tsa-action--stop" onClick={toggleRecording} aria-label="Stop recording">
-                <Icon name="stop" size={18} />
+              <button type="button" className="tsa-action tsa-action--stop" onClick={toggleRecording}><Icon name="stop" size={16} /></button>
+            ) : hasText ? (
+              <button type="button" className="tsa-action tsa-action--send" onClick={() => send(input)} disabled={!hasText || isLoading}>
+                <Icon name="arrowUp" size={20} sw={2.5} />
               </button>
-            ) : hasText || !speechSupported ? (
-              <button
-                type="button"
-                className="tsa-action tsa-action--send"
-                onClick={() => send(input)}
-                disabled={!hasText || isLoading}
-                aria-label="Send message"
-              >
-                <Icon name="arrowUp" size={20} sw={2.8} />
-              </button>
-            ) : (
-              <button type="button" className="tsa-action tsa-action--mic" onClick={toggleRecording} disabled={isLoading} aria-label="Voice input">
+            ) : speechSupported ? (
+              <button type="button" className="tsa-action tsa-action--mic" onClick={toggleRecording} disabled={isLoading}>
                 <Icon name="mic" size={20} />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -1026,175 +794,124 @@ export default function TessaBottomSheet({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Styles                                                             */
-/* ------------------------------------------------------------------ */
-
 const CSS = `
-.tsa-root{
-  --navy:#0F2B4A;
-  --navy-hi:#173C63;
-  --gold:#D9A72E;
-  --gold-hi:#F0C75E;
-  --gold-ink:#96700F;
-  --gold-grad:linear-gradient(135deg,#D9A72E,#F0C75E);
-  --card:var(--color-card,#FFFFFF);
-  --bg:var(--color-bg,#F6F3EC);
-  --text:var(--color-text,#14202E);
-  --muted:var(--color-text-muted,#66707E);
-  --line:var(--color-border,#E4E0D6);
-  --danger:var(--color-danger,#D9534F);
-  --display:var(--font-display,Georgia,'Times New Roman',serif);
-  --ease:cubic-bezier(.22,1,.36,1);
-  position:fixed;left:0;right:0;z-index:999;overflow:hidden;font-family:inherit;
+.tsa-root {
+  --navy: #0B2C5E;
+  --gold: #FDB515;
+  --green: #00A651;
+  --bg: #FFFFFF;
+  --chat-bg: #F9FAFB;
+  --text: #111827;
+  --muted: #6B7280;
+  --line: #E5E7EB;
+  position: fixed; left: 0; right: 0; z-index: 999; overflow: hidden;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-.tsa-root button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.tsa-root button:focus-visible,.tsa-root textarea:focus-visible,.tsa-root a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.tsa-root button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; border: none; background: none; }
+.tsa-root button:focus-visible, .tsa-root textarea:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
-.tsa-backdrop{position:absolute;inset:0;background:rgba(6,14,28,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .3s ease}
-.tsa-root.is-in .tsa-backdrop{opacity:1}
+.tsa-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); opacity: 0; transition: opacity 0.3s ease; }
+.tsa-root.is-in .tsa-backdrop { opacity: 1; }
 
-.tsa-sheet{
-  position:absolute;left:0;right:0;bottom:0;margin:0 auto;width:100%;max-width:640px;
-  background:var(--bg);color:var(--text);
-  border-radius:28px 28px 0 0;box-shadow:0 -14px 50px rgba(6,14,28,.35);
-  display:flex;flex-direction:column;overflow:hidden;
-  transform:translateY(100%);
-  transition:transform .4s var(--ease),height .32s var(--ease);
+.tsa-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: 640px;
+  background: var(--bg); color: var(--text);
+  border-radius: 20px 20px 0 0; box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+  display: flex; flex-direction: column; overflow: hidden;
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.3s ease;
 }
-.tsa-root.is-in .tsa-sheet{transform:translateY(0)}
-.tsa-sheet.is-dragging{transition:transform .4s var(--ease)}
+.tsa-root.is-in .tsa-sheet { transform: translateY(0); }
+.tsa-sheet.is-dragging { transition: transform 0.3s ease; }
 
-/* ---------- header ---------- */
-.tsa-grab{flex-shrink:0;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;background:linear-gradient(180deg,var(--navy-hi),var(--navy));color:#fff}
-.tsa-grab::after{content:'';display:block;height:2px;background:linear-gradient(90deg,transparent,var(--gold) 18%,var(--gold-hi) 50%,var(--gold) 82%,transparent)}
-.tsa-handle{display:flex;justify-content:center;padding:10px 0 4px}
-.tsa-handle i{width:44px;height:5px;border-radius:3px;background:rgba(255,255,255,.28)}
-.tsa-head{display:flex;align-items:center;gap:12px;padding:6px 14px 14px 16px}
-.tsa-who{flex:1;min-width:0}
-.tsa-title{font-family:var(--display);font-weight:700;font-size:1.18rem;line-height:1.15;letter-spacing:.2px}
-.tsa-status{display:flex;align-items:center;gap:6px;font-size:.76rem;color:rgba(255,255,255,.68);margin-top:3px}
-.tsa-dot{width:7px;height:7px;border-radius:50%;background:#34d399;transition:background .2s}
-.tsa-dot.is-busy{background:var(--gold-hi)}
-.tsa-pill{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px 0 12px;border-radius:18px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.08);color:#fff;font-size:.82rem;font-weight:600;transition:background .15s}
-.tsa-pill:active{background:rgba(255,255,255,.18)}
-.tsa-iconbtn{width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.13);color:#fff;display:grid;place-items:center}
-.tsa-iconbtn:active{background:rgba(255,255,255,.24)}
+/* Header */
+.tsa-grab { flex-shrink: 0; touch-action: none; user-select: none; background: var(--navy); color: #fff; }
+.tsa-handle { display: flex; justify-content: center; padding: 12px 0 6px; }
+.tsa-handle i { width: 36px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.3); }
+.tsa-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 16px; }
+.tsa-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
+.tsa-status { font-size: 0.78rem; color: var(--gold); font-weight: 500; margin-top: 2px; }
+.tsa-text-btn { color: rgba(255, 255, 255, 0.8); font-size: 0.85rem; font-weight: 600; padding: 8px; }
+.tsa-text-btn:active { color: #fff; }
+.tsa-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; color: #fff; }
+.tsa-icon-btn:active { background: rgba(255, 255, 255, 0.2); }
 
-/* ---------- brand marks ---------- */
-.tsa-orb{position:relative;width:var(--s);height:var(--s);flex-shrink:0;border-radius:50%}
-.tsa-orb::before{content:'';position:absolute;inset:0;border-radius:50%;background:conic-gradient(#ff5f6d,#ffc371,#d6e85a,#4fd1c5,#5b8def,#b06bff,#ff5f6d)}
-.tsa-orb.is-spin::before{animation:tsa-spin 1.3s linear infinite}
-.tsa-orb-core{position:absolute;inset:var(--ring);border-radius:50%;background:var(--navy);display:grid;place-items:center}
-.tsa-badge{width:var(--s);height:var(--s);border-radius:50%;background:var(--navy);display:inline-grid;place-items:center;flex-shrink:0;box-shadow:0 0 0 1.5px var(--gold)}
+/* Body */
+.tsa-body { position: relative; flex: 1; min-height: 0; background: var(--chat-bg); }
+.tsa-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 16px; display: flex; flex-direction: column; }
 
-/* ---------- body ---------- */
-.tsa-body{position:relative;flex:1;min-height:0;background:var(--bg)}
-.tsa-scroll{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 16px 12px;display:flex;flex-direction:column}
+/* Empty State */
+.tsa-empty { margin: auto; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.tsa-empty h2 { margin: 0 0 8px; font-size: 1.3rem; font-weight: 700; color: var(--navy); }
+.tsa-empty p { margin: 0 0 24px; color: var(--muted); font-size: 0.9rem; line-height: 1.4; }
+.tsa-suggs { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.tsa-sugg { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); color: var(--navy); font-size: 0.9rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
+.tsa-sugg:active { background: #F3F4F6; border-color: var(--navy); }
 
-/* empty state */
-.tsa-empty{margin:auto;width:100%;max-width:440px;display:flex;flex-direction:column;align-items:center;text-align:center;padding:4px 0}
-.tsa-empty h2{margin:14px 0 4px;font-family:var(--display);font-size:1.55rem;font-weight:700;line-height:1.15}
-.tsa-empty p{margin:0;color:var(--muted);font-size:.9rem;line-height:1.45;max-width:30ch}
-.tsa-suggs{margin-top:22px;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.tsa-sugg{display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;padding:13px 14px;border-radius:18px;border:1px solid var(--line);background:var(--card);color:var(--text);transition:transform .15s,border-color .15s,box-shadow .15s;animation:tsa-rise .55s var(--ease) both;animation-delay:calc(var(--i) * 80ms + 150ms)}
-.tsa-sugg:hover{border-color:var(--gold)}
-.tsa-sugg:active{transform:scale(.97)}
-.tsa-sugg-ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:color-mix(in srgb,var(--gold) 17%,transparent);color:var(--gold-ink)}
-.tsa-sugg-t{font-size:.9rem;font-weight:600;line-height:1.25}
+/* Chat Rows */
+.tsa-row { display: flex; flex-direction: column; margin-top: 8px; }
+.tsa-row.is-start { margin-top: 20px; }
+.tsa-row--user { align-items: flex-end; }
+.tsa-sender { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
 
-/* rows */
-.tsa-row{display:flex;flex-direction:column;margin-top:6px}
-.tsa-row.is-start{margin-top:22px}
-.tsa-row:first-child{margin-top:0}
-.tsa-row--user{align-items:flex-end}
-.tsa-row--user.is-fresh{animation:tsa-in .3s var(--ease)}
-.tsa-sender{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.82rem;font-weight:700}
+.tsa-bub { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--navy); color: #fff; font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.tsa-row--user.is-start .tsa-bub { border-top-right-radius: 4px; }
 
-.tsa-bub{max-width:82%;padding:11px 16px;border-radius:20px;background:var(--navy);color:#fff;font-size:.95rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
-.tsa-bub.is-start{border-top-right-radius:7px}
+.tsa-bub-ai { max-width: 90%; padding: 12px 16px; border-radius: 16px; background: var(--bg); color: var(--text); font-size: 0.95rem; line-height: 1.45; border: 1px solid var(--line); }
+.tsa-row--ai.is-start .tsa-bub-ai { border-top-left-radius: 4px; }
 
-.tsa-meta{display:flex;align-items:center;gap:12px;margin:6px 2px 0;font-size:.72rem;color:var(--muted)}
-.tsa-row--user .tsa-meta{justify-content:flex-end}
-.tsa-meta button{display:inline-flex;align-items:center;gap:4px;border:0;background:none;color:var(--muted);padding:2px 0;font-size:.72rem;font-weight:600}
-.tsa-meta button:active{color:var(--text)}
+.tsa-meta { display: flex; align-items: center; gap: 8px; margin: 6px 2px 0; font-size: 0.72rem; color: var(--muted); }
+.tsa-row--user .tsa-meta { justify-content: flex-end; }
+.tsa-meta button { color: var(--muted); font-weight: 500; padding: 0; font-size: 0.72rem; }
+.tsa-meta button:active { color: var(--navy); }
 
-.tsa-err{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--danger) 9%,var(--card));border:1px solid color-mix(in srgb,var(--danger) 35%,var(--line));color:var(--text);font-size:.9rem;line-height:1.45}
-.tsa-err svg{color:var(--danger);flex-shrink:0;margin-top:2px}
-.tsa-err p{margin:0}
-.tsa-err button{margin-top:8px;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;border:1px solid color-mix(in srgb,var(--danger) 45%,var(--line));background:var(--card);color:var(--text);font-size:.8rem;font-weight:600}
+/* Loading Dots */
+.tsa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: tsa-bounce 1.4s infinite ease-in-out both; }
+@keyframes tsa-bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
-/* loading skeleton */
-.tsa-skel{display:flex;flex-direction:column;gap:10px;padding:2px 0}
-.tsa-skel i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--line) 25%,color-mix(in srgb,var(--gold) 34%,var(--line)) 50%,var(--line) 75%);background-size:200% 100%;animation:tsa-shimmer 1.4s linear infinite}
+/* Error */
+.tsa-err { display: flex; gap: 10px; padding: 12px 16px; border-radius: 16px; background: #FEF2F2; border: 1px solid #FECACA; max-width: 90%; }
+.tsa-err svg { color: #EF4444; flex-shrink: 0; }
+.tsa-err p { margin: 0; font-size: 0.9rem; color: #991B1B; }
+.tsa-err button { margin-top: 8px; color: #991B1B; font-weight: 700; font-size: 0.85rem; padding: 0; }
 
-/* ---------- rich text ---------- */
-.tsa-rich{font-size:.95rem;line-height:1.62;color:var(--text);min-width:0;overflow-wrap:anywhere}
-.tsa-rich>*+*{margin-top:12px}
-.tsa-rich p{margin:0}
-.tsa-rich strong{font-weight:650}
-.tsa-rich a{color:var(--gold-ink);font-weight:600;text-decoration:underline;text-underline-offset:2px}
-.tsa-rich code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.84em;background:color-mix(in srgb,var(--muted) 15%,transparent);padding:1px 6px;border-radius:6px}
-.tsa-h{margin:0;font-family:var(--display);font-weight:700;line-height:1.25}
-.tsa-h[data-l="1"]{font-size:1.2rem}
-.tsa-h[data-l="2"]{font-size:1.1rem}
-.tsa-h[data-l="3"]{font-size:1.02rem}
-.tsa-rich>.tsa-h{margin-top:18px}
-.tsa-rich>.tsa-h:first-child{margin-top:0}
-.tsa-list ul,.tsa-list ol{margin:0;padding-left:1.3rem}
-.tsa-list li+li{margin-top:6px}
-.tsa-list li>ul,.tsa-list li>ol{margin-top:6px}
-.tsa-list li::marker{color:var(--gold-ink);font-weight:700}
-.tsa-rich blockquote{margin:0;padding:2px 0 2px 14px;border-left:3px solid var(--gold);color:var(--muted)}
-.tsa-rich hr{border:0;height:1px;background:var(--line);margin:16px 0}
-.tsa-rich pre{margin:0;padding:12px 14px;border-radius:14px;background:#11161D;color:#E8EDF3;overflow-x:auto;font-size:.82rem;line-height:1.55}
-.tsa-rich pre code{background:none;padding:0;font-size:inherit;color:inherit}
+/* Rich Text overrides */
+.tsa-rich { min-width: 0; overflow-wrap: anywhere; }
+.tsa-rich > * + * { margin-top: 8px; }
+.tsa-rich p { margin: 0; }
+.tsa-rich strong { font-weight: 700; }
+.tsa-rich a { color: var(--navy); font-weight: 600; text-decoration: underline; }
+.tsa-rich code { background: #F3F4F6; padding: 2px 4px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
+.tsa-h { margin: 0; font-weight: 700; color: var(--navy); }
+.tsa-h[data-l="1"] { font-size: 1.15rem; }
+.tsa-h[data-l="2"] { font-size: 1.05rem; }
+.tsa-h[data-l="3"] { font-size: 0.95rem; }
+.tsa-list ul, .tsa-list ol { margin: 0; padding-left: 1.2rem; }
+.tsa-list li::marker { color: var(--navy); }
+.tsa-tablewrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--line); }
+.tsa-tablewrap table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.tsa-tablewrap th { padding: 8px; background: #F9FAFB; text-align: left; border-bottom: 1px solid var(--line); color: var(--navy); }
+.tsa-tablewrap td { padding: 8px; border-bottom: 1px solid var(--line); }
 
-/* tables */
-.tsa-tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--card);-webkit-overflow-scrolling:touch}
-.tsa-tablewrap table{width:100%;border-collapse:collapse;font-size:.86rem;line-height:1.45}
-.tsa-tablewrap th{padding:11px 14px;text-align:left;font-weight:700;font-size:.8rem;color:#fff;background:var(--navy);white-space:nowrap}
-.tsa-tablewrap td{padding:11px 14px;vertical-align:top;border-top:1px solid var(--line)}
-.tsa-tablewrap tbody tr:first-child td{border-top:0}
-.tsa-tablewrap td:first-child{font-weight:650;min-width:6.5rem}
-.tsa-tablewrap tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--gold) 6%,transparent)}
+/* Jump Button */
+.tsa-jump { position: absolute; right: 16px; bottom: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--bg); color: var(--navy); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 1px solid var(--line); }
 
-/* fresh answers: blocks cascade in */
-.tsa-blk{animation:tsa-in .45s var(--ease) both;animation-delay:var(--d,0ms)}
+/* Composer */
+.tsa-composer { flex-shrink: 0; padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
+.tsa-field { display: flex; align-items: flex-end; gap: 8px; background: #F3F4F6; border-radius: 24px; padding: 6px 6px 6px 16px; border: 1px solid transparent; transition: border-color 0.2s; }
+.tsa-field:focus-within { border-color: var(--navy); background: #fff; box-shadow: 0 0 0 2px rgba(11, 44, 94, 0.1); }
+.tsa-field.is-rec { border-color: #EF4444; background: #FEF2F2; }
+.tsa-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 16px; line-height: 1.4; resize: none; padding: 8px 0; max-height: 120px; }
+.tsa-input::placeholder { color: var(--muted); }
+.tsa-action { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.2s; }
+.tsa-action:active { transform: scale(0.92); }
+.tsa-action--send { background: var(--navy); color: #fff; }
+.tsa-action--send:disabled { background: #D1D5DB; color: #fff; cursor: default; }
+.tsa-action--mic { background: transparent; color: var(--muted); }
+.tsa-action--stop { background: #EF4444; color: #fff; }
+.tsa-rec { flex: 1; display: flex; align-items: center; min-height: 38px; font-size: 0.9rem; }
+.tsa-notice { position: absolute; left: 16px; right: 16px; bottom: calc(100% + 8px); background: var(--navy); color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 
-.tsa-jump{position:absolute;right:14px;bottom:10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--text);display:grid;place-items:center;box-shadow:0 6px 18px rgba(6,14,28,.2);animation:tsa-pop .2s var(--ease)}
-
-/* ---------- composer ---------- */
-.tsa-composer{position:relative;flex-shrink:0;padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg)}
-.tsa-field{display:flex;align-items:flex-end;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:28px;padding:5px 5px 5px 18px;box-shadow:0 4px 16px rgba(15,43,74,.08);transition:border-color .2s,box-shadow .2s,background .2s}
-.tsa-field:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 26%,transparent),0 4px 16px rgba(15,43,74,.08)}
-.tsa-field.is-rec{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,var(--card));box-shadow:none}
-.tsa-input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:1rem;line-height:1.4;resize:none;padding:10px 0;max-height:120px}
-.tsa-input::placeholder{color:var(--muted)}
-.tsa-action{flex-shrink:0;width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;transition:transform .15s,background .2s,color .2s,opacity .2s}
-.tsa-action:active:not(:disabled){transform:scale(.9)}
-.tsa-action--send{background:var(--gold-grad);color:var(--navy);box-shadow:0 3px 10px color-mix(in srgb,var(--gold) 45%,transparent)}
-.tsa-action--send:disabled{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted);box-shadow:none;cursor:default}
-.tsa-action--mic{background:transparent;color:var(--muted)}
-.tsa-action--mic:active{background:color-mix(in srgb,var(--muted) 15%,transparent)}
-.tsa-action--stop{background:var(--danger);color:#fff}
-
-.tsa-rec{flex:1;min-width:0;display:flex;align-items:center;gap:12px;min-height:42px;color:var(--danger);font-weight:600;font-size:.93rem}
-.tsa-rec-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tsa-wave{display:inline-flex;align-items:center;gap:3px;height:20px;flex-shrink:0}
-.tsa-wave i{width:3px;height:100%;border-radius:2px;background:currentColor;animation:tsa-wave 1s ease-in-out infinite}
-
-.tsa-notice{position:absolute;left:12px;right:12px;bottom:calc(100% + 6px);background:var(--navy);color:#fff;border-radius:12px;padding:10px 14px;font-size:.83rem;line-height:1.35;box-shadow:0 8px 24px rgba(6,14,28,.3);animation:tsa-pop .22s var(--ease)}
-
-/* ---------- motion ---------- */
-@keyframes tsa-spin{to{transform:rotate(360deg)}}
-@keyframes tsa-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@keyframes tsa-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@keyframes tsa-pop{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
-@keyframes tsa-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
-@keyframes tsa-wave{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
-
-@media (prefers-reduced-motion:reduce){
-  .tsa-root *,.tsa-root *::before{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+@media (prefers-reduced-motion: reduce) {
+  .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 `;
