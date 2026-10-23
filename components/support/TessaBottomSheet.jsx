@@ -32,7 +32,7 @@ const normSugg = (s) =>
     : { ...s, prompt: s.prompt || s.label };
 
 /* ------------------------------------------------------------------ */
-/*  Icons (Minimal)                                                    */
+/*  Icons (Only what is needed)                                        */
 /* ------------------------------------------------------------------ */
 
 const ICONS = {
@@ -63,6 +63,13 @@ const ICONS = {
       <line x1="12" y1="16" x2="12.01" y2="16" />
     </>
   ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>
+  ),
+  check: <polyline points="20 6 9 17 4 12" />,
 };
 
 const Icon = ({ name, size = 20, sw = 2 }) => (
@@ -339,7 +346,7 @@ function RichText({ text }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Message row (DeepSeek Style)                                       */
+/*  Message row                                                        */
 /* ------------------------------------------------------------------ */
 
 function MessageRow({ msg, isStart, isEnd, onRetry }) {
@@ -382,8 +389,9 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
         <div className="tsa-meta">
           <time>{fmtTime(msg.ts)}</time>
           {!isUser && (
-            <button type="button" onClick={copy}>
-              {copied ? 'Copied' : 'Copy'}
+            <button type="button" onClick={copy} className="tsa-copy-btn">
+              <Icon name={copied ? 'check' : 'copy'} size={14} /> 
+              <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
           )}
         </div>
@@ -402,6 +410,7 @@ export default function TessaBottomSheet({
   businessId,
   suggestions = DEFAULT_SUGGESTIONS,
   pageContext, 
+  theme = 'light', // 'light' or 'dark' - CONTROLLED BY YOU
 }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -683,7 +692,7 @@ export default function TessaBottomSheet({
   const suggs = suggestions.map(normSugg);
 
   return (
-    <div className={`tsa-root ${entered ? 'is-in' : ''}`} style={{ top: vv.top, height: vv.h }}>
+    <div className={`tsa-root theme-${theme} ${entered ? 'is-in' : ''}`} style={{ top: vv.top, height: vv.h }}>
       <div className="tsa-backdrop" onClick={onClose} />
 
       <div className={`tsa-sheet ${dragging ? 'is-dragging' : ''}`} style={{ height }} role="dialog" aria-modal="true">
@@ -798,7 +807,7 @@ export default function TessaBottomSheet({
 
 const CSS = `
 /* --------------------------------------------------------- */
-/*  THEME VARIABLES (Light / Dark Mode)                      */
+/*  THEME VARIABLES (Controlled via .theme-light / .theme-dark) */
 /* --------------------------------------------------------- */
 .tsa-root {
   --tsa-bg: #FFFFFF;
@@ -816,17 +825,15 @@ const CSS = `
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  .tsa-root {
-    --tsa-bg: #1A1A1A;
-    --tsa-text: #EDEDED;
-    --tsa-text-muted: #9CA3AF;
-    --tsa-border: #333333;
-    --tsa-user-bubble-bg: #2D2D2D;
-    --tsa-user-bubble-text: #EDEDED;
-    --tsa-input-bg: #2D2D2D;
-    --tsa-overlay: rgba(0, 0, 0, 0.8);
-  }
+.tsa-root.theme-dark {
+  --tsa-bg: #1A1A1A;
+  --tsa-text: #EDEDED;
+  --tsa-text-muted: #9CA3AF;
+  --tsa-border: #333333;
+  --tsa-user-bubble-bg: #2D2D2D;
+  --tsa-user-bubble-text: #EDEDED;
+  --tsa-input-bg: #2D2D2D;
+  --tsa-overlay: rgba(0, 0, 0, 0.8);
 }
 
 .tsa-root button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; border: none; background: none; outline: none; }
@@ -850,7 +857,7 @@ const CSS = `
 .tsa-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 16px; }
 .tsa-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.01em; }
 .tsa-status { font-size: 0.78rem; color: var(--tsa-brand-navy); font-weight: 600; margin-top: 2px; }
-@media (prefers-color-scheme: dark) { .tsa-status { color: var(--tsa-brand-gold); } }
+.theme-dark .tsa-status { color: var(--tsa-brand-gold); }
 .tsa-text-btn { color: var(--tsa-text-muted); font-size: 0.85rem; font-weight: 600; padding: 8px; }
 .tsa-text-btn:active { color: var(--tsa-text); }
 .tsa-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-user-bubble-bg); display: flex; align-items: center; justify-content: center; color: var(--tsa-text); }
@@ -867,7 +874,7 @@ const CSS = `
 .tsa-sugg { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; background: var(--tsa-bg); border: 1px solid var(--tsa-border); color: var(--tsa-text); font-size: 0.9rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
 .tsa-sugg:active { background: var(--tsa-user-bubble-bg); border-color: var(--tsa-text-muted); }
 
-/* Chat Rows (DeepSeek Style) */
+/* Chat Rows */
 .tsa-row { display: flex; flex-direction: column; margin-top: 8px; width: 100%; }
 .tsa-row.is-start { margin-top: 24px; }
 .tsa-row--user { align-items: flex-end; }
@@ -876,15 +883,15 @@ const CSS = `
 /* User Bubble */
 .tsa-bubble-user { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--tsa-user-bubble-bg); color: var(--tsa-user-bubble-text); font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 
-/* AI Content (No Bubble) */
+/* AI Content */
 .tsa-ai-content { width: 100%; max-width: 100%; display: flex; flex-direction: column; }
 .tsa-ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.85rem; font-weight: 600; color: var(--tsa-text-muted); }
 
-/* Meta */
+/* Meta & Icons */
 .tsa-meta { display: flex; align-items: center; gap: 8px; margin: 8px 2px 0; font-size: 0.72rem; color: var(--tsa-text-muted); }
 .tsa-row--user .tsa-meta { justify-content: flex-end; }
-.tsa-meta button { color: var(--tsa-text-muted); font-weight: 500; padding: 0; font-size: 0.72rem; text-decoration: underline; text-underline-offset: 2px; }
-.tsa-meta button:active { color: var(--tsa-text); }
+.tsa-copy-btn { display: inline-flex; align-items: center; gap: 4px; color: var(--tsa-text-muted); font-weight: 500; font-size: 0.72rem; padding: 0; }
+.tsa-copy-btn:active { color: var(--tsa-text); }
 
 /* Loading Dots */
 .tsa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--tsa-text-muted); animation: tsa-bounce 1.4s infinite ease-in-out both; }
@@ -896,15 +903,13 @@ const CSS = `
 .tsa-err p { margin: 0; font-size: 0.9rem; color: #991B1B; }
 .tsa-err button { margin-top: 8px; color: #991B1B; font-weight: 700; font-size: 0.85rem; padding: 0; }
 
-/* --------------------------------------------------------- */
-/*  RICH TEXT (DeepSeek Typography)                          */
-/* --------------------------------------------------------- */
+/* RICH TEXT */
 .tsa-rich { min-width: 0; overflow-wrap: anywhere; font-size: 0.95rem; line-height: 1.65; color: var(--tsa-text); }
 .tsa-rich > * + * { margin-top: 12px; }
 .tsa-rich p { margin: 0; }
 .tsa-rich strong { font-weight: 700; }
 .tsa-rich a { color: var(--tsa-brand-navy); font-weight: 600; text-decoration: underline; }
-@media (prefers-color-scheme: dark) { .tsa-rich a { color: var(--tsa-brand-gold); } }
+.theme-dark .tsa-rich a { color: var(--tsa-brand-gold); }
 .tsa-rich code { background: var(--tsa-user-bubble-bg); padding: 2px 4px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
 .tsa-h { margin: 0; font-weight: 700; color: var(--tsa-text); }
 .tsa-h[data-l="1"] { font-size: 1.15rem; }
@@ -914,7 +919,7 @@ const CSS = `
 .tsa-rich pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--tsa-user-bubble-bg); overflow-x: auto; font-size: 0.85rem; }
 .tsa-list ul, .tsa-list ol { margin: 0; padding-left: 1.2rem; }
 .tsa-list li::marker { color: var(--tsa-brand-navy); }
-@media (prefers-color-scheme: dark) { .tsa-list li::marker { color: var(--tsa-brand-gold); } }
+.theme-dark .tsa-list li::marker { color: var(--tsa-brand-gold); }
 
 /* Table */
 .tsa-tablewrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--tsa-border); }
@@ -926,9 +931,7 @@ const CSS = `
 /* Jump Button */
 .tsa-jump { position: absolute; right: 16px; bottom: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-bg); color: var(--tsa-text); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 1px solid var(--tsa-border); }
 
-/* --------------------------------------------------------- */
-/*  COMPOSER (Floating Pill)                                 */
-/* --------------------------------------------------------- */
+/* Composer */
 .tsa-composer { flex-shrink: 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--tsa-bg); }
 .tsa-field { display: flex; align-items: flex-end; gap: 8px; background: var(--tsa-input-bg); border-radius: 24px; padding: 6px; border: 1px solid transparent; transition: border-color 0.2s; min-height: 52px; box-sizing: border-box; }
 .tsa-field:focus-within { border-color: var(--tsa-text-muted); }
@@ -941,7 +944,7 @@ const CSS = `
 .tsa-action:active { transform: scale(0.92); }
 .tsa-action--send { background: transparent; color: var(--tsa-text-muted); transition: all 0.2s; }
 .tsa-action--send.is-active { background: var(--tsa-brand-navy); color: #fff; }
-@media (prefers-color-scheme: dark) { .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; } }
+.theme-dark .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; }
 .tsa-action--send:disabled { cursor: default; }
 .tsa-action--mic { background: transparent; color: var(--tsa-text-muted); }
 .tsa-action--stop { background: #EF4444; color: #fff; }
@@ -952,3 +955,4 @@ const CSS = `
   .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 `;
+    
