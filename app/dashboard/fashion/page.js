@@ -11,7 +11,7 @@ import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
-import '../../../../globals.css'
+import '../../globals.css'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
