@@ -2623,3 +2623,206 @@ h1, h2, h3, h4, h5, h6 {
 .text-sm { font-size: 0.8rem !important; padding: 4px 10px !important; }
 .full-width { width: 100%; }
 .mt-2 { margin-top: 8px; }
+
+/* ============================================================
+   MEASUREMENT FORM COMPONENT (Fixing the broken layout)
+   ============================================================ */
+
+.measurement-form {
+  background: var(--cresoa-bg); /* Or var(--color-card) depending on where it sits */
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  margin-top: 10px;
+}
+
+.measurement-form-title {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* The 3-column grid for inputs */
+.measurement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 12px;
+}
+
+/* Make it 2 columns on smaller screens */
+@media (max-width: 480px) {
+  .measurement-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Individual field wrapper */
+.measurement-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The label (Bust / Chest, Waist, etc.) */
+.measurement-field label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.measurement-field .unit {
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+}
+
+/* The input box */
+.measurement-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.measurement-field input:focus {
+  border-color: var(--color-primary);
+}
+
+/* Custom Measurements Section */
+.measurement-custom-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.measurement-custom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.measurement-custom-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.measurement-add-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.measurement-add-custom:hover {
+  background: var(--cresoa-surface-soft);
+  border-color: var(--color-primary);
+}
+
+/* Custom Fields List */
+.measurement-custom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.measurement-custom-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.measurement-custom-key {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 80px;
+  text-transform: capitalize;
+}
+
+.measurement-custom-item input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.measurement-remove-custom {
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.measurement-remove-custom:hover {
+  background: var(--cresoa-danger-soft);
+}
+
+.measurement-custom-empty {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Notes Section inside the form */
+.measurement-notes {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.measurement-notes label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.measurement-notes textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.measurement-notes textarea:focus {
+  border-color: var(--color-primary);
+}
