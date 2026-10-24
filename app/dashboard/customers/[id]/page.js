@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Navigation } from '../../../../components/Navigation'
-import { MeasurementForm } from '../../../../components/MeasurementForm' // <-- Imported your form
+import { MeasurementForm } from '../../../../components/MeasurementForm'
 import '../../../globals.css'
 
 // ─── Embedded Icons ───
@@ -37,7 +37,7 @@ export default function CustomerDetailPage({ params }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [businessId, setBusinessId] = useState(null)
-  const [sector, setSector] = useState(null)
+  const [sector, setSector] = useState('Fashion') // Default to fashion
 
   // UI State
   const [editing, setEditing] = useState(false)
@@ -82,12 +82,12 @@ export default function CustomerDetailPage({ params }) {
       setName(result.customer.name || '')
       setPhone(result.customer.phone || '')
       setNotes(result.customer.notes || '')
-      
-      // Initialize measurements with the customer's saved data
       setMeasurements(result.customer.measurements || {})
 
       const { data: business } = await supabase.from('businesses').select('sector').eq('id', bizId).single()
-      if (business) setSector(business.sector)
+      if (business && business.sector) {
+        setSector(business.sector)
+      }
 
       const ordersData = result.orders || []
       if (ordersData.length > 0) {
@@ -114,23 +114,18 @@ export default function CustomerDetailPage({ params }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
-      // Clean up the measurements object before saving to DB
-      // This prevents saving empty strings over old data
       const cleanedMeasurements = {}
-      if (sector === 'Fashion & Custom Wear' && measurements) {
-        // Copy standard fields if they have values
+      if (measurements) {
         Object.keys(measurements).forEach(key => {
           if (key !== 'custom' && measurements[key] !== '' && measurements[key] !== null) {
             cleanedMeasurements[key] = measurements[key]
           }
         })
-        // Copy custom fields if they exist
         if (measurements.custom && Object.keys(measurements.custom).length > 0) {
           cleanedMeasurements.custom = measurements.custom
         }
       }
 
-      // If the MeasurementForm updated notes, we should save them
       const finalNotes = measurements.notes !== undefined ? measurements.notes : notes;
 
       const updateData = {
@@ -192,10 +187,11 @@ export default function CustomerDetailPage({ params }) {
     return parts.length === 1 ? parts[0].charAt(0).toUpperCase() : (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
   }
 
-  const isFashion = sector === 'Fashion & Custom Wear'
+  // ─── ROBUST FASHION CHECK ───
+  // If sector is "Fashion", "fashion", "Fashion & Custom Wear", or null, it shows the form.
+  const isFashion = !sector || sector.toLowerCase().includes('fashion');
   
-  // Check if there are any measurements saved to show the "Add Measurements" button
-  const hasMeasurements = isFashion && measurements && (
+  const hasMeasurements = measurements && (
     Object.keys(measurements).some(k => k !== 'custom' && k !== 'notes' && measurements[k] !== '' && measurements[k] !== null) || 
     (measurements.custom && Object.keys(measurements.custom).length > 0)
   )
@@ -302,7 +298,7 @@ export default function CustomerDetailPage({ params }) {
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} required className="order-input" placeholder="08012345678" />
           </div>
 
-          {/* ─── YOUR MEASUREMENT FORM COMPONENT ─── */}
+          {/* RENDER MEASUREMENT FORM IF FASHION */}
           {isFashion && (
             <div className="form-group mt-2">
               <MeasurementForm 
@@ -310,17 +306,17 @@ export default function CustomerDetailPage({ params }) {
                 onChange={(newValues) => {
                   setMeasurements(newValues)
                   if (newValues.notes !== undefined) {
-                    setNotes(newValues.notes) // Sync notes if the user types in the form's notes box
+                    setNotes(newValues.notes)
                   }
                 }}
                 showNotes={true}
-                label=""
+                label="Measurements"
               />
             </div>
           )}
 
           <div className="form-group">
-            <label className="order-label">Private Notes (Optional if not using form notes)</label>
+            <label className="order-label">Private Notes</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="order-notes-textarea" placeholder="Add any important details here..." />
           </div>
 
@@ -333,7 +329,7 @@ export default function CustomerDetailPage({ params }) {
         </form>
       ) : (
         <>
-          {/* ─── READ-ONLY MEASUREMENTS ─── */}
+          {/* READ-ONLY MEASUREMENTS */}
           {isFashion && (
             <div className="order-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -349,7 +345,7 @@ export default function CustomerDetailPage({ params }) {
                 <MeasurementForm 
                   measurements={measurements} 
                   readOnly={true} 
-                  showNotes={false} // Notes are displayed in their own card below
+                  showNotes={false}
                   label=""
                 />
               ) : (
@@ -363,7 +359,7 @@ export default function CustomerDetailPage({ params }) {
             </div>
           )}
 
-          {/* ─── READ-ONLY NOTES ─── */}
+          {/* READ-ONLY NOTES */}
           {notes && (
             <div className="order-card">
               <h3 className="order-section-title">Private Notes</h3>
@@ -415,4 +411,4 @@ export default function CustomerDetailPage({ params }) {
       </div>
     </div>
   )
-      }
+  }
