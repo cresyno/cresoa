@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
@@ -8,7 +8,7 @@ import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
-import '../../globals.css'   // global styles
+import '../../globals.css'
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -21,8 +21,23 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('latest')
+  
+  // State for the 3-dot menu
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const menuRef = useRef(null)
 
   const statusOptions = ['all', 'Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const loadOrders = async () => {
     setLoading(true)
@@ -160,7 +175,6 @@ export default function OrdersPage() {
 
   const handleWhatsApp = (phone, name, item, balance) => {
     if (!phone) return
-    // Ensure Nigerian country code format
     let cleanPhone = phone.replace(/\D/g, '')
     if (cleanPhone.startsWith('0')) cleanPhone = '234' + cleanPhone.slice(1)
     
@@ -168,7 +182,14 @@ export default function OrdersPage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  // ─── Delete order ───
+  // Avatar Initials Logic
+  const getInitials = (name) => {
+    if (!name) return '?'
+    const parts = name.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+  }
+
   const handleDelete = async (orderId) => {
     if (!confirm('Delete this order?')) return
     try {
@@ -184,6 +205,29 @@ export default function OrdersPage() {
       await loadOrders()
     } catch (err) {
       alert('Failed to delete order.')
+    }
+  }
+
+  const handleRecordPayment = async (orderId, price) => {
+    if (!confirm(`Record full payment of ₦${price.toLocaleString()}?`)) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      // Assuming your API supports PATCH for updates
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}` 
+        },
+        body: JSON.stringify({ amount_paid: price })
+      })
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Failed to record payment')
+      }
+      await loadOrders()
+    } catch (err) {
+      alert('Failed to record payment.')
     }
   }
 
@@ -236,7 +280,7 @@ export default function OrdersPage() {
         </a>
       </div>
 
-      {/* ─── Stats Grid (2x2 on mobile) ─── */}
+      {/* ─── Stats Grid ─── */}
       <div className="orders-metrics-grid">
         <div className="orders-metric-box">
           <span className="metric-label">Total</span>
@@ -298,15 +342,22 @@ export default function OrdersPage() {
             const customerName = o.customers?.name || 'No customer'
             const customerPhone = o.customers?.phone || ''
             const itemTitle = o.title || 'Untitled'
+            const isMenuOpen = openMenuId === o.id
 
             return (
               <Card key={o.id} className="order-card">
-                {/* Top Row: Name, Item, Price */}
+                {/* Top Row: Avatar, Name, Item, Price */}
                 <div className="order-card-header">
-                  <div className="order-card-title-group">
-                    <h3 className="order-card-customer">{customerName}</h3>
-                    <span className="order-card-item">· {itemTitle}</span>
+                  <div className="order-identity">
+                    <div className="cresoa-avatar">
+                      {getInitials(customerName)}
+                    </div>
+                    <div className="order-card-title-group">
+                      <h3 className="order-card-customer">{customerName}</h3>
+                      <span className="order-card-item">· {itemTitle}</span>
+                    </div>
                   </div>
+                  
                   <div className="order-card-price-group">
                     <span className="order-card-price">₦{o.price?.toLocaleString() || 0}</span>
                     {balance > 0 && (
@@ -323,22 +374,60 @@ export default function OrdersPage() {
 
                 {/* Bottom Row: Actions */}
                 <div className="order-card-actions">
-                  {customerPhone && (
-                    <>
-                      <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp">
-                        WhatsApp
-                      </button>
-                      <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call">
-                        Call
-                      </button>
-                    </>
-                  )}
-                  <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view">
-                    View Details
-                  </a>
-                  <button onClick={() => handleDelete(o.id)} className="btn-action btn-delete">
-                    Delete
-                  </button>
+                  <div className="action-buttons-group">
+                    {customerPhone && (
+                      <>
+                        <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp">
+                          WhatsApp
+                        </button>
+                        <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call">
+                          Call
+                        </button>
+                      </>
+                    )}
+                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view">
+                      View
+                    </a>
+                  </div>
+
+                  {/* 3-Dot Menu */}
+                  <div className="menu-container" ref={isMenuOpen ? menuRef : null}>
+                    <button 
+                      className={`btn-menu-trigger ${isMenuOpen ? 'active' : ''}`}
+                      onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)}
+                      aria-label="More options"
+                    >
+                      <Icon name="more-vertical" size={20} />
+                    </button>
+
+                    {isMenuOpen && (
+                      <div className="dropdown-menu">
+                        {balance > 0 && (
+                          <button onClick={() => { setOpenMenuId(null); handleRecordPayment(o.id, o.price) }} className="dropdown-item text-success">
+                            <Icon name="check-circle" size={16} />
+                            Record Full Payment
+                          </button>
+                        )}
+                        <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} className="dropdown-item">
+                          <Icon name="edit" size={16} />
+                          Edit Order
+                        </a>
+                        <button onClick={() => { 
+                          navigator.clipboard.writeText(o.id);
+                          setOpenMenuId(null);
+                          alert('Order ID copied!'); 
+                        }} className="dropdown-item">
+                          <Icon name="copy" size={16} />
+                          Copy Order ID
+                        </button>
+                        <div className="dropdown-divider"></div>
+                        <button onClick={() => { setOpenMenuId(null); handleDelete(o.id) }} className="dropdown-item text-danger">
+                          <Icon name="trash" size={16} />
+                          Delete Order
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Card>
             )
@@ -351,4 +440,4 @@ export default function OrdersPage() {
       </div>
     </div>
   )
-  }
+                 }
