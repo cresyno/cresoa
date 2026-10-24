@@ -2009,3 +2009,205 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
   line-height: 1.4;
 }
+
+/* ============================================================
+   CUSTOMERS PAGE REDESIGN
+   ============================================================ */
+
+.customers-page {
+  padding: 1.25rem;
+  max-width: 800px;
+  margin: 0 auto;
+  padding-bottom: 100px;
+  background: var(--cresoa-bg);
+  min-height: 100vh;
+}
+
+.customers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Metrics Grid (reusing standard classes from orders) */
+.customers-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .customers-metrics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Outstanding Alert */
+.outstanding-alert {
+  background: #FEF2F2; /* Very light red */
+  border: 1px solid #FECACA;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.outstanding-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.outstanding-amount {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-danger);
+  margin: 4px 0;
+}
+
+.outstanding-subtitle {
+  font-size: 0.8rem;
+  color: #991B1B;
+}
+
+.outstanding-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-danger);
+  background: transparent;
+  color: var(--color-danger);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.outstanding-btn:hover {
+  background: var(--color-danger);
+  color: white;
+}
+
+/* Customer List */
+.customers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.customer-list-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.customer-list-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.customer-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.customer-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.customer-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(11, 44, 94, 0.2);
+}
+
+.customer-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cresoa-text);
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customer-card-phone {
+  font-size: 0.8rem;
+  color: var(--cresoa-text-muted);
+  margin: 0;
+}
+
+.customer-card-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.customer-order-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--cresoa-surface-soft);
+  color: var(--cresoa-text);
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--cresoa-border);
+}
+
+.customer-balance-due {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--color-danger);
+}
+
+.customer-balance-paid {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+.customer-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--cresoa-border);
+  padding-top: 10px;
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
