@@ -3165,3 +3165,170 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 2px;
 }
   
+/* ============================================================
+   DASHBOARD REDESIGN - FINAL FIX
+   ============================================================ */
+
+.dashboard-page {
+  padding: 1.25rem;
+  max-width: 800px;
+  margin: 0 auto;
+  padding-bottom: 100px;
+  background: var(--cresoa-bg);
+  min-height: 100vh;
+}
+
+/* 1. Fixed Header Layout */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  gap: 12px;
+  width: 100%;
+}
+
+.dashboard-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--cresoa-text);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.dashboard-subtitle {
+  color: var(--cresoa-text-muted);
+  font-size: 0.85rem;
+  margin: 6px 0 0 0;
+}
+
+.dashboard-eyebrow {
+  color: var(--cresoa-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px 0;
+}
+
+/* The buttons on the right side of the header */
+.dashboard-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dashboard-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* 2. Fixed Action Center Buttons */
+/* Make the 'Collect payment' button look like a premium primary button */
+.cresoa-list-row button.cresoa-primary-button,
+.cresoa-list-row button[style*="gold"], 
+.cresoa-list-row button[style*="accent"] {
+  background: var(--cresoa-surface) !important;
+  color: var(--cresoa-text) !important;
+  border: 1px solid var(--cresoa-border) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s;
+}
+
+.cresoa-list-row button.cresoa-primary-button:hover {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+/* 3. KPI Cards (Tightened) */
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-kpi-card {
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 110px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.dashboard-kpi-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(11, 44, 94, 0.06);
+  transform: translateY(-2px);
+}
+
+.kpi-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--cresoa-text-muted);
+  text-transform: uppercase;
+}
+
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--cresoa-text);
+  line-height: 1;
+  margin: 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.kpi-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kpi-trend {
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.kpi-meta {
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
+
+/* 4. The Rainbow Killer (For Tessa) */
+/* This will force the Tessa button to be solid Navy with a Gold border */
+button[style*="conic-gradient"],
+div[style*="conic-gradient"],
+.rainbow-glow-btn-wrapper {
+  background: var(--color-primary) !important;
+  border: 2px solid var(--color-accent) !important;
+  animation: none !important;
+  box-shadow: 0 4px 12px rgba(11, 44, 94, 0.3) !important;
+  padding: 0 !important;
+}
+button[style*="conic-gradient"] > *,
+div[style*="conic-gradient"] > * {
+  background: transparent !important;
+  border-radius: 50% !important;
+}
