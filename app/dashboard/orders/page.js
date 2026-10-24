@@ -9,7 +9,7 @@ import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
-// ─── EMBEDDED ICONS (No external imports) ───
+// ─── EMBEDDED ICONS ───
 const SvgIcons = {
   Plus: () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
@@ -49,7 +49,6 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [businessName, setBusinessName] = useState('')
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -62,6 +61,7 @@ export default function OrdersPage() {
     isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
   })
   const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success') // 'success' or 'error'
 
   const statusOptions = ['all', 'Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
@@ -73,11 +73,13 @@ export default function OrdersPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const showToast = (msg) => {
+  const showToast = (msg, type = 'success') => {
     setToastMessage(msg)
+    setToastType(type)
     setTimeout(() => setToastMessage(''), 3000)
   }
 
+  // Initial Load Only
   const loadOrders = async () => {
     setLoading(true)
     setError(null)
@@ -89,11 +91,8 @@ export default function OrdersPage() {
 
       let businessId = getCurrentBusinessId()
       if (!businessId || businessId.length < 20) {
-        const { data: owned } = await supabase.from('businesses').select('id, name').eq('owner_id', user.id).single()
-        if (owned) { businessId = owned.id; setBusinessName(owned.name) }
-      } else {
-        const { data: biz } = await supabase.from('businesses').select('name').eq('id', businessId).single()
-        if (biz) setBusinessName(biz.name)
+        const { data: owned } = await supabase.from('businesses').select('id').eq('owner_id', user.id).single()
+        if (owned) businessId = owned.id
       }
 
       setCurrentBusinessId(businessId)
@@ -113,6 +112,7 @@ export default function OrdersPage() {
 
   useEffect(() => { loadOrders() }, [router, searchParams])
 
+  // ─── Computed stats ───
   const totalOrders = orders.length
   const activeOrders = orders.filter(o => o.current_status !== 'Delivered').length
   const readyOrders = orders.filter(o => o.current_status === 'Ready').length
@@ -167,6 +167,7 @@ export default function OrdersPage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
+  // ─── OPTIMISTIC DELETE (No Page Reload) ───
   const promptDelete = (orderId) => {
     setOpenMenuId(null)
     setModalConfig({
@@ -174,19 +175,31 @@ export default function OrdersPage() {
       confirmText: 'Delete', isDestructive: true,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
+        
+        // 1. Save current state to rollback if needed
+        const previousOrders = [...orders]
+        
+        // 2. Instantly update UI
+        setOrders(prev => prev.filter(o => o.id !== orderId))
+        showToast('Order deleted successfully', 'success')
+
+        // 3. Make API call in background
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}`, {
             method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` }
           })
           if (!res.ok) throw new Error('Failed to delete')
-          showToast('Order deleted successfully')
-          await loadOrders()
-        } catch (err) { showToast('Failed to delete order') }
+        } catch (err) {
+          // 4. Rollback if API fails
+          setOrders(previousOrders)
+          showToast('Failed to delete order', 'error')
+        }
       }
     })
   }
 
+  // ─── OPTIMISTIC PAYMENT (No Page Reload) ───
   const promptRecordPayment = (orderId, price) => {
     setOpenMenuId(null)
     setModalConfig({
@@ -194,6 +207,15 @@ export default function OrdersPage() {
       confirmText: 'Confirm Payment', isDestructive: false,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
+        
+        // 1. Save current state to rollback if needed
+        const previousOrders = [...orders]
+        
+        // 2. Instantly update UI
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, amount_paid: price } : o))
+        showToast('Payment recorded!', 'success')
+
+        // 3. Make API call in background
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}`, {
@@ -202,29 +224,38 @@ export default function OrdersPage() {
             body: JSON.stringify({ amount_paid: price })
           })
           if (!res.ok) throw new Error('Failed to record payment')
-          showToast('Payment recorded!')
-          await loadOrders()
-        } catch (err) { showToast('Failed to record payment') }
+        } catch (err) {
+          // 4. Rollback if API fails
+          setOrders(previousOrders)
+          showToast('Failed to record payment', 'error')
+        }
       }
     })
   }
 
-  // ─── SKELETON LOADING STATE (Restored) ───
+  // ─── SKELETON LOADING STATE ───
   if (loading) {
     return (
       <div className="orders-page">
-        <div className="skeleton-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-          <div className="skeleton-box" style={{ width: '140px', height: '24px' }} />
-          <div className="skeleton-box" style={{ width: '100px', height: '32px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <div className="skeleton-box" style={{ width: '140px', height: '28px' }} />
+          <div className="skeleton-box" style={{ width: '110px', height: '38px' }} />
         </div>
         <div className="orders-metrics-grid">
           {[1,2,3,4].map(i => (
-            <div key={i} className="skeleton-box" style={{ height: '70px', borderRadius: '12px' }} />
+            <div key={i} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />
           ))}
         </div>
-        <div className="orders-list" style={{ marginTop: '1.5rem' }}>
+        <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
+           <div className="skeleton-box" style={{ height: '44px', width: '100%', marginBottom: '10px' }} />
+           <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
+              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
+           </div>
+        </div>
+        <div className="orders-list">
           {[1,2,3].map(i => (
-            <div key={i} className="skeleton-box" style={{ height: '140px', marginBottom: '12px', borderRadius: '16px' }} />
+            <div key={i} className="skeleton-box" style={{ height: '160px', marginBottom: '12px', borderRadius: '16px' }} />
           ))}
         </div>
         <Navigation businessId={currentBusinessId} />
@@ -343,7 +374,7 @@ export default function OrdersPage() {
                         <button onClick={() => {
                           navigator.clipboard.writeText(o.id)
                           setOpenMenuId(null)
-                          showToast('Order ID copied!')
+                          showToast('Order ID copied!', 'success')
                         }} className="dropdown-item">
                           <SvgIcons.Copy /> Copy Order ID
                         </button>
@@ -374,7 +405,12 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {toastMessage && <div className="app-toast">{toastMessage}</div>}
+      {toastMessage && (
+        <div className={`app-toast ${toastType}`}>
+          {toastType === 'success' ? '✅ ' : '⚠️ '}
+          {toastMessage}
+        </div>
+      )}
       
       <div style={{ marginTop: '2rem' }}><Navigation businessId={currentBusinessId} /></div>
     </div>
