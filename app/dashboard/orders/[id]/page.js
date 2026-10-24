@@ -335,31 +335,36 @@ export default function OrderDetailPage() {
       </div>
 
       {/* ─── CUSTOMER & TRACKING ─── */}
-      <div className="order-grid-2">
-        <div className="order-card">
-          <div className="order-card-header">
-            <span className="cresoa-avatar">{customerName.charAt(0).toUpperCase()}</span>
-            <div>
-              <span className="order-label">CUSTOMER</span>
-              <h3 className="order-card-title">{customerName}</h3>
-              {customer?.phone && <p className="order-card-subtitle">{customer.phone}</p>}
-              {customer?.email && <p className="order-card-subtitle">{customer.email}</p>}
-            </div>
-          </div>
-          <div className="order-card-actions-row">
-            {customer?.phone && (
-              <a href={`tel:${customer.phone}`} className="order-btn-secondary full-width">
-                <Icon name="phone" size={16} /> Call
-              </a>
-            )}
-            {customer?.phone && (
-              <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
-                <Icon name="message-circle" size={16} /> WhatsApp
-              </button>
-            )}
-          </div>
-        </div>
+<div className="order-grid-2">
+  <div className="order-card">
+    <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CUSTOMER</span>
+    
+    <div className="customer-profile">
+      <div className="customer-avatar-round">
+        {customerName.charAt(0).toUpperCase()}
+      </div>
+      <div className="customer-info">
+        <h3 className="customer-name">{customerName}</h3>
+        {customer?.phone && <p className="customer-contact">{customer.phone}</p>}
+        {customer?.email && <p className="customer-contact">{customer.email}</p>}
+      </div>
+    </div>
 
+    <div className="order-card-actions-row" style={{ marginTop: '1.5rem' }}>
+      {customer?.phone && (
+        <a href={`tel:${customer.phone}`} className="order-btn-secondary full-width">
+          <Icon name="phone" size={16} /> Call
+        </a>
+      )}
+      {customer?.phone && (
+        <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
+          <Icon name="message-circle" size={16} /> WhatsApp
+        </button>
+      )}
+    </div>
+  </div>
+
+  
         <div className="order-card tracking-card">
           <div className="order-card-header">
              <span className="order-label">TRACKING LINK</span>
