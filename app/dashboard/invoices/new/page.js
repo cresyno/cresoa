@@ -31,8 +31,8 @@ export default function NewInvoicePage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [customerSearch, setCustomerSearch] = useState('')
 
-  const [orders, setOrders] = useState([]) // real orders for the selected customer
-  const [selectedOrders, setSelectedOrders] = useState([]) // includes temp orders
+  const [orders, setOrders] = useState([])
+  const [selectedOrders, setSelectedOrders] = useState([])
   const [showNewOrderModal, setShowNewOrderModal] = useState(false)
 
   // Editable fields
@@ -53,12 +53,12 @@ export default function NewInvoicePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  // New Order Modal State (fully controlled)
+  // New Order Modal State
   const [newOrder, setNewOrder] = useState({
     title: '',
     description: '',
-    quantity: '', // empty, no default
-    price_per_unit: '', // empty, no default
+    quantity: '',
+    price_per_unit: '',
     due_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
   })
 
@@ -92,12 +92,12 @@ export default function NewInvoicePage() {
         if (orderIdParam) {
           const { data: order } = await supabase
             .from('orders')
-            .select('*')
+            .select('*, customers(name, phone, email, address)')
             .eq('id', orderIdParam)
             .eq('business_id', bizId)
             .single()
           if (order) {
-            setSelectedCustomer({ id: order.customer_id, name: order.customers?.name || 'Customer' })
+            setSelectedCustomer({ id: order.customer_id, name: order.customers?.name || 'Customer', phone: order.customers?.phone, email: order.customers?.email, address: order.customers?.address })
             setSelectedOrders([order])
             setThankYouNote(order.notes || '')
             setIssueDate(order.created_at ? order.created_at.split('T')[0] : issueDate)
@@ -125,6 +125,13 @@ export default function NewInvoicePage() {
 
   const total = subtotal
 
+  // ─── NEW CALCULATIONS ───
+  const totalPaid = selectedOrders.reduce((sum, order) => {
+    return sum + (Number(order.amount_paid) || 0)
+  }, 0)
+  
+  const balanceDue = Math.max(0, total - totalPaid)
+
   const filteredCustomers = customers.filter(c =>
     (c.name || c.first_name || '').toLowerCase().includes(customerSearch.toLowerCase())
   )
@@ -149,7 +156,6 @@ export default function NewInvoicePage() {
     })
   }
 
-  // ─── CREATE TEMPORARY ORDER (NOT saved to DB) ───
   const handleCreateOrder = () => {
     if (!newOrder.title.trim()) { alert('Order title is required.'); return }
     if (newOrder.quantity === '' || Number(newOrder.quantity) < 1) { alert('Quantity must be at least 1.'); return }
@@ -163,9 +169,10 @@ export default function NewInvoicePage() {
       description: newOrder.description || '',
       quantity: Number(newOrder.quantity),
       price_per_unit: Number(newOrder.price_per_unit),
-      price: Number(newOrder.price_per_unit), // legacy
+      price: Number(newOrder.price_per_unit),
       due_date: newOrder.due_date,
       current_status: 'Order placed',
+      amount_paid: 0, // Temp orders have 0 paid
       is_temp: true
     }
 
@@ -206,18 +213,23 @@ export default function NewInvoicePage() {
       const nextNum = String((count || 0) + 1).padStart(3, '0')
       const invoiceNumber = `${prefix}-${nextNum}`
 
+      // Determine status based on payments
+      let invoiceStatus = 'draft'
+      if (balanceDue <= 0) invoiceStatus = 'paid'
+      else if (totalPaid > 0) invoiceStatus = 'partial'
+
       const { data: invoice, error: invError } = await supabase
         .from('invoices')
         .insert({
           invoice_number: invoiceNumber,
           business_id: businessId,
           customer_id: selectedCustomer.id,
-          status: 'draft',
+          status: invoiceStatus,
           issue_date: issueDate,
           due_date: dueDate,
           subtotal: total,
           total,
-          amount_paid: 0,
+          amount_paid: totalPaid, // <--- NOW SAVING CORRECT AMOUNT
           custom_note: thankYouNote,
           bank_name: bankName,
           account_number: accountNumber,
@@ -228,7 +240,6 @@ export default function NewInvoicePage() {
         .single()
       if (invError) throw invError
 
-      // Insert items (NO invoice_orders, NO total field)
       for (const order of selectedOrders) {
         const { error: itemError } = await supabase
           .from('invoice_items')
@@ -269,8 +280,8 @@ export default function NewInvoicePage() {
       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
         {[1, 2, 3, 4].map(s => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, background: step >= s ? 'var(--cresoa-accent)' : 'var(--cresoa-border)', color: step >= s ? '#fff' : 'var(--cresoa-text-muted)' }}>{s}</div>
-            {s < 4 && <div style={{ width: '20px', height: '2px', background: step > s ? 'var(--cresoa-accent)' : 'var(--cresoa-border)' }} />}
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, background: step >= s ? 'var(--color-primary)' : 'var(--cresoa-border)', color: step >= s ? '#fff' : 'var(--cresoa-text-muted)' }}>{s}</div>
+            {s < 4 && <div style={{ width: '20px', height: '2px', background: step > s ? 'var(--color-primary)' : 'var(--cresoa-border)' }} />}
           </div>
         ))}
       </div>
@@ -287,7 +298,7 @@ export default function NewInvoicePage() {
             {filteredCustomers.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>No customers found.</p> : (
               filteredCustomers.map(customer => (
                 <button key={customer.id} onClick={() => handleCustomerSelect(customer)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', padding: '0.8rem', border: '1px solid var(--cresoa-border)', borderRadius: '8px', background: 'var(--cresoa-bg)', marginBottom: '0.5rem', cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--cresoa-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{(customer.name || customer.first_name || '?').charAt(0)}</span>
+                  <span style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{(customer.name || customer.first_name || '?').charAt(0)}</span>
                   <div>
                     <strong>{customer.name || customer.first_name}</strong>
                     {customer.phone && <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>{customer.phone}</div>}
@@ -304,7 +315,7 @@ export default function NewInvoicePage() {
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ margin: 0 }}>Select Orders for {selectedCustomer.name || selectedCustomer.first_name}</h3>
-            <button onClick={() => setShowNewOrderModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--cresoa-accent)', color: '#fff', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => setShowNewOrderModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--color-primary)', color: '#fff', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
               <Svg name="plus" size={14} stroke="#fff" /> New Order
             </button>
           </div>
@@ -313,26 +324,28 @@ export default function NewInvoicePage() {
             <p style={{ color: 'var(--cresoa-text-muted)' }}>No orders found. Click "New Order" to add one.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {/* Real orders */}
               {orders.map(order => {
                 const isSelected = selectedOrders.some(o => o.id === order.id)
+                const orderPaid = Number(order.amount_paid) || 0
                 return (
-                  <div key={order.id} onClick={() => toggleOrder(order)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', border: `1px solid ${isSelected ? 'var(--cresoa-accent)' : 'var(--cresoa-border)'}`, borderRadius: '8px', background: isSelected ? 'var(--cresoa-accent-soft)' : 'var(--cresoa-bg)', cursor: 'pointer' }}>
-                    <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--cresoa-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isSelected ? 'var(--cresoa-accent)' : 'transparent' }}>
+                  <div key={order.id} onClick={() => toggleOrder(order)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--cresoa-border)'}`, borderRadius: '8px', background: isSelected ? 'rgba(11,44,94,0.05)' : 'var(--cresoa-bg)', cursor: 'pointer' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isSelected ? 'var(--color-primary)' : 'transparent' }}>
                       {isSelected && <Svg name="check" size={12} stroke="#fff" />}
                     </div>
                     <div style={{ flex: 1 }}>
                       <strong>{order.title || 'Order'}</strong>
                       <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Qty: {order.quantity || 1} × ₦{Number(order.price_per_unit || order.price).toLocaleString()}</div>
                     </div>
-                    <div style={{ fontWeight: 600 }}>₦{((Number(order.price_per_unit || order.price) || 0) * (Number(order.quantity) || 1)).toLocaleString()}</div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 600 }}>₦{((Number(order.price_per_unit || order.price) || 0) * (Number(order.quantity) || 1)).toLocaleString()}</div>
+                      {orderPaid > 0 && <div style={{ fontSize: '0.75rem', color: 'var(--color-secondary)' }}>₦{orderPaid.toLocaleString()} paid</div>}
+                    </div>
                   </div>
                 )
               })}
-              {/* Temp orders */}
               {selectedOrders.filter(o => o.is_temp).map(order => (
-                <div key={order.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', border: '1px solid var(--cresoa-accent)', borderRadius: '8px', background: 'var(--cresoa-accent-soft)' }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--cresoa-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--cresoa-accent)' }}>
+                <div key={order.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', border: '1px solid var(--color-primary)', borderRadius: '8px', background: 'rgba(11,44,94,0.05)' }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '4px', border: '2px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-primary)' }}>
                     <Svg name="check" size={12} stroke="#fff" />
                   </div>
                   <div style={{ flex: 1 }}>
@@ -340,7 +353,7 @@ export default function NewInvoicePage() {
                     <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Qty: {order.quantity} × ₦{Number(order.price_per_unit).toLocaleString()} (Temporary)</div>
                   </div>
                   <div style={{ fontWeight: 600 }}>₦{(Number(order.quantity) * Number(order.price_per_unit)).toLocaleString()}</div>
-                  <button onClick={(e) => { e.stopPropagation(); handleRemoveTempOrder(order.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-danger)' }}>
+                  <button onClick={(e) => { e.stopPropagation(); handleRemoveTempOrder(order.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}>
                     <Svg name="trash" size={16} stroke="currentColor" />
                   </button>
                 </div>
@@ -357,7 +370,7 @@ export default function NewInvoicePage() {
       )}
 
       {/* STEP 3: Details */}
-      {step === 3 && (
+{step === 3 && (
         <div style={{ background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem' }}>
           <h3 style={{ margin: '0 0 1rem' }}>Invoice Details</h3>
 
@@ -384,7 +397,7 @@ export default function NewInvoicePage() {
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Account Number (10 digits)</label>
               <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="e.g. 0123456789" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }} />
-              {accountNumber && !/^\d{10}$/.test(accountNumber) && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.3rem 0 0' }}>Must be exactly 10 digits</p>}
+              {accountNumber && !/^\d{10}$/.test(accountNumber) && <p style={{ color: 'var(--color-danger)', fontSize: '0.75rem', margin: '-0.3rem 0 0' }}>Must be exactly 10 digits</p>}
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>Account Name</label>
@@ -394,7 +407,7 @@ export default function NewInvoicePage() {
 
           <h4 style={{ margin: '1rem 0 0.5rem' }}>CAC Number (Optional)</h4>
           <input type="text" value={cacNumber} onChange={e => setCacNumber(e.target.value)} placeholder="e.g. RC-12345" style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', marginBottom: '0.5rem' }} />
-          {cacNumber && !/^[A-Z]{2,3}-\d{5,7}$/.test(cacNumber) && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.5rem' }}>Format: RC-12345 (5-7 digits)</p>}
+          {cacNumber && !/^[A-Z]{2,3}-\d{5,7}$/.test(cacNumber) && <p style={{ color: 'var(--color-danger)', fontSize: '0.75rem', margin: '-0.5rem 0 0.5rem' }}>Format: RC-12345 (5-7 digits)</p>}
 
           <button onClick={() => setStep(4)} className="cresoa-primary-button" style={{ width: '100%', justifyContent: 'center' }}>Review Invoice</button>
         </div>
@@ -403,19 +416,19 @@ export default function NewInvoicePage() {
       {/* STEP 4: Review */}
       {step === 4 && (
         <div>
-          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem' }}>
-            <div style={{ borderBottom: '2px solid var(--cresoa-accent)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid var(--cresoa-border)', padding: '1.5rem', marginBottom: '1rem', color: '#111' }}>
+            <div style={{ borderBottom: '2px solid var(--color-primary)', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {business?.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '48px', height: '48px', objectFit: 'contain' }} /> : <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--cresoa-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
+                {business?.logo_url ? <img src={business.logo_url} alt={business.name} style={{ width: '48px', height: '48px', objectFit: 'contain' }} /> : <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>{business?.name?.charAt(0) || 'B'}</div>}
                 <div>
-                  <h2 style={{ margin: 0, color: 'var(--cresoa-primary)' }}>{business?.name || 'Business'}</h2>
+                  <h2 style={{ margin: 0, color: 'var(--color-primary)' }}>{business?.name || 'Business'}</h2>
                   {business?.location && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.location}</p>}
                   {business?.phone && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.phone}</p>}
                   {business?.email && <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>{business.email}</p>}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <h3 style={{ margin: 0 }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span></h3>
+                <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>INVOICE <span style={{ fontSize: '0.8rem', fontWeight: 400 }}>(NGN)</span></h3>
                 <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Issued: {issueDate}</p>
                 <p style={{ margin: '2px 0', color: '#666', fontSize: '0.8rem' }}>Due: {dueDate}</p>
               </div>
@@ -451,10 +464,25 @@ export default function NewInvoicePage() {
               </tbody>
             </table>
 
+            {/* ─── UPDATED SUMMARY SECTION ─── */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
               <div style={{ width: '220px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Subtotal</span><span>{formatMoney(subtotal)}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}><span>Total</span><span>{formatMoney(total)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                  <span>Subtotal</span><span>{formatMoney(subtotal)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 700 }}>
+                  <span>Total</span><span>{formatMoney(total)}</span>
+                </div>
+                {totalPaid > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: 'var(--color-success)' }}>
+                      <span>Amount Paid</span><span>-{formatMoney(totalPaid)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #eee', padding: '8px 0', fontWeight: 800, color: balanceDue > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                      <span>Balance Due</span><span>{formatMoney(balanceDue)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -473,30 +501,13 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-      {/* ─── NEW ORDER MODAL (Fully Rebuilt) ─── */}
+      {/* ─── NEW ORDER MODAL ─── */}
       {showNewOrderModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, padding: '16px'
-        }} onClick={() => setShowNewOrderModal(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'var(--cresoa-surface)',
-            border: '1px solid var(--cresoa-border)',
-            borderRadius: '16px',
-            padding: '1.5rem',
-            width: '100%',
-            maxWidth: '480px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
-          }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }} onClick={() => setShowNewOrderModal(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--cresoa-surface)', border: '1px solid var(--cresoa-border)', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, color: 'var(--cresoa-text)' }}>New Order</h3>
-              <button onClick={() => setShowNewOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
-                <Svg name="x" size={20} stroke="currentColor" />
-              </button>
+              <button onClick={() => setShowNewOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><Svg name="x" size={20} stroke="currentColor" /></button>
             </div>
 
             <div style={{ marginBottom: '0.75rem' }}>
@@ -526,18 +537,18 @@ export default function NewInvoicePage() {
             </div>
 
             {newOrder.quantity && newOrder.price_per_unit && (
-              <div style={{ padding: '0.6rem', background: 'var(--cresoa-accent-soft)', borderRadius: '8px', textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', color: 'var(--cresoa-accent)', marginBottom: '1rem' }}>
+              <div style={{ padding: '0.6rem', background: 'var(--cresoa-surface-soft)', borderRadius: '8px', textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)', marginBottom: '1rem' }}>
                 Total: ₦{Math.round(Number(newOrder.quantity) * Number(newOrder.price_per_unit)).toLocaleString()}
               </div>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button onClick={() => setShowNewOrderModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', color: 'var(--cresoa-text)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button onClick={handleCreateOrder} style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: 'none', background: 'var(--cresoa-accent)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Add Order</button>
+              <button onClick={handleCreateOrder} className="cresoa-primary-button">Add Order</button>
             </div>
           </div>
         </div>
       )}
     </div>
   )
-        }
+}
