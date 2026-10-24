@@ -2382,3 +2382,244 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   color: var(--color-primary);
 }
+/* ============================================================
+   CUSTOMER DETAILS PAGE - REFINED
+   ============================================================ */
+
+/* Action Buttons Grid */
+.customer-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.customer-action-grid .new-order-btn {
+  grid-column: span 2;
+  justify-content: center;
+}
+
+.customer-action-grid button {
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Order History Section (Floating directly on background) */
+.customer-order-section {
+  margin-bottom: 1.5rem;
+}
+
+.customer-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.customer-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.customer-order-item:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.order-item-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.order-item-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cresoa-text);
+  margin: 0 0 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-item-date {
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  margin: 0;
+}
+
+.order-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.order-item-price {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--cresoa-text);
+}
+
+/* Fix the Finance Card Values */
+.order-finance-item .value {
+  font-size: 1.1rem; /* Slightly smaller to fit better */
+}
+
+/* ============================================================
+   CUSTOMER DETAILS PAGE - MEASUREMENTS UX
+   ============================================================ */
+
+/* Action Buttons Grid */
+.customer-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.customer-action-grid .new-order-btn {
+  grid-column: span 2;
+  justify-content: center;
+}
+
+.customer-action-grid button {
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Measurements Edit Grid */
+.measurements-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (min-width: 640px) {
+  .measurements-input-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Make measurement inputs large and touch-friendly */
+.measurement-input {
+  font-size: 1.1rem !important; /* Bigger font for numbers */
+  font-weight: 700;
+  text-align: center;
+  padding: 12px !important;
+}
+
+/* Read-Only Measurements Display */
+.measurements-display-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .measurements-display-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.measurement-item {
+  background: var(--cresoa-surface-soft);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.measurement-item .label {
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.measurement-item .value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* Empty State for Measurements */
+.measurements-empty-state {
+  background: var(--cresoa-surface-soft);
+  border: 1px dashed var(--cresoa-border);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.measurements-empty-state p {
+  color: var(--cresoa-text-muted);
+  font-size: 0.9rem;
+  margin: 0 0 12px 0;
+}
+
+/* Order History List */
+.customer-order-section {
+  margin-bottom: 1.5rem;
+}
+
+.customer-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.customer-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.customer-order-item:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.order-item-left { flex: 1; min-width: 0; }
+.order-item-title { font-size: 0.95rem; font-weight: 700; color: var(--cresoa-text); margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order-item-date { font-size: 0.75rem; color: var(--cresoa-text-muted); margin: 0; }
+
+.order-item-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.order-item-price { font-size: 0.95rem; font-weight: 800; color: var(--cresoa-text); }
+
+/* Utilities */
+.text-sm { font-size: 0.8rem !important; padding: 4px 10px !important; }
+.full-width { width: 100%; }
+.mt-2 { margin-top: 8px; }
