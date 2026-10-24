@@ -52,7 +52,6 @@ export default function OrderDetailPage() {
   const [error, setError] = useState(null)
   const [order, setOrder] = useState(null)
   const [customer, setCustomer] = useState(null)
-  const [business, setBusiness] = useState(null)
   const [payments, setPayments] = useState([])
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
   const [businessPlan, setBusinessPlan] = useState('free')
@@ -78,7 +77,6 @@ export default function OrderDetailPage() {
   const [isEditingMessage, setIsEditingMessage] = useState(false)
   const [whatsAppMessage, setWhatsAppMessage] = useState('')
   
-  // 3-Dot Menu State
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
 
@@ -108,7 +106,7 @@ export default function OrderDetailPage() {
       setEditForm({ title: orderData.title || '', price: orderData.price || '', due_date: orderData.due_date || '' })
 
       const { data: bizData } = await supabase.from('businesses').select('*').eq('id', bizId).single()
-      if (bizData) { setBusiness(bizData); setBusinessPlan(bizData.plan || 'free') }
+      if (bizData) setBusinessPlan(bizData.plan || 'free')
 
       const { data: paymentData, error: paymentError } = await supabase.from('payment_records').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
       if (paymentError) throw paymentError
@@ -136,6 +134,8 @@ export default function OrderDetailPage() {
   const isFullyPaid = balance <= 0
   const canWhatsApp = isFeatureAvailable(businessPlan, 'whatsapp_reminders')
   const isOverdue = order?.due_date && new Date(order.due_date) < new Date() && order?.current_status !== 'Delivered'
+  const currentStatusInfo = STATUS_FLOW.find(item => item.value === (order?.current_status || 'Order placed')) || STATUS_FLOW[0]
+  const selectedStatusInfo = STATUS_FLOW.find(item => item.value === selectedStatus) || null
 
   const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
   const formatDate = value => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -302,7 +302,7 @@ export default function OrderDetailPage() {
         </button>
       </div>
 
-      {/* ─── FINANCIAL SUMMARY (MERGED) ─── */}
+      {/* ─── FINANCIAL SUMMARY ─── */}
       <div className="order-finance-card">
         <div className="order-finance-grid">
           <div className="order-finance-item">
@@ -437,12 +437,177 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* ─── MODALS (Status, WhatsApp, Payment, Edit) ─── */}
-      {/* ... Keep the existing modals from your code, but apply the new app-modal classes for styling if you wish ... */}
-      
+      {/* ─── MODALS ─── */}
+
+      {/* Status Modal */}
+      {showStatusModal && (
+        <div className="app-modal-overlay" onClick={() => !updatingStatus && setShowStatusModal(false)}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>ORDER PROGRESS</span>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>Where is this order now?</h2>
+              </div>
+              <button onClick={() => setShowStatusModal(false)} disabled={updatingStatus} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            <p style={{ color: 'var(--cresoa-text-muted)', margin: '0.5rem 0 1rem', fontSize: '0.85rem' }}>Choose the stage that best describes where the order is right now.</p>
+            <div style={{ display: 'grid', gap: '0.5rem', maxHeight: '50vh', overflowY: 'auto' }}>
+              {STATUS_FLOW.map((status, index) => {
+                const selected = selectedStatus === status.value
+                const current = (order.current_status || 'Order placed') === status.value
+                return (
+                  <button key={status.value} onClick={() => setSelectedStatus(status.value)} disabled={updatingStatus || current} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '0.6rem', borderRadius: '12px', border: `1px solid ${selected ? 'var(--color-primary)' : current ? 'var(--cresoa-border)' : 'var(--cresoa-border)'}`, background: selected ? 'rgba(11,44,94,0.05)' : current ? 'var(--cresoa-bg)' : 'var(--cresoa-surface)', cursor: current || updatingStatus ? 'default' : 'pointer', opacity: current ? 0.8 : 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: 'var(--cresoa-bg)' }}>
+                      <Icon name="check-circle" size={18} stroke={selected ? 'var(--color-primary)' : current ? 'var(--color-secondary)' : 'var(--cresoa-text-muted)'} />
+                    </div>
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <strong style={{ fontSize: '0.85rem' }}>{status.label}</strong>
+                    </div>
+                    {current && <span style={{ padding: '0.2rem 0.6rem', borderRadius: '20px', background: 'rgba(0,166,81,0.1)', color: 'var(--color-secondary)', fontSize: '0.65rem', fontWeight: 700 }}>Current</span>}
+                    {selected && <Icon name="check-circle" size={18} stroke="var(--color-primary)" />}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button onClick={() => { setSelectedStatus(null); setShowStatusModal(false) }} disabled={updatingStatus} className="order-btn-secondary">Cancel</button>
+              <button onClick={() => updateStatus(selectedStatus)} disabled={!selectedStatus || updatingStatus} className="cresoa-primary-button">
+                {updatingStatus ? 'Updating...' : selectedStatus ? `Move to ${selectedStatusInfo?.short || selectedStatus}` : 'Choose a status'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Modal */}
+      {isWhatsAppModalOpen && (
+        <div className="app-modal-overlay" onClick={() => setIsWhatsAppModalOpen(false)}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>WHATSAPP UPDATE</span>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.2rem' }}>Update {customerName}</h2>
+              </div>
+              <button onClick={() => setIsWhatsAppModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '0.8rem', padding: '0.6rem', borderRadius: '8px', background: 'var(--cresoa-bg)', border: '1px solid var(--cresoa-border)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>Current Status:</span>
+              <span style={{ marginLeft: '0.4rem', fontWeight: 600, color: 'var(--color-primary)' }}>{currentStatusInfo.label}</span>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Message</label>
+              {!isEditingMessage ? (
+                <div style={{ padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--cresoa-text)', whiteSpace: 'pre-wrap' }}>
+                  {whatsAppMessage}
+                </div>
+              ) : (
+                <textarea 
+                  value={whatsAppMessage} 
+                  onChange={e => setWhatsAppMessage(e.target.value)} 
+                  rows={4} 
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', fontSize: '0.85rem', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              )}
+              <button onClick={() => setIsEditingMessage(!isEditingMessage)} style={{ marginTop: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'underline' }}>
+                {isEditingMessage ? 'Cancel edit' : '✎ Edit message'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button onClick={() => setIsWhatsAppModalOpen(false)} className="order-btn-secondary">Cancel</button>
+              <button onClick={handleSendWhatsApp} className="cresoa-primary-button">
+                <Icon name="send" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="app-modal-overlay" onClick={() => !recordingPayment && setShowPaymentModal(false)}>
+          <form className="app-modal-box" onSubmit={handleRecordPayment} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>PAYMENT</span>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>Record a payment</h2>
+              </div>
+              <button type="button" onClick={() => setShowPaymentModal(false)} disabled={recordingPayment} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem', borderRadius: '8px', background: 'rgba(11,44,94,0.05)', marginBottom: '1rem' }}>
+              <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>Remaining balance</span>
+              <strong>{formatMoney(balance)}</strong>
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Amount received</label>
+              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--cresoa-border)', borderRadius: '8px', background: 'var(--cresoa-surface)', overflow: 'hidden' }}>
+                <span style={{ paddingLeft: '0.8rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>₦</span>
+                <input type="number" min="1" max={balance} step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} placeholder="0" required style={{ flex: 1, border: 'none', padding: '0.6rem', outline: 'none', background: 'transparent', color: 'var(--cresoa-text)' }} />
+              </div>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Payment note</label>
+              <input type="text" value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment, transfer" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button type="button" onClick={() => setShowPaymentModal(false)} disabled={recordingPayment} className="order-btn-secondary">Cancel</button>
+              <button type="submit" disabled={recordingPayment} className="cresoa-primary-button">
+                {recordingPayment ? 'Recording...' : 'Save payment'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="app-modal-overlay" onClick={() => !editing && setShowEditModal(false)}>
+          <form className="app-modal-box" onSubmit={handleEditSubmit} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div>
+                <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>ORDER DETAILS</span>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>Edit order</h2>
+              </div>
+              <button type="button" onClick={() => setShowEditModal(false)} disabled={editing} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
+                <Icon name="x" size={20} stroke="currentColor" />
+              </button>
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Order name</label>
+              <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="e.g. Aso-ebi dress" required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
+            </div>
+            <div style={{ marginBottom: '0.8rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Total price</label>
+              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--cresoa-border)', borderRadius: '8px', background: 'var(--cresoa-surface)', overflow: 'hidden' }}>
+                <span style={{ paddingLeft: '0.8rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>₦</span>
+                <input type="number" min="0" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} placeholder="0" required style={{ flex: 1, border: 'none', padding: '0.6rem', outline: 'none', background: 'transparent', color: 'var(--cresoa-text)' }} />
+              </div>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due date</label>
+              <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button type="button" onClick={() => setShowEditModal(false)} disabled={editing} className="order-btn-secondary">Cancel</button>
+              <button type="submit" disabled={editing} className="cresoa-primary-button">
+                {editing ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={currentBusinessId} />
       </div>
     </div>
   )
-                }
+            }
