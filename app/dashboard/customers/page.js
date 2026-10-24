@@ -4,19 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { Icon } from '../../../components/Icon'
-import { Card } from '../../../components/Card'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
 
-const formatMoney = value =>
-  `₦${Number(value || 0).toLocaleString('en-NG')}`
+const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
 
 const formatDate = value => {
   if (!value) return 'No order yet'
   return new Date(value).toLocaleDateString('en-NG', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
+    day: 'numeric', month: 'short', year: 'numeric'
   })
 }
 
@@ -48,47 +44,29 @@ export default function CustomersPage() {
       let resolvedBusinessId = urlBusinessId
 
       if (!resolvedBusinessId || resolvedBusinessId.length < 20) {
-        const { data: owned } = await supabase
-          .from('businesses')
-          .select('id, name')
-          .eq('owner_id', user.id)
-          .single()
+        const { data: owned } = await supabase.from('businesses').select('id, name').eq('owner_id', user.id).single()
         if (owned) {
           resolvedBusinessId = owned.id
           setBusinessName(owned.name)
         } else {
-          const { data: membership } = await supabase
-            .from('business_memberships')
-            .select('business_id')
-            .eq('user_id', user.id)
-            .maybeSingle()
+          const { data: membership } = await supabase.from('business_memberships').select('business_id').eq('user_id', user.id).maybeSingle()
           if (membership) {
             resolvedBusinessId = membership.business_id
-            const { data: biz } = await supabase
-              .from('businesses')
-              .select('name')
-              .eq('id', resolvedBusinessId)
-              .single()
+            const { data: biz } = await supabase.from('businesses').select('name').eq('id', resolvedBusinessId).single()
             if (biz) setBusinessName(biz.name)
           }
         }
       } else {
-        const { data: biz } = await supabase
-          .from('businesses')
-          .select('name')
-          .eq('id', resolvedBusinessId)
-          .single()
+        const { data: biz } = await supabase.from('businesses').select('name').eq('id', resolvedBusinessId).single()
         if (biz) setBusinessName(biz.name)
       }
 
       if (!resolvedBusinessId) { router.push('/onboarding'); return }
-
       setBusinessId(resolvedBusinessId)
 
-      const response = await fetch(
-        `/api/customers?business_id=${resolvedBusinessId}`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } }
-      )
+      const response = await fetch(`/api/customers?business_id=${resolvedBusinessId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      })
 
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Unable to load customers')
@@ -126,9 +104,7 @@ export default function CustomersPage() {
     }
   }
 
-  useEffect(() => {
-    loadCustomers()
-  }, [searchParams, sortBy])
+  useEffect(() => { loadCustomers() }, [searchParams, sortBy])
 
   const totalOutstanding = customers.reduce((sum, c) => sum + Math.max(Number(c.balance || 0), 0), 0)
   const activeCustomers = customers.filter(c => c.orderCount > 0).length
@@ -147,263 +123,198 @@ export default function CustomersPage() {
     }
 
     switch (filterType) {
-      case 'withOrders':
-        result = result.filter(c => c.orderCount > 0)
-        break
-      case 'outstanding':
-        result = result.filter(c => Number(c.balance || 0) > 0)
-        break
-      case 'paid':
-        result = result.filter(c => Number(c.balance || 0) <= 0 && c.orderCount > 0)
-        break
-      default:
-        break
+      case 'withOrders': result = result.filter(c => c.orderCount > 0); break
+      case 'outstanding': result = result.filter(c => Number(c.balance || 0) > 0); break
+      case 'paid': result = result.filter(c => Number(c.balance || 0) <= 0 && c.orderCount > 0); break
+      default: break
     }
 
     return result
   }, [customers, search, filterType])
 
+  // ─── SKELETON LOADING STATE ───
   if (loading) {
     return (
-      <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-          <div style={{ width: '100px', height: '32px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
+      <div className="customers-page">
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <div className="skeleton-box" style={{ width: '140px', height: '28px' }} />
+          <div className="skeleton-box" style={{ width: '110px', height: '38px' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.8rem', marginBottom: '1rem' }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-              <div style={{ width: '60%', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
-            </div>
+        <div className="customers-metrics-grid">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <div style={{ flex: '1', height: '48px', background: 'var(--cresoa-border)', borderRadius: '14px' }} />
-          <div style={{ width: '140px', height: '48px', background: 'var(--cresoa-border)', borderRadius: '14px' }} />
+        <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
+           <div className="skeleton-box" style={{ height: '44px', width: '100%', marginBottom: '10px' }} />
+           <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
+              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
+           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="customers-list">
           {[1,2,3].map(i => (
-            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--cresoa-border)' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ width: '60%', height: '16px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-                  <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
-                </div>
-              </div>
-            </div>
+            <div key={i} className="skeleton-box" style={{ height: '110px', marginBottom: '12px', borderRadius: '16px' }} />
           ))}
         </div>
-        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
         <Navigation businessId={businessId} />
-      </main>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <main style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
+      <div className="order-page-error">
         <Icon name="alert-circle" size={30} stroke="var(--cresoa-danger)" />
-        <h2 style={{ margin: '14px 0 7px', color: 'var(--cresoa-text)', fontSize: '19px' }}>Couldn't load customers</h2>
-        <p style={{ maxWidth: '360px', margin: '0 0 18px', color: 'var(--cresoa-text-muted)', fontSize: '13px' }}>{error}</p>
-        <button onClick={loadCustomers} style={{ padding: '12px 18px', border: 0, borderRadius: '12px', background: 'var(--cresoa-accent)', color: '#fff', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>Try again</button>
-      </main>
+        <h2>Couldn't load customers</h2>
+        <p>{error}</p>
+        <button onClick={loadCustomers} className="cresoa-primary-button">Try again</button>
+      </div>
     )
   }
 
   return (
-    <main style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+    <div className="customers-page">
       <Navigation businessId={businessId} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+      {/* ─── HEADER ─── */}
+      <div className="customers-header">
         <div>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em', margin: 0 }}>
-            {businessName || 'YOUR BUSINESS'}
-          </p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0 0', color: 'var(--cresoa-text)' }}>Customers</h1>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0.1rem 0 0' }}>
+          <h1 className="orders-title">Customers</h1>
+          <p className="orders-subtitle">
             {customers.length} customer{customers.length === 1 ? '' : 's'}
           </p>
         </div>
         <button
           onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')}
           className="cresoa-primary-button"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}
         >
-          <Icon name="plus" size={14} stroke="#fff" /> Add customer
+          <Icon name="plus" size={14} stroke="#fff" /> Add Customer
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-        <button
-          onClick={() => setFilterType('all')}
-          style={{
-            background: filterType === 'all' ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--cresoa-border)',
-            cursor: 'pointer',
-            textAlign: 'left',
-            transition: 'all 0.15s'
-          }}
-        >
-          <div style={{ fontSize: '0.65rem', color: filterType === 'all' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Total</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'all' ? '#fff' : 'var(--cresoa-text)' }}>{customers.length}</div>
-        </button>
-        <button
-          onClick={() => setFilterType(filterType === 'withOrders' ? 'all' : 'withOrders')}
-          style={{
-            background: filterType === 'withOrders' ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--cresoa-border)',
-            cursor: 'pointer',
-            textAlign: 'left',
-            transition: 'all 0.15s'
-          }}
-        >
-          <div style={{ fontSize: '0.65rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>With orders</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'withOrders' ? '#fff' : 'var(--cresoa-text)' }}>{activeCustomers}</div>
-        </button>
-        <button
-          onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
-          style={{
-            background: filterType === 'outstanding' ? 'var(--cresoa-accent)' : 'var(--cresoa-surface)',
-            padding: '0.6rem 0.8rem',
-            borderRadius: '8px',
-            border: '1px solid var(--cresoa-border)',
-            cursor: 'pointer',
-            textAlign: 'left',
-            transition: 'all 0.15s'
-          }}
-        >
-          <div style={{ fontSize: '0.65rem', color: filterType === 'outstanding' ? '#fff' : 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Outstanding</div>
-          <div style={{ fontWeight: '700', fontSize: '1.1rem', color: filterType === 'outstanding' ? '#fff' : 'var(--cresoa-danger)' }}>{formatMoney(totalOutstanding)}</div>
-        </button>
+      {/* ─── METRICS ─── */}
+      <div className="customers-metrics-grid">
+        <div className="orders-metric-box">
+          <span className="metric-label">Total</span>
+          <span className="metric-value">{customers.length}</span>
+        </div>
+        <div className="orders-metric-box">
+          <span className="metric-label">With Orders</span>
+          <span className="metric-value">{activeCustomers}</span>
+        </div>
+        <div className="orders-metric-box">
+          <span className="metric-label">Owing</span>
+          <span className="metric-value text-danger">{customersWithBalance}</span>
+        </div>
+        <div className="orders-metric-box">
+          <span className="metric-label">Outstanding</span>
+          <span className="metric-value text-danger" style={{ fontSize: '1.1rem' }}>{formatMoney(totalOutstanding)}</span>
+        </div>
       </div>
 
+      {/* ─── OUTSTANDING ALERT ─── */}
       {customersWithBalance > 0 && (
-        <Card style={{ marginBottom: '1rem', background: 'var(--cresoa-danger-soft)', borderColor: 'var(--cresoa-danger)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Icon name="alert-triangle" size={16} stroke="var(--cresoa-danger)" />
-                <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)', fontSize: '0.9rem' }}>Outstanding</span>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: '1.2rem', color: 'var(--cresoa-danger)' }}>{formatMoney(totalOutstanding)}</div>
-              <div style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.8rem' }}>{customersWithBalance} customer{customersWithBalance > 1 ? 's' : ''} need payment</div>
+        <div className="outstanding-alert">
+          <div>
+            <div className="outstanding-title">
+              <Icon name="alert-triangle" size={16} stroke="var(--color-danger)" />
+              Outstanding Balance
             </div>
-            <button
-              onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
-              style={{ padding: '0.3rem 0.8rem', borderRadius: '20px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-            >
-              {filterType === 'outstanding' ? 'Show all' : `View ${customersWithBalance} customers →`}
-            </button>
+            <div className="outstanding-amount">{formatMoney(totalOutstanding)}</div>
+            <div className="outstanding-subtitle">{customersWithBalance} customer{customersWithBalance > 1 ? 's' : ''} need payment</div>
           </div>
-        </Card>
+          <button
+            onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
+            className="outstanding-btn"
+          >
+            {filterType === 'outstanding' ? 'Show All' : `View ${customersWithBalance} Customers`}
+          </button>
+        </div>
       )}
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <div style={{ flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: '8px', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)' }}>
-          <Icon name="search" size={16} stroke="var(--cresoa-text-muted)" />
-          <input
-            type="text"
-            placeholder="Search name, phone or order..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
-              <Icon name="x" size={16} stroke="currentColor" />
-            </button>
-          )}
+      {/* ─── FILTERS ─── */}
+      <div className="orders-filters">
+        <input
+          type="text"
+          className="orders-search-input"
+          placeholder="Search by name or phone..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <div className="orders-filter-row">
+          <select value={filterType} onChange={e => setFilterType(e.target.value)} className="orders-select">
+            <option value="all">All Customers</option>
+            <option value="withOrders">With Orders</option>
+            <option value="outstanding">Outstanding</option>
+            <option value="paid">Paid</option>
+          </select>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="orders-select">
+            <option value="last_added">Recently Added</option>
+            <option value="most_orders">Most Orders</option>
+            <option value="most_spent">Highest Payments</option>
+            <option value="name_asc">Name A–Z</option>
+          </select>
         </div>
-        <select
-          value={filterType}
-          onChange={e => setFilterType(e.target.value)}
-          style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
-        >
-          <option value="all">All</option>
-          <option value="withOrders">With orders</option>
-          <option value="outstanding">Outstanding</option>
-          <option value="paid">Paid</option>
-        </select>
-        <select
-          value={sortBy}
-          onChange={e => setSortBy(e.target.value)}
-          style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.85rem' }}
-        >
-          <option value="last_added">Recently added</option>
-          <option value="most_orders">Most orders</option>
-          <option value="most_spent">Highest payments</option>
-          <option value="name_asc">Name A–Z</option>
-        </select>
       </div>
 
+      {/* ─── CUSTOMER LIST ─── */}
       {filteredCustomers.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem 2rem', background: 'var(--cresoa-surface)', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
-          <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--cresoa-primary)" />
-          <h3 style={{ margin: '0.5rem 0 0.3rem', fontSize: '1rem' }}>
-            {search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}
-          </h3>
-          <p style={{ color: 'var(--cresoa-text-muted)', margin: '0 0 1rem' }}>
-            {search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}
-          </p>
+        <div className="orders-empty">
+          <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--color-primary)" />
+          <h3>{search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}</h3>
+          <p>{search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}</p>
           {!search && filterType === 'all' && (
-            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} className="cresoa-primary-button">Add customer</button>
+            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} className="cresoa-primary-button">Add Customer</button>
           )}
           {search && (
-            <button onClick={() => setSearch('')} className="cresoa-primary-button" style={{ background: 'var(--cresoa-primary)' }}>Clear search</button>
+            <button onClick={() => setSearch('')} className="cresoa-primary-button">Clear Search</button>
           )}
           {filterType !== 'all' && !search && (
-            <button onClick={() => setFilterType('all')} className="cresoa-primary-button" style={{ background: 'var(--cresoa-primary)' }}>Show all</button>
+            <button onClick={() => setFilterType('all')} className="cresoa-primary-button">Show All</button>
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="customers-list">
           {filteredCustomers.map(customer => {
             const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
             const initials = `${customer.first_name?.charAt(0) || ''}${customer.last_name?.charAt(0) || ''}`.toUpperCase() || '?'
             const hasBalance = Number(customer.balance || 0) > 0
 
             return (
-              <Card key={customer.id} style={{ padding: '0.6rem 1rem' }}>
-                <button
-                  onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
-                >
-                    {/* ✅ Avatar using standard class */}
-                  <span className="cresoa-avatar">{initials}</span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>{fullName}</span>
-                      {customer.orderCount > 0 && (
-                        <span style={{ padding: '2px 8px', borderRadius: '20px', background: 'rgba(212,165,42,0.14)', color: 'var(--cresoa-text)', fontSize: '0.7rem', fontWeight: 700 }}>
-                          {customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '0.1rem' }}>
-                      {customer.phone || customer.email || 'No contact'}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.8rem', fontSize: '0.75rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>
-                      <span>{customer.lastOrder ? `Last order · ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
-                      {hasBalance && (
-                        <span style={{ color: 'var(--cresoa-danger)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Icon name="alert-circle" size={12} stroke="var(--cresoa-danger)" />
-                          {formatMoney(customer.balance)} due
-                        </span>
-                      )}
-                      {!hasBalance && customer.orderCount > 0 && (
-                        <span style={{ color: 'var(--cresoa-success)', fontWeight: 600 }}>Paid</span>
-                      )}
+              <div 
+                key={customer.id} 
+                className="customer-list-card"
+                onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
+              >
+                <div className="customer-card-top">
+                  <div className="customer-card-info">
+                    <div className="customer-card-avatar">{initials}</div>
+                    <div>
+                      <h3 className="customer-card-name">{fullName}</h3>
+                      <p className="customer-card-phone">{customer.phone || customer.email || 'No contact'}</p>
                     </div>
                   </div>
-                  <Icon name="chevron-right" size={18} stroke="var(--cresoa-text-muted)" />
-                </button>
-              </Card>
+                  
+                  <div className="customer-card-stats">
+                    {customer.orderCount > 0 && (
+                      <span className="customer-order-badge">
+                        {customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {hasBalance ? (
+                      <span className="customer-balance-due">{formatMoney(customer.balance)} due</span>
+                    ) : customer.orderCount > 0 ? (
+                      <span className="customer-balance-paid">✓ Paid</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="customer-card-bottom">
+                  <span>{customer.lastOrder ? `Last order: ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
+                  <Icon name="chevron-right" size={16} stroke="var(--cresoa-text-muted)" />
+                </div>
+              </div>
             )
           })}
         </div>
@@ -412,6 +323,6 @@ export default function CustomersPage() {
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={businessId} />
       </div>
-    </main>
+    </div>
   )
-}
+    }
