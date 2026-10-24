@@ -61,7 +61,7 @@ export default function OrdersPage() {
     isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
   })
   const [toastMessage, setToastMessage] = useState('')
-  const [toastType, setToastType] = useState('success') // 'success' or 'error'
+  const [toastType, setToastType] = useState('success')
 
   const statusOptions = ['all', 'Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
@@ -79,7 +79,6 @@ export default function OrdersPage() {
     setTimeout(() => setToastMessage(''), 3000)
   }
 
-  // Initial Load Only
   const loadOrders = async () => {
     setLoading(true)
     setError(null)
@@ -112,7 +111,6 @@ export default function OrdersPage() {
 
   useEffect(() => { loadOrders() }, [router, searchParams])
 
-  // ─── Computed stats ───
   const totalOrders = orders.length
   const activeOrders = orders.filter(o => o.current_status !== 'Delivered').length
   const readyOrders = orders.filter(o => o.current_status === 'Ready').length
@@ -167,7 +165,6 @@ export default function OrdersPage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  // ─── OPTIMISTIC DELETE (No Page Reload) ───
   const promptDelete = (orderId) => {
     setOpenMenuId(null)
     setModalConfig({
@@ -175,15 +172,10 @@ export default function OrdersPage() {
       confirmText: 'Delete', isDestructive: true,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
-        
-        // 1. Save current state to rollback if needed
         const previousOrders = [...orders]
-        
-        // 2. Instantly update UI
         setOrders(prev => prev.filter(o => o.id !== orderId))
         showToast('Order deleted successfully', 'success')
 
-        // 3. Make API call in background
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}`, {
@@ -191,7 +183,6 @@ export default function OrdersPage() {
           })
           if (!res.ok) throw new Error('Failed to delete')
         } catch (err) {
-          // 4. Rollback if API fails
           setOrders(previousOrders)
           showToast('Failed to delete order', 'error')
         }
@@ -199,41 +190,46 @@ export default function OrdersPage() {
     })
   }
 
-  // ─── OPTIMISTIC PAYMENT (No Page Reload) ───
-  const promptRecordPayment = (orderId, price) => {
+  // ─── FIXED: OPTIMISTIC PAYMENT (Uses /payments endpoint and sends BALANCE) ───
+  const promptRecordPayment = (orderId, balance) => {
     setOpenMenuId(null)
     setModalConfig({
-      isOpen: true, title: 'Record Payment', message: `Confirm you have received full payment of ₦${price.toLocaleString()}?`,
-      confirmText: 'Confirm Payment', isDestructive: false,
+      isOpen: true, 
+      title: 'Record Payment', 
+      message: `Confirm you have received full payment of ₦${balance.toLocaleString()}?`,
+      confirmText: 'Confirm Payment', 
+      isDestructive: false,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         
         // 1. Save current state to rollback if needed
         const previousOrders = [...orders]
         
-        // 2. Instantly update UI
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, amount_paid: price } : o))
+        // 2. Instantly update UI (set amount_paid to price to clear balance)
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, amount_paid: o.price } : o))
         showToast('Payment recorded!', 'success')
 
-        // 3. Make API call in background
+        // 3. Make API call in background to the correct endpoint
         try {
           const { data: { session } } = await supabase.auth.getSession()
-          const res = await fetch(`/api/orders/${orderId}`, {
-            method: 'PATCH',
+          const res = await fetch(`/api/orders/${orderId}/payments`, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify({ amount_paid: price })
+            body: JSON.stringify({ amount: balance, note: 'Full payment from list view' })
           })
-          if (!res.ok) throw new Error('Failed to record payment')
+          if (!res.ok) {
+            const errData = await res.json()
+            throw new Error(errData.error || 'Failed to record payment')
+          }
         } catch (err) {
           // 4. Rollback if API fails
           setOrders(previousOrders)
-          showToast('Failed to record payment', 'error')
+          showToast(err.message || 'Failed to record payment', 'error')
         }
       }
     })
   }
 
-  // ─── SKELETON LOADING STATE ───
   if (loading) {
     return (
       <div className="orders-page">
@@ -364,7 +360,7 @@ export default function OrdersPage() {
                     {isMenuOpen && (
                       <div className="dropdown-menu">
                         {balance > 0 && (
-                          <button onClick={() => promptRecordPayment(o.id, o.price)} className="dropdown-item text-success">
+                          <button onClick={() => promptRecordPayment(o.id, balance)} className="dropdown-item text-success">
                             <SvgIcons.CheckCircle /> Record Full Payment
                           </button>
                         )}
