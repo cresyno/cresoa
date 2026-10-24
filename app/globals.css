@@ -926,3 +926,282 @@ h1, h2, h3, h4, h5, h6 {
   .cresoa-dashboard-page { padding: 1rem !important; }
   .cresoa-dashboard-page [style*="grid"] { grid-template-columns: 1fr !important; }
 }
+
+/* ============================================================
+   ORDERS PAGE REDESIGN
+   ============================================================ */
+
+.orders-page {
+  padding: 1.25rem;
+  max-width: 800px;
+  margin: 0 auto;
+  padding-bottom: 100px; /* Space for bottom nav */
+  background: var(--cresoa-bg);
+  min-height: 100vh;
+}
+
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.orders-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--cresoa-text);
+  letter-spacing: -0.02em;
+}
+
+.orders-subtitle {
+  color: var(--cresoa-text-muted);
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Metrics Grid: 2x2 on mobile, 4x1 on desktop */
+.orders-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .orders-metrics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.orders-metric-box {
+  background: var(--cresoa-surface);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--cresoa-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: var(--cresoa-text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: var(--cresoa-text);
+  line-height: 1.1;
+}
+
+/* Filters */
+.orders-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.orders-search-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.orders-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.orders-filter-row {
+  display: flex;
+  gap: 10px;
+}
+
+.orders-select {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Orders List & Card */
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-card {
+  padding: 16px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.order-card-title-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.order-card-customer {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cresoa-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-card-item {
+  font-size: 0.85rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
+
+.order-card-price-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.order-card-price {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.order-card-due {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-danger);
+  margin-top: 2px;
+}
+
+.order-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-overdue {
+  background: var(--color-danger);
+  color: white;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Actions Row */
+.order-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap; /* Wraps on very small screens */
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s, transform 0.1s;
+  text-decoration: none;
+}
+
+.btn-action:active {
+  transform: scale(0.97);
+}
+
+.btn-whatsapp {
+  background: #25D366;
+  color: white;
+  flex: 1; /* Makes it grow to fill space */
+}
+
+.btn-call {
+  background: var(--color-primary);
+  color: white;
+  flex: 1;
+}
+
+.btn-view {
+  background: var(--cresoa-surface-soft);
+  color: var(--cresoa-text);
+  border: 1px solid var(--cresoa-border);
+}
+
+.btn-delete {
+  background: transparent;
+  color: var(--color-danger);
+  padding: 0.5rem;
+}
+
+/* Empty State */
+.orders-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: var(--cresoa-surface);
+  border-radius: 16px;
+  border: 1px dashed var(--cresoa-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.orders-empty h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+  color: var(--cresoa-text);
+}
+
+.orders-empty p {
+  color: var(--cresoa-text-muted);
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+/* Skeletons */
+.skeleton-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+   }
