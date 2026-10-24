@@ -4,11 +4,44 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
-import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'
 import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
+
+// ─── EMBEDDED ICONS (No external imports) ───
+const SvgIcons = {
+  Plus: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  MoreVertical: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+    </svg>
+  ),
+  CheckCircle: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  ),
+  Edit: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  ),
+  Copy: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  ),
+  Trash: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  )
+}
 
 export default function OrdersPage() {
   const router = useRouter()
@@ -22,42 +55,30 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('latest')
   
-  // UI State
   const [openMenuId, setOpenMenuId] = useState(null)
   const menuRef = useRef(null)
 
-  // Custom Modal State
   const [modalConfig, setModalConfig] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: '',
-    isDestructive: false,
-    onConfirm: null
+    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
   })
   const [toastMessage, setToastMessage] = useState('')
 
   const statusOptions = ['all', 'Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-  // Close 3-dot menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setOpenMenuId(null)
-      }
+      if (menuRef.current && !menuRef.current.contains(event.target)) setOpenMenuId(null)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Show Toast
   const showToast = (msg) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(''), 3000)
   }
 
   const loadOrders = async () => {
-    // ... (Keep your existing loadOrders logic exactly the same) ...
     setLoading(true)
     setError(null)
     try {
@@ -92,7 +113,6 @@ export default function OrdersPage() {
 
   useEffect(() => { loadOrders() }, [router, searchParams])
 
-  // ─── Computed stats ───
   const totalOrders = orders.length
   const activeOrders = orders.filter(o => o.current_status !== 'Delivered').length
   const readyOrders = orders.filter(o => o.current_status === 'Ready').length
@@ -103,7 +123,6 @@ export default function OrdersPage() {
     return due < today
   }).length
 
-  // ─── Filters & Sorting ───
   const filteredOrders = orders.filter(o => {
     if (statusFilter !== 'all' && o.current_status !== statusFilter) return false
     if (search) {
@@ -128,7 +147,6 @@ export default function OrdersPage() {
     return acc
   }, {})
 
-  // ─── Helpers ───
   const getInitials = (name) => {
     if (!name) return '?'
     const parts = name.trim().split(/\s+/)
@@ -149,29 +167,22 @@ export default function OrdersPage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  // ─── Action Handlers (Now using Custom Modal) ───
   const promptDelete = (orderId) => {
     setOpenMenuId(null)
     setModalConfig({
-      isOpen: true,
-      title: 'Delete Order?',
-      message: 'This action cannot be undone. Are you sure you want to delete this order?',
-      confirmText: 'Delete',
-      isDestructive: true,
+      isOpen: true, title: 'Delete Order?', message: 'This action cannot be undone. Are you sure you want to delete this order?',
+      confirmText: 'Delete', isDestructive: true,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${session.access_token}` }
+            method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` }
           })
           if (!res.ok) throw new Error('Failed to delete')
           showToast('Order deleted successfully')
           await loadOrders()
-        } catch (err) {
-          showToast('Failed to delete order')
-        }
+        } catch (err) { showToast('Failed to delete order') }
       }
     })
   }
@@ -179,161 +190,193 @@ export default function OrdersPage() {
   const promptRecordPayment = (orderId, price) => {
     setOpenMenuId(null)
     setModalConfig({
-      isOpen: true,
-      title: 'Record Payment',
-      message: `Confirm you have received full payment of ₦${price.toLocaleString()}?`,
-      confirmText: 'Confirm Payment',
-      isDestructive: false,
+      isOpen: true, title: 'Record Payment', message: `Confirm you have received full payment of ₦${price.toLocaleString()}?`,
+      confirmText: 'Confirm Payment', isDestructive: false,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}`, {
             method: 'PATCH',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}` 
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
             body: JSON.stringify({ amount_paid: price })
           })
           if (!res.ok) throw new Error('Failed to record payment')
           showToast('Payment recorded!')
           await loadOrders()
-        } catch (err) {
-          showToast('Failed to record payment')
-        }
+        } catch (err) { showToast('Failed to record payment') }
       }
     })
   }
 
-  if (loading) { /* ... Keep Skeleton ... */ }
-  if (error) { /* ... Keep Error ... */ }
+  // ─── SKELETON LOADING STATE (Restored) ───
+  if (loading) {
+    return (
+      <div className="orders-page">
+        <div className="skeleton-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <div className="skeleton-box" style={{ width: '140px', height: '24px' }} />
+          <div className="skeleton-box" style={{ width: '100px', height: '32px' }} />
+        </div>
+        <div className="orders-metrics-grid">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="skeleton-box" style={{ height: '70px', borderRadius: '12px' }} />
+          ))}
+        </div>
+        <div className="orders-list" style={{ marginTop: '1.5rem' }}>
+          {[1,2,3].map(i => (
+            <div key={i} className="skeleton-box" style={{ height: '140px', marginBottom: '12px', borderRadius: '16px' }} />
+          ))}
+        </div>
+        <Navigation businessId={currentBusinessId} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--cresoa-danger)' }}>
+        {error}
+        <button onClick={loadOrders} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Retry</button>
+      </div>
+    )
+  }
 
   return (
     <div className="orders-page">
       <Navigation businessId={currentBusinessId} />
 
-      {/* HEADER & FILTERS (Keep as is) */}
       <div className="orders-header">
         <div>
           <h1 className="orders-title">Orders</h1>
-          <p className="orders-subtitle">{totalOrders} orders · {overdueOrders} overdue</p>
+          <p className="orders-subtitle">
+            {totalOrders} orders · <span style={{ color: overdueOrders > 0 ? 'var(--color-danger)' : 'inherit' }}>{overdueOrders} overdue</span>
+          </p>
         </div>
         <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button">
-          <Icon name="plus" size={14} stroke="#fff" /> New Order
+          <SvgIcons.Plus /> New Order
         </a>
       </div>
-      {/* ... Metrics, Search, Filters ... */}
 
-      {/* ─── Orders List ─── */}
-      {sortedOrders.map((o) => {
-        const isOverdue = o.due_date && new Date(o.due_date) < new Date() && o.current_status !== 'Delivered'
-        const balance = (o.price || 0) - (o.amount_paid || 0)
-        const customerName = o.customers?.name || 'No customer'
-        const customerPhone = o.customers?.phone || ''
-        const itemTitle = o.title || 'Untitled'
-        const isMenuOpen = openMenuId === o.id
+      <div className="orders-metrics-grid">
+        <div className="orders-metric-box"><span className="metric-label">Total</span><span className="metric-value">{totalOrders}</span></div>
+        <div className="orders-metric-box"><span className="metric-label">Active</span><span className="metric-value">{activeOrders}</span></div>
+        <div className="orders-metric-box"><span className="metric-label">Ready</span><span className="metric-value" style={{ color: 'var(--color-secondary)' }}>{readyOrders}</span></div>
+        <div className="orders-metric-box"><span className="metric-label">Overdue</span><span className="metric-value" style={{ color: 'var(--color-danger)' }}>{overdueOrders}</span></div>
+      </div>
 
-        return (
-          <Card key={o.id} className="order-card">
-            <div className="order-card-header">
-              <div className="order-identity">
-                <div className="cresoa-avatar">{getInitials(customerName)}</div>
-                <div className="order-card-title-group">
-                  <h3 className="order-card-customer">{customerName}</h3>
-                  <span className="order-card-item">· {itemTitle}</span>
-                </div>
-              </div>
-              <div className="order-card-price-group">
-                <span className="order-card-price">₦{o.price?.toLocaleString() || 0}</span>
-                {balance > 0 && <span className="order-card-due">₦{balance.toLocaleString()} due</span>}
-              </div>
-            </div>
+      <div className="orders-filters">
+        <input type="text" className="orders-search-input" placeholder="Search customer or item..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="orders-filter-row">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="orders-select">
+            {statusOptions.map(s => <option key={s} value={s}>{s === 'all' ? `All (${totalOrders})` : `${s} (${statusCounts[s] || 0})`}</option>)}
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="orders-select">
+            <option value="latest">Latest</option><option value="oldest">Oldest</option>
+            <option value="highest">Highest Price</option><option value="lowest">Lowest Price</option>
+          </select>
+        </div>
+      </div>
 
-            <div className="order-card-badges">
-              <StatusPill status={o.current_status} />
-              {isOverdue && <span className="badge-overdue">Overdue</span>}
-            </div>
+      {sortedOrders.length === 0 ? (
+        <div className="orders-empty">
+          <span style={{ fontSize: '3rem', display: 'block', marginBottom: '0.5rem' }}>📋</span>
+          <h3>No orders found</h3><p>Create your first order to get started.</p>
+          <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button">Create Order</a>
+        </div>
+      ) : (
+        <div className="orders-list">
+          {sortedOrders.map((o) => {
+            const isOverdue = o.due_date && new Date(o.due_date) < new Date() && o.current_status !== 'Delivered'
+            const balance = (o.price || 0) - (o.amount_paid || 0)
+            const customerName = o.customers?.name || 'No customer'
+            const customerPhone = o.customers?.phone || ''
+            const itemTitle = o.title || 'Untitled'
+            const isMenuOpen = openMenuId === o.id
 
-            <div className="order-card-actions">
-              <div className="action-buttons-group">
-                {customerPhone && (
-                  <>
-                    <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp">WhatsApp</button>
-                    <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call">Call</button>
-                  </>
-                )}
-                <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view">View</a>
-              </div>
-
-              {/* 3-Dot Menu */}
-              <div className="menu-container" ref={isMenuOpen ? menuRef : null}>
-                <button 
-                  className={`btn-menu-trigger ${isMenuOpen ? 'active' : ''}`}
-                  onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)}
-                >
-                  <Icon name="more-vertical" size={18} />
-                </button>
-
-                {isMenuOpen && (
-                  <div className="dropdown-menu">
-                    {balance > 0 && (
-                      <button onClick={() => promptRecordPayment(o.id, o.price)} className="dropdown-item text-success">
-                        <Icon name="check-circle" size={16} /> Record Full Payment
-                      </button>
-                    )}
-                    <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} className="dropdown-item">
-                      <Icon name="edit" size={16} /> Edit Order
-                    </a>
-                    <button onClick={() => {
-                      navigator.clipboard.writeText(o.id)
-                      setOpenMenuId(null)
-                      showToast('Order ID copied!')
-                    }} className="dropdown-item">
-                      <Icon name="copy" size={16} /> Copy Order ID
-                    </button>
-                    <div className="dropdown-divider"></div>
-                    <button onClick={() => promptDelete(o.id)} className="dropdown-item text-danger">
-                      <Icon name="trash" size={16} /> Delete Order
-                    </button>
+            return (
+              <Card key={o.id} className="order-card">
+                <div className="order-card-header">
+                  <div className="order-identity">
+                    <div className="cresoa-avatar">{getInitials(customerName)}</div>
+                    <div className="order-card-title-group">
+                      <h3 className="order-card-customer">{customerName}</h3>
+                      <span className="order-card-item">· {itemTitle}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        )
-      })}
+                  <div className="order-card-price-group">
+                    <span className="order-card-price">₦{o.price?.toLocaleString() || 0}</span>
+                    {balance > 0 && <span className="order-card-due">₦{balance.toLocaleString()} due</span>}
+                  </div>
+                </div>
 
-      {/* CUSTOM NATIVE MODAL */}
+                <div className="order-card-badges">
+                  <StatusPill status={o.current_status} />
+                  {isOverdue && <span className="badge-overdue">Overdue</span>}
+                </div>
+
+                <div className="order-card-actions">
+                  <div className="action-buttons-group">
+                    {customerPhone && (
+                      <>
+                        <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp">WhatsApp</button>
+                        <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call">Call</button>
+                      </>
+                    )}
+                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view">View</a>
+                  </div>
+
+                  <div className="menu-container" ref={isMenuOpen ? menuRef : null}>
+                    <button className={`btn-menu-trigger ${isMenuOpen ? 'active' : ''}`} onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)}>
+                      <SvgIcons.MoreVertical />
+                    </button>
+
+                    {isMenuOpen && (
+                      <div className="dropdown-menu">
+                        {balance > 0 && (
+                          <button onClick={() => promptRecordPayment(o.id, o.price)} className="dropdown-item text-success">
+                            <SvgIcons.CheckCircle /> Record Full Payment
+                          </button>
+                        )}
+                        <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} className="dropdown-item">
+                          <SvgIcons.Edit /> Edit Order
+                        </a>
+                        <button onClick={() => {
+                          navigator.clipboard.writeText(o.id)
+                          setOpenMenuId(null)
+                          showToast('Order ID copied!')
+                        }} className="dropdown-item">
+                          <SvgIcons.Copy /> Copy Order ID
+                        </button>
+                        <div className="dropdown-divider"></div>
+                        <button onClick={() => promptDelete(o.id)} className="dropdown-item text-danger">
+                          <SvgIcons.Trash /> Delete Order
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
       {modalConfig.isOpen && (
         <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <h3 className="app-modal-title">{modalConfig.title}</h3>
             <p className="app-modal-message">{modalConfig.message}</p>
             <div className="app-modal-actions">
-              <button 
-                className="app-modal-btn cancel" 
-                onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
-              >
-                Cancel
-              </button>
-              <button 
-                className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} 
-                onClick={modalConfig.onConfirm}
-              >
-                {modalConfig.confirmText}
-              </button>
+              <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
+              <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TOAST NOTIFICATION */}
-      {toastMessage && (
-        <div className="app-toast">
-          {toastMessage}
-        </div>
-      )}
+      {toastMessage && <div className="app-toast">{toastMessage}</div>}
+      
+      <div style={{ marginTop: '2rem' }}><Navigation businessId={currentBusinessId} /></div>
     </div>
   )
-              }
+    }
