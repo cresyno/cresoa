@@ -40,6 +40,21 @@ const SvgIcons = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
+  ),
+  ChevronDown: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  ),
+  Search: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  X: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   )
 }
 
@@ -54,20 +69,43 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('latest')
   
+  // Dropdown & Menu State
   const [openMenuId, setOpenMenuId] = useState(null)
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [showSortMenu, setShowSortMenu] = useState(false)
+  
   const menuRef = useRef(null)
+  const statusMenuRef = useRef(null)
+  const sortMenuRef = useRef(null)
 
+  // Custom Modal & Toast State
   const [modalConfig, setModalConfig] = useState({
     isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
   })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
 
-  const statusOptions = ['all', 'Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
+  const statusOptions = [
+    { label: 'All Orders', value: 'all' },
+    { label: 'Order placed', value: 'Order placed' },
+    { label: 'Cutting', value: 'Cutting' },
+    { label: 'Sewing', value: 'Sewing' },
+    { label: 'Ready', value: 'Ready' },
+    { label: 'Delivered', value: 'Delivered' }
+  ]
+
+  const sortOptions = [
+    { label: 'Latest', value: 'latest' },
+    { label: 'Oldest', value: 'oldest' },
+    { label: 'Highest Price', value: 'highest' },
+    { label: 'Lowest Price', value: 'lowest' }
+  ]
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) setOpenMenuId(null)
+      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target)) setShowStatusMenu(false)
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) setShowSortMenu(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -140,11 +178,6 @@ export default function OrdersPage() {
     }
   })
 
-  const statusCounts = orders.reduce((acc, o) => {
-    acc[o.current_status] = (acc[o.current_status] || 0) + 1
-    return acc
-  }, {})
-
   const getInitials = (name) => {
     if (!name) return '?'
     const parts = name.trim().split(/\s+/)
@@ -190,7 +223,6 @@ export default function OrdersPage() {
     })
   }
 
-  // ─── FIXED: OPTIMISTIC PAYMENT (Uses /payments endpoint and sends BALANCE) ───
   const promptRecordPayment = (orderId, balance) => {
     setOpenMenuId(null)
     setModalConfig({
@@ -202,14 +234,10 @@ export default function OrdersPage() {
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         
-        // 1. Save current state to rollback if needed
         const previousOrders = [...orders]
-        
-        // 2. Instantly update UI (set amount_paid to price to clear balance)
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, amount_paid: o.price } : o))
         showToast('Payment recorded!', 'success')
 
-        // 3. Make API call in background to the correct endpoint
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}/payments`, {
@@ -222,7 +250,6 @@ export default function OrdersPage() {
             throw new Error(errData.error || 'Failed to record payment')
           }
         } catch (err) {
-          // 4. Rollback if API fails
           setOrders(previousOrders)
           showToast(err.message || 'Failed to record payment', 'error')
         }
@@ -233,16 +260,14 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <div className="orders-page">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div className="orders-header-skeleton">
           <div className="skeleton-box" style={{ width: '140px', height: '28px' }} />
           <div className="skeleton-box" style={{ width: '110px', height: '38px' }} />
         </div>
         <div className="orders-metrics-grid">
-          {[1,2,3,4].map(i => (
-            <div key={i} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />
-          ))}
+          {[1,2,3,4].map(i => <div key={i} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />)}
         </div>
-        <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
+        <div className="orders-filters-skeleton">
            <div className="skeleton-box" style={{ height: '44px', width: '100%', marginBottom: '10px' }} />
            <div style={{ display: 'flex', gap: '10px' }}>
               <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
@@ -250,9 +275,7 @@ export default function OrdersPage() {
            </div>
         </div>
         <div className="orders-list">
-          {[1,2,3].map(i => (
-            <div key={i} className="skeleton-box" style={{ height: '160px', marginBottom: '12px', borderRadius: '16px' }} />
-          ))}
+          {[1,2,3].map(i => <div key={i} className="skeleton-box" style={{ height: '160px', marginBottom: '12px', borderRadius: '16px' }} />)}
         </div>
         <Navigation businessId={currentBusinessId} />
       </div>
@@ -261,9 +284,9 @@ export default function OrdersPage() {
 
   if (error) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--cresoa-danger)' }}>
-        {error}
-        <button onClick={loadOrders} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Retry</button>
+      <div className="orders-page" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+        <p style={{ color: 'var(--color-danger)', marginBottom: '1rem' }}>{error}</p>
+        <button onClick={loadOrders} className="cresoa-primary-button">Retry</button>
       </div>
     )
   }
@@ -272,6 +295,7 @@ export default function OrdersPage() {
     <div className="orders-page">
       <Navigation businessId={currentBusinessId} />
 
+      {/* ─── HEADER ─── */}
       <div className="orders-header">
         <div>
           <h1 className="orders-title">Orders</h1>
@@ -284,6 +308,7 @@ export default function OrdersPage() {
         </a>
       </div>
 
+      {/* ─── METRICS ─── */}
       <div className="orders-metrics-grid">
         <div className="orders-metric-box"><span className="metric-label">Total</span><span className="metric-value">{totalOrders}</span></div>
         <div className="orders-metric-box"><span className="metric-label">Active</span><span className="metric-value">{activeOrders}</span></div>
@@ -291,24 +316,78 @@ export default function OrdersPage() {
         <div className="orders-metric-box"><span className="metric-label">Overdue</span><span className="metric-value" style={{ color: 'var(--color-danger)' }}>{overdueOrders}</span></div>
       </div>
 
+      {/* ─── FILTERS ─── */}
       <div className="orders-filters">
-        <input type="text" className="orders-search-input" placeholder="Search customer or item..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="orders-search-wrapper">
+          <span className="search-icon"><SvgIcons.Search /></span>
+          <input 
+            type="text" 
+            className="orders-search-input" 
+            placeholder="Search customer or item..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+          />
+          {search && (
+            <button className="search-clear-btn" onClick={() => setSearch('')}>
+              <SvgIcons.X />
+            </button>
+          )}
+        </div>
+        
         <div className="orders-filter-row">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="orders-select">
-            {statusOptions.map(s => <option key={s} value={s}>{s === 'all' ? `All (${totalOrders})` : `${s} (${statusCounts[s] || 0})`}</option>)}
-          </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="orders-select">
-            <option value="latest">Latest</option><option value="oldest">Oldest</option>
-            <option value="highest">Highest Price</option><option value="lowest">Lowest Price</option>
-          </select>
+          {/* CUSTOM STATUS DROPDOWN */}
+          <div className="custom-select-wrapper" ref={statusMenuRef}>
+            <button className="custom-select-btn" onClick={() => { setShowStatusMenu(!showStatusMenu); setShowSortMenu(false); }}>
+              {statusOptions.find(o => o.value === statusFilter)?.label || 'Status'}
+              <SvgIcons.ChevronDown />
+            </button>
+            {showStatusMenu && (
+              <div className="custom-dropdown-menu">
+                {statusOptions.map(opt => (
+                  <button 
+                    key={opt.value} 
+                    className={`custom-dropdown-item ${statusFilter === opt.value ? 'active' : ''}`}
+                    onClick={() => { setStatusFilter(opt.value); setShowStatusMenu(false); }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CUSTOM SORT DROPDOWN */}
+          <div className="custom-select-wrapper" ref={sortMenuRef}>
+            <button className="custom-select-btn" onClick={() => { setShowSortMenu(!showSortMenu); setShowStatusMenu(false); }}>
+              {sortOptions.find(o => o.value === sortBy)?.label || 'Sort'}
+              <SvgIcons.ChevronDown />
+            </button>
+            {showSortMenu && (
+              <div className="custom-dropdown-menu">
+                {sortOptions.map(opt => (
+                  <button 
+                    key={opt.value} 
+                    className={`custom-dropdown-item ${sortBy === opt.value ? 'active' : ''}`}
+                    onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {sortedOrders.length === 0 ? (
+      {/* ─── LIST ─── */}
+        {sortedOrders.length === 0 ? (
         <div className="orders-empty">
-          <span style={{ fontSize: '3rem', display: 'block', marginBottom: '0.5rem' }}>📋</span>
-          <h3>No orders found</h3><p>Create your first order to get started.</p>
-          <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button">Create Order</a>
+          <div className="empty-icon">📋</div>
+          <h3>No orders found</h3>
+          <p>{search ? 'Try a different search term.' : 'Create your first order to get started.'}</p>
+          {!search && (
+            <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button">Create Order</a>
+          )}
         </div>
       ) : (
         <div className="orders-list">
@@ -388,6 +467,7 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {/* ─── MODALS & TOASTS ─── */}
       {modalConfig.isOpen && (
         <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -403,12 +483,11 @@ export default function OrdersPage() {
 
       {toastMessage && (
         <div className={`app-toast ${toastType}`}>
-          {toastType === 'success' ? '✅ ' : '⚠️ '}
-          {toastMessage}
+          {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
         </div>
       )}
       
       <div style={{ marginTop: '2rem' }}><Navigation businessId={currentBusinessId} /></div>
     </div>
   )
-    }
+                      }
