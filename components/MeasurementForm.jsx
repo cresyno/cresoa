@@ -19,6 +19,12 @@ export function MeasurementForm({
     custom: { ...(measurements.custom || {}) },
   }))
 
+  // State for the custom inline form
+  const [isAddingCustom, setIsAddingCustom] = useState(false)
+  const [newCustomName, setNewCustomName] = useState('')
+  const [newCustomValue, setNewCustomValue] = useState('')
+  const [customError, setCustomError] = useState('')
+
   // Update parent when local state changes
   const updateParent = (newValues) => {
     setFormValues(newValues)
@@ -37,23 +43,40 @@ export function MeasurementForm({
     updateParent(updated)
   }
 
-  // Handle custom field add
-  const handleAddCustom = () => {
-    const label = prompt('Enter measurement name (e.g. Thigh):')
-    if (!label || label.trim() === '') return
-    const key = label.trim().toLowerCase().replace(/\s+/g, '_')
-    // Avoid overwriting existing keys
-    if (formValues.custom[key] !== undefined) {
-      alert(`"${label}" already exists.`)
+  // Handle saving the custom field from the inline form
+  const handleSaveCustom = () => {
+    if (!newCustomName.trim()) {
+      setCustomError('Measurement name is required.')
       return
     }
-    const value = prompt(`Enter value for ${label}:`)
-    if (value === null) return
+    
+    const key = newCustomName.trim().toLowerCase().replace(/\s+/g, '_')
+    
+    // Avoid overwriting existing keys
+    if (formValues.custom[key] !== undefined) {
+      setCustomError(`"${newCustomName}" already exists.`)
+      return
+    }
+
     const updated = {
       ...formValues,
-      custom: { ...formValues.custom, [key]: value },
+      custom: { ...formValues.custom, [key]: newCustomValue || '0' },
     }
+    
     updateParent(updated)
+    
+    // Reset inline form
+    setNewCustomName('')
+    setNewCustomValue('')
+    setCustomError('')
+    setIsAddingCustom(false)
+  }
+
+  const handleCancelCustom = () => {
+    setNewCustomName('')
+    setNewCustomValue('')
+    setCustomError('')
+    setIsAddingCustom(false)
   }
 
   // Handle custom field removal
@@ -74,9 +97,6 @@ export function MeasurementForm({
     }
     updateParent(updated)
   }
-
-  // Check if any standard fields have values
-  const hasStandardValues = MEASUREMENT_FIELDS.some(f => formValues[f.key] && formValues[f.key] !== '')
 
   // Check if there are custom fields
   const customKeys = Object.keys(formValues.custom || {})
@@ -104,6 +124,7 @@ export function MeasurementForm({
               disabled={readOnly}
               placeholder="—"
               className={readOnly ? 'read-only' : ''}
+              inputMode="decimal"
             />
           </div>
         ))}
@@ -113,17 +134,47 @@ export function MeasurementForm({
       <div className="measurement-custom-section">
         <div className="measurement-custom-header">
           <span className="measurement-custom-label">Custom measurements</span>
-          {!readOnly && (
+          {!readOnly && !isAddingCustom && (
             <button
               type="button"
               className="measurement-add-custom"
-              onClick={handleAddCustom}
+              onClick={() => setIsAddingCustom(true)}
             >
               <Icon name="plus" size={14} stroke="currentColor" />
               Add custom
             </button>
           )}
         </div>
+
+        {/* INLINE CUSTOM FORM (Replaces window.prompt) */}
+        {isAddingCustom && (
+          <div className="inline-custom-form">
+            <div className="inline-custom-inputs">
+              <input
+                type="text"
+                placeholder="Name (e.g. Thigh)"
+                value={newCustomName}
+                onChange={(e) => { setNewCustomName(e.target.value); setCustomError(''); }}
+                className="inline-custom-input"
+                autoFocus
+              />
+              <input
+                type="number"
+                step="0.1"
+                placeholder="Value"
+                value={newCustomValue}
+                onChange={(e) => setNewCustomValue(e.target.value)}
+                className="inline-custom-input value-input"
+                inputMode="decimal"
+              />
+            </div>
+            <div className="inline-custom-actions">
+              <button type="button" onClick={handleCancelCustom} className="inline-custom-cancel">Cancel</button>
+              <button type="button" onClick={handleSaveCustom} className="inline-custom-save">Save</button>
+            </div>
+            {customError && <p className="inline-custom-error">{customError}</p>}
+          </div>
+        )}
 
         {hasCustomValues ? (
           <div className="measurement-custom-list">
@@ -140,6 +191,7 @@ export function MeasurementForm({
                     value={formValues.custom[key] ?? ''}
                     onChange={(e) => handleCustomChange(key, e.target.value)}
                     placeholder="—"
+                    inputMode="decimal"
                   />
                 )}
                 {!readOnly && (
@@ -155,9 +207,11 @@ export function MeasurementForm({
             ))}
           </div>
         ) : (
-          <div className="measurement-custom-empty">
-            {readOnly ? 'No custom measurements' : 'No custom measurements added yet'}
-          </div>
+          !isAddingCustom && (
+            <div className="measurement-custom-empty">
+              {readOnly ? 'No custom measurements' : 'No custom measurements added yet'}
+            </div>
+          )
         )}
       </div>
 
