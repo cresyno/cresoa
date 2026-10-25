@@ -80,6 +80,19 @@ export default function OrderDetailPage() {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
 
+  // Custom Modal & Toast State (Replaces all browser alerts/confirms)
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
+  })
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) setShowMenu(false)
@@ -141,13 +154,20 @@ export default function OrderDetailPage() {
   const formatDate = value => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
   const customerName = customer?.first_name || customer?.name || 'Customer'
 
+  // ─── ACTIONS WITH CUSTOM TOASTS ───
+
   const saveNotes = async () => {
     setSavingNotes(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       await supabase.from('orders').update({ notes }).eq('id', orderId)
-    } catch (err) { alert('Could not save the note.') } finally { setSavingNotes(false) }
+      showToast('Notes saved successfully')
+    } catch (err) { 
+      showToast('Could not save the note.', 'error') 
+    } finally { 
+      setSavingNotes(false) 
+    }
   }
 
   const handleRecordPayment = async (e) => {
@@ -165,7 +185,12 @@ export default function OrderDetailPage() {
       if (!response.ok) throw new Error('Failed')
       await loadOrder()
       setPaymentAmount(''); setPaymentNote(''); setShowPaymentModal(false)
-    } catch (err) { alert('Could not record payment.') } finally { setRecordingPayment(false) }
+      showToast('Payment recorded successfully!')
+    } catch (err) { 
+      showToast('Could not record payment.', 'error') 
+    } finally { 
+      setRecordingPayment(false) 
+    }
   }
 
   const updateStatus = async (status) => {
@@ -176,7 +201,12 @@ export default function OrderDetailPage() {
       await supabase.from('orders').update({ current_status: status }).eq('id', orderId)
       await loadOrder()
       setShowStatusModal(false); setSelectedStatus(null)
-    } catch (err) { alert('Could not update status.') } finally { setUpdatingStatus(false) }
+      showToast(`Status moved to ${status}`)
+    } catch (err) { 
+      showToast('Could not update status.', 'error') 
+    } finally { 
+      setUpdatingStatus(false) 
+    }
   }
 
   const openWhatsAppModal = () => {
@@ -188,7 +218,7 @@ export default function OrderDetailPage() {
   }
 
   const handleSendWhatsApp = () => {
-    if (!customer?.phone) return alert('No phone number.')
+    if (!customer?.phone) return showToast('No phone number saved for this customer.', 'error')
     window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsAppMessage)}`, '_blank')
     setIsWhatsAppModalOpen(false)
   }
@@ -198,6 +228,7 @@ export default function OrderDetailPage() {
   const copyTrackingLink = async () => {
     await navigator.clipboard.writeText(getTrackingLink())
     setCopied(true); setTimeout(() => setCopied(false), 2000)
+    showToast('Tracking link copied!')
   }
 
   const handleEditSubmit = async (e) => {
@@ -208,25 +239,57 @@ export default function OrderDetailPage() {
       await supabase.from('orders').update({ title: editForm.title, price: parseFloat(editForm.price) || 0, due_date: editForm.due_date || null }).eq('id', orderId)
       await loadOrder()
       setShowEditModal(false)
-    } catch (err) { alert('Could not update order.') } finally { setEditing(false) }
+      showToast('Order details updated')
+    } catch (err) { 
+      showToast('Could not update order.', 'error') 
+    } finally { 
+      setEditing(false) 
+    }
   }
 
-  const handleDuplicate = async () => {
-    if (!confirm('Duplicate this order?')) return
-    try {
-      const { data, error } = await supabase.from('orders').insert({ business_id: currentBusinessId, customer_id: order.customer_id, title: `${order.title} (Copy)`, price: order.price, amount_paid: 0, due_date: order.due_date, current_status: 'Order placed' }).select().single()
-      if (error) throw error
-      router.push(`/dashboard/orders/${data.id}?business_id=${currentBusinessId}`)
-    } catch (err) { alert('Could not duplicate.') }
+  // ─── CUSTOM CONFIRM MODALS ───
+
+  const promptDuplicate = () => {
+    setShowMenu(false)
+    setModalConfig({
+      isOpen: true,
+      title: 'Duplicate Order?',
+      message: 'This will create a new order with the exact same details. The new order will start at "Order placed" and have ₦0 paid.',
+      confirmText: 'Duplicate',
+      isDestructive: false,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }))
+        try {
+          const { data, error } = await supabase.from('orders').insert({ business_id: currentBusinessId, customer_id: order.customer_id, title: `${order.title} (Copy)`, price: order.price, amount_paid: 0, due_date: order.due_date, current_status: 'Order placed' }).select().single()
+          if (error) throw error
+          router.push(`/dashboard/orders/${data.id}?business_id=${currentBusinessId}`)
+          showToast('Order duplicated successfully')
+        } catch (err) { 
+          showToast('Could not duplicate order.', 'error') 
+        }
+      }
+    })
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to permanently delete this order? This cannot be undone.')) return
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      await supabase.from('orders').delete().eq('id', orderId)
-      router.push(`/dashboard/orders?business_id=${currentBusinessId}`)
-    } catch (err) { alert('Could not delete order.') }
+  const promptDelete = () => {
+    setShowMenu(false)
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Order?',
+      message: 'Are you sure you want to permanently delete this order? This action cannot be undone.',
+      confirmText: 'Delete Order',
+      isDestructive: true,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }))
+        try {
+          await supabase.from('orders').delete().eq('id', orderId)
+          router.push(`/dashboard/orders?business_id=${currentBusinessId}`)
+          showToast('Order deleted successfully')
+        } catch (err) { 
+          showToast('Could not delete order.', 'error') 
+        }
+      }
+    })
   }
 
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
@@ -262,11 +325,11 @@ export default function OrderDetailPage() {
                 <button onClick={() => { setShowMenu(false); setShowEditModal(true) }} className="dropdown-item">
                   <Icon name="edit-2" size={16} /> Edit Order
                 </button>
-                <button onClick={() => { setShowMenu(false); handleDuplicate() }} className="dropdown-item">
+                <button onClick={promptDuplicate} className="dropdown-item">
                   <Icon name="copy" size={16} /> Duplicate Order
                 </button>
                 <div className="dropdown-divider"></div>
-                <button onClick={() => { setShowMenu(false); handleDelete() }} className="dropdown-item text-danger">
+                <button onClick={promptDelete} className="dropdown-item text-danger">
                   <Icon name="trash-2" size={16} /> Delete Order
                 </button>
               </div>
@@ -335,36 +398,35 @@ export default function OrderDetailPage() {
       </div>
 
       {/* ─── CUSTOMER & TRACKING ─── */}
-<div className="order-grid-2">
-  <div className="order-card">
-    <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CUSTOMER</span>
-    
-    <div className="customer-profile">
-      <div className="customer-avatar-round">
-        {customerName.charAt(0).toUpperCase()}
-      </div>
-      <div className="customer-info">
-        <h3 className="customer-name">{customerName}</h3>
-        {customer?.phone && <p className="customer-contact">{customer.phone}</p>}
-        {customer?.email && <p className="customer-contact">{customer.email}</p>}
-      </div>
-    </div>
+      <div className="order-grid-2">
+        <div className="order-card">
+          <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CUSTOMER</span>
+          
+          <div className="customer-profile">
+            <div className="customer-avatar-round">
+              {customerName.charAt(0).toUpperCase()}
+            </div>
+            <div className="customer-info">
+              <h3 className="customer-name">{customerName}</h3>
+              {customer?.phone && <p className="customer-contact">{customer.phone}</p>}
+              {customer?.email && <p className="customer-contact">{customer.email}</p>}
+            </div>
+          </div>
 
-    <div className="order-card-actions-row" style={{ marginTop: '1.5rem' }}>
-      {customer?.phone && (
-        <a href={`tel:${customer.phone}`} className="order-btn-secondary full-width">
-          <Icon name="phone" size={16} /> Call
-        </a>
-      )}
-      {customer?.phone && (
-        <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
-          <Icon name="message-circle" size={16} /> WhatsApp
-        </button>
-      )}
-    </div>
-  </div>
+          <div className="order-card-actions-row" style={{ marginTop: '1.5rem' }}>
+            {customer?.phone && (
+              <a href={`tel:${customer.phone}`} className="order-btn-secondary full-width">
+                <Icon name="phone" size={16} /> Call
+              </a>
+            )}
+            {customer?.phone && (
+              <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
+                <Icon name="message-circle" size={16} /> WhatsApp
+              </button>
+            )}
+          </div>
+        </div>
 
-  
         <div className="order-card tracking-card">
           <div className="order-card-header">
              <span className="order-label">TRACKING LINK</span>
@@ -440,6 +502,10 @@ export default function OrderDetailPage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: '2rem' }}>
+        <Navigation businessId={currentBusinessId} />
       </div>
 
       {/* ─── MODALS ─── */}
@@ -610,9 +676,26 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      <div style={{ marginTop: '2rem' }}>
-        <Navigation businessId={currentBusinessId} />
-      </div>
+      {/* ─── CUSTOM MODAL (For Delete & Duplicate) ─── */}
+      {modalConfig.isOpen && (
+        <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <h3 className="app-modal-title">{modalConfig.title}</h3>
+            <p className="app-modal-message">{modalConfig.message}</p>
+            <div className="app-modal-actions">
+              <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
+              <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TOAST ─── */}
+      {toastMessage && (
+        <div className={`app-toast ${toastType}`}>
+          {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
+        </div>
+      )}
     </div>
   )
-            }
+               }
