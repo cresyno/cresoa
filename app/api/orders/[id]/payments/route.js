@@ -71,11 +71,14 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // ─── Update order amount_paid ───
+    // ─── Update order amount_paid AND updated_at ───
     const newTotal = (order.amount_paid || 0) + amount;
     const { error: updateError } = await supabaseAdmin
       .from('orders')
-      .update({ amount_paid: newTotal })
+      .update({ 
+        amount_paid: newTotal,
+        updated_at: new Date().toISOString() // <--- THIS IS THE FIX
+      })
       .eq('id', id);
 
     if (updateError) {
@@ -96,4 +99,4 @@ export async function POST(req, { params }) {
     console.error('Payment API error:', err);
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
-                               }
+}
