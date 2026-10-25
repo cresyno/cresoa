@@ -3862,3 +3862,59 @@ select.order-input {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-sm);
 }
+/* ============================================================
+   SMART TABS & STATUS PILLS
+   ============================================================ */
+
+.smart-tabs-container {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.smart-tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
+.smart-tab {
+  padding: 8px 16px;
+  border-radius: 99px;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  color: var(--cresoa-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.smart-tab.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+/* Status Pills */
+.badge-status {
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-status.success { background: rgba(0, 166, 81, 0.1); color: var(--color-secondary); }
+.badge-status.warning { background: rgba(253, 181, 21, 0.15); color: #B4881E; }
+.badge-status.info { background: rgba(11, 44, 94, 0.08); color: var(--color-primary); }
+
+/* Active state for buttons in modals */
+.order-btn-secondary.active {
+  border-color: var(--color-primary);
+  background: rgba(11, 44, 94, 0.05);
+}
