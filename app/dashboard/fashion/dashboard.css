@@ -214,3 +214,86 @@
   background: var(--cresoa-surface-soft);
   color: var(--color-primary);
 }
+
+/* ============================================================
+   TIMEFRAME SELECTOR & KPI HEADER
+   ============================================================ */
+
+.kpi-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0 4px;
+}
+
+/* Custom Dropdown */
+.timeframe-dropdown-wrapper {
+  position: relative;
+}
+
+.timeframe-btn {
+  display: flex;
+  align-items: center;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--cresoa-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.timeframe-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.timeframe-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  width: 160px;
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.timeframe-item {
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cresoa-text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.timeframe-item:hover {
+  background: var(--cresoa-surface-soft);
+}
+
+.timeframe-item.active {
+  background: var(--cresoa-surface-soft);
+  color: var(--color-primary);
+}
+
+.analytics-period-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--cresoa-text-muted);
+  background: var(--cresoa-surface-soft);
+  padding: 4px 10px;
+  border-radius: 99px;
+}
