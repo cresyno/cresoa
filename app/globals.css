@@ -3332,3 +3332,123 @@ div[style*="conic-gradient"] > * {
   background: transparent !important;
   border-radius: 50% !important;
 }
+/* ============================================================
+   ORDERS PAGE - CUSTOM FILTERS & SEARCH
+   ============================================================ */
+
+/* Search Bar with Icon and Clear Button */
+.orders-search-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--cresoa-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.orders-search-input {
+  width: 100%;
+  padding: 12px 40px 12px 40px; /* Space for icon and clear button */
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.orders-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: var(--cresoa-surface-soft);
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cresoa-text-muted);
+  cursor: pointer;
+}
+
+.search-clear-btn:hover {
+  background: var(--cresoa-border);
+  color: var(--cresoa-text);
+}
+
+/* Custom Select Dropdowns */
+.custom-select-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.custom-select-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.custom-select-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.custom-dropdown-item {
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--cresoa-text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.custom-dropdown-item:hover {
+  background: var(--cresoa-surface-soft);
+}
+
+.custom-dropdown-item.active {
+  background: var(--cresoa-surface-soft);
+  color: var(--color-primary);
+  font-weight: 700;
+}
