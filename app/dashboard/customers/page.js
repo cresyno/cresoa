@@ -1,11 +1,49 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import { Icon } from '../../../components/Icon'
 import { Navigation } from '../../../components/Navigation'
 import '../../globals.css'
+
+// ─── EMBEDDED ICONS ───
+const SvgIcons = {
+  Search: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  X: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
+  ChevronDown: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  ),
+  ChevronRight: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  ),
+  AlertTriangle: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  Users: () => (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  Plus: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  )
+}
 
 const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
 
@@ -23,11 +61,26 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [businessName, setBusinessName] = useState('')
   const [businessId, setBusinessId] = useState(null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('last_added')
   const [filterType, setFilterType] = useState('all')
+
+  // Custom Dropdown State
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
+  const [showSortMenu, setShowSortMenu] = useState(false)
+  const filterMenuRef = useRef(null)
+  const sortMenuRef = useRef(null)
+
+  // Handle click outside for dropdowns
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) setShowFilterMenu(false)
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) setShowSortMenu(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const loadCustomers = async () => {
     setLoading(true)
@@ -44,21 +97,10 @@ export default function CustomersPage() {
       let resolvedBusinessId = urlBusinessId
 
       if (!resolvedBusinessId || resolvedBusinessId.length < 20) {
-        const { data: owned } = await supabase.from('businesses').select('id, name').eq('owner_id', user.id).single()
+        const { data: owned } = await supabase.from('businesses').select('id').eq('owner_id', user.id).single()
         if (owned) {
           resolvedBusinessId = owned.id
-          setBusinessName(owned.name)
-        } else {
-          const { data: membership } = await supabase.from('business_memberships').select('business_id').eq('user_id', user.id).maybeSingle()
-          if (membership) {
-            resolvedBusinessId = membership.business_id
-            const { data: biz } = await supabase.from('businesses').select('name').eq('id', resolvedBusinessId).single()
-            if (biz) setBusinessName(biz.name)
-          }
         }
-      } else {
-        const { data: biz } = await supabase.from('businesses').select('name').eq('id', resolvedBusinessId).single()
-        if (biz) setBusinessName(biz.name)
       }
 
       if (!resolvedBusinessId) { router.push('/onboarding'); return }
@@ -75,7 +117,7 @@ export default function CustomersPage() {
         (result.customers || []).map(async customer => {
           const { data: orders } = await supabase
             .from('orders')
-            .select('id, price, amount_paid, created_at, current_status')
+            .select('id, price, amount_paid, created_at')
             .eq('customer_id', customer.id)
 
           const orderList = orders || []
@@ -91,7 +133,11 @@ export default function CustomersPage() {
       const sorted = [...customersWithStats].sort((a, b) => {
         if (sortBy === 'most_orders') return b.orderCount - a.orderCount
         if (sortBy === 'most_spent') return b.totalSpent - a.totalSpent
-        if (sortBy === 'name_asc') return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+        if (sortBy === 'name_asc') {
+          const nameA = a.name || `${a.first_name} ${a.last_name}`
+          const nameB = b.name || `${b.first_name} ${b.last_name}`
+          return nameA.localeCompare(nameB)
+        }
         return new Date(b.created_at) - new Date(a.created_at)
       })
 
@@ -116,7 +162,7 @@ export default function CustomersPage() {
 
     if (query) {
       result = result.filter(customer => {
-        const name = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase()
+        const name = (customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`).toLowerCase()
         const phone = customer.phone || ''
         return name.includes(query) || phone.includes(query)
       })
@@ -131,6 +177,29 @@ export default function CustomersPage() {
 
     return result
   }, [customers, search, filterType])
+
+  // Robust Initials Generator
+  const getInitials = (customer) => {
+    const name = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
+    if (!name) return '?'
+    const parts = name.split(/\s+/)
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+  }
+
+  const filterOptions = [
+    { label: 'All Customers', value: 'all' },
+    { label: 'With Orders', value: 'withOrders' },
+    { label: 'Outstanding', value: 'outstanding' },
+    { label: 'Paid', value: 'paid' }
+  ]
+
+  const sortOptions = [
+    { label: 'Recently Added', value: 'last_added' },
+    { label: 'Most Orders', value: 'most_orders' },
+    { label: 'Highest Payments', value: 'most_spent' },
+    { label: 'Name A–Z', value: 'name_asc' }
+  ]
 
   // ─── SKELETON LOADING STATE ───
   if (loading) {
@@ -164,10 +233,8 @@ export default function CustomersPage() {
 
   if (error) {
     return (
-      <div className="order-page-error">
-        <Icon name="alert-circle" size={30} stroke="var(--cresoa-danger)" />
-        <h2>Couldn't load customers</h2>
-        <p>{error}</p>
+      <div className="order-page-error" style={{ paddingTop: '4rem', textAlign: 'center' }}>
+        <p style={{ color: 'var(--color-danger)' }}>{error}</p>
         <button onClick={loadCustomers} className="cresoa-primary-button">Try again</button>
       </div>
     )
@@ -189,7 +256,7 @@ export default function CustomersPage() {
           onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')}
           className="cresoa-primary-button"
         >
-          <Icon name="plus" size={14} stroke="#fff" /> Add Customer
+          <SvgIcons.Plus /> Add Customer
         </button>
       </div>
 
@@ -216,9 +283,9 @@ export default function CustomersPage() {
       {/* ─── OUTSTANDING ALERT ─── */}
       {customersWithBalance > 0 && (
         <div className="outstanding-alert">
-          <div>
+          <div className="outstanding-content">
             <div className="outstanding-title">
-              <Icon name="alert-triangle" size={16} stroke="var(--color-danger)" />
+              <SvgIcons.AlertTriangle />
               Outstanding Balance
             </div>
             <div className="outstanding-amount">{formatMoney(totalOutstanding)}</div>
@@ -228,40 +295,78 @@ export default function CustomersPage() {
             onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
             className="outstanding-btn"
           >
-            {filterType === 'outstanding' ? 'Show All' : `View ${customersWithBalance} Customers`}
+            {filterType === 'outstanding' ? 'Show All' : `View ${customersWithBalance}`}
           </button>
         </div>
       )}
 
       {/* ─── FILTERS ─── */}
       <div className="orders-filters">
-        <input
-          type="text"
-          className="orders-search-input"
-          placeholder="Search by name or phone..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <div className="custom-search-wrapper">
+          <span className="search-icon"><SvgIcons.Search /></span>
+          <input
+            type="text"
+            className="custom-search-input"
+            placeholder="Search by name or phone..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button className="search-clear-btn" onClick={() => setSearch('')}>
+              <SvgIcons.X />
+            </button>
+          )}
+        </div>
+        
         <div className="orders-filter-row">
-          <select value={filterType} onChange={e => setFilterType(e.target.value)} className="orders-select">
-            <option value="all">All Customers</option>
-            <option value="withOrders">With Orders</option>
-            <option value="outstanding">Outstanding</option>
-            <option value="paid">Paid</option>
-          </select>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="orders-select">
-            <option value="last_added">Recently Added</option>
-            <option value="most_orders">Most Orders</option>
-            <option value="most_spent">Highest Payments</option>
-            <option value="name_asc">Name A–Z</option>
-          </select>
+          {/* CUSTOM FILTER DROPDOWN */}
+          <div className="custom-select-wrapper" ref={filterMenuRef}>
+            <button className="custom-select-btn" onClick={() => { setShowFilterMenu(!showFilterMenu); setShowSortMenu(false); }}>
+              {filterOptions.find(o => o.value === filterType)?.label}
+              <SvgIcons.ChevronDown />
+            </button>
+            {showFilterMenu && (
+              <div className="custom-dropdown-menu">
+                {filterOptions.map(opt => (
+                  <button
+                    key={opt.value}
+                    className={`custom-dropdown-item ${filterType === opt.value ? 'active' : ''}`}
+                    onClick={() => { setFilterType(opt.value); setShowFilterMenu(false); }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CUSTOM SORT DROPDOWN */}
+          <div className="custom-select-wrapper" ref={sortMenuRef}>
+            <button className="custom-select-btn" onClick={() => { setShowSortMenu(!showSortMenu); setShowFilterMenu(false); }}>
+              {sortOptions.find(o => o.value === sortBy)?.label}
+              <SvgIcons.ChevronDown />
+            </button>
+            {showSortMenu && (
+              <div className="custom-dropdown-menu">
+                {sortOptions.map(opt => (
+                  <button
+                    key={opt.value}
+                    className={`custom-dropdown-item ${sortBy === opt.value ? 'active' : ''}`}
+                    onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ─── CUSTOMER LIST ─── */}
       {filteredCustomers.length === 0 ? (
         <div className="orders-empty">
-          <Icon name={search ? 'search-x' : 'users'} size={30} stroke="var(--color-primary)" />
+          <div className="empty-icon"><SvgIcons.Users /></div>
           <h3>{search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}</h3>
           <p>{search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}</p>
           {!search && filterType === 'all' && (
@@ -277,25 +382,24 @@ export default function CustomersPage() {
       ) : (
         <div className="customers-list">
           {filteredCustomers.map(customer => {
-            const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
-            const initials = `${customer.first_name?.charAt(0) || ''}${customer.last_name?.charAt(0) || ''}`.toUpperCase() || '?'
+            const fullName = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
             const hasBalance = Number(customer.balance || 0) > 0
 
             return (
-              <div 
-                key={customer.id} 
+              <div
+                key={customer.id}
                 className="customer-list-card"
                 onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
               >
                 <div className="customer-card-top">
                   <div className="customer-card-info">
-                    <div className="customer-card-avatar">{initials}</div>
+                    <div className="customer-card-avatar">{getInitials(customer)}</div>
                     <div>
                       <h3 className="customer-card-name">{fullName}</h3>
                       <p className="customer-card-phone">{customer.phone || customer.email || 'No contact'}</p>
                     </div>
                   </div>
-                  
+
                   <div className="customer-card-stats">
                     {customer.orderCount > 0 && (
                       <span className="customer-order-badge">
@@ -312,7 +416,7 @@ export default function CustomersPage() {
 
                 <div className="customer-card-bottom">
                   <span>{customer.lastOrder ? `Last order: ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
-                  <Icon name="chevron-right" size={16} stroke="var(--cresoa-text-muted)" />
+                  <SvgIcons.ChevronRight />
                 </div>
               </div>
             )
