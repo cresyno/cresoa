@@ -12,7 +12,7 @@ import { StatusPill } from '../../../components/StatusPill'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import '../../../globals.css'
+import './dashboard.css'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
