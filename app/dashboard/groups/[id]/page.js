@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation' // Notice: useParams is imported here
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Navigation } from '../../../../components/Navigation'
@@ -77,11 +77,9 @@ export default function GroupDetailPage() {
   const [canManage, setCanManage] = useState(false)
   const [businessName, setBusinessName] = useState('')
 
-  // Filters
   const [activeFilter, setActiveFilter] = useState('all')
   const [search, setSearch] = useState('')
 
-  // Modals
   const [showMemberFormModal, setShowMemberFormModal] = useState(false)
   const [editingMemberId, setEditingMemberId] = useState(null)
   const [memberForm, setMemberForm] = useState(EMPTY_MEMBER)
@@ -100,7 +98,6 @@ export default function GroupDetailPage() {
   const [measurementMember, setMeasurementMember] = useState(null)
   const [tempMeasurements, setTempMeasurements] = useState({})
 
-  // Custom UI
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
@@ -159,7 +156,6 @@ export default function GroupDetailPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // ─── Derived Data ───
   const stats = useMemo(() => {
     const total = members.reduce((sum, m) => sum + Number(m.price || 0), 0)
     const paid = members.reduce((sum, m) => sum + Number(m.amount_paid || 0), 0)
@@ -191,7 +187,6 @@ export default function GroupDetailPage() {
   const coordinatorName = coordinator?.name || coordinator?.first_name || 'Coordinator'
   const coordinatorPhone = coordinator?.phone
 
-  // ─── Status Update Logic (Inline) ───
   const openStatusModal = (member) => {
     setStatusMember(member)
     setSelectedStatus(member.current_status || 'Order placed')
@@ -204,8 +199,6 @@ export default function GroupDetailPage() {
     try {
       const { error: updateError } = await supabase.from('orders').update({ current_status: selectedStatus }).eq('id', statusMember.id)
       if (updateError) throw updateError
-      
-      // Optimistic Update
       setMembers(prev => prev.map(m => m.id === statusMember.id ? { ...m, current_status: selectedStatus } : m))
       setShowStatusModal(false)
       setStatusMember(null)
@@ -217,7 +210,6 @@ export default function GroupDetailPage() {
     }
   }
 
-  // ─── Member Form Logic ───
   const closeMemberFormModal = () => {
     if (!saving) { setShowMemberFormModal(false); setEditingMemberId(null); setMemberForm(EMPTY_MEMBER) }
   }
@@ -324,28 +316,6 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
-  const promptDeleteMember = (member) => {
-    setModalConfig({
-      isOpen: true,
-      title: 'Remove Member',
-      message: `Are you sure you want to remove ${customerLabel(member.customer)} from this group? Their individual order will remain in your main orders list.`,
-      confirmText: 'Remove Member',
-      isDestructive: true,
-      onConfirm: async () => {
-        setModalConfig(prev => ({ ...prev, isOpen: false }))
-        try {
-          const { error: updateError } = await supabase.from('orders').update({ group_order_id: null }).eq('id', member.id)
-          if (updateError) throw updateError
-          await loadData()
-          showToast('Member removed from group')
-        } catch (err) {
-          showToast('Failed to remove member.', 'error')
-        }
-      }
-    })
-  }
-
-  // ─── Payments ───
   const fetchPayments = async (orderId) => {
     const { data } = await supabase.from('payment_records').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
     return data || []
@@ -393,7 +363,6 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
-  // ─── Measurements ───
   const openMeasurementModal = (member) => {
     setMeasurementMember(member)
     setTempMeasurements(member.measurements || {})
@@ -415,7 +384,6 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
-  // ─── WhatsApp Actions ───
   const sendMemberStatusUpdate = (member) => {
     const customerPhone = member.customer?.phone
     if (!customerPhone) { showToast('Member phone number not available.', 'error'); return }
@@ -454,7 +422,6 @@ export default function GroupDetailPage() {
         <SvgIcons.ArrowLeft /> Groups
       </button>
 
-      {/* ─── HEADER ─── */}
       <div className="customer-profile-header">
         <div className="customer-profile-left">
           <div className="customer-avatar-large" style={{ background: 'var(--color-primary)' }}>
@@ -487,7 +454,6 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {/* ─── FINANCIAL COMMAND CENTER ─── */}
       <div className="cresoa-card" style={{ marginBottom: '1.5rem', background: 'var(--color-primary)', color: '#fff', border: 'none' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
@@ -512,21 +478,12 @@ export default function GroupDetailPage() {
         </div>
       </div>
 
-      {/* ─── SEARCH & SMART FILTER TABS ─── */}
       <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
-        <span className="search-icon"><SvgIcons.Search /></span>
-        <input 
-          type="text" 
-          className="orders-search-input" 
-          placeholder="Search member or item..." 
-          value={search} 
-          onChange={e => setSearch(e.target.value)} 
-        />
-        {search && (
-          <button className="search-clear-btn" onClick={() => setSearch('')}>
-            <SvgIcons.X />
-          </button>
-        )}
+        <span className="search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        </span>
+        <input type="text" className="orders-search-input" placeholder="Search member or item..." value={search} onChange={e => setSearch(e.target.value)} />
+        {search && <button className="search-clear-btn" onClick={() => setSearch('')}><SvgIcons.X /></button>}
       </div>
 
       <div className="smart-tabs-container">
@@ -535,24 +492,14 @@ export default function GroupDetailPage() {
         {PRODUCTION_STAGES.map(stage => {
           const count = members.filter(m => (m.current_status || 'Order placed') === stage).length
           return (
-            <button 
-              key={stage}
-              className={`smart-tab ${activeFilter === stage ? 'active' : ''}`} 
-              onClick={() => setActiveFilter(stage)}
-            >
-              {stage} ({count})
-            </button>
+            <button key={stage} className={`smart-tab ${activeFilter === stage ? 'active' : ''}`} onClick={() => setActiveFilter(stage)}>{stage} ({count})</button>
           )
         })}
       </div>
 
-      {/* ─── MEMBER LIST ─── */}
       <div className="customer-order-list" style={{ marginTop: '1rem' }}>
         {filteredMembers.length === 0 ? (
-          <div className="orders-empty" style={{ padding: '3rem 1rem' }}>
-            <h3>No members found</h3>
-            <p>There are no members matching this filter.</p>
-          </div>
+          <div className="orders-empty" style={{ padding: '3rem 1rem' }}><h3>No members found</h3><p>There are no members matching this filter.</p></div>
         ) : (
           filteredMembers.map((member) => {
             const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
@@ -562,86 +509,48 @@ export default function GroupDetailPage() {
 
             return (
               <div key={member.id} className="cresoa-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', borderLeft: `4px solid ${balance > 0 ? 'var(--color-danger)' : 'var(--color-secondary)'}` }}>
-                
-                {/* Top Row: Name & Status Pill */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => openEditMember(member)}>
-                    <div className="customer-card-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>
-                      {name.charAt(0).toUpperCase()}
-                    </div>
+                    <div className="customer-card-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>{name.charAt(0).toUpperCase()}</div>
                     <div>
                       <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>{name}</h4>
                       <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{member.title || 'Untitled'}</p>
                     </div>
                   </div>
-                  
-                  {/* THE FIX: Status Pill is right here, highly tappable */}
-                  <button 
-                    onClick={() => openStatusModal(member)}
-                    className={`badge-status ${status === 'Delivered' ? 'success' : status === 'Ready' ? 'warning' : 'info'}`}
-                    style={{ cursor: 'pointer', border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
+                  <button onClick={() => openStatusModal(member)} className={`badge-status ${status === 'Delivered' ? 'success' : status === 'Ready' ? 'warning' : 'info'}`} style={{ cursor: 'pointer', border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {status} <SvgIcons.ChevronRight />
                   </button>
                 </div>
 
-                {/* Bottom Row: Financials & Quick Actions */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--cresoa-bg)', padding: '10px 12px', borderRadius: '10px' }}>
                   <div style={{ display: 'flex', gap: '16px' }}>
-                    <div>
-                      <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Price</span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{formatNaira(member.price)}</span>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Balance</span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: balance > 0 ? 'var(--color-danger)' : 'var(--color-secondary)' }}>
-                        {balance > 0 ? formatNaira(balance) : 'Paid'}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Meas.</span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: hasMeas ? 'var(--color-secondary)' : 'var(--color-danger)' }}>
-                        {hasMeas ? 'Saved' : 'Missing'}
-                      </span>
-                    </div>
+                    <div><span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Price</span><span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{formatNaira(member.price)}</span></div>
+                    <div><span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Balance</span><span style={{ fontSize: '0.85rem', fontWeight: 700, color: balance > 0 ? 'var(--color-danger)' : 'var(--color-secondary)' }}>{balance > 0 ? formatNaira(balance) : 'Paid'}</span></div>
+                    <div><span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Meas.</span><span style={{ fontSize: '0.85rem', fontWeight: 600, color: hasMeas ? 'var(--color-secondary)' : 'var(--color-danger)' }}>{hasMeas ? 'Saved' : 'Missing'}</span></div>
                   </div>
-
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => openMeasurementModal(member)} className="order-btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}>
-                      <SvgIcons.Ruler /> Meas.
-                    </button>
+                    <button onClick={() => openMeasurementModal(member)} className="order-btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}><SvgIcons.Ruler /> Meas.</button>
                     {balance > 0 ? (
-                      <button onClick={() => openPaymentModal(member)} className="cresoa-primary-button" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
-                        <SvgIcons.Dollar /> Pay
-                      </button>
+                      <button onClick={() => openPaymentModal(member)} className="cresoa-primary-button" style={{ padding: '6px 12px', fontSize: '0.75rem' }}><SvgIcons.Dollar /> Pay</button>
                     ) : (
-                      <button disabled className="order-btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem', opacity: 0.5, color: 'var(--color-secondary)' }}>
-                        <SvgIcons.Check /> Paid
-                      </button>
+                      <button disabled className="order-btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem', opacity: 0.5, color: 'var(--color-secondary)' }}><SvgIcons.Check /> Paid</button>
                     )}
                   </div>
                 </div>
                 
-                {/* WhatsApp Action */}
-                <button onClick={() => sendMemberStatusUpdate(member)} className="order-btn-secondary full-width" style={{ padding: '8px', fontSize: '0.8rem', color: 'var(--color-secondary)', borderColor: 'rgba(0,166,81,0.3)' }}>
-                  <SvgIcons.Send /> Send WhatsApp Update
-                </button>
+                <button onClick={() => sendMemberStatusUpdate(member)} className="order-btn-secondary full-width" style={{ padding: '8px', fontSize: '0.8rem', color: 'var(--color-secondary)', borderColor: 'rgba(0,166,81,0.3)' }}><SvgIcons.Send /> Send WhatsApp Update</button>
                 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                   <button onClick={() => openEditMember(member)} style={{ background: 'none', border: 'none', color: 'var(--cresoa-text-muted)', fontSize: '0.8rem', textDecoration: 'underline', cursor: 'pointer' }}>Edit Details</button>
                 </div>
-
               </div>
             )
           })
         )}
       </div>
 
-      <div style={{ marginTop: '2rem' }}>
-        <Navigation businessId={businessId} />
-      </div>
+      <div style={{ marginTop: '2rem' }}><Navigation businessId={businessId} /></div>
 
-      {/* ─── STATUS UPDATE MODAL ─── */}
       {showStatusModal && statusMember && (
         <div className="app-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -649,25 +558,15 @@ export default function GroupDetailPage() {
               <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Update Production Status</h2>
               <button onClick={() => setShowStatusModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
-            
-            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 1rem 0' }}>
-              Changing status for <strong>{customerLabel(statusMember.customer)}</strong>
-            </p>
-
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 1rem 0' }}>Changing status for <strong>{customerLabel(statusMember.customer)}</strong></p>
             <div style={{ display: 'grid', gap: '8px' }}>
               {PRODUCTION_STAGES.map(stage => (
-                <button 
-                  key={stage}
-                  onClick={() => setSelectedStatus(stage)}
-                  className={`order-btn-secondary ${selectedStatus === stage ? 'active' : ''}`}
-                  style={{ justifyContent: 'space-between', padding: '12px 16px', borderColor: selectedStatus === stage ? 'var(--color-primary)' : 'var(--cresoa-border)' }}
-                >
+                <button key={stage} onClick={() => setSelectedStatus(stage)} className={`order-btn-secondary ${selectedStatus === stage ? 'active' : ''}`} style={{ justifyContent: 'space-between', padding: '12px 16px', borderColor: selectedStatus === stage ? 'var(--color-primary)' : 'var(--cresoa-border)' }}>
                   <span>{stage}</span>
                   {selectedStatus === stage && <SvgIcons.Check />}
                 </button>
               ))}
             </div>
-
             <div style={{ display: 'flex', gap: '12px', marginTop: '1.5rem' }}>
               <button onClick={() => setShowStatusModal(false)} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button>
               <button onClick={handleStatusUpdate} disabled={saving} className="cresoa-primary-button" style={{ flex: 1 }}>Save Status</button>
@@ -676,7 +575,6 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {/* ─── ADD/EDIT MEMBER FORM MODAL ─── */}
       {showMemberFormModal && (
         <div className="app-modal-overlay" onClick={closeMemberFormModal}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
@@ -687,7 +585,6 @@ export default function GroupDetailPage() {
               </div>
               <button onClick={closeMemberFormModal} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
-
             <form onSubmit={saveMember} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label className="order-label">Existing Customer (Optional)</label>
@@ -696,7 +593,6 @@ export default function GroupDetailPage() {
                   {customers.map(c => <option key={c.id} value={c.id}>{customerLabel(c)} {c.phone ? `(${c.phone})` : ''}</option>)}
                 </select>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label className="order-label">Customer Name *</label>
@@ -707,12 +603,10 @@ export default function GroupDetailPage() {
                   <input name="phone" value={memberForm.phone} onChange={handleMemberChange} disabled={saving || !!memberForm.customer_id} className="order-input" placeholder="080..." />
                 </div>
               </div>
-
               <div>
                 <label className="order-label">Item / Garment *</label>
                 <input name="item" value={memberForm.item} onChange={handleMemberChange} required disabled={saving} className="order-input" placeholder="e.g. Aso Ebi Lace" />
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label className="order-label">Total Price (₦) *</label>
@@ -723,31 +617,24 @@ export default function GroupDetailPage() {
                   <input type="number" min="0" name="deposit" value={memberForm.deposit} onChange={handleMemberChange} disabled={saving} className="order-input" placeholder="0" />
                 </div>
               </div>
-
               <div>
                 <label className="order-label">Due Date</label>
                 <input type="date" name="due_date" value={memberForm.due_date} onChange={handleMemberChange} disabled={saving} className="order-input" />
               </div>
-
               <div style={{ marginTop: '8px' }}>
                 <label className="order-label" style={{ marginBottom: '8px', display: 'block' }}>Measurements</label>
                 <MeasurementForm measurements={memberForm.measurements || {}} onChange={(updated) => setMemberForm(prev => ({ ...prev, measurements: updated }))} />
               </div>
-
               {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem', margin: 0 }}>{error}</p>}
-
               <div style={{ display: 'flex', gap: '12px', marginTop: '1rem' }}>
                 <button type="button" onClick={closeMemberFormModal} disabled={saving} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button>
-                <button type="submit" disabled={saving} className="cresoa-primary-button" style={{ flex: 1 }}>
-                  {saving ? 'Saving...' : editingMemberId ? 'Save Changes' : 'Add Member'}
-                </button>
+                <button type="submit" disabled={saving} className="cresoa-primary-button" style={{ flex: 1 }}>{saving ? 'Saving...' : editingMemberId ? 'Save Changes' : 'Add Member'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ─── PAYMENT MODAL ─── */}
       {showPaymentModal && (
         <div className="app-modal-overlay" onClick={() => { if (!saving) setShowPaymentModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -755,7 +642,6 @@ export default function GroupDetailPage() {
               <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Record Payment</h2>
               <button onClick={() => setShowPaymentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
-
             {paymentsList.length > 0 && (
               <div style={{ marginBottom: '1rem', maxHeight: '120px', overflowY: 'auto', background: 'var(--cresoa-bg)', padding: '10px', borderRadius: '8px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--cresoa-text-muted)', textTransform: 'uppercase' }}>Recent Payments</span>
@@ -767,7 +653,6 @@ export default function GroupDetailPage() {
                 ))}
               </div>
             )}
-
             <form onSubmit={handleRecordPayment} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label className="order-label">Amount (₦)</label>
@@ -786,7 +671,6 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {/* ─── MEASUREMENT MODAL ─── */}
       {showMeasurementModal && measurementMember && (
         <div className="app-modal-overlay" onClick={() => { if (!saving) setShowMeasurementModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -803,8 +687,7 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {/* ─── CUSTOM CONFIRM MODAL ─── */}
-      {modalConfig.isOpen && (
+        {modalConfig.isOpen && (
         <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <h3 className="app-modal-title">{modalConfig.title}</h3>
@@ -817,13 +700,7 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {/* ─── TOAST ─── */}
-      {toastMessage && (
-        <div className={`app-toast ${toastType}`}>
-          {toastMessage}
-        </div>
-      )}
-
+      {toastMessage && <div className={`app-toast ${toastType}`}>{toastMessage}</div>}
     </div>
   )
-                          }
+}
