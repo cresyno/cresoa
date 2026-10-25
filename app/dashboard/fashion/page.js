@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
 import { formatMoney, formatShortDate, safeAmount } from '../../../lib/utils'
@@ -17,7 +17,7 @@ import './dashboard.css'
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
 // ============================================================
-// HELPERS (UNTOUCHED LOGIC)
+// HELPERS
 // ============================================================
 function getInitials(name) {
   if (!name) return '?'
@@ -116,9 +116,10 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   
-  // Chart State
-  const [period, setPeriod] = useState('7')
-  const [showPeriodMenu, setShowPeriodMenu] = useState(false)
+  // ─── TIMEFRAME STATE ───
+  const [timeframe, setTimeframe] = useState('current_month')
+  const [showTimeframeMenu, setShowTimeframeMenu] = useState(false)
+  const timeframeMenuRef = useRef(null)
 
   // Custom Modal & Toast State
   const [modalConfig, setModalConfig] = useState({
@@ -134,6 +135,16 @@ function FashionDashboard({ businessId }) {
   }
 
   useEffect(() => {
+    function handleClickOutside(event) {
+      if (timeframeMenuRef.current && !timeframeMenuRef.current.contains(event.target)) {
+        setShowTimeframeMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
     const initial = saved === 'dark' ? 'dark' : 'light'
     setTheme(initial)
@@ -145,64 +156,85 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  const { currentMonthOrders, previousMonthOrders } = useMemo(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  // ─── DYNAMIC DATA CALCULATIONS ───
+  const { currentOrders, previousOrders } = useMemo(() => {
+    const now = new Date()
+    let start, prevStart, prevEnd
+
+    if (timeframe === '24h') {
+      start = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      prevStart = new Date(start.getTime() - 24 * 60 * 60 * 1000)
+      prevEnd = start
+    } else if (timeframe === '7d') {
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      prevStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000)
+      prevEnd = start
+    } else if (timeframe === '30d') {
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      prevStart = new Date(start.getTime() - 30 * 24 * 60 * 60 * 1000)
+      prevEnd = start
+    } else if (timeframe === '90d') {
+      start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+      prevStart = new Date(start.getTime() - 90 * 24 * 60 * 60 * 1000)
+      prevEnd = start
+    } else {
+      // current_month
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      prevEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+    }
 
     const current = orders.filter(o => {
-      if (!o.created_at) return false;
-      const d = new Date(o.created_at);
-      return d >= startOfMonth && d <= endOfMonth;
-    });
+      if (!o.created_at) return false
+      const d = new Date(o.created_at)
+      return d >= start && d <= now
+    })
 
     const previous = orders.filter(o => {
-      if (!o.created_at) return false;
-      const d = new Date(o.created_at);
-      return d >= startOfPrevMonth && d <= endOfPrevMonth;
-    });
+      if (!o.created_at) return false
+      const d = new Date(o.created_at)
+      return d >= prevStart && d <= prevEnd
+    })
 
-    return { currentMonthOrders: current, previousMonthOrders: previous };
-  }, [orders]);
+    return { currentOrders: current, previousOrders: previous }
+  }, [orders, timeframe])
 
-  const currentMonthSummary = useMemo(() => {
-    const revenue = currentMonthOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    const paid = currentMonthOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
-    const outstanding = currentMonthOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
-    return { revenue, paid, outstanding, orders: currentMonthOrders.length }
-  }, [currentMonthOrders]);
+  const currentSummary = useMemo(() => {
+    const revenue = currentOrders.reduce((s, o) => s + safeAmount(o.price), 0)
+    const paid = currentOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const outstanding = currentOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
+    return { revenue, paid, outstanding, orders: currentOrders.length }
+  }, [currentOrders])
 
-  const previousMonthSummary = useMemo(() => {
-    const revenue = previousMonthOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    const paid = previousMonthOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
-    const outstanding = previousMonthOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
-    return { revenue, paid, outstanding, orders: previousMonthOrders.length }
-  }, [previousMonthOrders]);
+  const previousSummary = useMemo(() => {
+    const revenue = previousOrders.reduce((s, o) => s + safeAmount(o.price), 0)
+    const paid = previousOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const outstanding = previousOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
+    return { revenue, paid, outstanding, orders: previousOrders.length }
+  }, [previousOrders])
 
   const getTrend = (current, previous) => {
     if (previous === 0 && current === 0) return { text: 'No activity', color: 'var(--cresoa-text-muted)' };
-    if (previous === 0 && current > 0) return { text: '↑ New this month', color: 'var(--cresoa-success)' };
+    if (previous === 0 && current > 0) return { text: '↑ New activity', color: 'var(--cresoa-success)' };
     const change = ((current - previous) / previous) * 100;
     if (change > 0) return { text: `↑ ${change.toFixed(1)}%`, color: 'var(--cresoa-success)' };
     if (change < 0) return { text: `↓ ${Math.abs(change).toFixed(1)}%`, color: 'var(--cresoa-danger)' };
     return { text: `0%`, color: 'var(--cresoa-text-muted)' };
   };
 
-  const revenueTrend = getTrend(currentMonthSummary.revenue, previousMonthSummary.revenue);
-  const ordersTrend = getTrend(currentMonthSummary.orders, previousMonthSummary.orders);
-  const collectedTrend = getTrend(currentMonthSummary.paid, previousMonthSummary.paid);
-  const outstandingTrend = getTrend(currentMonthSummary.outstanding, previousMonthSummary.outstanding);
+  const revenueTrend = getTrend(currentSummary.revenue, previousSummary.revenue);
+  const ordersTrend = getTrend(currentSummary.orders, previousSummary.orders);
+  const collectedTrend = getTrend(currentSummary.paid, previousSummary.paid);
+  const outstandingTrend = getTrend(currentSummary.outstanding, previousSummary.outstanding);
 
   const healthScoreData = useMemo(() => {
-    if (currentMonthSummary.revenue === 0 && currentMonthSummary.orders === 0) {
+    if (currentSummary.revenue === 0 && currentSummary.orders === 0) {
       return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' };
     }
-    const rawCollectionRate = currentMonthSummary.revenue > 0 ? (currentMonthSummary.paid / currentMonthSummary.revenue) : 0;
+    const rawCollectionRate = currentSummary.revenue > 0 ? (currentSummary.paid / currentSummary.revenue) : 0;
     const collectionRate = Math.min(Math.max(rawCollectionRate, 0), 1);
-    const currentMonthDeliveredCount = currentMonthOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
-    const rawCompletionRate = currentMonthSummary.orders > 0 ? (currentMonthDeliveredCount / currentMonthSummary.orders) : 0;
+    const currentDeliveredCount = currentOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
+    const rawCompletionRate = currentSummary.orders > 0 ? (currentDeliveredCount / currentSummary.orders) : 0;
     const completionRate = Math.min(Math.max(rawCompletionRate, 0), 1);
     const rawScore = ((collectionRate * 0.5) + (completionRate * 0.5)) * 100;
     const score = Math.min(Math.round(rawScore), 100);
@@ -213,30 +245,30 @@ function FashionDashboard({ businessId }) {
     else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)'; }
 
     return { score, label, color };
-  }, [currentMonthSummary, currentMonthOrders]);
+  }, [currentSummary, currentOrders]);
 
+  // Analytics is linked to the same timeframe
   const analytics = useMemo(() => {
-    const daysMap = { '7': 7, '30': 30, '90': 90 };
-    const days = daysMap[period] || 7;
-    const now = new Date();
-    const startDate = new Date(now.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
-    startDate.setHours(0, 0, 0, 0);
+    let days = 30;
+    if (timeframe === '24h') days = 1;
+    else if (timeframe === '7d') days = 7;
+    else if (timeframe === '30d') days = 30;
+    else if (timeframe === '90d') days = 90;
+    else if (timeframe === 'current_month') {
+      const now = new Date();
+      days = now.getDate(); // Days elapsed so far this month
+    }
 
-    const filteredOrders = orders.filter(o => {
-      if (!o.created_at) return false;
-      return new Date(o.created_at) >= startDate;
-    });
-
-    const totalOrderValue = filteredOrders.reduce((sum, o) => sum + safeAmount(o.price), 0);
-    const collected = filteredOrders.reduce((sum, o) => sum + safeAmount(o.amount_paid), 0);
-    const outstanding = filteredOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
-    const orderCount = filteredOrders.length;
+    const totalOrderValue = currentOrders.reduce((sum, o) => sum + safeAmount(o.price), 0);
+    const collected = currentOrders.reduce((sum, o) => sum + safeAmount(o.amount_paid), 0);
+    const outstanding = currentOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
+    const orderCount = currentOrders.length;
     
     const collectedPercent = totalOrderValue > 0 ? Math.min((collected / totalOrderValue) * 100, 100) : 0;
     const outstandingPercent = totalOrderValue > 0 ? Math.min((outstanding / totalOrderValue) * 100, 100) : 0;
 
     const chartData = [];
-    for (let i = days - 1; i >= 0; i--) {
+    for (let i = Math.min(days - 1, 6); i >= 0; i--) { // Limit chart bars to 7 for clarity
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
@@ -249,7 +281,7 @@ function FashionDashboard({ businessId }) {
       });
     }
 
-    filteredOrders.forEach(o => {
+    currentOrders.forEach(o => {
       const dateStr = new Date(o.created_at).toISOString().split('T')[0];
       const dayObj = chartData.find(d => d.dateStr === dateStr);
       if (dayObj) {
@@ -259,10 +291,10 @@ function FashionDashboard({ businessId }) {
     });
 
     const maxRevenue = Math.max(...chartData.map(d => d.collected), 1);
-    const labelStep = Math.max(Math.ceil(days / 6), 1);
+    const labelStep = Math.max(Math.ceil(chartData.length / 6), 1);
 
-    return { totalOrderValue, collected, outstanding, orderCount, collectedPercent, outstandingPercent, chartData, maxRevenue, labelStep, hasOrders: orders.length > 0, hasFilteredOrders: filteredOrders.length > 0 };
-  }, [orders, period]);
+    return { totalOrderValue, collected, outstanding, orderCount, collectedPercent, outstandingPercent, chartData, maxRevenue, labelStep, hasOrders: orders.length > 0, hasFilteredOrders: currentOrders.length > 0 };
+  }, [orders, currentOrders, timeframe]);
 
   const chartPoints = analytics.chartData.map((d) => {
     const heightPct = analytics.maxRevenue > 0 ? (d.collected / analytics.maxRevenue) * 100 : 0;
@@ -304,6 +336,7 @@ function FashionDashboard({ businessId }) {
             if (!res.ok) throw new Error('Failed')
             showToast('Payment recorded successfully!')
             refresh() 
+            router.refresh()
           } catch (err) {
             showToast('Failed to record payment', 'error')
           }
@@ -318,10 +351,18 @@ function FashionDashboard({ businessId }) {
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
 
   const kpiCards = [
-    { label: 'Revenue', value: formatMoney(currentMonthSummary.revenue), trend: revenueTrend, meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Orders', value: String(currentMonthSummary.orders), trend: ordersTrend, meta: 'Orders in period', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Collected', value: formatMoney(currentMonthSummary.paid), trend: collectedTrend, meta: `${currentMonthSummary.revenue > 0 ? Math.min(Math.round((currentMonthSummary.paid / currentMonthSummary.revenue) * 100), 100) : 0}% of total`, onClick: () => navigate('/dashboard/orders?filter=payments') },
-    { label: 'Outstanding', value: formatMoney(currentMonthSummary.outstanding), trend: outstandingTrend, meta: `${currentMonthSummary.revenue > 0 ? Math.min(Math.round((currentMonthSummary.outstanding / currentMonthSummary.revenue) * 100), 100) : 0}% of total`, onClick: () => navigate('/dashboard/orders?filter=attention') },
+    { label: 'Revenue', value: formatMoney(currentSummary.revenue), trend: revenueTrend, meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Orders', value: String(currentSummary.orders), trend: ordersTrend, meta: 'Orders created', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Collected', value: formatMoney(currentSummary.paid), trend: collectedTrend, meta: `${currentSummary.revenue > 0 ? Math.min(Math.round((currentSummary.paid / currentSummary.revenue) * 100), 100) : 0}% of total`, onClick: () => navigate('/dashboard/orders?filter=payments') },
+    { label: 'Outstanding', value: formatMoney(currentSummary.outstanding), trend: outstandingTrend, meta: `${currentSummary.revenue > 0 ? Math.min(Math.round((currentSummary.outstanding / currentSummary.revenue) * 100), 100) : 0}% of total`, onClick: () => navigate('/dashboard/orders?filter=attention') },
+  ]
+
+  const timeframes = [
+    { label: 'Last 24 hours', value: '24h' },
+    { label: 'Last 7 days', value: '7d' },
+    { label: 'Last 30 days', value: '30d' },
+    { label: 'Last 90 days', value: '90d' },
+    { label: 'This Month', value: 'current_month' },
   ]
 
   return (
@@ -349,6 +390,34 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
+        {/* ─── TIMEFRAME SELECTOR ─── */}
+        <div className="kpi-header-row">
+          <h2 className="section-title">Performance Overview</h2>
+          <div className="timeframe-dropdown-wrapper" ref={timeframeMenuRef}>
+            <button 
+              className="timeframe-btn"
+              onClick={() => setShowTimeframeMenu(!showTimeframeMenu)}
+            >
+              {timeframes.find(t => t.value === timeframe)?.label || 'This Month'}
+              <Icon name="chevron-down" size={14} style={{ marginLeft: '6px' }} />
+            </button>
+            
+            {showTimeframeMenu && (
+              <div className="timeframe-menu">
+                {timeframes.map(tf => (
+                  <button 
+                    key={tf.value}
+                    onClick={() => { setTimeframe(tf.value); setShowTimeframeMenu(false) }} 
+                    className={`timeframe-item ${timeframe === tf.value ? 'active' : ''}`}
+                  >
+                    {tf.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* ─── KPI GRID ─── */}
         <div className="dashboard-kpi-grid">
           {kpiCards.map((card, idx) => (
@@ -373,7 +442,7 @@ function FashionDashboard({ businessId }) {
             <div className="health-bar-fill" style={{ width: `${healthScoreData.score}%`, background: healthScoreData.color }} />
           </div>
           <p className="health-desc">
-            {healthScoreData.label} — Based on collection rate and delivery completion.
+            {healthScoreData.label} — Based on collection rate and delivery completion for selected period.
           </p>
         </Card>
 
@@ -401,34 +470,9 @@ function FashionDashboard({ businessId }) {
         <Card className="dashboard-card">
           <div className="analytics-header">
             <h2 className="section-title">Analytics</h2>
-            
-            {/* CUSTOM DROPDOWN REPLACING NATIVE SELECT */}
-            <div className="analytics-dropdown-wrapper">
-              <button 
-                className="analytics-dropdown-btn"
-                onClick={() => setShowPeriodMenu(!showPeriodMenu)}
-              >
-                {period === '7' ? 'Last 7 days' : period === '30' ? 'Last 30 days' : 'Last 90 days'}
-                <Icon name="chevron-down" size={14} style={{ marginLeft: '6px' }} />
-              </button>
-              
-              {showPeriodMenu && (
-                <>
-                  <div className="analytics-dropdown-backdrop" onClick={() => setShowPeriodMenu(false)} />
-                  <div className="analytics-dropdown-menu">
-                    <button onClick={() => { setPeriod('7'); setShowPeriodMenu(false) }} className={`analytics-dropdown-item ${period === '7' ? 'active' : ''}`}>
-                      Last 7 days
-                    </button>
-                    <button onClick={() => { setPeriod('30'); setShowPeriodMenu(false) }} className={`analytics-dropdown-item ${period === '30' ? 'active' : ''}`}>
-                      Last 30 days
-                    </button>
-                    <button onClick={() => { setPeriod('90'); setShowPeriodMenu(false) }} className={`analytics-dropdown-item ${period === '90' ? 'active' : ''}`}>
-                      Last 90 days
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <span className="analytics-period-label">
+              {timeframes.find(t => t.value === timeframe)?.label || 'This Month'}
+            </span>
           </div>
 
           <div className="analytics-summary">
@@ -570,7 +614,7 @@ function FashionDashboard({ businessId }) {
           <Navigation businessId={businessId} />
         </div>
 
-        {/* ─── CUSTOM MODALS & TOASTS (NO BROWSER ALERTS) ─── */}
+        {/* ─── CUSTOM MODALS & TOASTS ─── */}
         {modalConfig.isOpen && (
           <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
             <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -608,4 +652,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                }                                                                                                                                
+          }
