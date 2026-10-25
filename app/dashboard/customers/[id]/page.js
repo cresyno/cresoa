@@ -37,7 +37,7 @@ export default function CustomerDetailPage({ params }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [businessId, setBusinessId] = useState(null)
-  const [sector, setSector] = useState('Fashion') // Default to fashion
+  const [sector, setSector] = useState('Fashion')
 
   // UI State
   const [editing, setEditing] = useState(false)
@@ -51,6 +51,19 @@ export default function CustomerDetailPage({ params }) {
   const [phone, setPhone] = useState('')
   const [notes, setNotes] = useState('')
   const [measurements, setMeasurements] = useState({})
+
+  // Custom Modal & Toast State
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
+  })
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -145,28 +158,42 @@ export default function CustomerDetailPage({ params }) {
       
       await loadCustomer()
       setEditing(false)
+      showToast('Customer details updated successfully')
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      showToast(err.message || 'Failed to save changes', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!window.confirm('Delete this customer and all their orders? This cannot be undone.')) return
-    setDeleting(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch(`/api/customers/${params.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (!response.ok) throw new Error('Failed to delete customer')
-      router.push(`/dashboard/customers?business_id=${businessId}`)
-    } catch (err) {
-      alert('Failed to delete: ' + err.message)
-      setDeleting(false)
-    }
+  // ─── CUSTOM DELETE MODAL (Replaces window.confirm) ───
+  const promptDelete = () => {
+    setShowMenu(false)
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Customer?',
+      message: 'This action cannot be undone. All orders associated with this customer will also be deleted permanently.',
+      confirmText: 'Delete Customer',
+      isDestructive: true,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }))
+        setDeleting(true)
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const response = await fetch(`/api/customers/${params.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+          if (!response.ok) throw new Error('Failed to delete customer')
+          
+          showToast('Customer deleted successfully')
+          router.push(`/dashboard/customers?business_id=${businessId}`)
+        } catch (err) {
+          showToast(err.message || 'Failed to delete customer', 'error')
+          setDeleting(false)
+        }
+      }
+    })
   }
 
   const handleCall = () => {
@@ -187,8 +214,6 @@ export default function CustomerDetailPage({ params }) {
     return parts.length === 1 ? parts[0].charAt(0).toUpperCase() : (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
   }
 
-  // ─── ROBUST FASHION CHECK ───
-  // If sector is "Fashion", "fashion", "Fashion & Custom Wear", or null, it shows the form.
   const isFashion = !sector || sector.toLowerCase().includes('fashion');
   
   const hasMeasurements = measurements && (
@@ -230,7 +255,7 @@ export default function CustomerDetailPage({ params }) {
             </button>
             {showMenu && (
               <div className="dropdown-menu">
-                <button onClick={handleDelete} disabled={deleting} className="dropdown-item text-danger">
+                <button onClick={promptDelete} disabled={deleting} className="dropdown-item text-danger">
                   <Svg name="trash-2" size={16} /> {deleting ? 'Deleting...' : 'Delete Customer'}
                 </button>
               </div>
@@ -298,7 +323,6 @@ export default function CustomerDetailPage({ params }) {
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} required className="order-input" placeholder="08012345678" />
           </div>
 
-          {/* RENDER MEASUREMENT FORM IF FASHION */}
           {isFashion && (
             <div className="form-group mt-2">
               <MeasurementForm 
@@ -409,6 +433,28 @@ export default function CustomerDetailPage({ params }) {
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={businessId} />
       </div>
+
+      {/* ─── CUSTOM MODAL ─── */}
+      {modalConfig.isOpen && (
+        <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <h3 className="app-modal-title">{modalConfig.title}</h3>
+            <p className="app-modal-message">{modalConfig.message}</p>
+            <div className="app-modal-actions">
+              <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
+              <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TOAST ─── */}
+      {toastMessage && (
+        <div className={`app-toast ${toastType}`}>
+          {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
+        </div>
+      )}
+
     </div>
   )
-  }
+      }
