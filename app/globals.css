@@ -3573,3 +3573,94 @@ div[style*="conic-gradient"] > * {
   color: var(--cresoa-text-muted);
   font-weight: 500;
 }
+/* ============================================================
+   MEASUREMENT FORM - INLINE CUSTOM INPUT
+   ============================================================ */
+
+.inline-custom-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--cresoa-surface-soft);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 10px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.inline-custom-inputs {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.inline-custom-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--cresoa-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.inline-custom-input:focus {
+  border-color: var(--color-primary);
+}
+
+.inline-custom-input.value-input {
+  max-width: 100px; /* Make the value input smaller */
+}
+
+.inline-custom-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.inline-custom-save {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.inline-custom-save:hover {
+  opacity: 0.9;
+}
+
+.inline-custom-cancel {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inline-custom-cancel:hover {
+  background: var(--color-card);
+  color: var(--color-text);
+}
+
+.inline-custom-error {
+  color: var(--color-danger);
+  font-size: 0.75rem;
+  margin: 0;
+  font-weight: 500;
+}
