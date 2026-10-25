@@ -115,8 +115,11 @@ function FashionDashboard({ businessId }) {
   const router = useRouter()
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
-  const [period, setPeriod] = useState('7')
   
+  // Chart State
+  const [period, setPeriod] = useState('7')
+  const [showPeriodMenu, setShowPeriodMenu] = useState(false)
+
   // Custom Modal & Toast State
   const [modalConfig, setModalConfig] = useState({
     isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
@@ -281,7 +284,6 @@ function FashionDashboard({ businessId }) {
     router.push(`${path}${sep}business_id=${businessId}`)
   }
 
-  // Handle Action Center Click (Replaces Browser Confirm)
   const handleActionClick = (item) => {
     if (item.actionLabel === 'Collect payment') {
       setModalConfig({
@@ -301,7 +303,7 @@ function FashionDashboard({ businessId }) {
             })
             if (!res.ok) throw new Error('Failed')
             showToast('Payment recorded successfully!')
-            refresh() // Refresh dashboard data
+            refresh() 
           } catch (err) {
             showToast('Failed to record payment', 'error')
           }
@@ -381,7 +383,7 @@ function FashionDashboard({ businessId }) {
           <ActionCenter items={actionItems} onActionClick={handleActionClick} onViewAll={() => navigate('/dashboard/orders')} />
         </Card>
 
-        {/* ─── PRODUCTION PIPELINE (MISSED EARLIER) ─── */}
+        {/* ─── PRODUCTION PIPELINE ─── */}
         <Card className="dashboard-card">
           <SectionHeader title="Production" subtitle="What's moving through your workshop" />
           <div className="cresoa-pipeline">
@@ -399,11 +401,34 @@ function FashionDashboard({ businessId }) {
         <Card className="dashboard-card">
           <div className="analytics-header">
             <h2 className="section-title">Analytics</h2>
-            <select className="cresoa-select" value={period} onChange={e => setPeriod(e.target.value)}>
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-            </select>
+            
+            {/* CUSTOM DROPDOWN REPLACING NATIVE SELECT */}
+            <div className="analytics-dropdown-wrapper">
+              <button 
+                className="analytics-dropdown-btn"
+                onClick={() => setShowPeriodMenu(!showPeriodMenu)}
+              >
+                {period === '7' ? 'Last 7 days' : period === '30' ? 'Last 30 days' : 'Last 90 days'}
+                <Icon name="chevron-down" size={14} style={{ marginLeft: '6px' }} />
+              </button>
+              
+              {showPeriodMenu && (
+                <>
+                  <div className="analytics-dropdown-backdrop" onClick={() => setShowPeriodMenu(false)} />
+                  <div className="analytics-dropdown-menu">
+                    <button onClick={() => { setPeriod('7'); setShowPeriodMenu(false) }} className={`analytics-dropdown-item ${period === '7' ? 'active' : ''}`}>
+                      Last 7 days
+                    </button>
+                    <button onClick={() => { setPeriod('30'); setShowPeriodMenu(false) }} className={`analytics-dropdown-item ${period === '30' ? 'active' : ''}`}>
+                      Last 30 days
+                    </button>
+                    <button onClick={() => { setPeriod('90'); setShowPeriodMenu(false) }} className={`analytics-dropdown-item ${period === '90' ? 'active' : ''}`}>
+                      Last 90 days
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="analytics-summary">
@@ -507,7 +532,7 @@ function FashionDashboard({ businessId }) {
           })}
         </Card>
 
-        {/* ─── GROUP ORDERS (MISSED EARLIER) ─── */}
+        {/* ─── GROUP ORDERS ─── */}
         <Card className="dashboard-card">
           <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
           {groupsWithProgress.length === 0 ? (
@@ -583,4 +608,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                    }
+                }                                                                                                                                
