@@ -139,3 +139,78 @@
 
 .group-progress-bar-bg { height: 4px; background: var(--cresoa-border); border-radius: 99px; margin-top: 6px; width: 100%; max-width: 120px; overflow: hidden; }
 .group-progress-bar-fill { height: 100%; background: var(--color-secondary); border-radius: 99px; }
+
+/* Custom Dropdown for Chart Period */
+.analytics-dropdown-wrapper {
+  position: relative;
+}
+
+.analytics-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cresoa-text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.analytics-dropdown-btn:hover {
+  border-color: var(--color-primary);
+}
+
+/* The backdrop to close the menu when clicking outside */
+.analytics-dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+/* The actual menu */
+.analytics-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  width: 140px;
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.analytics-dropdown-item {
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cresoa-text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.analytics-dropdown-item:hover {
+  background: var(--cresoa-surface-soft);
+}
+
+.analytics-dropdown-item.active {
+  background: var(--cresoa-surface-soft);
+  color: var(--color-primary);
+}
