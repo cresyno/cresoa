@@ -22,17 +22,15 @@ const EMPTY_MEMBER = {
 
 const PRODUCTION_STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-// ─── EMBEDDED ICONS ───
+// ─── EMBEDDED ICONS (Only the essentials) ───
 const SvgIcons = {
   ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
-  Send: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>,
-  Dollar: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>,
-  Ruler: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.3 15.3l-2.6 2.6a1 1 0 0 1-1.4 0l-2.1-2.1-2.1 2.1a1 1 0 0 1-1.4 0l-2.1-2.1-2.1 2.1a1 1 0 0 1-1.4 0l-2.6-2.6a1 1 0 0 1 0-1.4l9.9-9.9a1 1 0 0 1 1.4 0l6.5 6.5a1 1 0 0 1 0 1.4z" /></svg>,
-  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
-  Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
-  ChevronRight: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
+  Search: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>,
+  Edit: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>,
   Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
-  Trash: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+  ChevronRight: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
+  Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
 }
 
 function splitName(fullName) {
@@ -197,7 +195,7 @@ export default function GroupDetailPage() {
   }
 
   const openStatusModal = (member) => {
-    setShowMemberHubModal(false) // Close hub if open
+    setShowMemberHubModal(false)
     setStatusMember(member)
     setSelectedStatus(member.current_status || 'Order placed')
     setShowStatusModal(true)
@@ -452,7 +450,7 @@ export default function GroupDetailPage() {
       </button>
 
       {/* ─── HEADER ─── */}
-      <div className="customer-profile-header" style={{ marginBottom: '1rem' }}>
+     <div className="customer-profile-header" style={{ marginBottom: '1rem' }}>
         <div className="customer-profile-left">
           <div className="customer-avatar-large" style={{ background: 'var(--color-primary)' }}>
             {group.group_name.charAt(0).toUpperCase()}
@@ -503,15 +501,13 @@ export default function GroupDetailPage() {
           </div>
         </div>
         <button onClick={sendCoordinatorUpdate} className="order-btn-secondary full-width" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'rgba(255,255,255,0.2)', padding: '8px', fontSize: '0.8rem' }}>
-          <SvgIcons.Send /> Send WhatsApp Update to Coordinator
+          Send WhatsApp Update to Coordinator
         </button>
       </div>
 
       {/* ─── SEARCH & SMART FILTERS ─── */}
       <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
-        <span className="search-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-        </span>
+        <span className="search-icon"><SvgIcons.Search /></span>
         <input type="text" className="orders-search-input" placeholder="Search member or item..." value={search} onChange={e => setSearch(e.target.value)} />
         {search && <button className="search-clear-btn" onClick={() => setSearch('')}><SvgIcons.X /></button>}
       </div>
@@ -567,7 +563,7 @@ export default function GroupDetailPage() {
 
       <div style={{ marginTop: '2rem' }}><Navigation businessId={businessId} /></div>
 
-      {/* ─── MEMBER HUB MODAL (The Action Center) ─── */}
+      {/* ─── MEMBER HUB MODAL ─── */}
       {showMemberHubModal && hubMember && (
         <div className="app-modal-overlay" onClick={() => setShowMemberHubModal(false)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -602,25 +598,25 @@ export default function GroupDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button onClick={() => openStatusModal(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
                 <span className={`status-dot ${hubMember.current_status === 'Delivered' ? 'delivered' : hubMember.current_status === 'Ready' ? 'ready' : 'active'}`} style={{ marginRight: '8px' }} />
-                Update Status (Currently: {hubMember.current_status || 'Order placed'})
+                Update Status ({hubMember.current_status || 'Order placed'})
               </button>
               <button onClick={() => openPaymentModal(hubMember)} className="cresoa-primary-button full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
-                <SvgIcons.Dollar /> Record Payment
+                Record Payment
               </button>
               <button onClick={() => openMeasurementModal(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
-                <SvgIcons.Ruler /> View & Edit Measurements
+                View & Edit Measurements
               </button>
               <button onClick={() => sendMemberStatusUpdate(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px', color: 'var(--color-secondary)' }}>
-                <SvgIcons.Send /> Send WhatsApp Update
+                Send WhatsApp Update
               </button>
               <button onClick={() => openEditMember(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
-                <SvgIcons.Edit /> Edit Order Details
+                Edit Order Details
               </button>
               
               <div style={{ height: '1px', background: 'var(--cresoa-border)', margin: '8px 0' }} />
               
               <button onClick={() => promptDeleteMember(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px', color: 'var(--color-danger)', borderColor: 'var(--color-danger-soft)' }}>
-                <SvgIcons.Trash /> Remove from Group
+                Remove from Group
               </button>
             </div>
           </div>
@@ -632,7 +628,7 @@ export default function GroupDetailPage() {
         <div className="app-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Update Production Status</h2>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Update Status</h2>
               <button onClick={() => setShowStatusModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
             <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 1rem 0' }}>Changing status for <strong>{customerLabel(statusMember.customer)}</strong></p>
@@ -714,7 +710,7 @@ export default function GroupDetailPage() {
       )}
 
       {/* ─── PAYMENT MODAL ─── */}
-  {showPaymentModal && (
+ {showPaymentModal && (
         <div className="app-modal-overlay" onClick={() => { if (!saving) setShowPaymentModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -755,7 +751,7 @@ export default function GroupDetailPage() {
         <div className="app-modal-overlay" onClick={() => { if (!saving) setShowMeasurementModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Measurements - {customerLabel(measurementMember.customer)}</h2>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Measurements</h2>
               <button onClick={() => setShowMeasurementModal(false)} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
             <MeasurementForm measurements={tempMeasurements} onChange={setTempMeasurements} />
@@ -785,4 +781,4 @@ export default function GroupDetailPage() {
       {toastMessage && <div className={`app-toast ${toastType}`}>{toastMessage}</div>}
     </div>
   )
-        }
+}
