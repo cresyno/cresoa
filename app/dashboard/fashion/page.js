@@ -121,9 +121,16 @@ function FashionDashboard({ businessId }) {
   const [showTimeframeMenu, setShowTimeframeMenu] = useState(false)
   const timeframeMenuRef = useRef(null)
 
-  // Optimistic UI State (Updates immediately on click)
+  // Optimistic UI State
   const [optimisticOrders, setOptimisticOrders] = useState(null)
   const displayOrders = optimisticOrders || orders
+
+  // Reset optimistic state when real data arrives
+  useEffect(() => {
+    if (optimisticOrders && orders !== optimisticOrders) {
+      setOptimisticOrders(null)
+    }
+  }, [orders])
 
   // Custom Modal & Toast State
   const [modalConfig, setModalConfig] = useState({
@@ -160,8 +167,8 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  // ─── DYNAMIC DATA CALCULATIONS ───
-  const { currentOrders, previousOrders } = useMemo(() => {
+  // ─── DYNAMIC DATA CALCULATIONS (FIXED) ───
+  const { currentOrders, previousOrders, currentPayments, previousPayments } = useMemo(() => {
     const now = new Date()
     let start, prevStart, prevEnd
 
@@ -188,36 +195,57 @@ function FashionDashboard({ businessId }) {
       prevEnd = new Date(now.getFullYear(), now.getMonth(), 0)
     }
 
-    // Filter by created_at. If an order was created in this timeframe, it counts.
-    const current = displayOrders.filter(o => {
+    // 1. Orders CREATED in timeframe
+    const currentOrd = displayOrders.filter(o => {
       if (!o.created_at) return false
       const d = new Date(o.created_at)
       return d >= start && d <= now
     })
 
-    const previous = displayOrders.filter(o => {
+    const prevOrd = displayOrders.filter(o => {
       if (!o.created_at) return false
       const d = new Date(o.created_at)
       return d >= prevStart && d <= prevEnd
     })
 
-    return { currentOrders: current, previousOrders: previous }
+    // 2. Payments UPDATED in timeframe
+    const currentPay = displayOrders.filter(o => {
+      if (safeAmount(o.amount_paid) === 0) return false
+      const dateStr = o.updated_at || o.created_at // Fallback to created_at if updated_at is null
+      if (!dateStr) return false
+      const d = new Date(dateStr)
+      return d >= start && d <= now
+    })
+
+    const prevPay = displayOrders.filter(o => {
+      if (safeAmount(o.amount_paid) === 0) return false
+      const dateStr = o.updated_at || o.created_at
+      if (!dateStr) return false
+      const d = new Date(dateStr)
+      return d >= prevStart && d <= prevEnd
+    })
+
+    return { 
+      currentOrders: currentOrd, 
+      previousOrders: prevOrd,
+      currentPayments: currentPay,
+      previousPayments: prevPay
+    }
   }, [displayOrders, timeframe])
 
   const currentSummary = useMemo(() => {
-    // Revenue, Paid, and Outstanding are all calculated from orders created in this timeframe
     const revenue = currentOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    const paid = currentOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const paid = currentPayments.reduce((s, o) => s + safeAmount(o.amount_paid), 0) // Correctly sums payments updated in timeframe
     const outstanding = currentOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
     return { revenue, paid, outstanding, orders: currentOrders.length }
-  }, [currentOrders])
+  }, [currentOrders, currentPayments])
 
   const previousSummary = useMemo(() => {
     const revenue = previousOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    const paid = previousOrders.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const paid = previousPayments.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
     const outstanding = previousOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
     return { revenue, paid, outstanding, orders: previousOrders.length }
-  }, [previousOrders])
+  }, [previousOrders, previousPayments])
 
   const getTrend = (current, previous) => {
     if (previous === 0 && current === 0) return { text: 'No activity', color: 'var(--cresoa-text-muted)' };
@@ -265,7 +293,7 @@ function FashionDashboard({ businessId }) {
     }
 
     const totalOrderValue = currentOrders.reduce((sum, o) => sum + safeAmount(o.price), 0);
-    const collected = currentOrders.reduce((sum, o) => sum + safeAmount(o.amount_paid), 0);
+    const collected = currentPayments.reduce((sum, o) => sum + safeAmount(o.amount_paid), 0);
     const outstanding = currentOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
     const orderCount = currentOrders.length;
     
@@ -286,8 +314,8 @@ function FashionDashboard({ businessId }) {
       });
     }
 
-    currentOrders.forEach(o => {
-      const dateStr = new Date(o.created_at).toISOString().split('T')[0];
+    currentPayments.forEach(o => {
+      const dateStr = new Date(o.updated_at || o.created_at).toISOString().split('T')[0];
       const dayObj = chartData.find(d => d.dateStr === dateStr);
       if (dayObj) {
         dayObj.collected += safeAmount(o.amount_paid);
@@ -298,8 +326,8 @@ function FashionDashboard({ businessId }) {
     const maxRevenue = Math.max(...chartData.map(d => d.collected), 1);
     const labelStep = Math.max(Math.ceil(chartData.length / 6), 1);
 
-    return { totalOrderValue, collected, outstanding, orderCount, collectedPercent, outstandingPercent, chartData, maxRevenue, labelStep, hasOrders: displayOrders.length > 0, hasFilteredOrders: currentOrders.length > 0 };
-  }, [displayOrders, currentOrders, timeframe]);
+    return { totalOrderValue, collected, outstanding, orderCount, collectedPercent, outstandingPercent, chartData, maxRevenue, labelStep, hasOrders: displayOrders.length > 0, hasFilteredOrders: currentOrders.length > 0 || currentPayments.length > 0 };
+  }, [displayOrders, currentOrders, currentPayments, timeframe]);
 
   const chartPoints = analytics.chartData.map((d) => {
     const heightPct = analytics.maxRevenue > 0 ? (d.collected / analytics.maxRevenue) * 100 : 0;
@@ -332,19 +360,19 @@ function FashionDashboard({ businessId }) {
         onConfirm: async () => {
           setModalConfig(prev => ({ ...prev, isOpen: false }))
           
-          // 1. INSTANT OPTIMISTIC UPDATE
+          // 1. OPTIMISTIC UPDATE: Set amount_paid to price, and update 'updated_at' to NOW
           const previousDisplayOrders = displayOrders
           setOptimisticOrders(prev => {
             const current = prev || displayOrders
             return current.map(o => 
               o.id === item.id 
-                ? { ...o, amount_paid: safeAmount(o.price) } // Wipe out the debt locally
+                ? { ...o, amount_paid: safeAmount(o.price), updated_at: new Date().toISOString() } 
                 : o
             )
           })
           showToast('Payment recorded successfully!')
 
-          // 2. API CALL
+          // 2. NETWORK REQUEST
           try {
             const { data: { session } } = await supabase.auth.getSession()
             const res = await fetch(`/api/orders/${item.id}/payments`, {
@@ -356,6 +384,7 @@ function FashionDashboard({ businessId }) {
             
             // 3. SYNC WITH BACKEND
             if (refresh) refresh() 
+            router.refresh()
             
           } catch (err) {
             // ROLLBACK ON FAILURE
@@ -455,7 +484,7 @@ function FashionDashboard({ businessId }) {
         </div>
 
         {/* ─── BUSINESS HEALTH ─── */}
-          <Card className="dashboard-card">
+        <Card className="dashboard-card">
           <div className="health-header">
             <h3 className="section-title">Business Health Score</h3>
             <span className="health-score" style={{ color: healthScoreData.color }}>{healthScoreData.score}%</span>
@@ -674,4 +703,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-}
+                        }
