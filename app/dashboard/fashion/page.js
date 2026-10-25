@@ -11,7 +11,8 @@ import { SectionHeader } from '../../../components/SectionHeader'
 import { StatusPill } from '../../../components/StatusPill'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
-import '../../globals.css'
+import { supabase } from '../../../lib/supabaseClient'
+import '../../../globals.css'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
 
@@ -84,7 +85,6 @@ function getActionItems(orders, customers) {
         }
       })
   } catch (e) {
-    console.error('getActionItems error:', e)
     return []
   }
 }
@@ -108,10 +108,6 @@ function DashboardShell({ children, theme }) {
   )
 }
 
-function SafeRender({ children, fallback = null }) {
-  try { return children } catch (e) { console.error('Render error:', e); return fallback }
-}
-
 // ============================================================
 // MAIN DASHBOARD
 // ============================================================
@@ -120,6 +116,19 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   const [period, setPeriod] = useState('7')
+  
+  // Custom Modal & Toast State
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
+  })
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
@@ -272,8 +281,35 @@ function FashionDashboard({ businessId }) {
     router.push(`${path}${sep}business_id=${businessId}`)
   }
 
+  // Handle Action Center Click (Replaces Browser Confirm)
   const handleActionClick = (item) => {
-    if (item?.order?.id) navigate(`/dashboard/orders/${item.order.id}`)
+    if (item.actionLabel === 'Collect payment') {
+      setModalConfig({
+        isOpen: true,
+        title: 'Record Payment',
+        message: `Confirm you have received full payment of ${formatMoney(item.amount)} for ${item.customerName}?`,
+        confirmText: 'Confirm Payment',
+        isDestructive: false,
+        onConfirm: async () => {
+          setModalConfig(prev => ({ ...prev, isOpen: false }))
+          try {
+            const { data: { session } } = await supabase.auth.getSession()
+            const res = await fetch(`/api/orders/${item.id}/payments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+              body: JSON.stringify({ amount: item.amount, note: 'Payment collected from dashboard' })
+            })
+            if (!res.ok) throw new Error('Failed')
+            showToast('Payment recorded successfully!')
+            refresh() // Refresh dashboard data
+          } catch (err) {
+            showToast('Failed to record payment', 'error')
+          }
+        }
+      })
+    } else if (item.order?.id) {
+      navigate(`/dashboard/orders/${item.order.id}`)
+    }
   }
 
   if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
@@ -311,7 +347,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* ─── KPI GRID (2x2 Clean Layout) ─── */}
+        {/* ─── KPI GRID ─── */}
         <div className="dashboard-kpi-grid">
           {kpiCards.map((card, idx) => (
             <button key={card.label} onClick={card.onClick} className="dashboard-kpi-card">
@@ -325,7 +361,7 @@ function FashionDashboard({ businessId }) {
           ))}
         </div>
 
-        {/* ─── BUSINESS HEALTH (Merged) ─── */}
+        {/* ─── BUSINESS HEALTH ─── */}
         <Card className="dashboard-card">
           <div className="health-header">
             <h3 className="section-title">Business Health Score</h3>
@@ -345,7 +381,7 @@ function FashionDashboard({ businessId }) {
           <ActionCenter items={actionItems} onActionClick={handleActionClick} onViewAll={() => navigate('/dashboard/orders')} />
         </Card>
 
-        {/* ─── PRODUCTION PIPELINE ─── */}
+        {/* ─── PRODUCTION PIPELINE (MISSED EARLIER) ─── */}
         <Card className="dashboard-card">
           <SectionHeader title="Production" subtitle="What's moving through your workshop" />
           <div className="cresoa-pipeline">
@@ -433,48 +469,102 @@ function FashionDashboard({ businessId }) {
           </div>
         </Card>
 
-        {/* ─── RECENT LISTS ─── */}
+        {/* ─── RECENT ORDERS ─── */}
         <Card className="dashboard-card">
           <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
-          <SafeRender fallback={<p>Couldn't load orders</p>}>
-            {orders.slice(0, 4).map(order => {
-              const customerName = resolveCustomerName(order, customers)
-              return (
-                <div key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="dashboard-list-item">
-                  <span className="cresoa-avatar">{getInitials(customerName)}</span>
-                  <div className="list-item-content">
-                    <span className="list-item-title">{getOrderTitle(order)} – {customerName}</span>
-                    <span className="list-item-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
-                  </div>
-                  <StatusPill status={order.current_status || 'Order placed'} />
+          {orders.slice(0, 4).map(order => {
+            const customerName = resolveCustomerName(order, customers)
+            return (
+              <div key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="dashboard-list-item">
+                <span className="cresoa-avatar">{getInitials(customerName)}</span>
+                <div className="list-item-content">
+                  <span className="list-item-title">{getOrderTitle(order)} – {customerName}</span>
+                  <span className="list-item-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
                 </div>
-              )
-            })}
-          </SafeRender>
+                <StatusPill status={order.current_status || 'Order placed'} />
+              </div>
+            )
+          })}
         </Card>
 
+        {/* ─── RECENT CUSTOMERS ─── */}
         <Card className="dashboard-card">
           <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
-          <SafeRender fallback={<p>Couldn't load customers</p>}>
-            {customers.slice(0, 4).map(customer => {
-              const name = customer.name || 'Unnamed'
+          {customers.slice(0, 4).map(customer => {
+            const name = customer.name || 'Unnamed'
+            const customerOrders = orders.filter(o => o.customer_id === customer.id)
+            const activeOrders = customerOrders.filter(o => o.current_status !== 'Delivered').length
+            return (
+              <div key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="dashboard-list-item">
+                <span className="cresoa-avatar">{getInitials(name)}</span>
+                <div className="list-item-content">
+                  <span className="list-item-title">{name}</span>
+                  <span className="list-item-meta">{activeOrders > 0 ? `${activeOrders} active orders` : 'No active orders'}</span>
+                </div>
+                <Icon name="chevron-right" size={16} />
+              </div>
+            )
+          })}
+        </Card>
+
+        {/* ─── GROUP ORDERS (MISSED EARLIER) ─── */}
+        <Card className="dashboard-card">
+          <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
+          {groupsWithProgress.length === 0 ? (
+            <div className="elegant-empty" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+              <h4 style={{ fontSize: '1rem', fontStyle: 'italic', marginBottom: '4px' }}>No group orders</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '16px' }}>Create a group to manage coordinated outfits.</p>
+              <button onClick={() => navigate('/dashboard/groups/new')} className="cresoa-primary-button">+ New Group Order</button>
+            </div>
+          ) : (
+            groupsWithProgress.slice(0, 4).map(group => {
+              const coordinator = customers.find(c => c.id === group.coordinator_customer_id)
               return (
-                <div key={customer.id} onClick={() => navigate(`/dashboard/customers/${customer.id}`)} className="dashboard-list-item">
-                  <span className="cresoa-avatar">{getInitials(name)}</span>
+                <div key={group.id} onClick={() => navigate(`/dashboard/groups/${group.id}`)} className="dashboard-list-item">
+                  <span className="cresoa-avatar">{group.name ? group.name.charAt(0).toUpperCase() : 'G'}</span>
                   <div className="list-item-content">
-                    <span className="list-item-title">{name}</span>
-                    <span className="list-item-meta">{customer.phone || 'No phone'}</span>
+                    <span className="list-item-title">{group.name}</span>
+                    <span className="list-item-meta">
+                      {group.progress !== null ? `${group.progress}% complete` : 'Progress unavailable'}
+                      {coordinator && ` · ${coordinator.name}`}
+                    </span>
+                    {group.progress !== null && (
+                      <div className="group-progress-bar-bg">
+                        <div className="group-progress-bar-fill" style={{ width: `${group.progress}%` }} />
+                      </div>
+                    )}
                   </div>
                   <Icon name="chevron-right" size={16} />
                 </div>
               )
-            })}
-          </SafeRender>
+            })
+          )}
         </Card>
 
         <div style={{ marginTop: '2rem' }}>
           <Navigation businessId={businessId} />
         </div>
+
+        {/* ─── CUSTOM MODALS & TOASTS (NO BROWSER ALERTS) ─── */}
+        {modalConfig.isOpen && (
+          <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
+            <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+              <h3 className="app-modal-title">{modalConfig.title}</h3>
+              <p className="app-modal-message">{modalConfig.message}</p>
+              <div className="app-modal-actions">
+                <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
+                <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toastMessage && (
+          <div className={`app-toast ${toastType}`}>
+            {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
+          </div>
+        )}
+
       </div>
     </DashboardShell>
   )
@@ -493,4 +583,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-          }                                                                                                                    
+                    }
