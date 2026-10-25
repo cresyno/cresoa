@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation' // Notice: useParams is imported here
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Navigation } from '../../../../components/Navigation'
@@ -22,20 +22,17 @@ const EMPTY_MEMBER = {
 
 const PRODUCTION_STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-// ─── EMBEDDED ICONS (No Emojis) ───
+// ─── EMBEDDED ICONS ───
 const SvgIcons = {
   ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
-  MoreVertical: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>,
-  Edit: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>,
-  Trash: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>,
-  Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
   Send: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>,
   Dollar: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>,
   Ruler: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.3 15.3l-2.6 2.6a1 1 0 0 1-1.4 0l-2.1-2.1-2.1 2.1a1 1 0 0 1-1.4 0l-2.1-2.1-2.1 2.1a1 1 0 0 1-1.4 0l-2.6-2.6a1 1 0 0 1 0-1.4l9.9-9.9a1 1 0 0 1 1.4 0l6.5 6.5a1 1 0 0 1 0 1.4z" /></svg>,
-  ChevronRight: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
   X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
   Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
-  Alert: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+  ChevronRight: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>,
+  Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+  Trash: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
 }
 
 function splitName(fullName) {
@@ -80,9 +77,13 @@ export default function GroupDetailPage() {
   const [activeFilter, setActiveFilter] = useState('all')
   const [search, setSearch] = useState('')
 
+  // Modals
   const [showMemberFormModal, setShowMemberFormModal] = useState(false)
   const [editingMemberId, setEditingMemberId] = useState(null)
   const [memberForm, setMemberForm] = useState(EMPTY_MEMBER)
+
+  const [showMemberHubModal, setShowMemberHubModal] = useState(false)
+  const [hubMember, setHubMember] = useState(null)
 
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [statusMember, setStatusMember] = useState(null)
@@ -98,6 +99,7 @@ export default function GroupDetailPage() {
   const [measurementMember, setMeasurementMember] = useState(null)
   const [tempMeasurements, setTempMeasurements] = useState({})
 
+  // Custom UI
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
@@ -139,7 +141,7 @@ export default function GroupDetailPage() {
       setMaxMembers(limits?.maxGroupMembers || 0)
       setGroup(groupData)
 
-      const [{ data: memberData, error: memberError }, { data: customerData, error: customerError }] = await Promise.all([
+      const [{ data: memberData, error: memberError }, { data: customerData }] = await Promise.all([
         supabase.from('orders').select(`*, customer:customer_id (id, name, first_name, last_name, phone)`).eq('group_order_id', groupId).eq('business_id', bizId).order('created_at', { ascending: false }),
         supabase.from('customers').select('id, name, first_name, last_name, phone').eq('business_id', bizId).order('first_name', { ascending: true }),
       ])
@@ -156,6 +158,7 @@ export default function GroupDetailPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // ─── Derived Data ───
   const stats = useMemo(() => {
     const total = members.reduce((sum, m) => sum + Number(m.price || 0), 0)
     const paid = members.reduce((sum, m) => sum + Number(m.amount_paid || 0), 0)
@@ -187,7 +190,14 @@ export default function GroupDetailPage() {
   const coordinatorName = coordinator?.name || coordinator?.first_name || 'Coordinator'
   const coordinatorPhone = coordinator?.phone
 
+  // ─── Actions ───
+  const openMemberHub = (member) => {
+    setHubMember(member)
+    setShowMemberHubModal(true)
+  }
+
   const openStatusModal = (member) => {
+    setShowMemberHubModal(false) // Close hub if open
     setStatusMember(member)
     setSelectedStatus(member.current_status || 'Order placed')
     setShowStatusModal(true)
@@ -210,15 +220,12 @@ export default function GroupDetailPage() {
     }
   }
 
-  const closeMemberFormModal = () => {
-    if (!saving) { setShowMemberFormModal(false); setEditingMemberId(null); setMemberForm(EMPTY_MEMBER) }
-  }
-
   const openAddMember = () => {
     setError(''); setEditingMemberId(null); setMemberForm({ ...EMPTY_MEMBER, measurements: {} }); setShowMemberFormModal(true)
   }
 
   const openEditMember = (member) => {
+    setShowMemberHubModal(false)
     setError(''); setEditingMemberId(member.id)
     setMemberForm({
       customer_id: member.customer_id || '',
@@ -308,7 +315,7 @@ export default function GroupDetailPage() {
         const { error: insertError } = await supabase.from('orders').insert(payload)
         if (insertError) throw insertError
       }
-      closeMemberFormModal()
+      setShowMemberFormModal(false)
       await loadData()
       showToast(editingMemberId ? 'Member updated' : 'Member added successfully')
     } catch (err) {
@@ -316,12 +323,36 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
+  const promptDeleteMember = (member) => {
+    setShowMemberHubModal(false)
+    setModalConfig({
+      isOpen: true,
+      title: 'Remove Member',
+      message: `Are you sure you want to remove ${customerLabel(member.customer)} from this group? Their individual order will remain in your main orders list.`,
+      confirmText: 'Remove Member',
+      isDestructive: true,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }))
+        try {
+          const { error: updateError } = await supabase.from('orders').update({ group_order_id: null }).eq('id', member.id)
+          if (updateError) throw updateError
+          await loadData()
+          showToast('Member removed from group')
+        } catch (err) {
+          showToast('Failed to remove member.', 'error')
+        }
+      }
+    })
+  }
+
+  // ─── Payments ───
   const fetchPayments = async (orderId) => {
     const { data } = await supabase.from('payment_records').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
     return data || []
   }
 
   const openPaymentModal = async (member) => {
+    setShowMemberHubModal(false)
     const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
     if (balance <= 0) { showToast('This order is fully paid.', 'error'); return }
     setPaymentMemberId(member.id)
@@ -363,7 +394,9 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
+  // ─── Measurements ───
   const openMeasurementModal = (member) => {
+    setShowMemberHubModal(false)
     setMeasurementMember(member)
     setTempMeasurements(member.measurements || {})
     setShowMeasurementModal(true)
@@ -384,7 +417,9 @@ export default function GroupDetailPage() {
     } finally { setSaving(false) }
   }
 
+  // ─── WhatsApp ───
   const sendMemberStatusUpdate = (member) => {
+    setShowMemberHubModal(false)
     const customerPhone = member.customer?.phone
     if (!customerPhone) { showToast('Member phone number not available.', 'error'); return }
     const name = customerLabel(member.customer) || 'Customer'
@@ -399,13 +434,7 @@ export default function GroupDetailPage() {
 
   const sendCoordinatorUpdate = () => {
     if (!coordinatorPhone) { showToast('Coordinator phone number not available.', 'error'); return }
-    let message = `Group Order Update\n\n`
-    message += `Group: ${group?.group_name}\n`
-    message += `Coordinator: ${coordinatorName}\n\n`
-    message += `Total Expected: ${formatNaira(stats.total)}\n`
-    message += `Total Collected: ${formatNaira(stats.paid)}\n`
-    message += `Outstanding Balance: ${formatNaira(stats.balance)}\n\n`
-    message += `Please ensure all balances are cleared before the event date.`
+    let message = `Group Order Update\n\nGroup: ${group?.group_name}\nCoordinator: ${coordinatorName}\n\nTotal Expected: ${formatNaira(stats.total)}\nTotal Collected: ${formatNaira(stats.paid)}\nOutstanding Balance: ${formatNaira(stats.balance)}\n\nPlease ensure all balances are cleared before the event date.`
     const url = `https://wa.me/${coordinatorPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`
     window.open(url, '_blank')
   }
@@ -422,7 +451,8 @@ export default function GroupDetailPage() {
         <SvgIcons.ArrowLeft /> Groups
       </button>
 
-      <div className="customer-profile-header">
+      {/* ─── HEADER ─── */}
+      <div className="customer-profile-header" style={{ marginBottom: '1rem' }}>
         <div className="customer-profile-left">
           <div className="customer-avatar-large" style={{ background: 'var(--color-primary)' }}>
             {group.group_name.charAt(0).toUpperCase()}
@@ -438,7 +468,7 @@ export default function GroupDetailPage() {
 
         <div className="customer-header-actions">
           <button onClick={() => router.push(`/dashboard/groups/${groupId}/edit?business_id=${businessId}`)} className="order-btn-secondary">
-            <SvgIcons.Edit /> Edit Group
+            <SvgIcons.Edit /> Edit
           </button>
           {canManage && (
             <button onClick={openAddMember} className="cresoa-primary-button">
@@ -454,30 +484,30 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      <div className="cresoa-card" style={{ marginBottom: '1.5rem', background: 'var(--color-primary)', color: '#fff', border: 'none' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+      {/* ─── FINANCIAL COMMAND CENTER ─── */}
+      <div className="cresoa-card" style={{ marginBottom: '1rem', background: 'var(--color-primary)', color: '#fff', border: 'none', padding: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '12px' }}>
           <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8, fontWeight: 700 }}>Total Expected</span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{formatNaira(stats.total)}</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8, fontWeight: 700 }}>Expected</span>
+            <span style={{ fontSize: '1rem', fontWeight: 800 }}>{formatNaira(stats.total)}</span>
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8, fontWeight: 700 }}>Collected</span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#72C49C' }}>{formatNaira(stats.paid)}</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8, fontWeight: 700 }}>Collected</span>
+            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#72C49C' }}>{formatNaira(stats.paid)}</span>
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8, fontWeight: 700 }}>Outstanding</span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800, color: stats.balance > 0 ? '#EF7771' : '#72C49C' }}>
-              {stats.balance > 0 ? formatNaira(stats.balance) : 'Fully Paid'}
+            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.8, fontWeight: 700 }}>Owing</span>
+            <span style={{ fontSize: '1rem', fontWeight: 800, color: stats.balance > 0 ? '#EF7771' : '#72C49C' }}>
+              {stats.balance > 0 ? formatNaira(stats.balance) : 'Paid'}
             </span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={sendCoordinatorUpdate} className="order-btn-secondary full-width" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'rgba(255,255,255,0.2)' }}>
-            <SvgIcons.Send /> Send WhatsApp Update to Coordinator
-          </button>
-        </div>
+        <button onClick={sendCoordinatorUpdate} className="order-btn-secondary full-width" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'rgba(255,255,255,0.2)', padding: '8px', fontSize: '0.8rem' }}>
+          <SvgIcons.Send /> Send WhatsApp Update to Coordinator
+        </button>
       </div>
 
+      {/* ─── SEARCH & SMART FILTERS ─── */}
       <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
         <span className="search-icon">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
@@ -497,51 +527,37 @@ export default function GroupDetailPage() {
         })}
       </div>
 
-      <div className="customer-order-list" style={{ marginTop: '1rem' }}>
+      {/* ─── HIGH-DENSITY MEMBER LIST ─── */}
+      <div className="member-dense-list">
         {filteredMembers.length === 0 ? (
           <div className="orders-empty" style={{ padding: '3rem 1rem' }}><h3>No members found</h3><p>There are no members matching this filter.</p></div>
         ) : (
           filteredMembers.map((member) => {
             const balance = Number(member.price || 0) - Number(member.amount_paid || 0)
             const name = customerLabel(member.customer)
-            const hasMeas = member.measurements && Object.keys(member.measurements).length > 0
             const status = member.current_status || 'Order placed'
 
             return (
-              <div key={member.id} className="cresoa-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', borderLeft: `4px solid ${balance > 0 ? 'var(--color-danger)' : 'var(--color-secondary)'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => openEditMember(member)}>
-                    <div className="customer-card-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>{name.charAt(0).toUpperCase()}</div>
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>{name}</h4>
-                      <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>{member.title || 'Untitled'}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => openStatusModal(member)} className={`badge-status ${status === 'Delivered' ? 'success' : status === 'Ready' ? 'warning' : 'info'}`} style={{ cursor: 'pointer', border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {status} <SvgIcons.ChevronRight />
-                  </button>
+              <div key={member.id} className="member-dense-row" onClick={() => openMemberHub(member)}>
+                <div className="member-avatar">
+                  {name.charAt(0).toUpperCase()}
+                </div>
+                
+                <div className="member-info">
+                  <span className="member-name">{name}</span>
+                  <span className="member-item">{member.title || 'Untitled'}</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--cresoa-bg)', padding: '10px 12px', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', gap: '16px' }}>
-                    <div><span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Price</span><span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{formatNaira(member.price)}</span></div>
-                    <div><span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Balance</span><span style={{ fontSize: '0.85rem', fontWeight: 700, color: balance > 0 ? 'var(--color-danger)' : 'var(--color-secondary)' }}>{balance > 0 ? formatNaira(balance) : 'Paid'}</span></div>
-                    <div><span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Meas.</span><span style={{ fontSize: '0.85rem', fontWeight: 600, color: hasMeas ? 'var(--color-secondary)' : 'var(--color-danger)' }}>{hasMeas ? 'Saved' : 'Missing'}</span></div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => openMeasurementModal(member)} className="order-btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem' }}><SvgIcons.Ruler /> Meas.</button>
-                    {balance > 0 ? (
-                      <button onClick={() => openPaymentModal(member)} className="cresoa-primary-button" style={{ padding: '6px 12px', fontSize: '0.75rem' }}><SvgIcons.Dollar /> Pay</button>
-                    ) : (
-                      <button disabled className="order-btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem', opacity: 0.5, color: 'var(--color-secondary)' }}><SvgIcons.Check /> Paid</button>
-                    )}
-                  </div>
+                <div className="member-status-col">
+                  <span className={`status-dot ${status === 'Delivered' ? 'delivered' : status === 'Ready' ? 'ready' : 'active'}`} />
+                  <span className="status-text">{status}</span>
                 </div>
-                
-                <button onClick={() => sendMemberStatusUpdate(member)} className="order-btn-secondary full-width" style={{ padding: '8px', fontSize: '0.8rem', color: 'var(--color-secondary)', borderColor: 'rgba(0,166,81,0.3)' }}><SvgIcons.Send /> Send WhatsApp Update</button>
-                
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                  <button onClick={() => openEditMember(member)} style={{ background: 'none', border: 'none', color: 'var(--cresoa-text-muted)', fontSize: '0.8rem', textDecoration: 'underline', cursor: 'pointer' }}>Edit Details</button>
+
+                <div className="member-finance-col">
+                  <span className={`member-balance ${balance > 0 ? 'owing' : 'paid'}`}>
+                    {balance > 0 ? formatNaira(balance) : 'Paid'}
+                  </span>
+                  <SvgIcons.ChevronRight />
                 </div>
               </div>
             )
@@ -551,6 +567,67 @@ export default function GroupDetailPage() {
 
       <div style={{ marginTop: '2rem' }}><Navigation businessId={businessId} /></div>
 
+      {/* ─── MEMBER HUB MODAL (The Action Center) ─── */}
+      {showMemberHubModal && hubMember && (
+        <div className="app-modal-overlay" onClick={() => setShowMemberHubModal(false)}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="customer-card-avatar" style={{ width: '48px', height: '48px', fontSize: '1.2rem' }}>
+                  {customerLabel(hubMember.customer).charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 800 }}>{customerLabel(hubMember.customer)}</h2>
+                  <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '2px 0 0', fontWeight: 500 }}>{hubMember.title || 'Untitled'}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowMemberHubModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
+            </div>
+
+            <div className="order-finance-grid" style={{ marginBottom: '1.5rem', background: 'var(--cresoa-bg)', padding: '12px', borderRadius: '12px' }}>
+              <div className="order-finance-item">
+                <span className="label">Total</span>
+                <span className="value">{formatNaira(hubMember.price)}</span>
+              </div>
+              <div className="order-finance-item">
+                <span className="label">Paid</span>
+                <span className="value text-success">{formatNaira(hubMember.amount_paid)}</span>
+              </div>
+              <div className="order-finance-item">
+                <span className="label">Balance</span>
+                <span className="value text-danger">{formatNaira(Number(hubMember.price) - Number(hubMember.amount_paid))}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button onClick={() => openStatusModal(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
+                <span className={`status-dot ${hubMember.current_status === 'Delivered' ? 'delivered' : hubMember.current_status === 'Ready' ? 'ready' : 'active'}`} style={{ marginRight: '8px' }} />
+                Update Status (Currently: {hubMember.current_status || 'Order placed'})
+              </button>
+              <button onClick={() => openPaymentModal(hubMember)} className="cresoa-primary-button full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
+                <SvgIcons.Dollar /> Record Payment
+              </button>
+              <button onClick={() => openMeasurementModal(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
+                <SvgIcons.Ruler /> View & Edit Measurements
+              </button>
+              <button onClick={() => sendMemberStatusUpdate(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px', color: 'var(--color-secondary)' }}>
+                <SvgIcons.Send /> Send WhatsApp Update
+              </button>
+              <button onClick={() => openEditMember(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px' }}>
+                <SvgIcons.Edit /> Edit Order Details
+              </button>
+              
+              <div style={{ height: '1px', background: 'var(--cresoa-border)', margin: '8px 0' }} />
+              
+              <button onClick={() => promptDeleteMember(hubMember)} className="order-btn-secondary full-width" style={{ justifyContent: 'flex-start', padding: '14px 16px', color: 'var(--color-danger)', borderColor: 'var(--color-danger-soft)' }}>
+                <SvgIcons.Trash /> Remove from Group
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── STATUS MODAL ─── */}
       {showStatusModal && statusMember && (
         <div className="app-modal-overlay" onClick={() => setShowStatusModal(false)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -575,15 +652,16 @@ export default function GroupDetailPage() {
         </div>
       )}
 
+      {/* ─── ADD/EDIT MEMBER MODAL ─── */}
       {showMemberFormModal && (
-        <div className="app-modal-overlay" onClick={closeMemberFormModal}>
+        <div className="app-modal-overlay" onClick={() => { if (!saving) setShowMemberFormModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
               <div>
                 <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>Group Member</span>
                 <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.3rem' }}>{editingMemberId ? 'Edit Member' : 'Add Member'}</h2>
               </div>
-              <button onClick={closeMemberFormModal} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
+              <button onClick={() => setShowMemberFormModal(false)} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
             <form onSubmit={saveMember} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
@@ -627,7 +705,7 @@ export default function GroupDetailPage() {
               </div>
               {error && <p style={{ color: 'var(--color-danger)', fontSize: '0.8rem', margin: 0 }}>{error}</p>}
               <div style={{ display: 'flex', gap: '12px', marginTop: '1rem' }}>
-                <button type="button" onClick={closeMemberFormModal} disabled={saving} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button>
+                <button type="button" onClick={() => setShowMemberFormModal(false)} disabled={saving} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button>
                 <button type="submit" disabled={saving} className="cresoa-primary-button" style={{ flex: 1 }}>{saving ? 'Saving...' : editingMemberId ? 'Save Changes' : 'Add Member'}</button>
               </div>
             </form>
@@ -635,7 +713,8 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-      {showPaymentModal && (
+      {/* ─── PAYMENT MODAL ─── */}
+  {showPaymentModal && (
         <div className="app-modal-overlay" onClick={() => { if (!saving) setShowPaymentModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -671,6 +750,7 @@ export default function GroupDetailPage() {
         </div>
       )}
 
+      {/* ─── MEASUREMENT MODAL ─── */}
       {showMeasurementModal && measurementMember && (
         <div className="app-modal-overlay" onClick={() => { if (!saving) setShowMeasurementModal(false) }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -687,7 +767,8 @@ export default function GroupDetailPage() {
         </div>
       )}
 
-        {modalConfig.isOpen && (
+      {/* ─── CUSTOM CONFIRM MODAL ─── */}
+      {modalConfig.isOpen && (
         <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <h3 className="app-modal-title">{modalConfig.title}</h3>
@@ -700,7 +781,8 @@ export default function GroupDetailPage() {
         </div>
       )}
 
+      {/* ─── TOAST ─── */}
       {toastMessage && <div className={`app-toast ${toastType}`}>{toastMessage}</div>}
     </div>
   )
-}
+        }
