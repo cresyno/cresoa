@@ -3452,3 +3452,124 @@ div[style*="conic-gradient"] > * {
   color: var(--color-primary);
   font-weight: 700;
 }
+/* ============================================================
+   CUSTOMERS PAGE - CUSTOM FILTERS & SEARCH
+   ============================================================ */
+
+/* Search Bar with Icon and Clear Button */
+.custom-search-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.custom-search-wrapper .search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--cresoa-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.custom-search-input {
+  width: 100%;
+  padding: 12px 40px 12px 40px;
+  border-radius: 10px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.custom-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.custom-search-wrapper .search-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: var(--cresoa-surface-soft);
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cresoa-text-muted);
+  cursor: pointer;
+}
+
+.custom-search-wrapper .search-clear-btn:hover {
+  background: var(--cresoa-border);
+  color: var(--cresoa-text);
+}
+
+/* Outstanding Alert */
+.outstanding-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 1.25rem;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.outstanding-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.outstanding-amount {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--color-danger);
+  margin: 4px 0;
+}
+
+.outstanding-subtitle {
+  font-size: 0.8rem;
+  color: #991B1B;
+}
+
+.outstanding-btn {
+  background: var(--color-danger);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+
+.outstanding-btn:hover {
+  opacity: 0.9;
+}
+
+/* Customer Card Bottom */
+.customer-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--cresoa-border);
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
