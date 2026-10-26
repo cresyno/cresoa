@@ -116,6 +116,9 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   
+  // Payments State for Accurate KPI Math
+  const [payments, setPayments] = useState([])
+
   // Timeframe State
   const [timeframe, setTimeframe] = useState('current_month')
   const [showTimeframeMenu, setShowTimeframeMenu] = useState(false)
@@ -131,6 +134,20 @@ function FashionDashboard({ businessId }) {
       setOptimisticOrders(null)
     }
   }, [orders])
+
+  // Fetch Payments directly to ensure accurate KPI calculation
+  useEffect(() => {
+    if (!businessId || !orders || orders.length === 0) return
+    const fetchPayments = async () => {
+      const orderIds = orders.map(o => o.id)
+      const { data } = await supabase
+        .from('payment_records')
+        .select('*')
+        .in('order_id', orderIds)
+      setPayments(data || [])
+    }
+    fetchPayments()
+  }, [businessId, orders])
 
   // Custom Modal & Toast State
   const [modalConfig, setModalConfig] = useState({
@@ -167,7 +184,7 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  // ─── DYNAMIC DATA CALCULATIONS (FIXED) ───
+  // ─── DYNAMIC DATA CALCULATIONS ───
   const { currentOrders, previousOrders, currentPayments, previousPayments } = useMemo(() => {
     const now = new Date()
     let start, prevStart, prevEnd
@@ -189,13 +206,12 @@ function FashionDashboard({ businessId }) {
       prevStart = new Date(start.getTime() - 90 * 24 * 60 * 60 * 1000)
       prevEnd = start
     } else {
-      // current_month
       start = new Date(now.getFullYear(), now.getMonth(), 1)
       prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
       prevEnd = new Date(now.getFullYear(), now.getMonth(), 0)
     }
 
-    // 1. Orders CREATED in timeframe
+    // 1. Orders CREATED in timeframe (For Revenue & Outstanding)
     const currentOrd = displayOrders.filter(o => {
       if (!o.created_at) return false
       const d = new Date(o.created_at)
@@ -208,20 +224,16 @@ function FashionDashboard({ businessId }) {
       return d >= prevStart && d <= prevEnd
     })
 
-    // 2. Payments UPDATED in timeframe
-    const currentPay = displayOrders.filter(o => {
-      if (safeAmount(o.amount_paid) === 0) return false
-      const dateStr = o.updated_at || o.created_at // Fallback to created_at if updated_at is null
-      if (!dateStr) return false
-      const d = new Date(dateStr)
+    // 2. Payments RECORDED in timeframe (For Collected)
+    const currentPay = payments.filter(p => {
+      if (!p.created_at) return false
+      const d = new Date(p.created_at)
       return d >= start && d <= now
     })
 
-    const prevPay = displayOrders.filter(o => {
-      if (safeAmount(o.amount_paid) === 0) return false
-      const dateStr = o.updated_at || o.created_at
-      if (!dateStr) return false
-      const d = new Date(dateStr)
+    const prevPay = payments.filter(p => {
+      if (!p.created_at) return false
+      const d = new Date(p.created_at)
       return d >= prevStart && d <= prevEnd
     })
 
@@ -231,18 +243,19 @@ function FashionDashboard({ businessId }) {
       currentPayments: currentPay,
       previousPayments: prevPay
     }
-  }, [displayOrders, timeframe])
+  }, [displayOrders, payments, timeframe])
 
   const currentSummary = useMemo(() => {
     const revenue = currentOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    const paid = currentPayments.reduce((s, o) => s + safeAmount(o.amount_paid), 0) // Correctly sums payments updated in timeframe
+    // We use the exact payment amount from payment_records, not the total order amount_paid
+    const paid = currentPayments.reduce((s, p) => s + Number(p.amount || 0), 0) 
     const outstanding = currentOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
     return { revenue, paid, outstanding, orders: currentOrders.length }
   }, [currentOrders, currentPayments])
 
   const previousSummary = useMemo(() => {
     const revenue = previousOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    const paid = previousPayments.reduce((s, o) => s + safeAmount(o.amount_paid), 0)
+    const paid = previousPayments.reduce((s, p) => s + Number(p.amount || 0), 0)
     const outstanding = previousOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
     return { revenue, paid, outstanding, orders: previousOrders.length }
   }, [previousOrders, previousPayments])
@@ -293,7 +306,7 @@ function FashionDashboard({ businessId }) {
     }
 
     const totalOrderValue = currentOrders.reduce((sum, o) => sum + safeAmount(o.price), 0);
-    const collected = currentPayments.reduce((sum, o) => sum + safeAmount(o.amount_paid), 0);
+    const collected = currentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const outstanding = currentOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
     const orderCount = currentOrders.length;
     
@@ -314,11 +327,12 @@ function FashionDashboard({ businessId }) {
       });
     }
 
-    currentPayments.forEach(o => {
-      const dateStr = new Date(o.updated_at || o.created_at).toISOString().split('T')[0];
+    // Fill chart based on exact payment records
+    currentPayments.forEach(p => {
+      const dateStr = new Date(p.created_at).toISOString().split('T')[0];
       const dayObj = chartData.find(d => d.dateStr === dateStr);
       if (dayObj) {
-        dayObj.collected += safeAmount(o.amount_paid);
+        dayObj.collected += Number(p.amount || 0);
         dayObj.orders += 1;
       }
     });
@@ -360,8 +374,10 @@ function FashionDashboard({ businessId }) {
         onConfirm: async () => {
           setModalConfig(prev => ({ ...prev, isOpen: false }))
           
-          // 1. OPTIMISTIC UPDATE: Set amount_paid to price, and update 'updated_at' to NOW
+          // 1. OPTIMISTIC UPDATE: Update both orders and payments state
           const previousDisplayOrders = displayOrders
+          const previousPayments = [...payments]
+          
           setOptimisticOrders(prev => {
             const current = prev || displayOrders
             return current.map(o => 
@@ -370,6 +386,16 @@ function FashionDashboard({ businessId }) {
                 : o
             )
           })
+
+          const newPaymentRecord = {
+            id: `temp-${Date.now()}`,
+            order_id: item.id,
+            amount: item.amount,
+            created_at: new Date().toISOString(),
+            note: 'Payment collected from dashboard'
+          }
+          setPayments(prev => [newPaymentRecord, ...prev])
+
           showToast('Payment recorded successfully!')
 
           // 2. NETWORK REQUEST
@@ -389,6 +415,7 @@ function FashionDashboard({ businessId }) {
           } catch (err) {
             // ROLLBACK ON FAILURE
             setOptimisticOrders(previousDisplayOrders)
+            setPayments(previousPayments)
             showToast('Failed to record payment', 'error')
           }
         }
@@ -681,7 +708,7 @@ function FashionDashboard({ businessId }) {
 
         {toastMessage && (
           <div className={`app-toast ${toastType}`}>
-            {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
+            {toastMessage}
           </div>
         )}
 
