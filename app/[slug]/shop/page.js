@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-export const revalidate = 60
+export const revalidate = 0 // Set to 0 for immediate updates during dev
 
 export async function generateMetadata({ params }) {
   const slug = params.slug
@@ -29,16 +29,16 @@ export async function generateMetadata({ params }) {
   }
 }
 
-// Maps a business_products row to the shape ShopPageClient already expects
-function toShopItem(p) {
+// Maps an inventory_items row to the shape ShopPageClient expects
+function toShopItem(item) {
   return {
-    id: p.id,
-    name: p.name,
-    price: p.price,
-    description: p.description || '',
-    image_url: p.image_url || '',
-    featured: !!p.featured,
-    stock: p.stock ?? 0,
+    id: item.id,
+    name: item.item_name,
+    price: item.selling_price,
+    description: item.web_description || item.description || '',
+    image_url: item.image_url || '',
+    featured: !!item.featured_on_website,
+    stock: item.quantity_on_hand ?? 0,
   }
 }
 
@@ -59,30 +59,22 @@ export default async function ShopPage({ params }) {
     .eq('id', page.business_id)
     .single()
 
-  // Live source of truth: products explicitly checked "List on website"
-  // and currently active. This replaces the old shop_products JSON blob.
+  // ✅ Live source of truth: inventory_items
   let shop = []
-  const { data: allProducts, error: productsError } = await supabaseAdmin
-    .from('business_products')
+  
+  const { data: inventoryItems, error: inventoryError } = await supabaseAdmin
+    .from('inventory_items')
     .select('*')
     .eq('business_id', page.business_id)
+    .eq('is_listed_on_website', true) // Only fetch items toggled for the website
     .order('created_at', { ascending: false })
 
-  if (!productsError && allProducts && allProducts.length > 0) {
-    // This business has migrated to the new Products system — trust it
-    // completely, even if the result is an empty storefront right now.
-    //
-    // Visibility rule (the real strategy):
-    //  - active = false  -> never shows, no matter what (paused/discontinued)
-    //  - active = true, on_website = false -> inventory only, not on the site
-    //  - active = true, on_website = true  -> shows; stock=0 shows as
-    //    "Out of stock" (handled client-side) rather than disappearing
-    shop = allProducts
-      .filter((p) => p.active && p.on_website)
-      .map(toShopItem)
-  } else if (!productsError) {
-    // Safety net: only for a business with ZERO rows in business_products —
-    // i.e. one that has never opened the new Products dashboard at all.
+  if (!inventoryError && inventoryItems && inventoryItems.length > 0) {
+    // We have items from the new inventory system
+    shop = inventoryItems.map(toShopItem)
+  } else if (!inventoryError) {
+    // Safety net: If they have zero items in inventory marked for website,
+    // fallback to the legacy JSON so the shop doesn't completely break.
     const legacyShop = Array.isArray(page.shop_products) ? page.shop_products : []
     shop = legacyShop
   }
