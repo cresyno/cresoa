@@ -1,15 +1,22 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
-import { Icon } from '../../../../../components/Icon'
-import { Card } from '../../../../../components/Card'
-import { SectionHeader } from '../../../../../components/SectionHeader'
 import { Navigation } from '../../../../../components/Navigation'
 import { MeasurementForm } from '../../../../../components/MeasurementForm'
-import '../../../../globals.css'
+import './edit-order.css' // <-- New specific CSS file
+
+// ─── EMBEDDED ICONS (No Emojis) ───
+const SvgIcons = {
+  ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
+  ChevronDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>,
+  Search: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>,
+  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+  Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>,
+  Check: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+}
 
 export default function EditOrderPage() {
   const router = useRouter()
@@ -22,10 +29,25 @@ export default function EditOrderPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
+  
   const [customers, setCustomers] = useState([])
   const [order, setOrder] = useState(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const statusMenuRef = useRef(null)
 
-  // ─── Form state ────────────────────────────────────────────
+  // Custom UI State
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
+
   const [formData, setFormData] = useState({
     customer_id: '',
     title: '',
@@ -37,25 +59,26 @@ export default function EditOrderPage() {
     measurements: {},
   })
 
-  // ─── Navigation helper ────────────────────────────────────
-  const navigateWithBusiness = (path) => {
-    const separator = path.includes('?') ? '&' : '?'
-    router.push(`${path}${separator}business_id=${businessId}`)
-  }
+  const STATUS_OPTIONS = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-  // ─── Load data ─────────────────────────────────────────────
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target)) {
+        setShowStatusMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   useEffect(() => {
     const load = async () => {
-      if (!businessId || !orderId) {
-        router.push('/dashboard')
-        return
-      }
+      if (!businessId || !orderId) { router.push('/dashboard'); return }
 
       try {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { router.push('/login'); return }
 
-        // ─── Fetch order ──────────────────────────────────────
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select('*')
@@ -77,16 +100,18 @@ export default function EditOrderPage() {
           measurements: orderData.measurements || {},
         })
 
-        // ─── Fetch customers ──────────────────────────────────
         const { data: custData } = await supabase
           .from('customers')
-          .select('id, name, phone, email')
+          .select('id, name, first_name, last_name, phone, email')
           .eq('business_id', businessId)
-          .order('name')
-        setCustomers(custData || [])
+          .order('first_name')
+
+        setCustomers((custData || []).map(c => ({
+          ...c,
+          display_name: c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed'
+        })))
 
       } catch (err) {
-        console.error(err)
         setError('Failed to load order.')
       } finally {
         setLoading(false)
@@ -95,11 +120,48 @@ export default function EditOrderPage() {
     load()
   }, [orderId, businessId])
 
-  // ─── Handlers ──────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     setError(null)
+  }
+
+  const handleCustomerSelect = (cust) => {
+    setFormData(prev => ({ ...prev, customer_id: cust.id }))
+    setShowCustomerModal(false)
+    setCustomerSearch('')
+  }
+
+  const handleStatusSelect = (status) => {
+    setFormData(prev => ({ ...prev, current_status: status }))
+    setShowStatusMenu(false)
+  }
+
+  const promptDelete = () => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Order',
+      message: 'Are you sure you want to delete this order? This action cannot be undone.',
+      confirmText: 'Delete Order',
+      isDestructive: true,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }))
+        setDeleting(true)
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const response = await fetch(`/api/orders/${orderId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          })
+          if (!response.ok) throw new Error('Failed to delete order')
+          router.push(`/dashboard/orders?business_id=${businessId}`)
+          showToast('Order deleted successfully')
+        } catch (err) {
+          showToast('Failed to delete order', 'error')
+          setDeleting(false)
+        }
+      }
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -120,330 +182,215 @@ export default function EditOrderPage() {
         current_status: formData.current_status,
         notes: formData.notes || null,
         measurements: formData.measurements || {},
+        updated_at: new Date().toISOString()
       }
 
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify(payload)
       })
 
       const result = await response.json()
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update order')
-      }
+      if (!response.ok) throw new Error(result.error || 'Failed to update order')
 
-      // Log activity
-      await supabase.from('business_activity_logs').insert({
-        business_id: businessId,
-        performed_by: session.user.id,
-        action: 'order_updated',
-        details: { title: formData.title }
-      })
-
-      navigateWithBusiness(`/dashboard/orders/${orderId}`)
+      showToast('Order updated successfully')
+      router.push(`/dashboard/orders/${orderId}?business_id=${businessId}`)
 
     } catch (err) {
-      console.error(err)
       setError(err.message || 'Failed to update order.')
       setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) return
+  const selectedCustomer = useMemo(() => customers.find(c => c.id === formData.customer_id), [customers, formData.customer_id])
+  const remainingBalance = useMemo(() => Math.max((Number(formData.price) || 0) - (Number(formData.amount_paid) || 0), 0), [formData.price, formData.amount_paid])
+  
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.toLowerCase()
+    return customers.filter(c => c.display_name.toLowerCase().includes(q) || c.phone?.includes(q)).slice(0, 10)
+  }, [customers, customerSearch])
 
-    setDeleting(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
-
-      if (!response.ok) {
-        const result = await response.json()
-        throw new Error(result.error || 'Failed to delete order')
-      }
-
-      navigateWithBusiness('/dashboard/orders')
-
-    } catch (err) {
-      console.error(err)
-      alert('Failed to delete order: ' + err.message)
-      setDeleting(false)
-    }
-  }
-
-  // ─── Computed ──────────────────────────────────────────────
-  const selectedCustomer = useMemo(() => {
-    return customers.find(c => c.id === formData.customer_id) || null
-  }, [customers, formData.customer_id])
-
-  const remainingBalance = useMemo(() => {
-    return Math.max((Number(formData.price) || 0) - (Number(formData.amount_paid) || 0), 0)
-  }, [formData.price, formData.amount_paid])
-
-  // ─── Loading skeleton ────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-          <div style={{ width: '100px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-          {[1,2,3,4,5].map(i => (
-            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '60%', height: '16px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
-            </div>
-          ))}
-        </div>
-        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
-        <Navigation businessId={businessId} />
-      </div>
-    )
-  }
-
-  if (error && !loading) {
-    return (
-      <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
-        <Card style={{ padding: '2rem', textAlign: 'center' }}>
-          <Icon name="alert-circle" size={32} stroke="var(--cresoa-danger)" />
-          <h2 style={{ margin: '0.5rem 0' }}>Couldn't load order</h2>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>{error}</p>
-          <button onClick={() => window.location.reload()} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Retry</button>
-        </Card>
-        <Navigation businessId={businessId} />
-      </div>
-    )
-  }
-
+  if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
+  if (error && !order) return <div className="order-page-error"><h2>Couldn't load order</h2><button onClick={() => window.location.reload()} className="cresoa-primary-button">Retry</button></div>
   if (!order) return null
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', paddingBottom: '80px' }}>
+    <div className="edit-order-page">
       <Navigation businessId={businessId} />
 
-      {/* Back button */}
-      <button
-        onClick={() => navigateWithBusiness(`/dashboard/orders/${orderId}`)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}
-      >
-        <Icon name="arrow-left" size={16} stroke="currentColor" /> Back to Order
-      </button>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+      <div className="edit-header">
         <div>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Orders</p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Edit Order</h1>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>#{orderId.slice(0, 8)} · Update order details below.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <span style={{
-            padding: '0.2rem 0.8rem',
-            borderRadius: '20px',
-            background: order.current_status === 'Delivered' ? 'var(--cresoa-success-soft)' : 'var(--cresoa-warning-soft)',
-            color: order.current_status === 'Delivered' ? 'var(--cresoa-success)' : 'var(--cresoa-warning)',
-            fontSize: '0.7rem',
-            fontWeight: 600
-          }}>
-            {order.current_status}
-          </span>
+          <button onClick={() => router.push(`/dashboard/orders/${orderId}?business_id=${businessId}`)} className="order-back-btn" style={{ margin: 0, marginBottom: '8px' }}>
+            <SvgIcons.ArrowLeft /> Back to Order
+          </button>
+          <h1 className="edit-title">Edit Order</h1>
+          <p className="edit-subtitle">Update details for #{orderId.slice(0, 8).toUpperCase()}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-
-        {/* ─── Customer ───────────────────────────────────────── */}
-        <Card style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-          <SectionHeader title="Customer" subtitle="Select the customer for this order" />
-          <div>
-            <select
-              name="customer_id"
-              value={formData.customer_id}
-              onChange={handleChange}
-              style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
+        {/* CUSTOMER */}
+        <div className="edit-card">
+          <h3 className="edit-section-title">Customer</h3>
+          <div className="edit-form-group" style={{ marginBottom: 0 }}>
+            <button 
+              type="button" 
+              className="edit-input" 
+              onClick={() => setShowCustomerModal(true)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
             >
-              <option value="">No customer</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name} {c.phone ? `· ${c.phone}` : ''}</option>)}
-            </select>
-            {selectedCustomer && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>
-                {selectedCustomer.name} · {selectedCustomer.phone || 'No phone'}
-              </div>
-            )}
+              <span style={{ color: selectedCustomer ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)' }}>
+                {selectedCustomer ? selectedCustomer.display_name : 'Select a customer'}
+              </span>
+              <SvgIcons.ChevronDown />
+            </button>
           </div>
-        </Card>
+        </div>
 
-        {/* ─── Order Details ──────────────────────────────────── */}
-        <Card style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-          <SectionHeader title="Order Details" />
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Item / Garment *</label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
-              />
+        {/* ORDER DETAILS */}
+        <div className="edit-card">
+          <h3 className="edit-section-title">Order Details</h3>
+          
+          <div className="edit-form-group">
+            <label className="edit-label">Garment Name</label>
+            <input type="text" name="title" value={formData.title} onChange={handleChange} required className="edit-input" placeholder="Enter order name" />
+          </div>
+
+          <div className="edit-finance-grid">
+            <div className="edit-form-group">
+              <label className="edit-label">Total Price (₦)</label>
+              <input type="number" name="price" value={formData.price} onChange={handleChange} required min="0" className="edit-input" placeholder="Enter total price" />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Total Price (₦) *</label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  required
-                  min="0"
-                  step="100"
-                  style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Deposit (₦)</label>
-                <input
-                  type="number"
-                  name="amount_paid"
-                  value={formData.amount_paid}
-                  onChange={handleChange}
-                  min="0"
-                  step="100"
-                  style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.8rem', background: 'var(--cresoa-bg)', borderRadius: '6px' }}>
-              <span style={{ fontWeight: 600 }}>Balance remaining</span>
-              <strong style={{ color: remainingBalance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
-                {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(remainingBalance)}
-              </strong>
+            <div className="edit-form-group">
+              <label className="edit-label">Deposit Paid (₦)</label>
+              <input type="number" name="amount_paid" value={formData.amount_paid} onChange={handleChange} min="0" className="edit-input" placeholder="Enter deposit paid" />
             </div>
           </div>
-        </Card>
 
-        {/* ─── Dates & Status ────────────────────────────────── */}
-        <Card style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-          <SectionHeader title="Dates & Status" />
-          <div style={{ display: 'grid', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Due Date</label>
-              <input
-                type="date"
-                name="due_date"
-                value={formData.due_date}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.2rem', color: 'var(--cresoa-text)' }}>Status</label>
-              <select
-                name="current_status"
-                value={formData.current_status}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem' }}
-              >
-                <option value="Order placed">Order placed</option>
-                <option value="Cutting">Cutting</option>
-                <option value="Sewing">Sewing</option>
-                <option value="Ready">Ready</option>
-                <option value="Delivered">Delivered</option>
-              </select>
+          <div className="edit-balance-box">
+            <span>Balance Due</span>
+            <span style={{ color: remainingBalance > 0 ? 'var(--color-danger)' : 'var(--color-secondary)' }}>
+              ₦{remainingBalance.toLocaleString('en-NG')}
+            </span>
+          </div>
+        </div>
+
+        {/* DATES & STATUS */}
+        <div className="edit-card">
+          <h3 className="edit-section-title">Dates & Status</h3>
+          
+          <div className="edit-form-group">
+            <label className="edit-label">Due Date</label>
+            <input type="date" name="due_date" value={formData.due_date} onChange={handleChange} className="edit-input" />
+          </div>
+
+          <div className="edit-form-group" ref={statusMenuRef}>
+            <label className="edit-label">Production Status</label>
+            <div className="custom-dropdown-wrapper">
+              <button type="button" className="custom-dropdown-btn" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+                {formData.current_status}
+                <SvgIcons.ChevronDown />
+              </button>
+              {showStatusMenu && (
+                <div className="custom-dropdown-menu">
+                  {STATUS_OPTIONS.map(opt => (
+                    <button type="button" key={opt} className={`custom-dropdown-item ${formData.current_status === opt ? 'active' : ''}`} onClick={() => handleStatusSelect(opt)}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* ─── Measurements ───────────────────────────────────── */}
-        <Card style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-          <SectionHeader title="Measurements" subtitle="Update sizing details for this order" />
+        {/* MEASUREMENTS */}
+        <div className="edit-card">
+          <h3 className="edit-section-title">Measurements</h3>
           <MeasurementForm
             measurements={formData.measurements || {}}
             onChange={(updated) => setFormData(prev => ({ ...prev, measurements: updated }))}
             showNotes={false}
+            label=""
           />
-        </Card>
+        </div>
 
-        {/* ─── Notes ──────────────────────────────────────────── */}
-        <Card style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-          <SectionHeader title="Notes" subtitle="Private notes for your team" />
-          <textarea
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            rows={4}
-            placeholder="Add any notes about this order..."
-            style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-bg)', color: 'var(--cresoa-text)', fontSize: '0.95rem', resize: 'vertical' }}
-          />
-        </Card>
+        {/* NOTES */}
+        <div className="edit-card">
+          <h3 className="edit-section-title">Private Notes</h3>
+          <textarea name="notes" value={formData.notes} onChange={handleChange} rows={4} className="edit-input" placeholder="Add private notes for your team..." />
+        </div>
 
-        {/* ─── Error ──────────────────────────────────────────── */}
+        {/* ERROR MESSAGE */}
         {error && (
-          <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'var(--cresoa-danger-soft)', color: 'var(--cresoa-danger)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Icon name="alert-circle" size={16} stroke="var(--cresoa-danger)" /> {error}
+          <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--color-danger-soft)', color: 'var(--color-danger)', marginBottom: '16px', fontWeight: 600 }}>
+            {error}
           </div>
         )}
 
-        {/* ─── Actions ────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            type="submit"
-            disabled={saving}
-            className="cresoa-primary-button"
-            style={{ padding: '0.6rem 1.5rem' }}
-          >
-            <Icon name="check" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigateWithBusiness(`/dashboard/orders/${orderId}`)}
-            style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', color: 'var(--cresoa-text)', fontSize: '0.9rem', fontWeight: 500 }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting}
-            style={{
-              marginLeft: 'auto',
-              padding: '0.6rem 1.5rem',
-              borderRadius: '8px',
-              border: '1px solid var(--cresoa-danger)',
-              background: 'transparent',
-              cursor: 'pointer',
-              color: 'var(--cresoa-danger)',
-              fontSize: '0.9rem',
-              fontWeight: 500,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-              opacity: deleting ? 0.6 : 1
-            }}
-          >
-            <Icon name="trash-2" size={14} stroke="var(--cresoa-danger)" /> {deleting ? 'Deleting...' : 'Delete Order'}
-          </button>
-        </div>
-
       </form>
 
-      {/* ─── Footer ──────────────────────────────────────────── */}
-      <div style={{ marginTop: '2rem' }}>
-        <Navigation businessId={businessId} />
+      {/* FIXED FOOTER */}
+      <div className="edit-fixed-footer">
+        <button type="button" onClick={promptDelete} disabled={deleting} className="btn-delete-edit">
+          <SvgIcons.Trash />
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={saving} className="cresoa-primary-button btn-save-edit">
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
       </div>
+
+      {/* CUSTOMER SELECT MODAL */}
+      {showCustomerModal && (
+        <div className="app-modal-overlay" onClick={() => setShowCustomerModal(false)}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ height: '70vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Select Customer</h2>
+              <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
+            </div>
+
+            <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
+              <span className="search-icon"><SvgIcons.Search /></span>
+              <input type="text" className="orders-search-input" placeholder="Search by name or phone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} autoFocus />
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {filteredCustomers.map(c => (
+                <div key={c.id} onClick={() => handleCustomerSelect(c)} className="member-dense-row" style={{ padding: '12px', marginBottom: '8px', border: '1px solid var(--cresoa-border)', borderRadius: '10px' }}>
+                  <div className="member-avatar">{c.display_name.charAt(0).toUpperCase()}</div>
+                  <div className="member-info">
+                    <span className="member-name">{c.display_name}</span>
+                    <span className="member-item">{c.phone || 'No phone number'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM MODAL (Delete Confirmation) */}
+      {modalConfig.isOpen && (
+        <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <h3 className="app-modal-title">{modalConfig.title}</h3>
+            <p className="app-modal-message">{modalConfig.message}</p>
+            <div className="app-modal-actions">
+              <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
+              <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST */}
+      {toastMessage && (
+        <div className={`app-toast ${toastType}`}>
+          {toastMessage}
+        </div>
+      )}
+
     </div>
   )
-}
+    }
