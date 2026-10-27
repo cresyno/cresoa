@@ -4212,3 +4212,112 @@ textarea.order-input {
   from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
    }
+/* ============================================================
+   WIZARD FORM FIXES (Inputs & Dropdowns)
+   ============================================================ */
+
+/* Spacing between form fields */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Space between label and input */
+  margin-bottom: 20px; /* Space below the input */
+}
+
+/* Make the inputs look like native iOS/Android inputs */
+.order-input {
+  width: 100%;
+  padding: 16px; /* Plenty of touch area */
+  border-radius: 12px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.order-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(11, 44, 94, 0.1);
+}
+
+.order-input::placeholder {
+  color: #9CA3AF;
+}
+
+/* Custom Dropdown Styles */
+.custom-dropdown-wrapper {
+  position: relative;
+}
+
+.custom-dropdown-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-dropdown-item {
+  padding: 14px 16px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--cresoa-text);
+  cursor: pointer;
+}
+
+.custom-dropdown-item:hover {
+  background: var(--cresoa-surface-soft);
+}
+
+.custom-dropdown-item.active {
+  background: var(--cresoa-surface-soft);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* 2-Column Grid for side-by-side inputs */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Force Tessa button to be flat Navy/Gold */
+button[style*="conic-gradient"],
+div[style*="conic-gradient"],
+.rainbow-glow-btn-wrapper {
+  background: var(--color-primary) !important;
+  border: 2px solid var(--color-accent) !important;
+  animation: none !important;
+  box-shadow: 0 4px 12px rgba(11, 44, 94, 0.3) !important;
+  padding: 0 !important;
+   }
