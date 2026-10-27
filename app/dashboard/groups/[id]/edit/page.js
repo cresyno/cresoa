@@ -1,21 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
-import { Icon } from '../../../../../components/Icon'
+// Reusing the edit-order CSS for a consistent look
+import '../../orders/[id]/edit/edit-order.css' 
+
+// ─── EMBEDDED ICONS ───
+const SvgIcons = {
+  ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
+  ChevronDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>,
+  Search: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>,
+  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+  Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>,
+  User: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+}
 
 export default function EditGroupPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
   const groupId = params.id
+  const requestedBusinessId = searchParams.get('business_id')
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState(null)
   const [businessId, setBusinessId] = useState(null)
+  
   const [customers, setCustomers] = useState([])
   const [formData, setFormData] = useState({
     group_name: '',
@@ -23,20 +37,27 @@ export default function EditGroupPage() {
     due_date: '',
   })
 
+  // UI State
+  const [showCoordinatorModal, setShowCoordinatorModal] = useState(false)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/login')
-          return
-        }
+        if (!user) { router.push('/login'); return }
 
-        const bizId = getCurrentBusinessId()
-        if (!bizId) {
-          router.push('/dashboard')
-          return
-        }
+        const bizId = requestedBusinessId || getCurrentBusinessId()
+        if (!bizId) { router.push('/dashboard'); return }
         setBusinessId(bizId)
 
         // Fetch group
@@ -54,13 +75,18 @@ export default function EditGroupPage() {
           due_date: group.due_date || '',
         })
 
-        // Fetch customers for coordinator dropdown
+        // Fetch customers
         const { data: customersData } = await supabase
           .from('customers')
-          .select('id, name')
+          .select('id, name, first_name, last_name, phone')
           .eq('business_id', bizId)
-          .order('name')
-        setCustomers(customersData || [])
+          .order('first_name')
+
+        setCustomers((customersData || []).map(c => ({
+          ...c,
+          display_name: c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed'
+        })))
+
       } catch (err) {
         console.error(err)
         setError('Failed to load group.')
@@ -69,10 +95,16 @@ export default function EditGroupPage() {
       }
     }
     load()
-  }, [groupId, router])
+  }, [groupId, router, requestedBusinessId])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+  }
+
+  const handleCoordinatorSelect = (cust) => {
+    setFormData(prev => ({ ...prev, coordinator_customer_id: cust.id }))
+    setShowCoordinatorModal(false)
+    setCustomerSearch('')
   }
 
   const handleSubmit = async (e) => {
@@ -82,17 +114,19 @@ export default function EditGroupPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase
+      
+      const { error: updateError } = await supabase
         .from('group_orders')
         .update({
           group_name: formData.group_name,
           coordinator_customer_id: formData.coordinator_customer_id || null,
           due_date: formData.due_date || null,
+          updated_at: new Date().toISOString()
         })
         .eq('id', groupId)
         .eq('business_id', businessId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       await supabase.from('business_activity_logs').insert({
         business_id: businessId,
@@ -101,194 +135,197 @@ export default function EditGroupPage() {
         details: { group_name: formData.group_name }
       })
 
-      router.push(`/dashboard/groups?business_id=${businessId}`)
+      showToast('Group updated successfully')
+      router.push(`/dashboard/groups/${groupId}?business_id=${businessId}`)
     } catch (err) {
       console.error(err)
-      setError('Failed to update group.')
-    } finally {
+      showToast(err.message || 'Failed to update group.', 'error')
       setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Delete this group? All linked orders will be unassigned.')) return
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      // First, unlink orders from this group (set group_order_id to null)
-      await supabase
-        .from('orders')
-        .update({ group_order_id: null })
-        .eq('group_order_id', groupId)
+  // ─── CUSTOM DELETE MODAL ───
+  const promptDelete = () => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Group',
+      message: 'Are you sure you want to delete this group? All linked orders will be unassigned from this group, but the orders themselves will NOT be deleted.',
+      confirmText: 'Delete Group',
+      isDestructive: true,
+      onConfirm: async () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }))
+        setDeleting(true)
+        
+        try {
+          const { data: { user } } = await supabase.auth.getUser()
+          
+          // Unlink orders
+          await supabase.from('orders').update({ group_order_id: null }).eq('group_order_id', groupId)
 
-      // Then delete the group
-      const { error } = await supabase
-        .from('group_orders')
-        .delete()
-        .eq('id', groupId)
-        .eq('business_id', businessId)
+          // Delete group
+          const { error } = await supabase.from('group_orders').delete().eq('id', groupId).eq('business_id', businessId)
+          if (error) throw error
 
-      if (error) throw error
+          await supabase.from('business_activity_logs').insert({
+            business_id: businessId,
+            performed_by: user.id,
+            action: 'group_deleted',
+            details: { id: groupId }
+          })
 
-      await supabase.from('business_activity_logs').insert({
-        business_id: businessId,
-        performed_by: user.id,
-        action: 'group_deleted',
-        details: { id: groupId }
-      })
-
-      router.push(`/dashboard/groups?business_id=${businessId}`)
-    } catch (err) {
-      console.error(err)
-      alert('Failed to delete group.')
-    }
+          showToast('Group deleted successfully')
+          router.push(`/dashboard/groups?business_id=${businessId}`)
+        } catch (err) {
+          console.error(err)
+          showToast('Failed to delete group.', 'error')
+          setDeleting(false)
+        }
+      }
+    })
   }
 
-  if (loading) {
-    return (
-      <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-        <div style={{ width: '140px', height: '24px', background: 'var(--color-border)', borderRadius: '6px' }} />
-        <div style={{ marginTop: '1.5rem' }}>
-          <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
-          <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px', marginBottom: '1rem' }} />
-          <div style={{ width: '100%', height: '40px', background: 'var(--color-border)', borderRadius: '6px' }} />
-        </div>
-      </div>
-    )
-  }
+  const selectedCoordinator = useMemo(() => customers.find(c => c.id === formData.coordinator_customer_id), [customers, formData.coordinator_customer_id])
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.toLowerCase()
+    return customers.filter(c => c.display_name.toLowerCase().includes(q) || c.phone?.includes(q)).slice(0, 10)
+  }, [customers, customerSearch])
 
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
-        {error}
-        <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: 'var(--color-accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Retry</button>
-      </div>
-    )
-  }
+  if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
+  if (error) return <div className="order-page-error"><h2>Error</h2><p>{error}</p><button onClick={() => window.location.reload()} className="cresoa-primary-button">Retry</button></div>
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '800px', margin: '0 auto', color: 'var(--color-text)' }}>
-      <h1 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>Edit Group Order</h1>
-      <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>Update the group details below.</p>
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div className="edit-order-page">
+      <div className="edit-header">
         <div>
-          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Group Name *</label>
-          <input
-            type="text"
-            name="group_name"
-            value={formData.group_name}
-            onChange={handleChange}
-            required
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '0.9rem'
-            }}
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Coordinator (optional)</label>
-          <select
-            name="coordinator_customer_id"
-            value={formData.coordinator_customer_id}
-            onChange={handleChange}
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '0.9rem'
-            }}
-          >
-            <option value="">No coordinator</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.3rem' }}>Due Date (optional)</label>
-          <input
-            type="date"
-            name="due_date"
-            value={formData.due_date}
-            onChange={handleChange}
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text)',
-              fontSize: '0.9rem'
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              padding: '0.6rem 1.5rem',
-              background: 'var(--color-accent)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              fontWeight: '600',
-              cursor: saving ? 'default' : 'pointer',
-              opacity: saving ? 0.6 : 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}
-          >
-            <Icon name="check" size={16} stroke="#fff" />
-            {saving ? 'Saving...' : 'Save Changes'}
+          <button onClick={() => router.back()} className="order-back-btn" style={{ margin: 0, marginBottom: '8px' }}>
+            <SvgIcons.ArrowLeft /> Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            style={{
-              padding: '0.6rem 1.5rem',
-              background: 'transparent',
-              border: '1px solid var(--color-border)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              color: 'var(--color-text)'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            style={{
-              padding: '0.6rem 1.5rem',
-              background: 'transparent',
-              border: '1px solid var(--color-danger)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              color: 'var(--color-danger)',
-              marginLeft: 'auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3rem'
-            }}
-          >
-            <Icon name="alert" size={16} stroke="var(--color-danger)" />
-            Delete Group
-          </button>
+          <h1 className="edit-title">Edit Group</h1>
+          <p className="edit-subtitle">Update the group details below.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div className="edit-card">
+          <div className="form-group">
+            <label className="order-label">Group Name *</label>
+            <input
+              type="text"
+              name="group_name"
+              value={formData.group_name}
+              onChange={handleChange}
+              required
+              className="order-input"
+              placeholder="Enter group name"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="order-label">Coordinator</label>
+            <button 
+              type="button" 
+              className="order-input" 
+              onClick={() => setShowCoordinatorModal(true)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+            >
+              <span style={{ color: selectedCoordinator ? 'var(--cresoa-text)' : 'var(--cresoa-text-muted)' }}>
+                {selectedCoordinator ? selectedCoordinator.display_name : 'Select a coordinator (optional)'}
+              </span>
+              <SvgIcons.ChevronDown />
+            </button>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="order-label">Event Due Date</label>
+            <input
+              type="date"
+              name="due_date"
+              value={formData.due_date}
+              onChange={handleChange}
+              className="order-input"
+            />
+          </div>
         </div>
 
-        {error && <div style={{ color: 'var(--color-danger)', marginTop: '0.5rem' }}>{error}</div>}
+        {error && (
+          <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--color-danger-soft)', color: 'var(--color-danger)', marginBottom: '16px', fontWeight: 600 }}>
+            {error}
+          </div>
+        )}
       </form>
+
+      {/* FIXED FOOTER */}
+      <div className="edit-fixed-footer">
+        <button type="button" onClick={promptDelete} disabled={deleting} className="btn-delete-edit">
+          <SvgIcons.Trash />
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={saving} className="cresoa-primary-button btn-save-edit">
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+
+      {/* CUSTOMER SELECT MODAL (For Coordinator) */}
+      {showCoordinatorModal && (
+        <div className="app-modal-overlay" onClick={() => setShowCoordinatorModal(false)}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ height: '70vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Select Coordinator</h2>
+              <button onClick={() => setShowCoordinatorModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
+            </div>
+
+            <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
+              <span className="search-icon"><SvgIcons.Search /></span>
+              <input type="text" className="orders-search-input" placeholder="Search by name or phone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} autoFocus />
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <div 
+                onClick={() => { setFormData(prev => ({ ...prev, coordinator_customer_id: '' })); setShowCoordinatorModal(false) }} 
+                className="member-dense-row" 
+                style={{ padding: '12px', marginBottom: '8px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', cursor: 'pointer' }}
+              >
+                <div className="member-avatar" style={{ background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></div>
+                <div className="member-info">
+                  <span className="member-name">No Coordinator</span>
+                  <span className="member-item">Remove coordinator from this group</span>
+                </div>
+              </div>
+
+              {filteredCustomers.map(c => (
+                <div key={c.id} onClick={() => handleCoordinatorSelect(c)} className="member-dense-row" style={{ padding: '12px', marginBottom: '8px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', cursor: 'pointer' }}>
+                  <div className="member-avatar">{c.display_name.charAt(0).toUpperCase()}</div>
+                  <div className="member-info">
+                    <span className="member-name">{c.display_name}</span>
+                    <span className="member-item">{c.phone || 'No phone number'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM DELETE MODAL */}
+      {modalConfig.isOpen && (
+        <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <h3 className="app-modal-title">{modalConfig.title}</h3>
+            <p className="app-modal-message">{modalConfig.message}</p>
+            <div className="app-modal-actions">
+              <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
+              <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST */}
+      {toastMessage && (
+        <div className={`app-toast ${toastType}`}>
+          {toastMessage}
+        </div>
+      )}
+
     </div>
   )
-          }
+  }
