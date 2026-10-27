@@ -1,0 +1,209 @@
+/* app/dashboard/orders/[id]/edit/edit-order.css */
+
+.edit-order-page {
+  padding: 1.25rem;
+  padding-bottom: 120px; /* Space for fixed footer */
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--cresoa-bg);
+  min-height: 100vh;
+}
+
+.edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.edit-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--cresoa-text);
+}
+
+.edit-subtitle {
+  font-size: 0.85rem;
+  color: var(--cresoa-text-muted);
+  margin: 4px 0 0 0;
+}
+
+.edit-card {
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.edit-section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cresoa-text);
+  margin: 0 0 16px 0;
+}
+
+.edit-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.edit-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--cresoa-text-secondary);
+  text-transform: uppercase;
+}
+
+.edit-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.edit-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(11, 44, 94, 0.1);
+}
+
+.edit-input::placeholder {
+  color: #9CA3AF;
+  font-weight: 400;
+}
+
+textarea.edit-input {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.edit-finance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.edit-balance-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--cresoa-surface-soft);
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-top: 8px;
+}
+
+/* Fixed Footer */
+.edit-fixed-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--cresoa-surface);
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--cresoa-border);
+  display: flex;
+  gap: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.btn-save-edit {
+  flex: 2;
+  padding: 14px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.btn-delete-edit {
+  flex: 1;
+  padding: 14px;
+  background: transparent;
+  color: var(--color-danger);
+  border: 1.5px solid var(--color-danger);
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-delete-edit:active {
+  background: var(--color-danger-soft);
+}
+
+/* Custom Dropdown for Status */
+.custom-dropdown-wrapper {
+  position: relative;
+}
+
+.custom-dropdown-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-dropdown-item {
+  padding: 12px 16px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--cresoa-text);
+  cursor: pointer;
+}
+
+.custom-dropdown-item:hover {
+  background: var(--cresoa-surface-soft);
+}
+
+.custom-dropdown-item.active {
+  background: var(--cresoa-surface-soft);
+  color: var(--color-primary);
+  font-weight: 700;
+  }
