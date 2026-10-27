@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
 // Reusing the edit-order CSS for a consistent look
-import '../../orders/[id]/edit/edit-order.css' 
+import '../orders/[id]/edit/edit-order.css' 
 
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
