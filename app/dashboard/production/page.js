@@ -6,7 +6,6 @@ import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'
 import { ProductionPipeline } from '../../../components/ProductionPipeline'
-import { StatusPill } from '../../../components/StatusPill'
 import '../../globals.css'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
@@ -15,7 +14,6 @@ const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 const SvgIcons = {
   Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
   Alert: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
-  Eye: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
   Check: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
   X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
   Package: () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.91 8.84L12 13 3.09 8.84" /><line x1="12" y1="22" x2="12" y2="13" /><line x1="2" y1="4" x2="12" y2="9" /><line x1="22" y1="4" x2="12" y2="9" /></svg>
@@ -40,7 +38,7 @@ export default function ProductionPage() {
   const [selectedStage, setSelectedStage] = useState(null)
   
   // Custom UI State
-  const [statusOrder, setStatusOrder] = useState(null) // Order being updated
+  const [statusOrder, setStatusOrder] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState('')
   const [saving, setSaving] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
@@ -111,7 +109,6 @@ export default function ProductionPage() {
 
   const handleStageClick = (stage) => setSelectedStage(prev => prev === stage ? null : stage)
 
-  // ─── Status Update Logic ───
   const openStatusModal = (order) => {
     setStatusOrder(order)
     setSelectedStatus(order.current_status || 'Order placed')
@@ -210,7 +207,7 @@ export default function ProductionPage() {
         <span style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{filteredOrders.length} orders</span>
       </div>
 
-      {/* ORDERS LIST */}
+      {/* ORDERS LIST (New High-Density Layout) */}
       {filteredOrders.length === 0 ? (
         <div className="orders-empty" style={{ padding: '3rem 1rem' }}>
           <SvgIcons.Package />
@@ -226,40 +223,36 @@ export default function ProductionPage() {
             const status = order.current_status || 'Order placed'
 
             return (
-              <div key={order.id} className="cresoa-card" style={{ padding: '16px', borderLeft: `4px solid ${isOverdue ? 'var(--color-danger)' : 'var(--color-primary)'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                  
-                  {/* Left Side: Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>{customerName}</h4>
-                      {isOverdue && <span style={{ fontSize: '0.7rem', color: 'white', background: 'var(--color-danger)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>Overdue</span>}
-                    </div>
-                    <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>
-                      {order.title || 'Untitled'} · Due: {formatDate(order.due_date)}
-                    </p>
-                    {balance > 0 && <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-danger)', fontWeight: 600 }}>{money(balance)} balance</p>}
-                  </div>
+              <div 
+                key={order.id} 
+                className="production-card" 
+                onClick={() => router.push(`/dashboard/orders/${order.id}?business_id=${businessId}`)}
+              >
+                {/* Top Row: Name & Status */}
+                <div className="production-card-top">
+                  <h4 className="production-name">{customerName}</h4>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); openStatusModal(order); }}
+                    className={`production-status-btn ${status === 'Delivered' ? 'delivered' : status === 'Ready' ? 'ready' : 'active'}`}
+                  >
+                    {status}
+                  </button>
+                </div>
 
-                  {/* Right Side: Actions */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    {/* Status Pill (Tap to change) */}
-                    <button 
-                      onClick={() => openStatusModal(order)}
-                      className={`badge-status ${status === 'Delivered' ? 'success' : status === 'Ready' ? 'warning' : 'info'}`}
-                      style={{ cursor: 'pointer', border: '1px solid transparent' }}
-                    >
-                      {status}
-                    </button>
-                    
-                    <button 
-                      onClick={() => router.push(`/dashboard/orders/${order.id}?business_id=${businessId}`)}
-                      className="order-btn-secondary"
-                      style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    >
-                      <SvgIcons.Eye /> View
-                    </button>
+                {/* Bottom Row: Details & Financials */}
+                <div className="production-card-bottom">
+                  <div className="production-details">
+                    <span className="production-title">{order.title || 'Untitled'}</span>
+                    <span className="production-date" style={{ color: isOverdue ? 'var(--color-danger)' : 'var(--cresoa-text-muted)' }}>
+                      {isOverdue && 'Overdue · '} Due: {formatDate(order.due_date)}
+                    </span>
                   </div>
+                  
+                  {balance > 0 && (
+                    <div className="production-balance">
+                      {money(balance)} <span>due</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -315,4 +308,4 @@ export default function ProductionPage() {
 
     </div>
   )
-    }
+  }
