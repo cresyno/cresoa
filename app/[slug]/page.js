@@ -7,7 +7,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// Keep this at 60 for production, but for testing right now, you might want to set it to 0 to see changes instantly.
 export const revalidate = 0 
 
 export async function generateMetadata({ params }) {
@@ -62,24 +61,35 @@ export default async function PublicPage({ params }) {
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
 
-    // ✅ NEW: Fetch real products from inventory_items
+    // ✅ 1. Fetch inventory items that are listed on the website
     const { data: inventoryItems } = await supabaseAdmin
       .from('inventory_items')
       .select('*')
       .eq('business_id', page.business_id)
-      .eq('is_listed_on_website', true) // Only fetch items toggled for the website
+      .eq('is_listed_on_website', true)
 
-    // ✅ NEW: Map inventory data to the format the templates expect
-    const shop = (inventoryItems || []).map(item => ({
-      id: item.id,
-      name: item.item_name,
-      price: item.selling_price,
-      description: item.web_description || item.description || '',
-      image_url: item.image_url || '',
-      featured: item.featured_on_website || false
-    }))
+    // ✅ 2. Map inventory OR fallback to old JSON if inventory is empty
+    let shop = []
+    if (inventoryItems && inventoryItems.length > 0) {
+      shop = inventoryItems.map(item => ({
+        id: item.id,
+        name: item.item_name,
+        price: String(item.selling_price), // Ensure it's a string
+        description: item.web_description || item.description || '',
+        image_url: item.image_url || '',
+        // If your template filters by featured, ensure this is true if they marked it
+        featured: item.featured_on_website ?? false 
+      }))
+    } else {
+      // FALLBACK: If no new inventory items are toggled, show the old JSON data 
+      // so the website doesn't look blank while you migrate.
+      try { 
+        shop = page.shop_products || []; 
+        if (!Array.isArray(shop)) shop = []; 
+      } catch { shop = [] }
+    }
 
-    // Robust portfolio parsing (handles strings, arrays, weird formats)
+    // Robust portfolio parsing
     let portfolio = []
     try {
       const raw = page.portfolio_images || []
@@ -117,7 +127,7 @@ export default async function PublicPage({ params }) {
           whatsapp: business?.whatsapp || business?.phone || '',
           email: business?.email || '',
           location: business?.location || '',
-          business_type: business?.business_type || business?.sector || '', // ✅ Sector
+          business_type: business?.business_type || business?.sector || '', 
           facebook: business?.facebook || '',
           instagram: business?.instagram || '',
           tiktok: business?.tiktok || '',
@@ -126,17 +136,15 @@ export default async function PublicPage({ params }) {
           google_business: business?.google_business || '',
         }}
         page={{
-          ...page, // spread all existing page properties
+          ...page,
           about,
           description: page.description || business?.description || '',
           business_id: page.business_id,
           slug: page.slug,
-          has_shop: page.has_shop || true, // ✅ Force true so shop renders if items exist
+          has_shop: true, // Force true so the shop renders
           has_services: page.has_services,
           show_quote_button: page.show_quote_button,
           show_whatsapp_button: page.show_whatsapp_button,
-
-          // New editor settings (must be passed for templates to use)
           hero_font: page.hero_font || 'Inter',
           hero_layout: page.hero_layout || 'center',
           header_order: page.header_order || ['Home', 'About', 'Services', 'Shop', 'Work', 'Contact'],
@@ -152,7 +160,7 @@ export default async function PublicPage({ params }) {
           cta_type: page.cta_type || '',
         }}
         services={services}
-        shop={shop} // ✅ Now passing the live inventory items!
+        shop={shop} // ✅ Passes either new inventory items OR old fallback
         portfolio={portfolio}
         reviews={reviews || []}
         templateId={page.template_id || 'elegant'}
@@ -169,4 +177,4 @@ export default async function PublicPage({ params }) {
       </div>
     )
   }
-          }
+}
