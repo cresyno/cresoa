@@ -162,7 +162,7 @@ function DashboardLayoutContent({ children }) {
     load()
   }, [router, searchParams])
 
-  // ─── SECURITY GUARDS (Now sets mismatch instead of redirect) ───
+  // ─── SECURITY GUARDS ───
   useEffect(() => {
     if (!loading && business) {
       const urlBusinessId = searchParams.get('business_id')
@@ -172,17 +172,13 @@ function DashboardLayoutContent({ children }) {
       }
 
       const currentSector = business.sector || 'fashion'
-      const sectorPath = pathname?.split('/')[2] // e.g., 'fashion', 'repairs', 'printing'
+      const sectorPath = pathname?.split('/')[2]
 
-      // If path is a sector-specific path but doesn't match the business sector
       if (sectorPath && SECTOR_KEYS.includes(sectorPath) && sectorPath !== currentSector) {
         setMismatchInfo({ sector: currentSector, businessId: business.id })
         return
       }
 
-      // Fashion lives at the bare /dashboard root with no distinguishing
-      // URL segment, so a non-fashion business wandering into fashion-only
-      // paths isn't caught by the segment check above — guard it explicitly.
       const FASHION_ONLY_PATHS = ['/dashboard/orders', '/dashboard/customers', '/dashboard/inventory', '/dashboard/groups', '/dashboard/production']
       const onSharedPath = SHARED_DASHBOARD_PATHS.some((p) => pathname?.startsWith(p))
       if (
@@ -205,23 +201,51 @@ function DashboardLayoutContent({ children }) {
     }
   }, [loading, business, pathname, router, searchParams])
 
-  // ─── NAVIGATION ITEMS ───
-  // Sourced entirely from lib/sector-config.js — adding a new sector means
-  // adding one entry there, never touching this file again.
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
-  const isActive = (path) => isNavPathActive(pathname, path)
+  // Custom active checker for "My Website" that accounts for the ?tab= query
+  const isActive = (path) => {
+    if (path === '/dashboard/my-website') {
+      return pathname?.startsWith('/dashboard/my-website')
+    }
+    return isNavPathActive(pathname, path)
+  }
 
   const handleNavClick = () => setSidebarOpen(false)
 
   const getIndustryBadge = () => getSectorBadge(business?.sector || 'fashion')
 
   const currentSector = business?.sector || 'fashion'
-  const currentNavItems = getNavItemsFor(currentSector)
+  
+  // ─── NAVIGATION ITEMS CONSOLIDATION ───
+  // 1. Get standard items for sector
+  const rawNavItems = getNavItemsFor(currentSector)
+  
+  // 2. Filter out the old separate website routes
+  const oldWebsitePaths = [
+    '/dashboard/public-page', 
+    '/dashboard/public-quote', 
+    '/dashboard/public-orders', 
+    '/dashboard/website-products',
+    '/dashboard/website-onboarding'
+  ]
+  
+  const filteredNavItems = rawNavItems.filter(item => 
+    !oldWebsitePaths.includes(item.path) && 
+    !item.name.toLowerCase().includes('website')
+  )
+
+  // 3. Inject the new unified "My Website" hub
+  // We place it after Inventory/Orders but before Team/Settings
+  const insertIndex = filteredNavItems.findIndex(i => i.name === 'Production' || i.name === 'Invoices') + 1 || filteredNavItems.length;
+  const currentNavItems = [
+    ...filteredNavItems.slice(0, insertIndex),
+    { name: 'My Website', path: '/dashboard/my-website', icon: 'globe' }, // 'globe' assumed to be in your Icon component
+    ...filteredNavItems.slice(insertIndex)
+  ]
 
   if (loading && !authChecked) {
     return (
@@ -235,7 +259,6 @@ function DashboardLayoutContent({ children }) {
     )
   }
 
-  // ─── Show SectorMismatch if needed ───
   if (mismatchInfo.sector) {
     return <SectorMismatch sector={mismatchInfo.sector} businessId={mismatchInfo.businessId} />
   }
@@ -340,7 +363,6 @@ function DashboardLayoutContent({ children }) {
           </div>
         </div>
 
-        {/* ✅ UPDATED: Pass currentSector to BusinessSwitcher */}
         <div style={{ marginBottom: '0.4rem' }}>
           <BusinessSwitcher key={business?.id} currentBusinessId={business?.id} currentSector={business?.sector} />
         </div>
@@ -363,7 +385,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
-          {showSettingsSection && (
+   {showSettingsSection && (
           <div className="nav-section">
             <div className="section-label">Settings</div>
             {showBusinessSettings && <a href={baseUrl('/dashboard/settings')} className={isActive('/dashboard/settings') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="settings" size={16} stroke="currentColor" /></span> Business Settings</a>}
@@ -372,7 +394,7 @@ function DashboardLayoutContent({ children }) {
           </div>
         )}
 
-      {user?.email === 'taiwoabraham640@gmail.com' && (
+        {user?.email === 'taiwoabraham640@gmail.com' && (
           <div className="nav-section">
             <div className="section-label">Admin</div>
             <a href={baseUrl('/admin/support')} className={isActive('/admin') ? 'active' : ''} onClick={handleNavClick}><span className="icon"><Icon name="inbox" size={16} stroke="currentColor" /></span> Support Tickets</a>
