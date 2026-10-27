@@ -4,36 +4,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
-import { Icon } from '../../../components/Icon'
-import { Card } from '../../../components/Card'
-import { SectionHeader } from '../../../components/SectionHeader'
-import { StatusPill } from '../../../components/StatusPill'
 import { Navigation } from '../../../components/Navigation'
 import { ProductionPipeline } from '../../../components/ProductionPipeline'
+import { StatusPill } from '../../../components/StatusPill'
 import '../../globals.css'
 
 const STAGES = ['Order placed', 'Cutting', 'Sewing', 'Ready', 'Delivered']
 
-function money(value) {
-  return `₦${Number(value || 0).toLocaleString('en-NG')}`
+// ─── EMBEDDED ICONS ───
+const SvgIcons = {
+  Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+  Alert: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
+  Eye: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
+  Check: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+  Package: () => <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.91 8.84L12 13 3.09 8.84" /><line x1="12" y1="22" x2="12" y2="13" /><line x1="2" y1="4" x2="12" y2="9" /><line x1="22" y1="4" x2="12" y2="9" /></svg>
 }
 
+function money(value) { return `₦${Number(value || 0).toLocaleString('en-NG')}` }
 function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
   if (isNaN(date.getTime())) return '—'
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function getStatusInfo(status) {
-  const map = {
-    'Order placed': { label: 'Placed', className: 'placed' },
-    Cutting: { label: 'Cutting', className: 'cutting' },
-    Sewing: { label: 'Sewing', className: 'sewing' },
-    Ready: { label: 'Ready', className: 'ready' },
-    Delivered: { label: 'Delivered', className: 'delivered' },
-  }
-  return map[status] || { label: status || 'Placed', className: 'placed' }
 }
 
 export default function ProductionPage() {
@@ -44,7 +37,20 @@ export default function ProductionPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedStage, setSelectedStage] = useState(null) // null = show all (except delivered)
+  const [selectedStage, setSelectedStage] = useState(null)
+  
+  // Custom UI State
+  const [statusOrder, setStatusOrder] = useState(null) // Order being updated
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    setToastMessage(msg)
+    setToastType(type)
+    setTimeout(() => setToastMessage(''), 3000)
+  }
 
   const loadOrders = async () => {
     if (!businessId) return
@@ -56,269 +62,257 @@ export default function ProductionPage() {
 
       const { data, error: fetchError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          customers (name, first_name, last_name, phone)
-        `)
+        .select(`*, customers (name, first_name, last_name, phone)`)
         .eq('business_id', businessId)
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
       setOrders(data || [])
     } catch (err) {
-      console.error('Error loading production orders:', err)
       setError('Could not load production data.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadOrders()
-  }, [businessId])
+  useEffect(() => { loadOrders() }, [businessId])
 
-  // ─── Compute stats ──────────────────────────────────────
-  const productionOrders = useMemo(() => {
-    return orders.filter(o => o.current_status !== 'Delivered')
-  }, [orders])
-
+  const productionOrders = useMemo(() => orders.filter(o => o.current_status !== 'Delivered'), [orders])
+  
   const overdueOrders = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
     return productionOrders.filter(o => {
       if (!o.due_date) return false
-      const due = new Date(o.due_date)
-      due.setHours(0, 0, 0, 0)
+      const due = new Date(o.due_date); due.setHours(0, 0, 0, 0)
       return due < today
     })
   }, [productionOrders])
 
   const dueTodayOrders = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
     return productionOrders.filter(o => {
       if (!o.due_date) return false
-      const due = new Date(o.due_date)
-      due.setHours(0, 0, 0, 0)
+      const due = new Date(o.due_date); due.setHours(0, 0, 0, 0)
       return due.getTime() === today.getTime()
     })
   }, [productionOrders])
 
-  // ─── Stage counts ──────────────────────────────────────
   const stageCounts = useMemo(() => {
     const counts = {}
     STAGES.forEach(s => counts[s] = 0)
-    orders.forEach(o => {
-      const status = o.current_status
-      if (counts[status] !== undefined) counts[status]++
-    })
+    orders.forEach(o => { if (counts[o.current_status] !== undefined) counts[o.current_status]++ })
     return counts
   }, [orders])
 
-  // ─── Filtered orders based on selected stage ──────────
   const filteredOrders = useMemo(() => {
-    if (!selectedStage) {
-      // Show all production orders (excluding delivered)
-      return productionOrders
-    }
+    if (!selectedStage) return productionOrders
     return productionOrders.filter(o => o.current_status === selectedStage)
   }, [productionOrders, selectedStage])
 
-  // ─── Handlers ──────────────────────────────────────────
-  const handleStageClick = (stage) => {
-    setSelectedStage(prev => prev === stage ? null : stage)
+  const handleStageClick = (stage) => setSelectedStage(prev => prev === stage ? null : stage)
+
+  // ─── Status Update Logic ───
+  const openStatusModal = (order) => {
+    setStatusOrder(order)
+    setSelectedStatus(order.current_status || 'Order placed')
   }
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusUpdate = async () => {
+    if (!statusOrder || !selectedStatus) return
+    setSaving(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-      const { error } = await supabase
-        .from('orders')
-        .update({ current_status: newStatus })
-        .eq('id', orderId)
-        .eq('business_id', businessId)
+      const { error } = await supabase.from('orders').update({ current_status: selectedStatus }).eq('id', statusOrder.id).eq('business_id', businessId)
       if (error) throw error
-      // Optimistically update local state
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, current_status: newStatus } : o))
+      
+      setOrders(prev => prev.map(o => o.id === statusOrder.id ? { ...o, current_status: selectedStatus } : o))
+      showToast(`Status updated to ${selectedStatus}`)
+      setStatusOrder(null)
     } catch (err) {
-      console.error('Status update error:', err)
-      alert('Could not update status.')
+      showToast('Could not update status', 'error')
+    } finally {
+      setSaving(false)
     }
   }
 
-  // ─── Loading skeleton ──────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ width: '140px', height: '24px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-          <div style={{ width: '100px', height: '32px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.8rem', marginBottom: '1rem' }}>
-          {[1,2,3,4].map(i => (
-            <div key={i} style={{ background: 'var(--cresoa-surface)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite' }}>
-              <div style={{ width: '40%', height: '12px', background: 'var(--cresoa-border)', borderRadius: '6px' }} />
-              <div style={{ width: '60%', height: '20px', background: 'var(--cresoa-border)', borderRadius: '6px', marginTop: '0.3rem' }} />
-            </div>
-          ))}
-        </div>
-        <div style={{ background: 'var(--cresoa-surface)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--cresoa-border)', animation: 'pulse 1.5s infinite', height: '200px' }} />
-        <style>{`@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }`}</style>
-        <Navigation businessId={businessId} />
-      </div>
-    )
-  }
+  if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
+  if (error) return <div className="order-page-error"><h2>Error</h2><p>{error}</p><button onClick={loadOrders} className="cresoa-primary-button">Try again</button></div>
 
-  if (error) {
-    return (
-      <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
-        <Card style={{ padding: '2rem', textAlign: 'center' }}>
-          <Icon name="alert-circle" size={32} stroke="var(--cresoa-danger)" />
-          <h2 style={{ margin: '0.5rem 0' }}>Couldn't load production</h2>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>{error}</p>
-          <button onClick={loadOrders} className="cresoa-primary-button" style={{ marginTop: '1rem' }}>Try again</button>
-        </Card>
-        <Navigation businessId={businessId} />
-      </div>
-    )
-  }
-
-  // ─── Main render ──────────────────────────────────────
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', paddingBottom: '80px' }}>
+    <div className="orders-page">
       <Navigation businessId={businessId} />
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+      {/* HEADER */}
+      <div className="orders-header">
         <div>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Workshop</p>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--cresoa-text)' }}>Production</h1>
-          <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: 0 }}>
-            {productionOrders.length} orders in production · {overdueOrders.length} overdue
+          <h1 className="orders-title">Production</h1>
+          <p className="orders-subtitle">
+            {productionOrders.length} active orders · <span style={{ color: overdueOrders.length > 0 ? 'var(--color-danger)' : 'inherit' }}>{overdueOrders.length} overdue</span>
           </p>
         </div>
         <button onClick={() => router.push(`/dashboard/orders/new?business_id=${businessId}`)} className="cresoa-primary-button">
-          <Icon name="plus" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> New Order
+          <SvgIcons.Plus /> New Order
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>In Production</div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{productionOrders.length}</div>
-        </Card>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center', borderColor: overdueOrders.length > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-border)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Overdue</div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: overdueOrders.length > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>
+      {/* STATS GRID */}
+      <div className="orders-metrics-grid">
+        <div className="orders-metric-box">
+          <span className="metric-label">In Production</span>
+          <span className="metric-value">{productionOrders.length}</span>
+        </div>
+        <div className="orders-metric-box">
+          <span className="metric-label">Overdue</span>
+          <span className="metric-value" style={{ color: overdueOrders.length > 0 ? 'var(--color-danger)' : 'var(--color-secondary)' }}>
             {overdueOrders.length > 0 ? overdueOrders.length : '✓'}
-          </div>
-        </Card>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Due Today</div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{dueTodayOrders.length}</div>
-        </Card>
-        <Card style={{ padding: '0.6rem 0.8rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--cresoa-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Ready</div>
-          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--cresoa-success)' }}>{stageCounts['Ready'] || 0}</div>
-        </Card>
+          </span>
+        </div>
+        <div className="orders-metric-box">
+          <span className="metric-label">Due Today</span>
+          <span className="metric-value">{dueTodayOrders.length}</span>
+        </div>
+        <div className="orders-metric-box">
+          <span className="metric-label">Ready</span>
+          <span className="metric-value" style={{ color: 'var(--color-secondary)' }}>{stageCounts['Ready'] || 0}</span>
+        </div>
       </div>
 
-      {/* Overdue / Urgent Alert */}
+      {/* OVERDUE ALERT */}
       {overdueOrders.length > 0 && (
-        <Card style={{ marginBottom: '1rem', background: 'var(--cresoa-danger-soft)', borderColor: 'var(--cresoa-danger)', padding: '0.8rem 1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Icon name="alert-triangle" size={18} stroke="var(--cresoa-danger)" />
-            <span style={{ fontWeight: 700, color: 'var(--cresoa-danger)' }}>
-              {overdueOrders.length} order{overdueOrders.length > 1 ? 's' : ''} overdue
-            </span>
-            <button
-              onClick={() => setSelectedStage(null)} // show all, but we can't filter by overdue easily
-              style={{ marginLeft: 'auto', padding: '0.2rem 0.8rem', borderRadius: '20px', border: '1px solid var(--cresoa-danger)', background: 'transparent', color: 'var(--cresoa-danger)', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}
-            >
-              View all
-            </button>
-          </div>
-        </Card>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '16px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <SvgIcons.Alert />
+          <span style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: '0.9rem' }}>
+            {overdueOrders.length} order{overdueOrders.length > 1 ? 's are' : ' is'} overdue
+          </span>
+          <button onClick={() => setSelectedStage(null)} style={{ marginLeft: 'auto', background: 'var(--color-danger)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
+            View All
+          </button>
+        </div>
       )}
 
-      {/* Production Pipeline */}
-      <Card style={{ padding: '1rem', marginBottom: '1rem' }}>
-        <SectionHeader title="Pipeline" subtitle="Click a stage to filter orders" />
-        <ProductionPipeline
-          counts={stageCounts}
-          onStageClick={handleStageClick}
-        />
+      {/* PIPELINE */}
+      <div className="cresoa-card" style={{ padding: '16px', marginBottom: '1.25rem' }}>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 700 }}>Pipeline</h3>
+        <ProductionPipeline counts={stageCounts} onStageClick={handleStageClick} />
         {selectedStage && (
-          <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={() => setSelectedStage(null)} style={{ border: 'none', background: 'transparent', color: 'var(--cresoa-accent)', cursor: 'pointer', fontSize: '0.8rem' }}>
-              Clear filter
+          <div style={{ marginTop: '8px', textAlign: 'right' }}>
+            <button onClick={() => setSelectedStage(null)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}>
+              Clear Filter ({selectedStage})
             </button>
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* Orders List */}
-      <SectionHeader
-        title={selectedStage ? `Orders: ${selectedStage}` : 'All Orders in Production'}
-        subtitle={filteredOrders.length > 0 ? `${filteredOrders.length} order${filteredOrders.length > 1 ? 's' : ''}` : 'No orders in this stage'}
-      />
+      {/* LIST HEADER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+          {selectedStage ? `${selectedStage} Orders` : 'All Orders in Production'}
+        </h2>
+        <span style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', fontWeight: 600 }}>{filteredOrders.length} orders</span>
+      </div>
 
+      {/* ORDERS LIST */}
       {filteredOrders.length === 0 ? (
-        <Card style={{ padding: '2rem', textAlign: 'center' }}>
-          <Icon name="package" size={32} stroke="var(--cresoa-text-muted)" />
-          <h3 style={{ margin: '0.5rem 0 0.2rem' }}>No orders here</h3>
-          <p style={{ color: 'var(--cresoa-text-muted)' }}>All orders in this stage will appear here.</p>
-        </Card>
+        <div className="orders-empty" style={{ padding: '3rem 1rem' }}>
+          <SvgIcons.Package />
+          <h3>No orders in this stage</h3>
+          <p>Everything is up to date here.</p>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
+        <div className="orders-list">
           {filteredOrders.map(order => {
-            const customer = order.customers
-            const customerName = customer?.name || customer?.first_name || 'Unknown'
-            const isOverdue = order.due_date && new Date(order.due_date) < new Date() && order.current_status !== 'Delivered'
+            const customerName = order.customers?.name || order.customers?.first_name || 'Unknown'
+            const isOverdue = order.due_date && new Date(order.due_date) < new Date()
             const balance = (order.price || 0) - (order.amount_paid || 0)
+            const status = order.current_status || 'Order placed'
+
             return (
-              <Card key={order.id} style={{ padding: '0.8rem 1rem', borderLeft: `4px solid ${isOverdue ? 'var(--cresoa-danger)' : 'var(--cresoa-accent)'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div key={order.id} className="cresoa-card" style={{ padding: '16px', borderLeft: `4px solid ${isOverdue ? 'var(--color-danger)' : 'var(--color-primary)'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                  
+                  {/* Left Side: Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <strong style={{ fontSize: '1rem' }}>{customerName}</strong>
-                      <StatusPill status={order.current_status} />
-                      {isOverdue && <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-danger)', fontWeight: 600 }}>Overdue</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--cresoa-text)' }}>{customerName}</h4>
+                      {isOverdue && <span style={{ fontSize: '0.7rem', color: 'white', background: 'var(--color-danger)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>Overdue</span>}
                     </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginTop: '0.2rem' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>
                       {order.title || 'Untitled'} · Due: {formatDate(order.due_date)}
-                      {balance > 0 && ` · ${money(balance)} due`}
-                    </div>
+                    </p>
+                    {balance > 0 && <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-danger)', fontWeight: 600 }}>{money(balance)} balance</p>}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <select
-                      value={order.current_status || 'Order placed'}
-                      onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', fontSize: '0.8rem', cursor: 'pointer' }}
+
+                  {/* Right Side: Actions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                    {/* Status Pill (Tap to change) */}
+                    <button 
+                      onClick={() => openStatusModal(order)}
+                      className={`badge-status ${status === 'Delivered' ? 'success' : status === 'Ready' ? 'warning' : 'info'}`}
+                      style={{ cursor: 'pointer', border: '1px solid transparent' }}
                     >
-                      {STAGES.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <button
+                      {status}
+                    </button>
+                    
+                    <button 
                       onClick={() => router.push(`/dashboard/orders/${order.id}?business_id=${businessId}`)}
-                      style={{ padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--cresoa-border)', background: 'transparent', cursor: 'pointer', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                      className="order-btn-secondary"
+                      style={{ padding: '4px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
-                      <Icon name="eye" size={14} stroke="currentColor" /> View
+                      <SvgIcons.Eye /> View
                     </button>
                   </div>
                 </div>
-              </Card>
+              </div>
             )
           })}
         </div>
       )}
 
-      <div style={{ marginTop: '2rem' }}>
-        <Navigation businessId={businessId} />
-      </div>
+      <div style={{ marginTop: '2rem' }}><Navigation businessId={businessId} /></div>
+
+      {/* ─── CUSTOM STATUS UPDATE MODAL ─── */}
+      {statusOrder && (
+        <div className="app-modal-overlay" onClick={() => setStatusOrder(null)}>
+          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 800 }}>Update Production Stage</h2>
+              <button onClick={() => setStatusOrder(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
+            </div>
+            
+            <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 16px 0' }}>
+              Changing stage for <strong>{statusOrder.customers?.name || statusOrder.customers?.first_name}</strong>
+            </p>
+
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {STAGES.map(stage => (
+                <button 
+                  key={stage}
+                  onClick={() => setSelectedStatus(stage)}
+                  className={`order-btn-secondary ${selectedStatus === stage ? 'active' : ''}`}
+                  style={{ justifyContent: 'space-between', padding: '14px 16px', borderColor: selectedStatus === stage ? 'var(--color-primary)' : 'var(--cresoa-border)' }}
+                >
+                  <span>{stage}</span>
+                  {selectedStatus === stage && <SvgIcons.Check />}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '1.5rem' }}>
+              <button onClick={() => setStatusOrder(null)} className="order-btn-secondary" style={{ flex: 1, padding: '12px' }}>Cancel</button>
+              <button onClick={handleStatusUpdate} disabled={saving} className="cresoa-primary-button" style={{ flex: 1, padding: '12px' }}>
+                {saving ? 'Updating...' : 'Save Stage'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── TOAST ─── */}
+      {toastMessage && (
+        <div className={`app-toast ${toastType}`}>
+          {toastMessage}
+        </div>
+      )}
+
     </div>
   )
-}
+    }
