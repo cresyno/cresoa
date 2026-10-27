@@ -468,7 +468,7 @@ function FashionDashboard({ businessId }) {
           </div>
         </header>
 
-        {/* ─── TIMEFRAME SELECTOR ─── */}
+          {/* ─── TIMEFRAME SELECTOR ─── */}
         <div className="kpi-header-row">
           <h2 className="section-title">Performance Overview</h2>
           <div className="timeframe-dropdown-wrapper" ref={timeframeMenuRef}>
@@ -730,4 +730,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                        }
+                               }
