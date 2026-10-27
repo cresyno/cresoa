@@ -7,7 +7,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-export const revalidate = 60
+// Keep this at 60 for production, but for testing right now, you might want to set it to 0 to see changes instantly.
+export const revalidate = 0 
 
 export async function generateMetadata({ params }) {
   try {
@@ -45,6 +46,7 @@ export default async function PublicPage({ params }) {
       .eq('slug', slug)
       .eq('is_enabled', true)
       .maybeSingle()
+      
     if (!page) notFound()
 
     const { data: business } = await supabaseAdmin
@@ -60,6 +62,23 @@ export default async function PublicPage({ params }) {
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
 
+    // ✅ NEW: Fetch real products from inventory_items
+    const { data: inventoryItems } = await supabaseAdmin
+      .from('inventory_items')
+      .select('*')
+      .eq('business_id', page.business_id)
+      .eq('is_listed_on_website', true) // Only fetch items toggled for the website
+
+    // ✅ NEW: Map inventory data to the format the templates expect
+    const shop = (inventoryItems || []).map(item => ({
+      id: item.id,
+      name: item.item_name,
+      price: item.selling_price,
+      description: item.web_description || item.description || '',
+      image_url: item.image_url || '',
+      featured: item.featured_on_website || false
+    }))
+
     // Robust portfolio parsing (handles strings, arrays, weird formats)
     let portfolio = []
     try {
@@ -69,7 +88,6 @@ export default async function PublicPage({ params }) {
       portfolio = portfolio.map(item => {
         if (typeof item === 'string') return { url: item, description: '' }
         if (item && typeof item === 'object' && !item.url) {
-          // Handle weird numeric-key format
           const keys = Object.keys(item).filter(k => /^\d+$/.test(k))
           if (keys.length) {
             const url = keys.sort((a, b) => parseInt(a) - parseInt(b)).map(k => item[k]).join('')
@@ -80,13 +98,15 @@ export default async function PublicPage({ params }) {
       }).filter(item => item.url && item.url.includes('http'))
     } catch { portfolio = [] }
 
-    let shop = []
-    try { shop = page.shop_products || []; if (!Array.isArray(shop)) shop = [] } catch { shop = [] }
-
     let services = []
-    try { services = page.services || []; if (!Array.isArray(services)) services = [] } catch { services = [] }
+    try { 
+      services = page.services || []; 
+      if (!Array.isArray(services)) {
+         services = typeof services === 'string' ? JSON.parse(services) : []
+      } 
+    } catch { services = [] }
 
-    const about = page.about || business?.description || ''
+    const about = page.about_text || page.about || business?.description || ''
 
     return (
       <PublicPageWrapper
@@ -97,7 +117,7 @@ export default async function PublicPage({ params }) {
           whatsapp: business?.whatsapp || business?.phone || '',
           email: business?.email || '',
           location: business?.location || '',
-          business_type: business?.business_type || '', // ✅ Sector
+          business_type: business?.business_type || business?.sector || '', // ✅ Sector
           facebook: business?.facebook || '',
           instagram: business?.instagram || '',
           tiktok: business?.tiktok || '',
@@ -111,7 +131,7 @@ export default async function PublicPage({ params }) {
           description: page.description || business?.description || '',
           business_id: page.business_id,
           slug: page.slug,
-          has_shop: page.has_shop,
+          has_shop: page.has_shop || true, // ✅ Force true so shop renders if items exist
           has_services: page.has_services,
           show_quote_button: page.show_quote_button,
           show_whatsapp_button: page.show_whatsapp_button,
@@ -132,7 +152,7 @@ export default async function PublicPage({ params }) {
           cta_type: page.cta_type || '',
         }}
         services={services}
-        shop={shop}
+        shop={shop} // ✅ Now passing the live inventory items!
         portfolio={portfolio}
         reviews={reviews || []}
         templateId={page.template_id || 'elegant'}
@@ -149,4 +169,4 @@ export default async function PublicPage({ params }) {
       </div>
     )
   }
-}
+          }
