@@ -29,9 +29,7 @@ const INITIAL_FORM = {
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
   ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
-  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
   ChevronDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>,
-  CheckCircle: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
 }
 
 export default function NewCustomerPage() {
@@ -45,8 +43,8 @@ export default function NewCustomerPage() {
   const [step, setStep] = useState(1)
   const [form, setForm] = useState(INITIAL_FORM)
   
-  // UI State for custom dropdowns
-  const [openDropdown, setOpenDropdown] = useState(null) // 'gender' | 'age' | null
+  // Custom Dropdown State
+  const [openDropdown, setOpenDropdown] = useState(null)
   const dropdownRef = useRef(null)
 
   // Custom UI State
@@ -60,7 +58,6 @@ export default function NewCustomerPage() {
     setTimeout(() => setToastMessage(''), 3000)
   }
 
-  // Handle click outside for dropdowns
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -191,7 +188,7 @@ export default function NewCustomerPage() {
             <h2 className="wizard-title">Personal Information</h2>
             <p className="wizard-subtitle">Basic details for this customer.</p>
 
-            <div className="edit-finance-grid">
+            <div className="form-grid-2">
               <div className="form-group">
                 <label className="order-label">First Name *</label>
                 <input type="text" className="order-input" value={form.first_name} onChange={e => updateField('first_name', e.target.value)} placeholder="Enter first name" autoFocus />
@@ -207,7 +204,7 @@ export default function NewCustomerPage() {
               <input type="tel" className="order-input" value={form.phone} onChange={e => updateField('phone', e.target.value)} placeholder="Enter phone number" />
             </div>
 
-            <div className="edit-finance-grid">
+            <div className="form-grid-2">
               {/* CUSTOM GENDER DROPDOWN */}
               <div className="form-group" ref={openDropdown === 'gender' ? dropdownRef : null}>
                 <label className="order-label">Gender</label>
