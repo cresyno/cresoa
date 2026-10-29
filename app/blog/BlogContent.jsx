@@ -11,6 +11,8 @@ const ICONS = {
   menu: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
   x: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   arrowRight: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  search: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   scissors: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>,
   tool: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
   printer: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
@@ -31,14 +33,25 @@ function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// Check if post is less than 14 days old
+function isNewPost(dateString) {
+  const postDate = new Date(dateString)
+  const today = new Date()
+  const diffTime = Math.abs(today - postDate)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return postDate <= today && diffDays <= 14
+}
+
 function PostCover({ post, size = 'default' }) {
   const [errored, setErrored] = useState(false)
   const color = getCategoryColor(post.category)
   const showImage = post.image && !errored
+  const isNew = isNewPost(post.date)
 
   if (showImage) {
     return (
       <div className={`cover cover--${size}`}>
+        {isNew && <span className="badge-new">New</span>}
         <img
           src={post.image}
           alt={post.title}
@@ -51,6 +64,7 @@ function PostCover({ post, size = 'default' }) {
 
   return (
     <div className={`cover cover--${size} cover--fallback`} style={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}>
+      {isNew && <span className="badge-new">New</span>}
       <span className="cover-category" style={{ color: '#fff' }}>{post.category}</span>
     </div>
   )
@@ -59,6 +73,8 @@ function PostCover({ post, size = 'default' }) {
 export default function BlogContent({ posts }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState('All')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(6)
 
   const closeMobileMenu = () => setMobileMenuOpen(false)
 
@@ -84,18 +100,29 @@ export default function BlogContent({ posts }) {
     }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' })
     els.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
-  }, [activeCategory])
+  }, [activeCategory, visibleCount])
 
-  // Sort newest first, keep stable order for ties
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVisibleCount(6)
+  }, [activeCategory, searchQuery])
+
+  // Sort newest first
   const sortedPosts = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date))
   const categories = ['All', ...Array.from(new Set(posts.map((p) => p.category)))]
 
-  const filtered = activeCategory === 'All'
-    ? sortedPosts
-    : sortedPosts.filter((p) => p.category === activeCategory)
+  // Filter by category AND search query
+  const filtered = sortedPosts.filter(post => {
+    const matchesCategory = activeCategory === 'All' || post.category === activeCategory
+    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          post.excerpt.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
 
-  const featured = activeCategory === 'All' ? filtered[0] : null
-  const remaining = activeCategory === 'All' ? filtered.slice(1) : filtered
+  const featured = activeCategory === 'All' && searchQuery === '' ? filtered[0] : null
+  const remaining = featured ? filtered.slice(1) : filtered
+  const displayedPosts = remaining.slice(0, visibleCount)
+  const hasMore = visibleCount < remaining.length
 
   return (
     <main className="page">
@@ -112,6 +139,7 @@ export default function BlogContent({ posts }) {
           --border-strong: #D6CFC1;
           --gold: #C99B2B;
           --gold-bright: #E5B84B;
+          --red: #EF4444;
         }
         [data-theme="dark"] {
           --bg: #0A0A0F;
@@ -177,16 +205,23 @@ export default function BlogContent({ posts }) {
         .hero h1 { font-size: 3rem; line-height: 1.08; letter-spacing: -0.035em; margin: 0 0 1.2rem; }
         .hero p { color: var(--text-muted); font-size: 1.1rem; line-height: 1.7; margin: 0; max-width: 680px; }
 
-        /* Filter */
-        .filter { background: var(--bg); padding: 1.75rem 1.5rem 0.5rem; position: sticky; top: 60px; z-index: 100; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-        [data-theme="dark"] .filter { background: rgba(10,10,15,0.9); }
-        .filter-inner {
-          max-width: 1180px; margin: 0 auto; display: flex; gap: 0.5rem;
+        /* Filter & Search Bar */
+        .toolbar { background: var(--bg); padding: 1.75rem 1.5rem 0.5rem; position: sticky; top: 60px; z-index: 100; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        [data-theme="dark"] .toolbar { background: rgba(10,10,15,0.9); }
+        
+        .toolbar-inner { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+        
+        .search-wrap { position: relative; width: 100%; max-width: 400px; }
+        .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+        .search-input { width: 100%; padding: 0.7rem 1rem 0.7rem 2.75rem; border-radius: 100px; background: var(--card); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 0.9rem; transition: border-color 0.2s, box-shadow 0.2s; }
+        .search-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,155,43,0.15); }
+        
+        .filter-scroll {
+          display: flex; gap: 0.5rem;
           overflow-x: auto; scrollbar-width: none;
           scroll-snap-type: x proximity;
-          padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);
         }
-        .filter-inner::-webkit-scrollbar { display: none; }
+        .filter-scroll::-webkit-scrollbar { display: none; }
         .filter-pill {
           flex-shrink: 0; scroll-snap-align: start;
           padding: 0.55rem 1.1rem; border-radius: 100px;
@@ -199,6 +234,23 @@ export default function BlogContent({ posts }) {
         .filter-pill.active { background: var(--bg-dark); color: #fff; border-color: var(--bg-dark); }
         [data-theme="dark"] .filter-pill.active { background: var(--gold); color: var(--bg-darkest); border-color: var(--gold); }
 
+        /* Badge NEW */
+        .badge-new {
+          position: absolute;
+          top: 1rem;
+          left: 1rem;
+          z-index: 10;
+          background: var(--red);
+          color: #fff;
+          font-size: 0.65rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          padding: 0.3rem 0.7rem;
+          border-radius: 100px;
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
         /* Featured */
         .featured { background: var(--bg); padding: 3rem 1.5rem 1rem; }
         .featured-inner { max-width: 1180px; margin: 0 auto; }
@@ -210,13 +262,21 @@ export default function BlogContent({ posts }) {
         }
         .featured-card:hover { border-color: var(--border-strong); transform: translateY(-3px); box-shadow: 0 30px 60px rgba(15,43,74,0.10); }
         .featured-content { padding: 3rem 2.5rem; display: flex; flex-direction: column; justify-content: center; }
-        .featured-badge { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 1.2rem; }
+        
+        .badges-row { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.2rem; }
+        .featured-badge { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
         .featured-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+        .featured-badge .badge-new { position: static; }
+        
         .featured-card h2 { font-size: 1.85rem; line-height: 1.2; margin: 0 0 1rem; letter-spacing: -0.025em; color: var(--text); }
         .featured-card .excerpt { color: var(--text-muted); font-size: 1rem; line-height: 1.7; margin: 0 0 1.6rem; }
-        .featured-meta { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.83rem; flex-wrap: wrap; }
-        .featured-meta strong { color: var(--text); font-weight: 600; }
-        .featured-meta .dot { opacity: 0.4; }
+        
+        /* Author Meta */
+        .author-meta { display: flex; align-items: center; gap: 0.6rem; color: var(--text-muted); font-size: 0.83rem; flex-wrap: wrap; }
+        .author-img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+        .author-name { color: var(--text); font-weight: 600; }
+        .meta-dot { opacity: 0.4; }
+        .meta-read { display: inline-flex; align-items: center; gap: 0.3rem; }
 
         /* Cover */
         .cover { position: relative; overflow: hidden; background: #EFEAE1; }
@@ -224,7 +284,8 @@ export default function BlogContent({ posts }) {
         .cover--default { aspect-ratio: 4 / 3; }
         .cover--tall { aspect-ratio: 3 / 4; }
         .cover--featured { aspect-ratio: auto; min-height: 100%; height: 100%; }
-        .cover img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+        .cover img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; transition: transform 0.6s cubic-bezier(0.16,1,0.3,1); }
+        .featured-card:hover .cover img { transform: scale(1.03); }
         .cover--fallback { display: flex; align-items: flex-end; padding: 1.5rem; }
         .cover-category { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; max-width: 200px; }
 
@@ -235,6 +296,7 @@ export default function BlogContent({ posts }) {
         .grid-head h2 { font-size: 1.5rem; margin: 0; color: var(--text); }
         .grid-head .count { color: var(--text-muted); font-size: 0.85rem; }
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        
         .card {
           display: flex; flex-direction: column;
           background: var(--card); border: 1px solid var(--border); border-radius: 18px;
@@ -243,15 +305,27 @@ export default function BlogContent({ posts }) {
         }
         .card:hover { border-color: var(--border-strong); transform: translateY(-4px); box-shadow: 0 24px 50px rgba(15,43,74,0.10); }
         .card:hover h3 { color: var(--gold); }
+        .card:hover .cover img { transform: scale(1.04); }
         .card-body { padding: 1.6rem 1.6rem 1.7rem; display: flex; flex-direction: column; flex: 1; }
         .card-category { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.85rem; }
         .card h3 { font-size: 1.15rem; line-height: 1.3; margin: 0 0 0.75rem; letter-spacing: -0.02em; color: var(--text); transition: color 0.2s; }
         .card .excerpt { color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; margin: 0 0 1.4rem; flex: 1; }
-        .card-meta { display: flex; align-items: center; gap: 0.45rem; color: var(--text-muted); font-size: 0.78rem; flex-wrap: wrap; padding-top: 1rem; border-top: 1px solid var(--border); }
-        .card-meta .dot { opacity: 0.4; }
+        
+        .card-meta-wrap { padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .card-meta { display: flex; align-items: center; gap: 0.45rem; color: var(--text-muted); font-size: 0.78rem; flex-wrap: wrap; }
+        
+        .read-more-link { font-size: 0.85rem; font-weight: 600; color: var(--gold); display: inline-flex; align-items: center; gap: 0.3rem; opacity: 0; transform: translateX(-5px); transition: opacity 0.3s, transform 0.3s; }
+        .card:hover .read-more-link { opacity: 1; transform: translateX(0); }
 
-        .empty { padding: 4rem 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.95rem; }
-        .empty strong { color: var(--text); display: block; font-size: 1.1rem; margin-bottom: 0.5rem; font-family: 'Fraunces', serif; }
+        /* Load More */
+        .load-more-wrap { text-align: center; margin-top: 3rem; }
+        .load-more-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.9rem 2.5rem; border-radius: 100px; background: transparent; color: var(--text); border: 1px solid var(--border-strong); font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: border-color 0.25s, background 0.2s, transform 0.25s; }
+        .load-more-btn:hover { border-color: var(--gold); background: rgba(201,155,43,0.05); transform: translateY(-2px); }
+
+        /* Empty State */
+        .empty-state { padding: 5rem 1.5rem; text-align: center; color: var(--text-muted); }
+        .empty-state-icon { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: rgba(201,155,43,0.1); color: var(--gold); margin-bottom: 1.5rem; }
+        .empty-state strong { color: var(--text); display: block; font-size: 1.3rem; margin-bottom: 0.5rem; font-family: 'Fraunces', serif; }
 
         /* Waitlist strip */
         .waitlist-strip { background: linear-gradient(170deg, #0F2B4A 0%, #061A2E 100%); padding: 6rem 1.5rem; text-align: center; position: relative; overflow: hidden; }
@@ -289,7 +363,7 @@ export default function BlogContent({ posts }) {
         .footer-links a:hover, .footer-links button:hover { color: var(--gold); }
 
         /* Responsive */
-           @media (max-width: 960px) {
+        @media (max-width: 960px) {
           .hero h1 { font-size: 2.4rem; }
           .featured-card { grid-template-columns: 1fr; }
           .cover--featured { aspect-ratio: 16 / 10; min-height: auto; }
@@ -303,6 +377,7 @@ export default function BlogContent({ posts }) {
           .cross-head h2 { font-size: 1.7rem; }
           .cta { padding: 5rem 1.25rem; }
           .cta h2 { font-size: 1.75rem; }
+          .toolbar-inner { flex-direction: column; align-items: flex-start; gap: 1rem; }
         }
         @media (max-width: 720px) {
           .navbar .nav-links { display: none; }
@@ -311,9 +386,10 @@ export default function BlogContent({ posts }) {
           .hero { padding: 2.5rem 1.25rem 2rem; }
           .hero h1 { font-size: 1.9rem; }
           .hero p { font-size: 1rem; }
-          .filter { top: 58px; padding: 1.25rem 1.25rem 0; }
+          .toolbar { top: 58px; padding: 1.25rem 1.25rem 0; }
           .grid { grid-template-columns: 1fr; }
           .grid-section { padding: 2rem 1.25rem 4rem; }
+          .read-more-link { display: none; } /* Hide read more on mobile to save space */
         }
       `}</style>
 
@@ -374,20 +450,33 @@ export default function BlogContent({ posts }) {
         </div>
       </section>
 
-      {/* FILTER */}
-      <div className="filter">
-        <div className="filter-inner" role="tablist" aria-label="Filter posts by category">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              role="tab"
-              aria-selected={activeCategory === cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`filter-pill ${activeCategory === cat ? 'active' : ''}`}
-            >
-              {cat}
-            </button>
-          ))}
+      {/* TOOLBAR (Search + Filter) */}
+      <div className="toolbar">
+        <div className="toolbar-inner">
+          <div className="search-wrap">
+            <span className="search-icon">{ICONS.search}</span>
+            <input 
+              type="text" 
+              placeholder="Search guides..." 
+              className="search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <div className="filter-scroll" role="tablist" aria-label="Filter posts by category">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                role="tab"
+                aria-selected={activeCategory === cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`filter-pill ${activeCategory === cat ? 'active' : ''}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -397,15 +486,19 @@ export default function BlogContent({ posts }) {
           <div className="featured-inner">
             <Link href={`/blog/${featured.slug}`} className="featured-card" data-reveal>
               <div className="featured-content">
-                <span className="featured-badge">Latest</span>
+                <div className="badges-row">
+                  <span className="featured-badge">Latest</span>
+                  {isNewPost(featured.date) && <span className="badge-new">New</span>}
+                </div>
                 <h2>{featured.title}</h2>
                 <p className="excerpt">{featured.excerpt}</p>
-                <div className="featured-meta">
-                  <strong>By Taiwo A. Feranmi</strong>
-                  <span className="dot">·</span>
+                <div className="author-meta">
+                  <img src="/mockups/founder.webp" alt="Taiwo A. Feranmi" className="author-img" />
+                  <span className="author-name">Taiwo A. Feranmi</span>
+                  <span className="meta-dot">·</span>
                   <span>{formatDate(featured.date)}</span>
-                  <span className="dot">·</span>
-                  <span>{featured.readTime}</span>
+                  <span className="meta-dot">·</span>
+                  <span className="meta-read">{ICONS.clock} {featured.readTime}</span>
                 </div>
               </div>
               <PostCover post={featured} size="featured" />
@@ -422,40 +515,54 @@ export default function BlogContent({ posts }) {
             <span className="count">{filtered.length} {filtered.length === 1 ? 'article' : 'articles'}</span>
           </div>
 
-          {remaining.length > 0 ? (
-            <div className="grid">
-              {remaining.map((post, i) => (
-                <Link
-                  key={post.slug}
-                  href={`/blog/${post.slug}`}
-                  className="card"
-                  data-reveal
-                  data-delay={i % 3 === 1 ? '1' : i % 3 === 2 ? '2' : undefined}
-                >
-                  <PostCover post={post} size="default" />
-                  <div className="card-body">
-                    <span className="card-category" style={{ color: getCategoryColor(post.category) }}>
-                      {post.category}
-                    </span>
-                    <h3>{post.title}</h3>
-                    <p className="excerpt">{post.excerpt}</p>
-                    <div className="card-meta">
-                      <span>By Taiwo A. Feranmi</span>
-                      <span className="dot">·</span>
-                      <span>{formatDate(post.date)}</span>
-                      <span className="dot">·</span>
-                      <span>{post.readTime}</span>
+          {displayedPosts.length > 0 ? (
+            <>
+              <div className="grid">
+                {displayedPosts.map((post, i) => (
+                  <Link
+                    key={post.slug}
+                    href={`/blog/${post.slug}`}
+                    className="card"
+                    data-reveal
+                    data-delay={i % 3 === 1 ? '1' : i % 3 === 2 ? '2' : undefined}
+                  >
+                    <PostCover post={post} size="default" />
+                    <div className="card-body">
+                      <span className="card-category" style={{ color: getCategoryColor(post.category) }}>
+                        {post.category}
+                      </span>
+                      <h3>{post.title}</h3>
+                      <p className="excerpt">{post.excerpt}</p>
+                      <div className="card-meta-wrap">
+                        <div className="card-meta">
+                          <img src="/mockups/founder.webp" alt="Taiwo A. Feranmi" className="author-img" style={{ width: 20, height: 20 }} />
+                          <span>{formatDate(post.date)}</span>
+                          <span className="meta-dot">·</span>
+                          <span className="meta-read">{ICONS.clock} {post.readTime}</span>
+                        </div>
+                        <span className="read-more-link">Read {ICONS.arrowRight}</span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))}
+              </div>
+              
+              {/* LOAD MORE */}
+              {hasMore && (
+                <div className="load-more-wrap">
+                  <button onClick={() => setVisibleCount(v => v + 6)} className="load-more-btn">
+                    Load More Guides
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon">{ICONS.search}</div>
+              <strong>No guides found</strong>
+              <p>We couldn't find any articles matching "{searchQuery}". Try another search term or category.</p>
             </div>
-          ) : !featured && filtered.length === 0 ? (
-            <div className="empty">
-              <strong>No guides in this category yet.</strong>
-              <p>Try another category or check back soon.</p>
-            </div>
-          ) : null}
+          )}
         </div>
       </section>
 
@@ -534,4 +641,4 @@ export default function BlogContent({ posts }) {
       </footer>
     </main>
   )
-          }
+                    }
