@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { compressImage } from '../../../../lib/compressImage'
 import { getSectorOnboardingFields } from '../../../../lib/sector-config'
-import { templates, getTemplate } from '../../../../lib/templateRegistry' // <-- Imported your registry
+import { templates, getTemplate } from '../../../../lib/templateRegistry'
 import '../my-website.css'
 
 // ─── EMBEDDED ICONS ───
@@ -277,6 +277,31 @@ export default function EditorTab({ businessId }) {
   // Get the actual live template component for the preview
   const PreviewTemplateComponent = getTemplate(templateId)
 
+  // SAFE DATA PASSING FOR PREVIEW
+  // This guarantees that no matter what the template expects (gallery, services, etc), it gets an array.
+  const safePreviewProps = {
+    business: { 
+      name: businessName || 'My Business', 
+      logo_url: logoUrl, 
+      phone: businessPhone, 
+      whatsapp: businessWhatsapp, 
+      email: businessEmail, 
+      location: businessAddress 
+    },
+    page: { 
+      about_text: aboutText, 
+      cover_image_url: heroImage, 
+      gallery_urls: Array.isArray(gallery) ? gallery : [], 
+      sector_data: { 
+        ...(sectorData || {}), 
+        services: Array.isArray(services) ? services : [], 
+        testimonials: Array.isArray(testimonials) ? testimonials : [], 
+        faqs: Array.isArray(faqs) ? faqs : [], 
+        business_hours: businessHours 
+      } 
+    }
+  }
+
   return (
     <div className="website-editor-page">
       
@@ -411,7 +436,7 @@ export default function EditorTab({ businessId }) {
           ))}
         </div>
 
-             {showAddService ? (
+        {showAddService ? (
           <div style={{ background: 'var(--cresoa-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--cresoa-border)' }}>
             <div className="website-form-group">
               <label className="website-label">Service Name</label>
@@ -659,14 +684,8 @@ export default function EditorTab({ businessId }) {
             
             <div className="phone-mockup" style={{ overflow: 'hidden', background: '#fff' }}>
               <div style={{ width: '100%', height: '100%', overflowY: 'auto' }}>
-                {/* 
-                  RENDER THE ACTUAL TEMPLATE COMPONENT FROM REGISTRY 
-                  We pass all the dynamic data the template needs to render
-                */}
-                <PreviewTemplateComponent 
-                  business={{ name: businessName, logo_url: logoUrl, phone: businessPhone, whatsapp: businessWhatsapp, email: businessEmail, location: businessAddress }}
-                  page={{ about_text: aboutText, cover_image_url: heroImage, gallery_urls: gallery, sector_data: { ...sectorData, services, testimonials, faqs, business_hours: businessHours } }}
-                />
+                {/* SAFE RENDER OF TEMPLATE */}
+                <PreviewTemplateComponent {...safePreviewProps} />
               </div>
             </div>
           </div>
@@ -691,4 +710,4 @@ export default function EditorTab({ businessId }) {
       )}
     </div>
   )
-                                                                                                                   }
+        }
