@@ -1,7 +1,77 @@
-/* ============================================================
-   WEBSITE EDITOR - PREMIUM UI
-   ============================================================ */
+/* app/dashboard/my-website/my-website.css */
 
+/* ── Container ── */
+.website-editor-page {
+  padding: 1.25rem;
+  padding-bottom: 120px; /* Space for footer */
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--cresoa-bg);
+  min-height: 100vh;
+}
+
+/* ── Cards & Sections ── */
+.website-card {
+  background: var(--cresoa-surface);
+  border: 1px solid var(--cresoa-border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.website-section-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--cresoa-text);
+  margin: 0 0 16px 0;
+}
+
+/* ── Form Inputs (The Fix) ── */
+.website-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.website-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cresoa-text-secondary);
+}
+
+.website-input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  color: var(--cresoa-text);
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.website-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(11, 44, 94, 0.1);
+}
+
+.website-input::placeholder {
+  color: #9CA3AF;
+}
+
+textarea.website-input {
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* ── URL Card & Actions ── */
 .website-url-card {
   background: var(--cresoa-surface-soft);
   border: 1px solid var(--cresoa-border);
@@ -11,7 +81,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .website-url-text {
@@ -33,9 +103,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   background: var(--cresoa-surface);
   border: 1px solid var(--cresoa-border);
   color: var(--cresoa-text);
@@ -48,7 +118,18 @@
   transform: scale(0.95);
 }
 
-/* Image Upload Cards */
+.edit-url-btn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* ── Image Uploads ── */
 .image-upload-card {
   border: 2px dashed var(--cresoa-border);
   border-radius: 16px;
@@ -110,7 +191,7 @@
   font-weight: 600;
 }
 
-/* Sector Gallery Grid */
+/* ── Gallery Grid ── */
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -148,7 +229,37 @@
   z-index: 10;
 }
 
-/* Preview Modal Phone */
+/* ── Form Grid ── */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Fixed Footer ── */
+.website-fixed-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--cresoa-surface);
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--cresoa-border);
+  display: flex;
+  gap: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Preview Phone Mockup ── */
 .phone-mockup {
   border: 8px solid #333;
   border-radius: 32px;
@@ -159,4 +270,4 @@
   max-width: 375px;
   margin: 0 auto;
   box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-                               }
+}
