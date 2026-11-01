@@ -6,7 +6,7 @@ import OrdersTab from './components/OrdersTab'
 import QuotesTab from './components/QuotesTab'
 import ProductsTab from './components/ProductsTab'
 import { Navigation } from '../../../components/Navigation'
-import '../../../globals.css'
+import '../../globals.css'
 
 const TABS = [
   { id: 'editor', label: 'Store Editor' },
