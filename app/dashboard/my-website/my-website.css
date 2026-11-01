@@ -271,3 +271,55 @@ textarea.website-input {
   margin: 0 auto;
   box-shadow: 0 20px 40px rgba(0,0,0,0.2);
 }
+
+/* Template Selection Grid */
+.template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.template-card {
+  border-radius: 16px;
+  border: 2px solid var(--cresoa-border);
+  background: var(--cresoa-surface);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.template-card:active {
+  transform: scale(0.98);
+}
+
+.template-card.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(11, 44, 94, 0.1);
+}
+
+.template-preview {
+  height: 80px;
+  width: 100%;
+  position: relative;
+}
+
+.template-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.template-name {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--cresoa-text);
+}
+
+.template-desc {
+  font-size: 0.75rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
