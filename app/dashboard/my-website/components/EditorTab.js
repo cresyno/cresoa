@@ -5,19 +5,21 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { compressImage } from '../../../../lib/compressImage'
 import { getSectorOnboardingFields } from '../../../../lib/sector-config'
+import { templates, getTemplate } from '../../../../lib/templateRegistry' // <-- Imported your registry
 import '../my-website.css'
 
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
   Save: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>,
   Eye: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
-  Plus: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+  Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
   Image: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>,
   Copy: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>,
   Share: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>,
   Check: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
   X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
-  Google: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+  Google: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>,
+  Trash: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
 }
 
 export default function EditorTab({ businessId }) {
@@ -35,11 +37,28 @@ export default function EditorTab({ businessId }) {
   const [heroImage, setHeroImage] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [isEnabled, setIsEnabled] = useState(false)
+  const [businessName, setBusinessName] = useState('')
   
-  // Dynamic Sector Data & Gallery
+  // Dynamic Data
   const [sectorData, setSectorData] = useState({})
   const [gallery, setGallery] = useState([])
   
+  // Structured Data
+  const [services, setServices] = useState([])
+  const [testimonials, setTestimonials] = useState([])
+  const [faqs, setFaqs] = useState([])
+  const [businessHours, setBusinessHours] = useState('')
+
+  // Input states for adding new items
+  const [newService, setNewService] = useState({ name: '', price: '', desc: '' })
+  const [showAddService, setShowAddService] = useState(false)
+  
+  const [newTestimonial, setNewTestimonial] = useState({ name: '', text: '' })
+  const [showAddTestimonial, setShowAddTestimonial] = useState(false)
+
+  const [newFaq, setNewFaq] = useState({ q: '', a: '' })
+  const [showAddFaq, setShowAddFaq] = useState(false)
+
   // Contact Info
   const [businessPhone, setBusinessPhone] = useState('')
   const [businessWhatsapp, setBusinessWhatsapp] = useState('')
@@ -69,6 +88,7 @@ export default function EditorTab({ businessId }) {
       try {
         const { data: biz } = await supabase.from('businesses').select('*').eq('id', businessId).single()
         if (biz) {
+          setBusinessName(biz.name || 'My Business')
           setSector(biz.sector || biz.business_type || 'fashion')
           setLogoUrl(biz.logo_url || '')
           setBusinessPhone(biz.phone || '')
@@ -85,12 +105,18 @@ export default function EditorTab({ businessId }) {
           setAboutText(page.about_text || '')
           setHeroImage(page.cover_image_url || '')
           setIsEnabled(page.is_enabled || false)
-          setSectorData(page.sector_data || {})
+          
+          const data = page.sector_data || {}
+          setSectorData(data)
           setGallery(page.gallery_urls || [])
+          setServices(data.services || [])
+          setTestimonials(data.testimonials || [])
+          setFaqs(data.faqs || [])
+          setBusinessHours(data.business_hours || '')
+
           setPublicUrl(`${window.location.origin}/${page.slug}`)
         }
 
-        // Check SEO Request Status
         const { data: seo } = await supabase.from('seo_requests').select('id').eq('business_id', businessId).eq('status', 'pending').maybeSingle()
         if (seo) setSeoRequested(true)
 
@@ -115,6 +141,14 @@ export default function EditorTab({ businessId }) {
         logo_url: logoUrl
       }).eq('id', businessId)
 
+      const updatedSectorData = {
+        ...sectorData,
+        services,
+        testimonials,
+        faqs,
+        business_hours: businessHours
+      }
+
       const { error } = await supabase.from('business_public_pages').upsert({
         business_id: businessId,
         slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ''),
@@ -122,7 +156,7 @@ export default function EditorTab({ businessId }) {
         about_text: aboutText,
         cover_image_url: heroImage,
         is_enabled: isEnabled,
-        sector_data: sectorData,
+        sector_data: updatedSectorData,
         gallery_urls: gallery
       }, { onConflict: 'business_id' })
       
@@ -197,6 +231,28 @@ export default function EditorTab({ businessId }) {
     }
   }
 
+  // ── Dynamic List Handlers ──
+  const handleAddService = () => {
+    if (!newService.name) return
+    setServices([...services, newService])
+    setNewService({ name: '', price: '', desc: '' })
+    setShowAddService(false)
+  }
+
+  const handleAddTestimonial = () => {
+    if (!newTestimonial.name || !newTestimonial.text) return
+    setTestimonials([...testimonials, newTestimonial])
+    setNewTestimonial({ name: '', text: '' })
+    setShowAddTestimonial(false)
+  }
+
+  const handleAddFaq = () => {
+    if (!newFaq.q || !newFaq.a) return
+    setFaqs([...faqs, newFaq])
+    setNewFaq({ q: '', a: '' })
+    setShowAddFaq(false)
+  }
+
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
 
   if (!hasWebsite) {
@@ -217,6 +273,9 @@ export default function EditorTab({ businessId }) {
   }
 
   const sectorFields = getSectorOnboardingFields(sector) || []
+  
+  // Get the actual live template component for the preview
+  const PreviewTemplateComponent = getTemplate(templateId)
 
   return (
     <div className="website-editor-page">
@@ -298,7 +357,28 @@ export default function EditorTab({ businessId }) {
         </div>
       </div>
 
-      {/* 2. ABOUT */}
+      {/* 2. TEMPLATE SELECTION (VISUAL) */}
+      <div className="website-card">
+        <h3 className="website-section-title">Website Style</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>Choose the overall look and feel of your website.</p>
+        <div className="template-grid">
+          {templates.map(tpl => (
+            <div
+              key={tpl.id}
+              className={`template-card ${templateId === tpl.id ? 'active' : ''}`}
+              onClick={() => setTemplateId(tpl.id)}
+            >
+              <div className="template-preview" style={{ background: tpl.preview }} />
+              <div className="template-info">
+                <span className="template-name">{tpl.name}</span>
+                <span className="template-desc">{tpl.description}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. ABOUT */}
       <div className="website-card">
         <h3 className="website-section-title">About Your Business</h3>
         <div className="website-form-group" style={{ marginBottom: 0 }}>
@@ -312,10 +392,140 @@ export default function EditorTab({ businessId }) {
         </div>
       </div>
 
-      {/* 3. SECTOR SPECIFICS */}
+      {/* 4. SERVICES & PRICING */}
+      <div className="website-card">
+        <h3 className="website-section-title">Services & Pricing</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>What do you offer? Adding services helps customers know exactly what to ask you for.</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1rem' }}>
+          {services.map((srv, idx) => (
+            <div key={idx} style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{srv.name} {srv.price && <span style={{ color: 'var(--color-primary)' }}> - ₦{Number(srv.price).toLocaleString()}</span>}</div>
+                {srv.desc && <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginTop: '4px' }}>{srv.desc}</div>}
+              </div>
+              <button type="button" onClick={() => setServices(services.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '4px' }}>
+                <SvgIcons.Trash />
+              </button>
+            </div>
+          ))}
+        </div>
+
+             {showAddService ? (
+          <div style={{ background: 'var(--cresoa-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--cresoa-border)' }}>
+            <div className="website-form-group">
+              <label className="website-label">Service Name</label>
+              <input type="text" className="website-input" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} placeholder="e.g. Custom Senator" />
+            </div>
+            <div className="website-form-group">
+              <label className="website-label">Starting Price (Optional)</label>
+              <input type="number" className="website-input" value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} placeholder="e.g. 35000" />
+            </div>
+            <div className="website-form-group">
+              <label className="website-label">Short Description (Optional)</label>
+              <input type="text" className="website-input" value={newService.desc} onChange={e => setNewService({...newService, desc: e.target.value})} placeholder="e.g. Includes fabric and tailoring" />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" onClick={() => setShowAddService(false)} className="order-btn-secondary" style={{ flex: 1, padding: '10px' }}>Cancel</button>
+              <button type="button" onClick={handleAddService} className="cresoa-primary-button" style={{ flex: 1, padding: '10px' }}>Save Service</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setShowAddService(true)} className="wizard-add-btn" style={{ padding: '16px', borderRadius: '12px' }}>
+            <SvgIcons.Plus />
+            <span>Add a Service</span>
+          </button>
+        )}
+      </div>
+
+      {/* 5. TESTIMONIALS */}
+      <div className="website-card">
+        <h3 className="website-section-title">Customer Testimonials</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>Nothing builds trust like real reviews. Add what your happy customers have said.</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1rem' }}>
+          {testimonials.map((t, idx) => (
+            <div key={idx} style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>"{t.text}"</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)', marginTop: '4px' }}>- {t.name}</div>
+              </div>
+              <button type="button" onClick={() => setTestimonials(testimonials.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '4px' }}>
+                <SvgIcons.Trash />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {showAddTestimonial ? (
+          <div style={{ background: 'var(--cresoa-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--cresoa-border)' }}>
+            <div className="website-form-group">
+              <label className="website-label">Customer Name</label>
+              <input type="text" className="website-input" value={newTestimonial.name} onChange={e => setNewTestimonial({...newTestimonial, name: e.target.value})} placeholder="e.g. Amaka Okafor" />
+            </div>
+            <div className="website-form-group">
+              <label className="website-label">Review</label>
+              <textarea className="website-input" value={newTestimonial.text} onChange={e => setNewTestimonial({...newTestimonial, text: e.target.value})} placeholder="e.g. The best tailor in Lagos! My dress was perfect." rows={2} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" onClick={() => setShowAddTestimonial(false)} className="order-btn-secondary" style={{ flex: 1, padding: '10px' }}>Cancel</button>
+              <button type="button" onClick={handleAddTestimonial} className="cresoa-primary-button" style={{ flex: 1, padding: '10px' }}>Save Review</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setShowAddTestimonial(true)} className="wizard-add-btn" style={{ padding: '16px', borderRadius: '12px' }}>
+            <SvgIcons.Plus />
+            <span>Add a Testimonial</span>
+          </button>
+        )}
+      </div>
+
+      {/* 6. FAQS */}
+      <div className="website-card">
+        <h3 className="website-section-title">Frequently Asked Questions</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>Answer common questions so you don't have to repeat yourself on WhatsApp.</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1rem' }}>
+          {faqs.map((faq, idx) => (
+            <div key={idx} style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{faq.q}</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginTop: '4px' }}>{faq.a}</div>
+              </div>
+              <button type="button" onClick={() => setFaqs(faqs.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: '4px' }}>
+                <SvgIcons.Trash />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {showAddFaq ? (
+          <div style={{ background: 'var(--cresoa-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--cresoa-border)' }}>
+            <div className="website-form-group">
+              <label className="website-label">Question</label>
+              <input type="text" className="website-input" value={newFaq.q} onChange={e => setNewFaq({...newFaq, q: e.target.value})} placeholder="e.g. Do you deliver nationwide?" />
+            </div>
+            <div className="website-form-group">
+              <label className="website-label">Answer</label>
+              <textarea className="website-input" value={newFaq.a} onChange={e => setNewFaq({...newFaq, a: e.target.value})} placeholder="e.g. Yes, we deliver via GIG Logistics." rows={2} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" onClick={() => setShowAddFaq(false)} className="order-btn-secondary" style={{ flex: 1, padding: '10px' }}>Cancel</button>
+              <button type="button" onClick={handleAddFaq} className="cresoa-primary-button" style={{ flex: 1, padding: '10px' }}>Save FAQ</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setShowAddFaq(true)} className="wizard-add-btn" style={{ padding: '16px', borderRadius: '12px' }}>
+            <SvgIcons.Plus />
+            <span>Add an FAQ</span>
+          </button>
+        )}
+      </div>
+
+      {/* 7. SECTOR SPECIFICS */}
       {sectorFields.length > 0 && (
         <div className="website-card">
-          <h3 className="website-section-title" style={{ textTransform: 'capitalize' }}>{sector} Features</h3>
+          <h3 className="website-section-title" style={{ textTransform: 'capitalize' }}>{sector} Portfolio</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {sectorFields.map(field => (
               <div key={field.id} className="website-form-group" style={{ marginBottom: 0 }}>
@@ -368,9 +578,9 @@ export default function EditorTab({ businessId }) {
         </div>
       )}
 
-      {/* 4. CONTACT */}
+      {/* 8. CONTACT & HOURS */}
       <div className="website-card">
-        <h3 className="website-section-title">Contact Information</h3>
+        <h3 className="website-section-title">Contact & Hours</h3>
         <div className="form-grid-2">
           <div className="website-form-group">
             <label className="website-label">Phone Number</label>
@@ -389,9 +599,13 @@ export default function EditorTab({ businessId }) {
             <input type="text" className="website-input" value={businessAddress} onChange={e => setBusinessAddress(e.target.value)} placeholder="Enter physical address" />
           </div>
         </div>
+        <div className="website-form-group" style={{ marginTop: '16px', marginBottom: 0 }}>
+          <label className="website-label">Business Hours</label>
+          <input type="text" className="website-input" value={businessHours} onChange={e => setBusinessHours(e.target.value)} placeholder="e.g. Mon-Fri: 9am - 6pm, Sat: 10am - 4pm" />
+        </div>
       </div>
 
-      {/* 5. SEO BOOST */}
+      {/* 9. SEO BOOST */}
       <div className="website-card">
         <h3 className="website-section-title">Search Engine Visibility</h3>
         <p style={{ fontSize: '0.9rem', color: 'var(--cresoa-text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
@@ -419,7 +633,7 @@ export default function EditorTab({ businessId }) {
         </div>
       </div>
 
-      {/* 6. STATUS */}
+      {/* 10. STATUS */}
       <div className="website-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 className="website-section-title" style={{ marginBottom: '4px' }}>Website Status</h3>
@@ -443,21 +657,16 @@ export default function EditorTab({ businessId }) {
               </button>
             </div>
             
-            <div className="phone-mockup">
+            <div className="phone-mockup" style={{ overflow: 'hidden', background: '#fff' }}>
               <div style={{ width: '100%', height: '100%', overflowY: 'auto' }}>
-                <div style={{ padding: '4rem 2rem', textAlign: 'center', background: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.8)), url(${heroImage || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&q=80'}) center/cover`, color: '#fff', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  {logoUrl && <img src={logoUrl} style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 1rem', border: '2px solid #fff' }} alt="Logo" />}
-                  <h1 style={{ margin: 0, fontSize: '2rem', fontFamily: 'serif' }}>{aboutText.split('.')[0] || 'Your Business'}</h1>
-                  <p style={{ opacity: 0.9, marginTop: '0.5rem', fontSize: '0.85rem' }}>{businessAddress}</p>
-                </div>
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#333' }}>
-                  <p style={{ lineHeight: 1.6, fontSize: '0.9rem' }}>{aboutText || 'Your business story will appear here.'}</p>
-                  <div style={{ marginTop: '1.5rem' }}>
-                    <span style={{ background: '#25D366', color: '#fff', padding: '0.75rem 1.5rem', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                      Chat on WhatsApp
-                    </span>
-                  </div>
-                </div>
+                {/* 
+                  RENDER THE ACTUAL TEMPLATE COMPONENT FROM REGISTRY 
+                  We pass all the dynamic data the template needs to render
+                */}
+                <PreviewTemplateComponent 
+                  business={{ name: businessName, logo_url: logoUrl, phone: businessPhone, whatsapp: businessWhatsapp, email: businessEmail, location: businessAddress }}
+                  page={{ about_text: aboutText, cover_image_url: heroImage, gallery_urls: gallery, sector_data: { ...sectorData, services, testimonials, faqs, business_hours: businessHours } }}
+                />
               </div>
             </div>
           </div>
@@ -482,4 +691,4 @@ export default function EditorTab({ businessId }) {
       )}
     </div>
   )
-                                                                }
+                                                                                                                   }
