@@ -28,19 +28,39 @@ export default function AdminSeoPage() {
       if (user?.email === 'taiwoabraham640@gmail.com') {
         setAuthorized(true)
         
-        // Fetch pending SEO requests with business details and slugs
-        const { data } = await supabase
+        // Step 1: Fetch pending requests and business names
+        const { data: reqData } = await supabase
           .from('seo_requests')
           .select(`
             id, 
             status, 
             created_at,
-            businesses ( name, business_public_pages ( slug ) )
+            business_id,
+            businesses ( name )
           `)
           .eq('status', 'pending')
           .order('created_at', { ascending: true })
         
-        setRequests(data || [])
+        if (reqData && reqData.length > 0) {
+          // Step 2: Fetch the slugs for those specific business IDs
+          const bizIds = reqData.map(r => r.business_id)
+          const { data: pageData } = await supabase
+            .from('business_public_pages')
+            .select('business_id, slug')
+            .in('business_id', bizIds)
+
+          // Step 3: Merge the slug into the request data
+          const mergedData = reqData.map(req => {
+            const page = pageData?.find(p => p.business_id === req.business_id)
+            return {
+              ...req,
+              slug: page?.slug || ''
+            }
+          })
+          setRequests(mergedData)
+        } else {
+          setRequests([])
+        }
       }
       setLoading(false)
     }
@@ -55,7 +75,6 @@ export default function AdminSeoPage() {
 
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
 
-  // ─── UNAUTHORIZED SCREEN ───
   if (!authorized) {
     return (
       <div className="order-page-error" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -68,7 +87,6 @@ export default function AdminSeoPage() {
     )
   }
 
-  // ─── AUTHORIZED ADMIN VIEW ───
   return (
     <div className="orders-page">
       {businessId && <Navigation businessId={businessId} />}
@@ -89,9 +107,7 @@ export default function AdminSeoPage() {
         <div className="orders-list">
           {requests.map(req => {
             const bizName = req.businesses?.name || 'Unknown Business'
-            // Handles the case where a business might not have a public page yet
-            const slug = req.businesses?.business_public_pages?.[0]?.slug || ''
-            const url = slug ? `https://www.cresoa.com.ng/${slug}` : 'No URL set'
+            const url = req.slug ? `https://www.cresoa.com.ng/${req.slug}` : 'No public URL found'
 
             return (
               <div key={req.id} className="cresoa-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -106,14 +122,20 @@ export default function AdminSeoPage() {
                   <span style={{ padding: '4px 8px', borderRadius: '4px', background: 'var(--color-accent-soft)', color: 'var(--color-accent)', fontSize: '0.7rem', fontWeight: 700 }}>Pending</span>
                 </div>
 
-                <div style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', wordBreak: 'break-all' }}>
+                <div style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', wordBreak: 'break-all', fontWeight: 600 }}>
                   {url}
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <a href={`https://search.google.com/search-console?resource_id=${encodeURIComponent(url)}`} target="_blank" rel="noreferrer" className="cresoa-primary-button" style={{ flex: 1, textDecoration: 'none', padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center' }}>
-                    Open Search Console
-                  </a>
+                  {req.slug ? (
+                    <a href={`https://search.google.com/search-console?resource_id=${encodeURIComponent(url)}`} target="_blank" rel="noreferrer" className="cresoa-primary-button" style={{ flex: 1, textDecoration: 'none', padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center' }}>
+                      Open Search Console
+                    </a>
+                  ) : (
+                    <button disabled className="cresoa-primary-button" style={{ flex: 1, padding: '10px', fontSize: '0.8rem', opacity: 0.5 }}>
+                      No URL to submit
+                    </button>
+                  )}
                   <button onClick={() => markAsDone(req.id)} className="order-btn-secondary" style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }}>
                     Mark Done
                   </button>
@@ -128,4 +150,4 @@ export default function AdminSeoPage() {
       {toastMessage && <div className="app-toast success">{toastMessage}</div>}
     </div>
   )
-    }
+  }
