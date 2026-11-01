@@ -107,7 +107,12 @@ export default function AdminSeoPage() {
         <div className="orders-list">
           {requests.map(req => {
             const bizName = req.businesses?.name || 'Unknown Business'
-            const url = req.slug ? `https://www.cresoa.com.ng/${req.slug}` : 'No public URL found'
+            const url = req.slug ? `https://www.cresoa.com.ng/${req.slug}` : ''
+            
+            // The correct deep-link to inspect a specific URL on a domain property
+            const inspectUrl = url 
+              ? `https://search.google.com/search-console/inspect?resource_id=sc-domain:cresoa.com.ng&id=${encodeURIComponent(url)}`
+              : '#'
 
             return (
               <div key={req.id} className="cresoa-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -123,13 +128,19 @@ export default function AdminSeoPage() {
                 </div>
 
                 <div style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', fontSize: '0.85rem', wordBreak: 'break-all', fontWeight: 600 }}>
-                  {url}
+                  {url || 'No public URL found'}
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  {req.slug ? (
-                    <a href={`https://search.google.com/search-console?resource_id=${encodeURIComponent(url)}`} target="_blank" rel="noreferrer" className="cresoa-primary-button" style={{ flex: 1, textDecoration: 'none', padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center' }}>
-                      Open Search Console
+                  {url ? (
+                    <a 
+                      href={inspectUrl} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="cresoa-primary-button" 
+                      style={{ flex: 1, textDecoration: 'none', padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center' }}
+                    >
+                      Open URL Inspection
                     </a>
                   ) : (
                     <button disabled className="cresoa-primary-button" style={{ flex: 1, padding: '10px', fontSize: '0.8rem', opacity: 0.5 }}>
@@ -150,4 +161,4 @@ export default function AdminSeoPage() {
       {toastMessage && <div className="app-toast success">{toastMessage}</div>}
     </div>
   )
-  }
+    }
