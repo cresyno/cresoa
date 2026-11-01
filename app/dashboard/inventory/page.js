@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'
-import '../../globals.css'
+import '../../../globals.css'
 
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
@@ -48,16 +48,19 @@ export default function InventoryPage() {
     setTimeout(() => setToastMessage(''), 3000)
   }
 
-  // Close category dropdown on click outside
+  // Close dropdowns and cancel edit on outside click
   useEffect(() => {
     function handleClickOutside(event) {
       if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target)) {
         setShowCategoryMenu(false)
       }
+      if (editingItemId && qtyWrapperRef.current && !qtyWrapperRef.current.contains(event.target)) {
+        setEditingItemId(null)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [editingItemId])
 
   // Fetch Inventory
   useEffect(() => {
@@ -110,10 +113,9 @@ export default function InventoryPage() {
 
   // Inline Quantity Editor Handlers
   const handleQtyClick = (e, item) => {
-    e.stopPropagation() // Prevent navigation to edit page
+    e.stopPropagation()
     setEditingItemId(item.id)
     setTempQuantity(String(item.quantity_on_hand || 0))
-    // Wait for input to render, then focus
     setTimeout(() => {
       if (qtyInputRef.current) {
         qtyInputRef.current.focus()
@@ -122,15 +124,10 @@ export default function InventoryPage() {
     }, 50)
   }
 
-  const handleQtyBlur = (e, item) => {
-    // If the click was on the save button, let the save handler take over
-    if (e.relatedTarget && e.relatedTarget.id === `save-qty-${item.id}`) return
-    // Otherwise, cancel editing and revert
-    setEditingItemId(null)
-  }
-
   const handleSaveQty = async (e, item) => {
     e.stopPropagation()
+    e.preventDefault()
+    
     const newQty = parseInt(tempQuantity, 10)
     
     if (isNaN(newQty) || newQty < 0) {
@@ -144,7 +141,6 @@ export default function InventoryPage() {
       return
     }
 
-    // Optimistic Update
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity_on_hand: newQty } : i))
     setEditingItemId(null)
     showToast('Stock updated')
@@ -157,7 +153,6 @@ export default function InventoryPage() {
       
       if (error) throw error
     } catch (err) {
-      // Revert on failure
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity_on_hand: item.quantity_on_hand } : i))
       showToast('Failed to update stock', 'error')
     }
@@ -171,7 +166,6 @@ export default function InventoryPage() {
     }
   }
 
-  // ─── Loading State ───
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
 
   return (
@@ -232,14 +226,12 @@ export default function InventoryPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {/* SMART TABS */}
           <div className="smart-tabs-container" style={{ marginBottom: 0, flex: 1 }}>
             <button className={`smart-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All</button>
             <button className={`smart-tab ${filter === 'low' ? 'active' : ''}`} onClick={() => setFilter('low')}>Low Stock</button>
             <button className={`smart-tab ${filter === 'out' ? 'active' : ''}`} onClick={() => setFilter('out')}>Out of Stock</button>
           </div>
 
-          {/* CATEGORY DROPDOWN */}
           <div className="custom-dropdown-wrapper" ref={categoryMenuRef} style={{ width: 'auto' }}>
             <button 
               className="custom-dropdown-btn" 
@@ -298,7 +290,6 @@ export default function InventoryPage() {
                 onClick={() => { if (!isEditing) router.push(`/dashboard/inventory/${item.id}/edit?business_id=${businessId}`) }}
               >
                 
-                {/* Left Side: Info */}
                 <div className="inventory-card-left">
                   <div className="inventory-thumb">
                     {item.image_url ? (
@@ -318,13 +309,12 @@ export default function InventoryPage() {
                   </div>
                 </div>
 
-                {/* Right Side: Inline Quantity Editor */}
                 <div className="inventory-card-right">
                   {isEditing ? (
                     <div 
                       className="inline-qty-editor" 
-                      onClick={e => e.stopPropagation()} 
-                      onBlur={e => handleQtyBlur(e, item)}
+                      ref={qtyWrapperRef}
+                      onClick={e => e.stopPropagation()}
                     >
                       <input
                         ref={qtyInputRef}
@@ -370,7 +360,6 @@ export default function InventoryPage() {
           {toastMessage}
         </div>
       )}
-
     </div>
   )
     }
