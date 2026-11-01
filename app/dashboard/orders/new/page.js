@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
-import { Navigation } from '../../../../components/Navigation'
 import { MeasurementForm } from '../../../../components/MeasurementForm'
 import '../../../globals.css'
 
@@ -40,15 +39,10 @@ const CATEGORIES = ['Senator', 'Agbada', 'Kaftan', 'Native wear', 'Suit', 'Dress
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
   ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
-  ArrowRight: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>,
   Search: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>,
   X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
   ChevronDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>,
   User: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
-  Scissors: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><line x1="8.5" y1="8.5" x2="15.5" y2="15.5" /><line x1="15.5" y1="8.5" x2="8.5" y2="15.5" /></svg>,
-  Ruler: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.3 15.3l-2.6 2.6a1 1 0 0 1-1.4 0l-2.1-2.1-2.1 2.1a1 1 0 0 1-1.4 0l-2.1-2.1-2.1 2.1a1 1 0 0 1-1.4 0l-2.6-2.6a1 1 0 0 1 0-1.4l9.9-9.9a1 1 0 0 1 1.4 0l6.5 6.5a1 1 0 0 1 0 1.4z" /></svg>,
-  Calendar: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
-  Check: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
   CheckCircle: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
   Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
 }
@@ -70,6 +64,14 @@ export default function NewOrderPage() {
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
   const [customerSearch, setCustomerSearch] = useState('')
+  
+  // Quick Add Customer State
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const [newCustName, setNewCustName] = useState('')
+  const [newCustPhone, setNewCustPhone] = useState('')
+  const [savingCustomer, setSavingCustomer] = useState(false)
+
+  // Custom UI State
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', onConfirm: null })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
@@ -127,6 +129,53 @@ export default function NewOrderPage() {
     }))
     setShowCustomerModal(false)
     setCustomerSearch('')
+    setIsCreatingCustomer(false) // Reset modal view
+  }
+
+  const handleQuickAddCustomer = async () => {
+    if (!newCustName.trim() || !newCustPhone.trim()) {
+      showToast('Name and phone number are required.', 'error')
+      return
+    }
+    setSavingCustomer(true)
+    try {
+      const names = newCustName.trim().split(/\s+/)
+      const firstName = names.shift() || ''
+      const lastName = names.join(' ') || firstName
+
+      const { data: newCustomer, error } = await supabase
+        .from('customers')
+        .insert({
+          business_id: businessId,
+          first_name: firstName,
+          last_name: lastName,
+          name: newCustName.trim(),
+          phone: newCustPhone.trim(),
+        })
+        .select('*')
+        .single()
+      
+      if (error) throw error
+
+      // Add to local state so it appears in the list immediately
+      const formattedCustomer = {
+        ...newCustomer,
+        name: newCustomer.name || newCustName.trim()
+      }
+      setCustomers(prev => [formattedCustomer, ...prev])
+      
+      // Automatically select the new customer and close modal
+      handleCustomerSelect(formattedCustomer)
+      showToast('Customer created and selected')
+      
+      // Reset fields
+      setNewCustName('')
+      setNewCustPhone('')
+    } catch (err) {
+      showToast('Failed to create customer.', 'error')
+    } finally {
+      setSavingCustomer(false)
+    }
   }
 
   const validateStep = () => {
@@ -164,20 +213,6 @@ export default function NewOrderPage() {
         setSaving(true)
         try {
           let customerId = formData.customer_id
-          
-          // Create new customer if needed
-          if (!customerId) {
-            const names = formData.customer_name.trim().split(/\s+/)
-            const firstName = names.shift() || ''
-            const lastName = names.join(' ') || firstName
-            
-            const { data: newCustomer, error: custError } = await supabase
-              .from('customers')
-              .insert({ business_id: businessId, first_name: firstName, last_name: lastName, name: formData.customer_name.trim(), phone: formData.customer_phone.trim() || null, email: formData.customer_email.trim() || null, measurements: formData.measurements || {} })
-              .select('id').single()
-            if (custError) throw custError
-            customerId = newCustomer.id
-          }
 
           const orderPayload = {
             business_id: businessId,
@@ -426,40 +461,97 @@ export default function NewOrderPage() {
         )}
       </div>
 
-      {/* ─── CUSTOMER SELECTOR MODAL ─── */}
+      {/* ─── CUSTOMER SELECTOR MODAL (Dual View) ─── */}
       {showCustomerModal && (
-        <div className="app-modal-overlay" onClick={() => setShowCustomerModal(false)}>
+        <div className="app-modal-overlay" onClick={() => { setShowCustomerModal(false); setIsCreatingCustomer(false); }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
+            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Select Customer</h2>
-              <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isCreatingCustomer && (
+                  <button onClick={() => setIsCreatingCustomer(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text)', padding: 0 }}>
+                    <SvgIcons.ArrowLeft />
+                  </button>
+                )}
+                <h2 style={{ fontSize: '1.2rem', margin: 0 }}>
+                  {isCreatingCustomer ? 'New Customer' : 'Select Customer'}
+                </h2>
+              </div>
+              <button onClick={() => { setShowCustomerModal(false); setIsCreatingCustomer(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
             </div>
 
-            <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
-              <span className="search-icon"><SvgIcons.Search /></span>
-              <input type="text" className="orders-search-input" placeholder="Search by name or phone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} autoFocus />
-            </div>
+            {isCreatingCustomer ? (
+              // ─── QUICK ADD FORM ───
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 20px 0' }}>
+                  Add basic details now. You can add measurements and full contact info later.
+                </p>
 
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {filteredCustomers.map(c => (
-                <div key={c.id} onClick={() => handleCustomerSelect(c)} className="member-dense-row" style={{ padding: '12px', marginBottom: '8px', border: '1px solid var(--cresoa-border)', borderRadius: '10px' }}>
-                  <div className="member-avatar">{c.name?.charAt(0).toUpperCase()}</div>
-                  <div className="member-info">
-                    <span className="member-name">{c.name}</span>
-                    <span className="member-item">{c.phone || 'No phone number'}</span>
-                  </div>
+                <div className="form-group">
+                  <label className="order-label">Full Name *</label>
+                  <input 
+                    type="text" 
+                    className="order-input" 
+                    placeholder="Enter customer's full name" 
+                    value={newCustName} 
+                    onChange={e => setNewCustName(e.target.value)} 
+                    autoFocus
+                  />
                 </div>
-              ))}
-            </div>
 
-            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
-              <button onClick={() => {
-                setFormData(prev => ({ ...prev, customer_id: '', customer_name: '', customer_phone: '' }))
-                setShowCustomerModal(false)
-              }} className="cresoa-primary-button full-width" style={{ padding: '14px', background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text)' }}>
-                <SvgIcons.Plus /> Create New Customer
-              </button>
-            </div>
+                <div className="form-group">
+                  <label className="order-label">Phone Number *</label>
+                  <input 
+                    type="tel" 
+                    className="order-input" 
+                    placeholder="Enter phone number" 
+                    value={newCustPhone} 
+                    onChange={e => setNewCustPhone(e.target.value)} 
+                  />
+                </div>
+
+                <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+                  <button 
+                    onClick={handleQuickAddCustomer} 
+                    disabled={savingCustomer} 
+                    className="cresoa-primary-button full-width" 
+                    style={{ padding: '14px' }}
+                  >
+                    {savingCustomer ? 'Saving...' : 'Save & Select Customer'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // ─── EXISTING LIST VIEW ───
+              <>
+                <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
+                  <span className="search-icon"><SvgIcons.Search /></span>
+                  <input type="text" className="orders-search-input" placeholder="Search by name or phone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} autoFocus />
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {filteredCustomers.map(c => (
+                    <div key={c.id} onClick={() => handleCustomerSelect(c)} className="member-dense-row" style={{ padding: '12px', marginBottom: '8px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', cursor: 'pointer' }}>
+                      <div className="member-avatar">{c.name?.charAt(0).toUpperCase()}</div>
+                      <div className="member-info">
+                        <span className="member-name">{c.name}</span>
+                        <span className="member-item">{c.phone || 'No phone number'}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredCustomers.length === 0 && (
+                    <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', marginTop: '20px' }}>No customers found.</p>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
+                  <button onClick={() => setIsCreatingCustomer(true)} className="cresoa-primary-button full-width" style={{ padding: '14px', background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text)' }}>
+                    <SvgIcons.Plus /> Create New Customer
+                  </button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}
@@ -487,4 +579,4 @@ export default function NewOrderPage() {
 
     </div>
   )
-          }
+                }
