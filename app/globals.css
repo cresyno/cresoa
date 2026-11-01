@@ -4432,3 +4432,60 @@ div[style*="conic-gradient"],
   font-weight: 500;
   color: var(--cresoa-text-muted);
      }
+
+/* ============================================================
+   NEW ORDER - IMPORT MEASUREMENTS BUTTON
+   ============================================================ */
+
+.import-meas-btn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px;
+  background: var(--cresoa-surface);
+  border: 1px solid var(--color-secondary); /* Green border */
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  margin-bottom: 16px;
+}
+
+.import-meas-btn:active {
+  transform: scale(0.98);
+  background: var(--cresoa-surface-soft);
+}
+
+.import-meas-btn svg {
+  width: 24px !important;
+  height: 24px !important;
+  flex-shrink: 0;
+  color: var(--color-secondary); /* Green icon */
+}
+
+.import-meas-btn > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.import-meas-btn span:first-child {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--cresoa-text);
+}
+
+.import-meas-btn span:last-child {
+  font-size: 0.8rem;
+  color: var(--cresoa-text-muted);
+  font-weight: 500;
+}
+
+/* Fix the input focus ring inside the Measurement Form */
+.measurement-field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(11, 44, 94, 0.1);
+}
