@@ -323,3 +323,15 @@ textarea.website-input {
   color: var(--cresoa-text-muted);
   font-weight: 500;
 }
+
+.phone-mockup {
+  border: 8px solid #333;
+  border-radius: 32px;
+  overflow: hidden;
+  background: #fff; /* Changed from grey to white */
+  height: 600px;
+  position: relative;
+  max-width: 375px;
+  margin: 0 auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
