@@ -119,17 +119,18 @@ export default function NewOrderPage() {
   const updateField = (name, value) => setFormData(prev => ({ ...prev, [name]: value }))
 
   const handleCustomerSelect = (customer) => {
+    // THIS IS WHERE EXISTING MEASUREMENTS ARE LOADED
     setFormData(prev => ({
       ...prev,
       customer_id: customer.id,
       customer_name: customer.name,
       customer_phone: customer.phone || '',
       customer_email: customer.email || '',
-      measurements: customer.measurements || {}
+      measurements: customer.measurements || {} // Loads measurements automatically!
     }))
     setShowCustomerModal(false)
     setCustomerSearch('')
-    setIsCreatingCustomer(false) // Reset modal view
+    setIsCreatingCustomer(false)
   }
 
   const handleQuickAddCustomer = async () => {
@@ -157,18 +158,15 @@ export default function NewOrderPage() {
       
       if (error) throw error
 
-      // Add to local state so it appears in the list immediately
       const formattedCustomer = {
         ...newCustomer,
         name: newCustomer.name || newCustName.trim()
       }
       setCustomers(prev => [formattedCustomer, ...prev])
       
-      // Automatically select the new customer and close modal
       handleCustomerSelect(formattedCustomer)
       showToast('Customer created and selected')
       
-      // Reset fields
       setNewCustName('')
       setNewCustPhone('')
     } catch (err) {
@@ -200,7 +198,7 @@ export default function NewOrderPage() {
 
   const handleBack = () => setStep(prev => Math.max(prev - 1, 1))
 
-  // ─── Submit ───
+  // ─── Submit (UPDATED TO SYNC MEASUREMENTS) ───
   const promptSubmit = () => {
     if (!validateStep()) return
     setModalConfig({
@@ -214,6 +212,16 @@ export default function NewOrderPage() {
         try {
           let customerId = formData.customer_id
 
+          // 1. UPDATE CUSTOMER MEASUREMENTS
+          // If measurements were entered/changed, sync them to the customer's profile
+          if (customerId && Object.keys(formData.measurements).length > 0) {
+            await supabase
+              .from('customers')
+              .update({ measurements: formData.measurements })
+              .eq('id', customerId)
+          }
+
+          // 2. CREATE ORDER
           const orderPayload = {
             business_id: businessId,
             customer_id: customerId,
@@ -405,7 +413,7 @@ export default function NewOrderPage() {
         )}
 
         {/* STEP 5: REVIEW */}
-              {step === 5 && (
+             {step === 5 && (
           <div className="wizard-step">
             <h2 className="wizard-title">Review Order</h2>
             <p className="wizard-subtitle">Confirm the details before creating the order.</p>
@@ -461,7 +469,7 @@ export default function NewOrderPage() {
         )}
       </div>
 
-      {/* ─── CUSTOMER SELECTOR MODAL (Dual View) ─── */}
+      {/* ─── CUSTOMER SELECTOR MODAL ─── */}
       {showCustomerModal && (
         <div className="app-modal-overlay" onClick={() => { setShowCustomerModal(false); setIsCreatingCustomer(false); }}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
@@ -481,7 +489,6 @@ export default function NewOrderPage() {
             </div>
 
             {isCreatingCustomer ? (
-              // ─── QUICK ADD FORM ───
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                 <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 20px 0' }}>
                   Add basic details now. You can add measurements and full contact info later.
@@ -489,40 +496,21 @@ export default function NewOrderPage() {
 
                 <div className="form-group">
                   <label className="order-label">Full Name *</label>
-                  <input 
-                    type="text" 
-                    className="order-input" 
-                    placeholder="Enter customer's full name" 
-                    value={newCustName} 
-                    onChange={e => setNewCustName(e.target.value)} 
-                    autoFocus
-                  />
+                  <input type="text" className="order-input" placeholder="Enter customer's full name" value={newCustName} onChange={e => setNewCustName(e.target.value)} autoFocus />
                 </div>
 
                 <div className="form-group">
                   <label className="order-label">Phone Number *</label>
-                  <input 
-                    type="tel" 
-                    className="order-input" 
-                    placeholder="Enter phone number" 
-                    value={newCustPhone} 
-                    onChange={e => setNewCustPhone(e.target.value)} 
-                  />
+                  <input type="tel" className="order-input" placeholder="Enter phone number" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} />
                 </div>
 
                 <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-                  <button 
-                    onClick={handleQuickAddCustomer} 
-                    disabled={savingCustomer} 
-                    className="cresoa-primary-button full-width" 
-                    style={{ padding: '14px' }}
-                  >
+                  <button onClick={handleQuickAddCustomer} disabled={savingCustomer} className="cresoa-primary-button full-width" style={{ padding: '14px' }}>
                     {savingCustomer ? 'Saving...' : 'Save & Select Customer'}
                   </button>
                 </div>
               </div>
             ) : (
-              // ─── EXISTING LIST VIEW ───
               <>
                 <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
                   <span className="search-icon"><SvgIcons.Search /></span>
@@ -579,4 +567,4 @@ export default function NewOrderPage() {
 
     </div>
   )
-                }
+               }
