@@ -61,12 +61,12 @@ export default function NewOrderPage() {
   const [formData, setFormData] = useState(INITIAL_FORM)
   
   // UI State
-  const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
-  const [customerSearch, setCustomerSearch] = useState('')
   
-  // Quick Add Customer State
+  // Customer Inline Selection State
+  const [isSelectingCustomer, setIsSelectingCustomer] = useState(true)
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const [customerSearch, setCustomerSearch] = useState('')
   const [newCustName, setNewCustName] = useState('')
   const [newCustPhone, setNewCustPhone] = useState('')
   const [savingCustomer, setSavingCustomer] = useState(false)
@@ -108,9 +108,14 @@ export default function NewOrderPage() {
 
   // ─── Derived Data ───
   const selectedCustomer = useMemo(() => customers.find(c => c.id === formData.customer_id), [customers, formData.customer_id])
+  
+  // LOADS ALL CUSTOMERS, NO SLICE
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.toLowerCase()
-    return customers.filter(c => c.name?.toLowerCase().includes(q) || c.phone?.includes(q)).slice(0, 10)
+    return customers.filter(c => 
+      c.name?.toLowerCase().includes(q) || 
+      c.phone?.includes(q)
+    )
   }, [customers, customerSearch])
   
   const remainingBalance = Math.max((Number(formData.price) || 0) - (Number(formData.amount_paid) || 0), 0)
@@ -119,18 +124,16 @@ export default function NewOrderPage() {
   const updateField = (name, value) => setFormData(prev => ({ ...prev, [name]: value }))
 
   const handleCustomerSelect = (customer) => {
-    // THIS IS WHERE EXISTING MEASUREMENTS ARE LOADED
     setFormData(prev => ({
       ...prev,
       customer_id: customer.id,
       customer_name: customer.name,
       customer_phone: customer.phone || '',
       customer_email: customer.email || '',
-      measurements: customer.measurements || {} // Loads measurements automatically!
+      measurements: customer.measurements || {} 
     }))
-    setShowCustomerModal(false)
+    setIsSelectingCustomer(false)
     setCustomerSearch('')
-    setIsCreatingCustomer(false)
   }
 
   const handleQuickAddCustomer = async () => {
@@ -169,6 +172,7 @@ export default function NewOrderPage() {
       
       setNewCustName('')
       setNewCustPhone('')
+      setIsCreatingCustomer(false)
     } catch (err) {
       showToast('Failed to create customer.', 'error')
     } finally {
@@ -177,8 +181,8 @@ export default function NewOrderPage() {
   }
 
   const validateStep = () => {
-    if (step === 1 && !formData.customer_id && !formData.customer_name.trim()) {
-      showToast('Please select or create a customer.', 'error'); return false
+    if (step === 1 && !formData.customer_id) {
+      showToast('Please select a customer.', 'error'); return false
     }
     if (step === 2 && (!formData.title.trim() || !formData.category)) {
       showToast('Please enter the order name and category.', 'error'); return false
@@ -196,9 +200,15 @@ export default function NewOrderPage() {
     if (validateStep()) setStep(prev => Math.min(prev + 1, STEPS.length))
   }
 
-  const handleBack = () => setStep(prev => Math.max(prev - 1, 1))
+  const handleBack = () => {
+    if (step === 1 && !isSelectingCustomer) {
+      setIsSelectingCustomer(true)
+      return
+    }
+    setStep(prev => Math.max(prev - 1, 1))
+  }
 
-  // ─── Submit (UPDATED TO SYNC MEASUREMENTS) ───
+  // ─── Submit ───
   const promptSubmit = () => {
     if (!validateStep()) return
     setModalConfig({
@@ -212,16 +222,11 @@ export default function NewOrderPage() {
         try {
           let customerId = formData.customer_id
 
-          // 1. UPDATE CUSTOMER MEASUREMENTS
-          // If measurements were entered/changed, sync them to the customer's profile
+          // Sync measurements to customer
           if (customerId && Object.keys(formData.measurements).length > 0) {
-            await supabase
-              .from('customers')
-              .update({ measurements: formData.measurements })
-              .eq('id', customerId)
+            await supabase.from('customers').update({ measurements: formData.measurements }).eq('id', customerId)
           }
 
-          // 2. CREATE ORDER
           const orderPayload = {
             business_id: businessId,
             customer_id: customerId,
@@ -246,7 +251,6 @@ export default function NewOrderPage() {
           const { data: order, error: orderError } = await supabase.from('orders').insert(orderPayload).select('id').single()
           if (orderError) throw orderError
 
-          // Log activity
           const { data: { user } } = await supabase.auth.getUser()
           await supabase.from('business_activity_logs').insert({ business_id: businessId, performed_by: user?.id, action: 'order_created', details: { title: formData.title } })
 
@@ -288,27 +292,105 @@ export default function NewOrderPage() {
       {/* ─── SCROLLABLE CONTENT ─── */}
       <div className="wizard-content">
         
-        {/* STEP 1: CUSTOMER */}
+        {/* STEP 1: CUSTOMER (Inline Selection) */}
         {step === 1 && (
           <div className="wizard-step">
-            <h2 className="wizard-title">Who is this order for?</h2>
-            <p className="wizard-subtitle">Select an existing customer or add a new one.</p>
+            
+            {/* 1A: CUSTOMER SELECTED */}
+            {!isSelectingCustomer && !isCreatingCustomer && selectedCustomer ? (
+              <>
+                <h2 className="wizard-title">Customer Selected</h2>
+                <p className="wizard-subtitle">This order will be created for this customer.</p>
 
-            {selectedCustomer || formData.customer_name ? (
-              <div className="customer-selected-card">
-                <div className="customer-card-avatar">{formData.customer_name.charAt(0).toUpperCase()}</div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{formData.customer_name}</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{formData.customer_phone || 'No phone number'}</p>
+                <div className="customer-selected-card">
+                  <div className="customer-card-avatar">{formData.customer_name.charAt(0).toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{formData.customer_name}</h3>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{formData.customer_phone || 'No phone number'}</p>
+                  </div>
+                  <button onClick={() => setIsSelectingCustomer(true)} className="order-btn-secondary">Change</button>
                 </div>
-                <button onClick={() => setFormData({ ...INITIAL_FORM, measurements: formData.measurements })} className="order-btn-secondary">Change</button>
-              </div>
-            ) : (
-              <button onClick={() => setShowCustomerModal(true)} className="wizard-add-btn">
-                <SvgIcons.User />
-                <span>Select or Create Customer</span>
-              </button>
-            )}
+              </>
+            ) : null}
+
+            {/* 1B: CREATING NEW CUSTOMER */}
+            {isCreatingCustomer ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <button onClick={() => setIsCreatingCustomer(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text)', padding: 0 }}>
+                    <SvgIcons.ArrowLeft />
+                  </button>
+                  <h2 className="wizard-title" style={{ margin: 0 }}>New Customer</h2>
+                </div>
+                <p className="wizard-subtitle">Add basic details now. Measurements can be added later.</p>
+
+                <div className="form-group">
+                  <label className="order-label">Full Name *</label>
+                  <input type="text" className="order-input" placeholder="Enter customer's full name" value={newCustName} onChange={e => setNewCustName(e.target.value)} />
+                </div>
+
+                <div className="form-group">
+                  <label className="order-label">Phone Number *</label>
+                  <input type="tel" className="order-input" placeholder="Enter phone number" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} />
+                </div>
+
+                <button onClick={handleQuickAddCustomer} disabled={savingCustomer} className="cresoa-primary-button" style={{ padding: '14px', marginTop: '16px' }}>
+                  {savingCustomer ? 'Saving...' : 'Save & Select Customer'}
+                </button>
+              </>
+            ) : null}
+
+            {/* 1C: SELECTING FROM LIST */}
+            {isSelectingCustomer && !isCreatingCustomer ? (
+              <>
+                <h2 className="wizard-title">Who is this order for?</h2>
+                <p className="wizard-subtitle">Select an existing customer or add a new one.</p>
+
+                <div className="orders-search-wrapper" style={{ marginBottom: '16px' }}>
+                  <span className="search-icon"><SvgIcons.Search /></span>
+                  {/* NO AUTO FOCUS */}
+                  <input 
+                    type="text" 
+                    className="orders-search-input" 
+                    placeholder="Search by name or phone" 
+                    value={customerSearch} 
+                    onChange={e => setCustomerSearch(e.target.value)} 
+                  />
+                  {customerSearch && (
+                    <button className="search-clear-btn" onClick={() => setCustomerSearch('')}>
+                      <SvgIcons.X />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '20px' }}>
+                  {filteredCustomers.map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => handleCustomerSelect(c)} 
+                      className="member-dense-row" 
+                      style={{ padding: '12px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', cursor: 'pointer', background: 'var(--cresoa-surface)' }}
+                    >
+                      <div className="member-avatar">{c.name?.charAt(0).toUpperCase()}</div>
+                      <div className="member-info">
+                        <span className="member-name">{c.name}</span>
+                        <span className="member-item">{c.phone || 'No phone number'}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredCustomers.length === 0 && (
+                    <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', marginTop: '20px' }}>No customers found.</p>
+                  )}
+                </div>
+
+                <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--cresoa-border)' }}>
+                  <button onClick={() => setIsCreatingCustomer(true)} className="cresoa-primary-button full-width" style={{ padding: '14px', background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text)' }}>
+                    <SvgIcons.Plus /> Create New Customer
+                  </button>
+                </div>
+              </>
+            ) : null}
+
           </div>
         )}
 
@@ -360,7 +442,7 @@ export default function NewOrderPage() {
         )}
 
         {/* STEP 3: MEASUREMENTS */}
-        {step === 3 && (
+          {step === 3 && (
           <div className="wizard-step">
             <h2 className="wizard-title">Measurements</h2>
             <p className="wizard-subtitle">Enter the sizing details for this order.</p>
@@ -413,7 +495,7 @@ export default function NewOrderPage() {
         )}
 
         {/* STEP 5: REVIEW */}
-             {step === 5 && (
+        {step === 5 && (
           <div className="wizard-step">
             <h2 className="wizard-title">Review Order</h2>
             <p className="wizard-subtitle">Confirm the details before creating the order.</p>
@@ -454,7 +536,7 @@ export default function NewOrderPage() {
 
       {/* ─── FIXED BOTTOM NAVIGATION ─── */}
       <div className="wizard-footer">
-        {step > 1 ? (
+        {step > 1 || isSelectingCustomer === false ? (
           <button onClick={handleBack} className="order-btn-secondary" style={{ flex: 1, padding: '14px' }}>Back</button>
         ) : <div style={{ flex: 1 }} />}
         
@@ -468,81 +550,6 @@ export default function NewOrderPage() {
           </button>
         )}
       </div>
-
-      {/* ─── CUSTOMER SELECTOR MODAL ─── */}
-      {showCustomerModal && (
-        <div className="app-modal-overlay" onClick={() => { setShowCustomerModal(false); setIsCreatingCustomer(false); }}>
-          <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ height: '80vh', display: 'flex', flexDirection: 'column' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {isCreatingCustomer && (
-                  <button onClick={() => setIsCreatingCustomer(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text)', padding: 0 }}>
-                    <SvgIcons.ArrowLeft />
-                  </button>
-                )}
-                <h2 style={{ fontSize: '1.2rem', margin: 0 }}>
-                  {isCreatingCustomer ? 'New Customer' : 'Select Customer'}
-                </h2>
-              </div>
-              <button onClick={() => { setShowCustomerModal(false); setIsCreatingCustomer(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}><SvgIcons.X /></button>
-            </div>
-
-            {isCreatingCustomer ? (
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <p style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.85rem', margin: '0 0 20px 0' }}>
-                  Add basic details now. You can add measurements and full contact info later.
-                </p>
-
-                <div className="form-group">
-                  <label className="order-label">Full Name *</label>
-                  <input type="text" className="order-input" placeholder="Enter customer's full name" value={newCustName} onChange={e => setNewCustName(e.target.value)} autoFocus />
-                </div>
-
-                <div className="form-group">
-                  <label className="order-label">Phone Number *</label>
-                  <input type="tel" className="order-input" placeholder="Enter phone number" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} />
-                </div>
-
-                <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-                  <button onClick={handleQuickAddCustomer} disabled={savingCustomer} className="cresoa-primary-button full-width" style={{ padding: '14px' }}>
-                    {savingCustomer ? 'Saving...' : 'Save & Select Customer'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="orders-search-wrapper" style={{ marginBottom: '1rem' }}>
-                  <span className="search-icon"><SvgIcons.Search /></span>
-                  <input type="text" className="orders-search-input" placeholder="Search by name or phone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} autoFocus />
-                </div>
-
-                <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {filteredCustomers.map(c => (
-                    <div key={c.id} onClick={() => handleCustomerSelect(c)} className="member-dense-row" style={{ padding: '12px', marginBottom: '8px', border: '1px solid var(--cresoa-border)', borderRadius: '10px', cursor: 'pointer' }}>
-                      <div className="member-avatar">{c.name?.charAt(0).toUpperCase()}</div>
-                      <div className="member-info">
-                        <span className="member-name">{c.name}</span>
-                        <span className="member-item">{c.phone || 'No phone number'}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {filteredCustomers.length === 0 && (
-                    <p style={{ textAlign: 'center', color: 'var(--cresoa-text-muted)', marginTop: '20px' }}>No customers found.</p>
-                  )}
-                </div>
-
-                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--cresoa-border)' }}>
-                  <button onClick={() => setIsCreatingCustomer(true)} className="cresoa-primary-button full-width" style={{ padding: '14px', background: 'var(--cresoa-surface-soft)', color: 'var(--cresoa-text)' }}>
-                    <SvgIcons.Plus /> Create New Customer
-                  </button>
-                </div>
-              </>
-            )}
-
-          </div>
-        </div>
-      )}
 
       {/* ─── CONFIRM MODAL ─── */}
       {modalConfig.isOpen && (
@@ -567,4 +574,4 @@ export default function NewOrderPage() {
 
     </div>
   )
-               }
+                               }
