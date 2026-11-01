@@ -73,6 +73,11 @@ export default function AdminSeoPage() {
     showToast('Marked as submitted to Google')
   }
 
+  const copyToClipboard = (url) => {
+    navigator.clipboard.writeText(url)
+    showToast('URL copied! Paste it into Search Console.')
+  }
+
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
 
   if (!authorized) {
@@ -108,11 +113,6 @@ export default function AdminSeoPage() {
           {requests.map(req => {
             const bizName = req.businesses?.name || 'Unknown Business'
             const url = req.slug ? `https://www.cresoa.com.ng/${req.slug}` : ''
-            
-            // The correct deep-link to inspect a specific URL on a domain property
-            const inspectUrl = url 
-              ? `https://search.google.com/search-console/inspect?resource_id=sc-domain:cresoa.com.ng&id=${encodeURIComponent(url)}`
-              : '#'
 
             return (
               <div key={req.id} className="cresoa-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -133,22 +133,33 @@ export default function AdminSeoPage() {
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {url ? (
-                    <a 
-                      href={inspectUrl} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="cresoa-primary-button" 
-                      style={{ flex: 1, textDecoration: 'none', padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center' }}
-                    >
-                      Open URL Inspection
-                    </a>
+                    <>
+                      <button 
+                        onClick={() => copyToClipboard(url)} 
+                        className="cresoa-primary-button" 
+                        style={{ flex: 1, padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center' }}
+                      >
+                        Copy URL
+                      </button>
+                      <a 
+                        href="https://search.google.com/search-console" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="order-btn-secondary" 
+                        style={{ flex: 1, padding: '10px', fontSize: '0.8rem', display: 'flex', justifyContent: 'center', textDecoration: 'none' }}
+                      >
+                        Open Search Console
+                      </a>
+                    </>
                   ) : (
                     <button disabled className="cresoa-primary-button" style={{ flex: 1, padding: '10px', fontSize: '0.8rem', opacity: 0.5 }}>
                       No URL to submit
                     </button>
                   )}
-                  <button onClick={() => markAsDone(req.id)} className="order-btn-secondary" style={{ flex: 1, padding: '10px', fontSize: '0.8rem' }}>
-                    Mark Done
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => markAsDone(req.id)} className="order-btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                    Mark as Done
                   </button>
                 </div>
 
@@ -161,4 +172,4 @@ export default function AdminSeoPage() {
       {toastMessage && <div className="app-toast success">{toastMessage}</div>}
     </div>
   )
-    }
+  }
