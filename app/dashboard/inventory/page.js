@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'
-import '../../../globals.css'
+import '../../../../globals.css'
 
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
