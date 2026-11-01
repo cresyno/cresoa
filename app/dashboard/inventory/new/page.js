@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { compressImage } from '../../../../lib/compressImage'
-import '../../../../globals.css'
+import '../../../globals.css'
 
 const STEPS = [
   { id: 1, label: 'Basics' },
