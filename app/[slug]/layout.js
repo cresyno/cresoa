@@ -1,9 +1,18 @@
-import { CartProvider } from '@/app/lib/CartContext'
-// You would fetch the business data here based on the slug
-// For now, let's assume you pass the businessId down.
-export default function StorefrontLayout({ children, params }) {
-  // In a real app, fetch business ID from slug here
-  const businessId = 'fetched-id'; 
+import { CartProvider } from '@/lib/CartContext'
+import { supabase } from '@/lib/supabaseClient'
+
+export default async function StoreLayout({ children, params }) {
+  const { slug } = params
+
+  // Fetch the business by slug so the cart is isolated per business
+  const { data: page } = await supabase
+    .from('business_public_pages')
+    .select('business_id')
+    .eq('slug', slug)
+    .single()
+
+  const businessId = page?.business_id || 'unknown'
+
   return (
     <CartProvider businessId={businessId}>
       {children}
