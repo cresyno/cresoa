@@ -1,4 +1,4 @@
-import { CartProvider } from '../../lib/CartContext';
+import { CartProvider } from '@/lib/CartContext'
 import { supabase } from '@/lib/supabaseClient'
 
 export default async function StoreLayout({ children, params }) {
