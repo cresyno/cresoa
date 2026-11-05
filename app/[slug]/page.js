@@ -9,7 +9,7 @@ const supabaseAdmin = createClient(
 
 export const revalidate = 0 
 
-export async function generateMetadata({ params }) {
+export async funcion generateMetadata({ params }) {
   try {
     const slug = params.slug
     const { data: page } = await supabaseAdmin
