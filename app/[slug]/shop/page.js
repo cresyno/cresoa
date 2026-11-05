@@ -1,100 +1,45 @@
+import { supabase } from '@/lib/supabaseClient'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
-import ShopPageClient from '../../../components/public-page/ShopPageClient'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-export const revalidate = 0 // Set to 0 for immediate updates during dev
-
-export async function generateMetadata({ params }) {
-  const slug = params.slug
-  const { data: page } = await supabaseAdmin
-    .from('business_public_pages')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_enabled', true)
-    .maybeSingle()
-  if (!page) return {}
-  const { data: business } = await supabaseAdmin
-    .from('businesses')
-    .select('name')
-    .eq('id', page.business_id)
-    .single()
-  return {
-    title: `${business?.name || 'Business'} - Shop`,
-    description: page.description || '',
-  }
-}
-
-// Maps an inventory_items row to the shape ShopPageClient expects
-function toShopItem(item) {
-  return {
-    id: item.id,
-    name: item.item_name,
-    price: item.selling_price,
-    description: item.web_description || item.description || '',
-    image_url: item.image_url || '',
-    featured: !!item.featured_on_website,
-    stock: item.quantity_on_hand ?? 0,
-  }
-}
 
 export default async function ShopPage({ params }) {
-  const slug = params.slug
-  const { data: page } = await supabaseAdmin
-    .from('business_public_pages')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_enabled', true)
-    .maybeSingle()
+  const { slug } = params
 
+  const { data: page } = await supabase.from('business_public_pages').select('*').eq('slug', slug).single()
   if (!page) notFound()
 
-  const { data: business } = await supabaseAdmin
-    .from('businesses')
-    .select('*')
-    .eq('id', page.business_id)
-    .single()
-
-  // ✅ Live source of truth: inventory_items
-  let shop = []
-  
-  const { data: inventoryItems, error: inventoryError } = await supabaseAdmin
+  const { data: products } = await supabase
     .from('inventory_items')
     .select('*')
     .eq('business_id', page.business_id)
-    .eq('is_listed_on_website', true) // Only fetch items toggled for the website
-    .order('created_at', { ascending: false })
-
-  if (!inventoryError && inventoryItems && inventoryItems.length > 0) {
-    // We have items from the new inventory system
-    shop = inventoryItems.map(toShopItem)
-  } else if (!inventoryError) {
-    // Safety net: If they have zero items in inventory marked for website,
-    // fallback to the legacy JSON so the shop doesn't completely break.
-    const legacyShop = Array.isArray(page.shop_products) ? page.shop_products : []
-    shop = legacyShop
-  }
+    .eq('is_listed_on_website', true)
 
   return (
-    <ShopPageClient
-      business={{
-        name: business?.name || 'Business',
-        logo_url: business?.logo_url || '',
-        phone: business?.phone || '',
-        email: business?.email || '',
-        location: business?.location || '',
-      }}
-      page={{
-        ...page,
-        business_id: page.business_id,
-        slug: page.slug,
-        has_shop: page.has_shop,
-      }}
-      shop={shop}
-    />
+    <div style={{ padding: '40px 20px', maxWidth: '1200px', margin: '0 auto', minHeight: '80vh' }}>
+      <div style={{ marginBottom: '40px' }}>
+        <Link href={`/${slug}`} style={{ color: '#D4AF37', textDecoration: 'none', fontWeight: 600 }}>← Back to Home</Link>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', color: '#0F2B4A', marginTop: '10px' }}>Shop Collection</h1>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '24px' }}>
+        {products?.map(product => (
+          <Link key={product.id} href={`/${slug}/shop/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+              <div style={{ height: '300px', background: '#f5f5f5' }}>
+                {product.image_url ? (
+                  <img src={product.image_url} alt={product.item_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#ccc' }}>No Image</div>
+                )}
+              </div>
+              <div style={{ padding: '20px' }}>
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: '#0F2B4A' }}>{product.item_name}</h3>
+                <p style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#D4AF37' }}>₦{Number(product.selling_price).toLocaleString()}</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   )
-        }
+}
