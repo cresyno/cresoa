@@ -61,7 +61,8 @@ export async function POST(req, { params }) {
       : `pay+${order.id.slice(0, 8)}@cresoa.com.ng`
 
   const fee = platformFeeKobo(amountKobo)
-  const reference = `cso_${crypto.randomBytes(12).toString('hex')}`
+  const modePrefix = secret.startsWith('sk_test') ? 'test_' : ''
+  const reference = `cso_${modePrefix}${crypto.randomBytes(12).toString('hex')}`
 
   const { data: intent, error: insErr } = await supabaseAdmin
     .from('payment_intents')
@@ -78,7 +79,7 @@ export async function POST(req, { params }) {
     .single()
   if (insErr) return fail('Could not start payment', 500)
 
-  const site = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.cresoa.com.ng'
+  const site = new URL(req.url).origin
   const payload = {
     email,
     amount: amountKobo,
