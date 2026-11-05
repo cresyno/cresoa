@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import PublicPageWrapper from '../../components/public-page/PublicPageWrapper'
+import { getTemplate } from '../../lib/templateRegistry' // Adjust path if needed
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -54,13 +54,6 @@ export default async function PublicPage({ params }) {
       .eq('id', page.business_id)
       .single()
 
-    const { data: reviews } = await supabaseAdmin
-      .from('public_reviews')
-      .select('*')
-      .eq('business_id', page.business_id)
-      .eq('is_approved', true)
-      .order('created_at', { ascending: false })
-
     // ✅ 1. Fetch inventory items that are listed on the website
     const { data: inventoryItems } = await supabaseAdmin
       .from('inventory_items')
@@ -68,31 +61,37 @@ export default async function PublicPage({ params }) {
       .eq('business_id', page.business_id)
       .eq('is_listed_on_website', true)
 
-    // ✅ 2. Map inventory OR fallback to old JSON if inventory is empty
+    // ✅ 2. Map inventory to standard format
     let shop = []
     if (inventoryItems && inventoryItems.length > 0) {
       shop = inventoryItems.map(item => ({
         id: item.id,
-        name: item.item_name,
-        price: String(item.selling_price), // Ensure it's a string
+        item_name: item.item_name, // Match ClassicGold expectations
+        selling_price: String(item.selling_price), 
         description: item.web_description || item.description || '',
         image_url: item.image_url || '',
-        // If your template filters by featured, ensure this is true if they marked it
-        featured: item.featured_on_website ?? false 
+        is_featured: item.is_featured ?? false,
+        quantity_on_hand: item.quantity_on_hand
       }))
     } else {
-      // FALLBACK: If no new inventory items are toggled, show the old JSON data 
-      // so the website doesn't look blank while you migrate.
-      try { 
-        shop = page.shop_products || []; 
-        if (!Array.isArray(shop)) shop = []; 
-      } catch { shop = [] }
+      // Fallback
+      try { shop = page.shop_products || []; } catch { shop = []; }
+    }
+
+    // ✅ 3. Filter for exactly 6 Featured Products for the Homepage
+    let featuredProducts = shop.filter(item => item.is_featured === true)
+    
+    // If they haven't marked exactly 6, just take the first 6 so the page isn't empty
+    if (featuredProducts.length === 0 && shop.length > 0) {
+      featuredProducts = shop.slice(0, 6)
+    } else {
+      featuredProducts = featuredProducts.slice(0, 6)
     }
 
     // Robust portfolio parsing
     let portfolio = []
     try {
-      const raw = page.portfolio_images || []
+      const raw = page.portfolio_images || page.sector_data?.portfolio || []
       portfolio = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : [])
       if (!Array.isArray(portfolio)) portfolio = []
       portfolio = portfolio.map(item => {
@@ -104,13 +103,13 @@ export default async function PublicPage({ params }) {
             return { url, description: item.description || '' }
           }
         }
-        return { url: item.url || '', description: item.description || '' }
+        return { url: item.url || '', description: item.description || '', title: item.title || '' }
       }).filter(item => item.url && item.url.includes('http'))
     } catch { portfolio = [] }
 
     let services = []
     try { 
-      services = page.services || []; 
+      services = page.services || page.sector_data?.services || []; 
       if (!Array.isArray(services)) {
          services = typeof services === 'string' ? JSON.parse(services) : []
       } 
@@ -118,54 +117,40 @@ export default async function PublicPage({ params }) {
 
     const about = page.about_text || page.about || business?.description || ''
 
-    return (
-      <PublicPageWrapper
-        business={{
-          name: business?.name || 'Business',
-          logo_url: business?.logo_url || '',
-          phone: business?.phone || '',
-          whatsapp: business?.whatsapp || business?.phone || '',
-          email: business?.email || '',
-          location: business?.location || '',
-          business_type: business?.business_type || business?.sector || '', 
-          facebook: business?.facebook || '',
-          instagram: business?.instagram || '',
-          tiktok: business?.tiktok || '',
-          youtube: business?.youtube || '',
-          linkedin: business?.linkedin || '',
-          google_business: business?.google_business || '',
-        }}
-        page={{
-          ...page,
-          about,
-          description: page.description || business?.description || '',
-          business_id: page.business_id,
-          slug: page.slug,
-          has_shop: true, // Force true so the shop renders
-          has_services: page.has_services,
-          show_quote_button: page.show_quote_button,
-          show_whatsapp_button: page.show_whatsapp_button,
-          hero_font: page.hero_font || 'Inter',
-          hero_layout: page.hero_layout || 'center',
-          header_order: page.header_order || ['Home', 'About', 'Services', 'Shop', 'Work', 'Contact'],
-          header_sidebar: page.header_sidebar || false,
-          footer_text: page.footer_text || '',
-          sector_sections: page.sector_sections || [],
-          color_primary: page.color_primary || '#0F2B4A',
-          color_secondary: page.color_secondary || '#D4A52A',
-          color_accent: page.color_accent || '#D4A52A',
-          font_heading: page.font_heading || 'Inter',
-          font_body: page.font_body || 'Inter',
-          cta_label: page.cta_label || '',
-          cta_type: page.cta_type || '',
-        }}
-        services={services}
-        shop={shop} // ✅ Passes either new inventory items OR old fallback
-        portfolio={portfolio}
-        reviews={reviews || []}
-        templateId={page.template_id || 'elegant'}
-      />
-    )
+    // ✅ 4. Dynamically Load the Template Component (ClassicGold)
+    const TemplateComponent = getTemplate(page.template_id || 'classic-gold')
+
+    // ✅ 5. Construct the props safely
+    const safePreviewProps = {
+      business: { 
+        name: business?.name || 'Business', 
+        logo_url: business?.logo_url || '', 
+        phone: business?.phone || '', 
+        whatsapp: business?.whatsapp || business?.phone || '', 
+        email: business?.email || '', 
+        location: business?.location || '' 
+      },
+      page: { 
+        ...page,
+        about_text: about,
+        cover_image_url: page.cover_image_url || '',
+        sector_data: { 
+          ...(page.sector_data || {}),
+          portfolio: portfolio,
+          services: services,
+          testimonials: page.sector_data?.testimonials || [],
+          faqs: page.sector_data?.faqs || [],
+          business_hours: page.sector_data?.business_hours || '',
+          delivery_rates: page.sector_data?.delivery_rates || {},
+          free_delivery: page.sector_data?.free_delivery || false
+        } 
+      },
+      products: featuredProducts, // Only passes the 6 featured
+      slug: slug
+    }
+
+    return <TemplateComponent {...safePreviewProps} />
+    
   } catch (error) {
     console.error('Public page error:', error)
     return (
@@ -177,4 +162,4 @@ export default async function PublicPage({ params }) {
       </div>
     )
   }
-}
+  }
