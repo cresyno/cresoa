@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useCart } from '../../../../lib/CartContext';
+import { useCart } from '@/lib/CartContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -83,4 +83,4 @@ export default function ProductPage({ params }) {
       </div>
     </div>
   )
-            }
+}
