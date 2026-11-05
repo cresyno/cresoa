@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
+import { getUsablePayout } from '../../../../lib/payments'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,7 +9,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MIN_KOBO = 10000 // ₦100
 
 function platformFeeKobo(amountKobo) {
-  const bps = Number(process.env.PLATFORM_FEE_BPS ?? 50)        // 0.5%
+  const bps = Number(process.env.PLATFORM_FEE_BPS ?? 50)         // 0.5%
   const cap = Number(process.env.PLATFORM_FEE_CAP_KOBO ?? 50000) // ₦500
   return Math.min(Math.round((amountKobo * bps) / 10000), cap)
 }
@@ -31,7 +32,9 @@ export async function POST(req, { params }) {
     .maybeSingle()
   if (!order) return fail('Order not found', 404)
 
-  const balanceKobo = Math.round(((Number(order.price) || 0) - (Number(order.amount_paid) || 0)) * 100)
+  const balanceKobo = Math.round(
+    ((Number(order.price) || 0) - (Number(order.amount_paid) || 0)) * 100
+  )
   if (balanceKobo <= 0) return fail('Nothing left to pay', 409)
 
   let amountKobo = balanceKobo
@@ -44,20 +47,11 @@ export async function POST(req, { params }) {
     amountKobo = asked
   }
 
-  const { data: payout } = await supabaseAdmin
-    .from('merchant_payout_accounts')
-    .select('paystack_subaccount_code, payout_mode, status')
-    .eq('business_id', order.business_id)
-    .maybeSingle()
-  if (!payout || payout.status !== 'active') {
-    return fail('This business has not enabled online payments yet', 409)
-  }
-  if (payout.payout_mode === 'direct' && !payout.paystack_subaccount_code) {
-    return fail('This business has not enabled online payments yet', 409)
-  }
-  if (payout.payout_mode === 'hold' && process.env.HOLD_MODE_ENABLED !== 'true') {
-    return fail('This business has not enabled online payments yet', 409)
-  }
+  const payout = await getUsablePayout(order.business_id)
+  const notReady = () => fail('This business has not enabled online payments yet', 409)
+  if (!payout) return notReady()
+  if (payout.payout_mode === 'direct' && !payout.paystack_subaccount_code) return notReady()
+  if (payout.payout_mode === 'hold' && process.env.HOLD_MODE_ENABLED !== 'true') return notReady()
 
   const emailOk = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
   const email = emailOk(body.email)
@@ -100,8 +94,8 @@ export async function POST(req, { params }) {
   }
   if (payout.payout_mode === 'direct') {
     payload.subaccount = payout.paystack_subaccount_code
-    payload.transaction_charge = fee   // flat kobo that goes to Cresoa
-    payload.bearer = 'subaccount'      // merchant bears Paystack's fee
+    payload.transaction_charge = fee // flat kobo that goes to Cresoa
+    payload.bearer = 'subaccount'    // merchant bears Paystack's fee
   }
 
   const res = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -116,4 +110,4 @@ export async function POST(req, { params }) {
   }
 
   return NextResponse.json({ url: json.data.authorization_url, reference })
-      }
+}
