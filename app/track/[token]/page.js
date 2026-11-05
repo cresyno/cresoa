@@ -19,7 +19,7 @@ export default function TrackPage() {
   const [order, setOrder] = useState(null)
   const [customer, setCustomer] = useState(null)
   const [business, setBusiness] = useState(null)
-  const [customStages, setCustomStages] = useState([]) // ✅ NEW STATE
+  const [customStages, setCustomStages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [industry, setIndustry] = useState('default')
@@ -29,15 +29,20 @@ export default function TrackPage() {
   const [copied, setCopied] = useState(false)
   const [shareUrl, setShareUrl] = useState('')
 
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false)
+  const [payAmount, setPayAmount] = useState('')
+  const [payBusy, setPayBusy] = useState(false)
+  const [payError, setPayError] = useState('')
+  const [confirming, setConfirming] = useState(false)
+
   useEffect(() => {
     if (!token) { setError(true); setLoading(false); return }
 
     const load = async () => {
       try {
-        // Add cache: 'no-store' to stop the browser from caching old data
-const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
-  cache: 'no-store'
-})
+        const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
+          cache: 'no-store'
+        })
         const data = await response.json()
 
         if (data.error) {
@@ -47,7 +52,8 @@ const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
         setOrder(data.order)
         setCustomer(data.order.customers)
         setBusiness(data.business)
-        setCustomStages(data.stages || []) // ✅ LOAD CUSTOM WORKFLOW STAGES
+        setCustomStages(data.stages || [])
+        setPaymentsEnabled(!!data.payments_enabled)
 
         let detectedIndustry = 'default'
         if (data.business) {
@@ -69,6 +75,47 @@ const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
   useEffect(() => {
     setShareUrl(window.location.href)
   }, [])
+
+  // After returning from Paystack, poll until the payment shows on the order
+  useEffect(() => {
+    if (!token || typeof window === 'undefined') return
+    if (new URLSearchParams(window.location.search).get('paid') !== '1') return
+    let tries = 0
+    setConfirming(true)
+    const timer = setInterval(async () => {
+      tries += 1
+      try {
+        const r = await fetch(`/api/track/${token}?t=${Date.now()}`, { cache: 'no-store' })
+        const d = await r.json()
+        if (d.order) setOrder((prev) => ({ ...(prev || {}), ...d.order }))
+      } catch (_) {}
+      if (tries >= 10) { clearInterval(timer); setConfirming(false) }
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [token])
+
+  const startPayment = async () => {
+    setPayError('')
+    setPayBusy(true)
+    try {
+      const amount = payAmount ? Number(payAmount) : undefined
+      const res = await fetch(`/api/pay/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(amount ? { amount } : {}),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        setPayError(data.error || 'Could not start payment. Please try again.')
+        setPayBusy(false)
+        return
+      }
+      window.location.href = data.url
+    } catch (_) {
+      setPayError('Network error. Please try again.')
+      setPayBusy(false)
+    }
+  }
 
   const getStatusInfo = (status) => {
     const map = {
@@ -98,7 +145,6 @@ const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
   const footerMsg = business?.tracking_footer_message || 'Thank you for choosing us!'
   const isRepairs = industry === 'repairs'
 
-  // ✅ USE CUSTOM STAGES IF THEY EXIST, OTHERWISE USE FALLBACK
   const fallbackStages = STAGES_BY_INDUSTRY[industry] || STAGES_BY_INDUSTRY.default
   const currentStages = customStages.length > 0 ? customStages : fallbackStages
 
@@ -209,7 +255,7 @@ const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
           )}
         </div>
 
-        {/* STEPPER - NOW USES CUSTOM STAGES */}
+        {/* STEPPER - USES CUSTOM STAGES */}
         <div className="track-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
             <div style={{ position: 'absolute', top: '16px', left: '5%', right: '5%', height: '2px', background: darkMode ? '#2A2A3A' : '#E5E0D8', zIndex: 0 }} />
@@ -241,13 +287,52 @@ const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
           <div className="detail-row"><span className="detail-label">Balance</span><span className="detail-value" style={{ color: balance > 0 ? 'var(--cresoa-danger)' : 'var(--cresoa-success)' }}>{balance > 0 ? `₦${balance.toLocaleString()}` : '✓ Paid'}</span></div>
         </div>
 
+        {confirming && (
+          <div className="track-card" style={{ textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: darkMode ? '#aaa' : '#8A8A8A' }}>
+              Confirming your payment. Your balance will update in a moment.
+            </p>
+          </div>
+        )}
+
+        {paymentsEnabled && balance > 0 && (
+          <div className="track-card">
+            <h3 style={{ margin: '0 0 0.6rem', fontSize: '1rem', color: darkMode ? '#fff' : '#1A1A1A' }}>Pay online</h3>
+            <label style={{ fontSize: '0.8rem', color: darkMode ? '#aaa' : '#8A8A8A' }}>
+              Amount (leave empty to pay the full balance of ₦{balance.toLocaleString()})
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min="100"
+              max={balance}
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder={`₦${balance.toLocaleString()}`}
+              style={{ width: '100%', boxSizing: 'border-box', margin: '0.4rem 0 0.8rem', padding: '0.7rem', borderRadius: '8px', border: `1px solid ${darkMode ? '#3A3A4A' : '#E5E0D8'}`, background: darkMode ? '#2A2A3A' : '#F8F6F2', color: darkMode ? '#fff' : '#1A1A1A', fontSize: '1rem' }}
+            />
+            {payError && <p style={{ color: 'var(--cresoa-danger)', fontSize: '0.8rem', margin: '0 0 0.6rem' }}>{payError}</p>}
+            <button
+              onClick={startPayment}
+              disabled={payBusy}
+              style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: 'none', background: primaryColor, color: '#fff', fontWeight: 600, fontSize: '0.95rem', cursor: payBusy ? 'default' : 'pointer', opacity: payBusy ? 0.7 : 1 }}
+            >
+              {payBusy ? 'Opening secure payment...' : 'Pay now'}
+            </button>
+            <p style={{ fontSize: '0.7rem', textAlign: 'center', margin: '0.6rem 0 0', color: darkMode ? '#888' : '#aaa' }}>
+              Secure payment by Paystack. Cresoa never sees your card details.
+            </p>
+          </div>
+        )}
+
         <div className="track-card" style={{ textAlign: 'center' }}>
           <button onClick={() => setShowShareModal(true)} style={{ background: 'transparent', border: 'none', color: primaryColor, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
             <Icon name="link" size={16} stroke="currentColor" /> Share this tracking link
           </button>
         </div>
 
-        {business?.whatsapp && (
+
+  {business?.whatsapp && (
           <div className="track-card" style={{ textAlign: 'center' }}>
             <p style={{ fontSize: '0.85rem', margin: '0 0 0.8rem', color: darkMode ? '#aaa' : '#8A8A8A' }}>Have questions? Contact us</p>
             <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -284,4 +369,4 @@ const response = await fetch(`/api/track/${token}?t=${Date.now()}`, {
       )}
     </div>
   )
-    }
+                }
