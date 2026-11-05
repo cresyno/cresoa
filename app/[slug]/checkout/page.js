@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useCart } from '../../../lib/CartContext';
+import { useCart } from '@/lib/CartContext'
 import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
 
@@ -78,4 +78,4 @@ export default function CheckoutPage({ params }) {
       </div>
     </div>
   )
-}
+    }
