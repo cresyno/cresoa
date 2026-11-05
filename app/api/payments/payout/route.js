@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
+import { paystack, createSubaccount, keyFingerprint } from '../../../../lib/payments'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,19 +21,6 @@ async function requireOwner(req, businessId) {
   return { user: data.user, biz }
 }
 
-async function paystack(path, method = 'GET', body) {
-  const res = await fetch(`https://api.paystack.co${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  const json = await res.json().catch(() => null)
-  return { ok: res.ok && json?.status, json }
-}
-
 const masked = (a) => a && {
   bank_name: a.bank_name,
   account_name: a.account_name,
@@ -50,7 +38,6 @@ export async function GET(req) {
   return NextResponse.json({ account: masked(data) || null })
 }
 
-// Save or change the payout bank account
 export async function POST(req) {
   const body = await req.json().catch(() => ({}))
   const auth = await requireOwner(req, body.business_id)
@@ -61,16 +48,18 @@ export async function POST(req) {
   if (!/^\d{10}$/.test(accountNumber)) return fail('Account number must be 10 digits', 400)
   if (!/^\d{3,6}$/.test(bankCode)) return fail('Invalid bank', 400)
 
-  const resolved = await paystack(
-    `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`
-  )
+  const resolved = await paystack(`/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`)
   if (!resolved.ok) return fail('Could not verify this account. Check the number and bank.', 422)
   const accountName = resolved.json.data.account_name
+
+  if (body.verify_only) return NextResponse.json({ account_name: accountName })
 
   const { data: existing } = await supabaseAdmin
     .from('merchant_payout_accounts').select('*').eq('business_id', body.business_id).maybeSingle()
 
-  let code = existing?.paystack_subaccount_code
+  const fp = keyFingerprint()
+  let code = existing && existing.key_fingerprint === fp ? existing.paystack_subaccount_code : null
+
   if (code) {
     const up = await paystack(`/subaccount/${code}`, 'PUT', {
       business_name: auth.biz.name,
@@ -80,30 +69,31 @@ export async function POST(req) {
     })
     if (!up.ok) return fail('Could not update payout account', 502)
   } else {
-    const cr = await paystack('/subaccount', 'POST', {
-      business_name: auth.biz.name,
-      settlement_bank: bankCode,
-      account_number: accountNumber,
-      percentage_charge: 0,
-      description: `Cresoa merchant ${auth.biz.id}`,
+    code = await createSubaccount({
+      businessName: auth.biz.name,
+      businessId: body.business_id,
+      bankCode,
+      accountNumber,
     })
-    if (!cr.ok) return fail('Could not create payout account', 502)
-    code = cr.json.data.subaccount_code
+    if (!code) return fail('Could not create payout account', 502)
   }
 
-  const row = {
-    business_id: body.business_id,
-    bank_code: bankCode,
-    bank_name: body.bank_name || null,
-    account_number: accountNumber,
-    account_name: accountName,
-    paystack_subaccount_code: code,
-    status: 'active',
-    verified_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
+  const now = new Date().toISOString()
   const { data: saved, error } = await supabaseAdmin
-    .from('merchant_payout_accounts').upsert(row, { onConflict: 'business_id' }).select('*').single()
+    .from('merchant_payout_accounts')
+    .upsert({
+      business_id: body.business_id,
+      bank_code: bankCode,
+      bank_name: body.bank_name || null,
+      account_number: accountNumber,
+      account_name: accountName,
+      paystack_subaccount_code: code,
+      key_fingerprint: fp,
+      status: 'active',
+      verified_at: now,
+      updated_at: now,
+    }, { onConflict: 'business_id' })
+    .select('*').single()
   if (error) return fail('Could not save', 500)
 
   await supabaseAdmin.from('audit_log').insert({
@@ -120,7 +110,6 @@ export async function POST(req) {
   return NextResponse.json({ account: masked(saved) })
 }
 
-// Change payout mode: 'direct' or 'hold'
 export async function PUT(req) {
   const body = await req.json().catch(() => ({}))
   const auth = await requireOwner(req, body.business_id)
