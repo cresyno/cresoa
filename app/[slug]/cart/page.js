@@ -1,6 +1,6 @@
 'use client'
 
-import { useCart } from '@/lib/CartContext'
+import { useCart } from '../../../lib/CartContext';
 import Link from 'next/link'
 
 export default function CartPage({ params }) {
