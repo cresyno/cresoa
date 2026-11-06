@@ -1,4 +1,4 @@
-import { CartProvider } from '../lib/CartContext';
+import { CartProvider } from '@/lib/CartContext'
 import { supabase } from '@/lib/supabaseClient'
 
 export default async function StoreLayout({ children, params }) {
@@ -9,7 +9,7 @@ export default async function StoreLayout({ children, params }) {
     .from('business_public_pages')
     .select('business_id')
     .eq('slug', slug)
-    .single()
+    .maybeSingle()
 
   const businessId = page?.business_id || 'unknown'
 
