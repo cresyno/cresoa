@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { compressImage } from '../../../../lib/compressImage'
 import { templates, getTemplate } from '../../../../lib/templateRegistry'
+import { parseSectorData } from '../../../../lib/publicPageData'
 import '../my-website.css'
 
 // ─── EMBEDDED ICONS ───
@@ -20,7 +21,14 @@ const SvgIcons = {
   Google: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
 }
 
-const NIGERIAN_STATES = ['Lagos', 'Abuja', 'Rivers', 'Oyo', 'Kano', 'Enugu', 'Anambra', 'Ogun', 'Kaduna', 'Delta']
+// Full Nigerian state list — matches lib/publicPageData.js
+const NIGERIAN_STATES = [
+  'Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno',
+  'Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT','Gombe','Imo',
+  'Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa',
+  'Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba',
+  'Yobe','Zamfara',
+]
 
 export default function EditorTab({ businessId }) {
   const router = useRouter()
@@ -37,11 +45,12 @@ export default function EditorTab({ businessId }) {
   const [heroImage, setHeroImage] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [isEnabled, setIsEnabled] = useState(false)
+  const [savedEnabled, setSavedEnabled] = useState(false) // ← what's actually in the DB
   const [businessName, setBusinessName] = useState('')
-  
+
   // Content Data
   const [sectorData, setSectorData] = useState({})
-  const [portfolio, setPortfolio] = useState([]) 
+  const [portfolio, setPortfolio] = useState([])
   const [services, setServices] = useState([])
   const [testimonials, setTestimonials] = useState([])
   const [faqs, setFaqs] = useState([])
@@ -63,9 +72,9 @@ export default function EditorTab({ businessId }) {
   const [seoRequested, setSeoRequested] = useState(false)
 
   // Modals State
-  const [modalType, setModalType] = useState(null) // 'service', 'testimonial', 'faq', 'portfolio_edit'
+  const [modalType, setModalType] = useState(null)
   const [activeItemIndex, setActiveItemIndex] = useState(null)
-  
+
   const [tempService, setTempService] = useState({ name: '', price: '', desc: '', image_url: '' })
   const [tempTestimonial, setTempTestimonial] = useState({ name: '', text: '' })
   const [tempFaq, setTempFaq] = useState({ q: '', a: '' })
@@ -105,17 +114,23 @@ export default function EditorTab({ businessId }) {
           setTemplateId(page.template_id || 'classic-gold')
           setAboutText(page.about_text || '')
           setHeroImage(page.cover_image_url || '')
-          setIsEnabled(page.is_enabled || false)
-          
-          const data = page.sector_data || {}
+          setIsEnabled(Boolean(page.is_enabled))
+          setSavedEnabled(Boolean(page.is_enabled))
+
+          // 🔑 Centralized parse — handles string OR object, never wipes data
+          const data = parseSectorData(page.sector_data)
           setSectorData(data)
           setPortfolio(Array.isArray(data.portfolio) ? data.portfolio : [])
-          setServices(data.services || [])
-          setTestimonials(data.testimonials || [])
-          setFaqs(data.faqs || [])
-          setBusinessHours(data.business_hours || '')
-          setFreeDelivery(data.free_delivery || false)
-          setDeliveryRates(data.delivery_rates || {})
+          setServices(Array.isArray(data.services) ? data.services : [])
+          setTestimonials(Array.isArray(data.testimonials) ? data.testimonials : [])
+          setFaqs(Array.isArray(data.faqs) ? data.faqs : [])
+          setBusinessHours(typeof data.business_hours === 'string' ? data.business_hours : '')
+          setFreeDelivery(Boolean(data.free_delivery))
+          setDeliveryRates(
+            data.delivery_rates && typeof data.delivery_rates === 'object' && !Array.isArray(data.delivery_rates)
+              ? data.delivery_rates
+              : {}
+          )
         }
 
         const { data: seo } = await supabase.from('seo_requests').select('id').eq('business_id', businessId).eq('status', 'pending').maybeSingle()
@@ -132,32 +147,85 @@ export default function EditorTab({ businessId }) {
 
   const handleSave = async () => {
     if (!slug.trim()) { showToast('Website URL is required.', 'error'); return }
+
+    const normalizedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '')
+
+    // 🔒 Slug collision guard
+    const { data: existingSlug, error: slugCheckErr } = await supabase
+      .from('business_public_pages')
+      .select('business_id')
+      .eq('slug', normalizedSlug)
+      .maybeSingle()
+
+    if (slugCheckErr) {
+      showToast('Could not verify URL. Please try again.', 'error')
+      return
+    }
+    if (existingSlug && existingSlug.business_id !== businessId) {
+      showToast('That URL is already taken. Please choose another.', 'error')
+      return
+    }
+
     setSaving(true)
     try {
       await supabase.from('businesses').update({
-        phone: businessPhone, whatsapp: businessWhatsapp, email: businessEmail, location: businessAddress, logo_url: logoUrl
+        phone: businessPhone,
+        whatsapp: businessWhatsapp,
+        email: businessEmail,
+        location: businessAddress,
+        logo_url: logoUrl,
       }).eq('id', businessId)
 
       const updatedSectorData = {
-        ...sectorData, portfolio, services, testimonials, faqs, business_hours: businessHours, free_delivery: freeDelivery, delivery_rates: deliveryRates
+        ...sectorData,
+        portfolio,
+        services,
+        testimonials,
+        faqs,
+        business_hours: businessHours,
+        free_delivery: freeDelivery,
+        delivery_rates: deliveryRates,
       }
 
+      // NOTE: is_enabled is intentionally NOT in the upsert body —
+      // the Site Status toggle owns that field and saves it on its own.
       const { error } = await supabase.from('business_public_pages').upsert({
         business_id: businessId,
-        slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, ''),
+        slug: normalizedSlug,
         template_id: templateId,
         about_text: aboutText,
         cover_image_url: heroImage,
-        is_enabled: isEnabled,
-        sector_data: updatedSectorData
+        sector_data: updatedSectorData,
       }, { onConflict: 'business_id' })
-      
+
       if (error) throw error
+
       setHasWebsite(true)
       setIsEditingUrl(false)
+      setSlug(normalizedSlug)
       showToast('Website settings saved successfully')
     } catch (err) {
       showToast(err.message || 'Failed to save settings', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Site Status: saves immediately, decoupled from content save ──
+  const toggleSiteStatus = async () => {
+    const next = !savedEnabled
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('business_public_pages')
+        .update({ is_enabled: next })
+        .eq('business_id', businessId)
+      if (error) throw error
+      setSavedEnabled(next)
+      setIsEnabled(next)
+      showToast(next ? 'Website is now live' : 'Website is now hidden')
+    } catch (err) {
+      showToast(err.message || 'Could not update site status', 'error')
     } finally {
       setSaving(false)
     }
@@ -168,7 +236,7 @@ export default function EditorTab({ businessId }) {
     if (!file) return
     setUploading(true)
     try {
-      const compressedBlob = await compressImage(file, 300) // Slightly higher quality for portfolio
+      const compressedBlob = await compressImage(file, 300)
       const filePath = `${businessId}/assets-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
       const { error: uploadError } = await supabase.storage.from('business-assets').upload(filePath, compressedBlob, { contentType: 'image/jpeg' })
       if (uploadError) throw uploadError
@@ -199,12 +267,15 @@ export default function EditorTab({ businessId }) {
     }
     setPortfolio(prev => [...prev, ...newItems])
     setUploading(false)
-    showToast(`${newItems.length} images uploaded`)
+    if (newItems.length > 0) {
+      // 🔔 Warn the user these are only in memory until Save
+      showToast(`${newItems.length} image(s) uploaded — click "Save Website Settings" to publish`)
+    }
   }
 
   // ── Modal Handlers ──
   const openServiceModal = (index = null) => {
-    if (index !== null) { setTempService(services[index]); setActiveItemIndex(index) } 
+    if (index !== null) { setTempService(services[index]); setActiveItemIndex(index) }
     else { setTempService({ name: '', price: '', desc: '', image_url: '' }); setActiveItemIndex(null) }
     setModalType('service')
   }
@@ -228,7 +299,7 @@ export default function EditorTab({ businessId }) {
   }
 
   const openTestimonialModal = (index = null) => {
-    if (index !== null) { setTempTestimonial(testimonials[index]); setActiveItemIndex(index) } 
+    if (index !== null) { setTempTestimonial(testimonials[index]); setActiveItemIndex(index) }
     else { setTempTestimonial({ name: '', text: '' }); setActiveItemIndex(null) }
     setModalType('testimonial')
   }
@@ -244,7 +315,7 @@ export default function EditorTab({ businessId }) {
   }
 
   const openFaqModal = (index = null) => {
-    if (index !== null) { setTempFaq(faqs[index]); setActiveItemIndex(index) } 
+    if (index !== null) { setTempFaq(faqs[index]); setActiveItemIndex(index) }
     else { setTempFaq({ q: '', a: '' }); setActiveItemIndex(null) }
     setModalType('faq')
   }
@@ -278,7 +349,7 @@ export default function EditorTab({ businessId }) {
 
   return (
     <div className="website-editor-page">
-      
+
       {/* ── TABS ── */}
       <div className="smart-tabs-container" style={{ marginBottom: '1.5rem', paddingBottom: '5px' }}>
         <button className={`smart-tab ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>Home</button>
@@ -292,15 +363,23 @@ export default function EditorTab({ businessId }) {
       {activeTab === 'home' && (
         <>
           <div className="website-card" style={{ background: 'linear-gradient(135deg, var(--color-primary), #1A4685)', color: '#fff', border: 'none' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 800 }}>Your Website is Live</h3>
-            <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', opacity: 0.9 }}>Share this link with your customers so they can shop and contact you.</p>
-            <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{publicUrl}</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" onClick={() => { navigator.clipboard.writeText(publicUrl); showToast('Copied!') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', padding: '8px', color: '#fff', cursor: 'pointer' }}><SvgIcons.Copy /></button>
-                <a href={`/${slug}`} target="_blank" style={{ background: 'var(--color-accent)', border: 'none', borderRadius: '8px', padding: '8px 16px', color: '#000', fontWeight: 700, textDecoration: 'none', fontSize: '0.85rem' }}>Preview</a>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 800 }}>
+              {savedEnabled ? 'Your Website is Live' : 'Your Website is in Draft'}
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', opacity: 0.9 }}>
+              {savedEnabled
+                ? 'Share this link with your customers so they can shop and contact you.'
+                : 'Toggle "Site Status" below to make your website visible to customers.'}
+            </p>
+            {savedEnabled && (
+              <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                <span style={{ fontWeight: 600, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{publicUrl}</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={() => { navigator.clipboard.writeText(publicUrl); showToast('Copied!') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', padding: '8px', color: '#fff', cursor: 'pointer' }}><SvgIcons.Copy /></button>
+                  <a href={`/${slug}`} target="_blank" rel="noreferrer" style={{ background: 'var(--color-accent)', border: 'none', borderRadius: '8px', padding: '8px 16px', color: '#000', fontWeight: 700, textDecoration: 'none', fontSize: '0.85rem' }}>Preview</a>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="website-card">
@@ -324,14 +403,14 @@ export default function EditorTab({ businessId }) {
               <div className="website-form-group" style={{ marginBottom: 0 }}>
                 <label className="website-label">Logo</label>
                 <label className="image-upload-card">
-                  {logoUrl ? <><img src={logoUrl} /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Plus /><span>Upload Logo</span></div>}
+                  {logoUrl ? <><img src={logoUrl} alt="Logo" /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Plus /><span>Upload Logo</span></div>}
                   <input type="file" accept="image/*" onChange={(e) => uploadSingleImage(e.target.files[0], setLogoUrl)} style={{ display: 'none' }} />
                 </label>
               </div>
               <div className="website-form-group" style={{ marginBottom: 0 }}>
                 <label className="website-label">Cover Image</label>
                 <label className="image-upload-card">
-                  {heroImage ? <><img src={heroImage} /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Image /><span>Upload Cover</span></div>}
+                  {heroImage ? <><img src={heroImage} alt="Cover" /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Image /><span>Upload Cover</span></div>}
                   <input type="file" accept="image/*" onChange={(e) => uploadSingleImage(e.target.files[0], setHeroImage)} style={{ display: 'none' }} />
                 </label>
               </div>
@@ -339,8 +418,29 @@ export default function EditorTab({ businessId }) {
           </div>
 
           <div className="website-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div><h3 className="website-section-title" style={{ marginBottom: '4px' }}>Site Status</h3><p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{isEnabled ? 'Live & Visible' : 'Hidden (Draft Mode)'}</p></div>
-            <button type="button" onClick={() => setIsEnabled(!isEnabled)} style={{ width: '56px', height: '28px', borderRadius: '14px', border: 'none', background: isEnabled ? 'var(--color-secondary)' : 'var(--cresoa-border)', position: 'relative' }}><span style={{ position: 'absolute', top: '2px', left: isEnabled ? '30px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} /></button>
+            <div>
+              <h3 className="website-section-title" style={{ marginBottom: '4px' }}>Site Status</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>
+                {savedEnabled ? 'Live & visible to customers' : 'Hidden (draft mode)'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleSiteStatus}
+              disabled={saving}
+              style={{
+                width: '56px', height: '28px', borderRadius: '14px', border: 'none',
+                background: savedEnabled ? 'var(--color-secondary)' : 'var(--cresoa-border)',
+                position: 'relative', cursor: saving ? 'wait' : 'pointer',
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: '2px', left: savedEnabled ? '30px' : '2px',
+                width: '24px', height: '24px', borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s',
+              }} />
+            </button>
           </div>
         </>
       )}
@@ -361,7 +461,7 @@ export default function EditorTab({ businessId }) {
         </div>
       )}
 
-           {/* ── TAB: CONTENT ── */}
+      {/* ── TAB: CONTENT ── */}
       {activeTab === 'content' && (
         <>
           <div className="website-card">
@@ -378,7 +478,7 @@ export default function EditorTab({ businessId }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {services.map((srv, idx) => (
                   <div key={idx} onClick={() => openServiceModal(idx)} style={{ display: 'flex', gap: '12px', background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '12px', cursor: 'pointer', alignItems: 'center' }}>
-                    {srv.image_url ? <img src={srv.image_url} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} /> : <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--cresoa-border)' }} />}
+                    {srv.image_url ? <img src={srv.image_url} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} /> : <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--cresoa-border)' }} />}
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{srv.name} {srv.price && `- ₦${Number(srv.price).toLocaleString()}`}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>{srv.desc}</div>
@@ -401,9 +501,9 @@ export default function EditorTab({ businessId }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px' }}>
               {portfolio.map((item, idx) => (
                 <div key={idx} onClick={() => openPortfolioModal(idx)} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', border: '1px solid var(--cresoa-border)' }}>
-                  <img src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={item.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.6)', padding: '4px' }}>
-                     <div style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+                    <div style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
                   </div>
                 </div>
               ))}
@@ -483,7 +583,7 @@ export default function EditorTab({ businessId }) {
             <h3 style={{ margin: '0 0 16px' }}>{activeItemIndex !== null ? 'Edit Service' : 'Add Service'}</h3>
             <label className="website-label">Service Image</label>
             <label className="image-upload-card" style={{ minHeight: '100px', marginBottom: '16px' }}>
-              {tempService.image_url ? <img src={tempService.image_url} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} /> : <div className="image-upload-label"><SvgIcons.Image size={20} /><span>Upload Image</span></div>}
+              {tempService.image_url ? <img src={tempService.image_url} alt="" style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} /> : <div className="image-upload-label"><SvgIcons.Image size={20} /><span>Upload Image</span></div>}
               <input type="file" accept="image/*" onChange={(e) => uploadSingleImage(e.target.files[0], (url) => setTempService({...tempService, image_url: url}))} style={{ display: 'none' }} />
             </label>
             <input type="text" className="website-input" placeholder="Service Name (e.g. Custom Senator)" value={tempService.name} onChange={e => setTempService({...tempService, name: e.target.value})} style={{ marginBottom: '10px' }} />
@@ -501,7 +601,7 @@ export default function EditorTab({ businessId }) {
         <div className="app-modal-overlay" onClick={() => setModalType(null)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px' }}>Edit Portfolio Item</h3>
-            <img src={tempPortfolioItem.url} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '12px', marginBottom: '16px' }} />
+            <img src={tempPortfolioItem.url} alt="" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '12px', marginBottom: '16px' }} />
             <input type="text" className="website-input" placeholder="Title (e.g. Aso Ebi Wedding)" value={tempPortfolioItem.title} onChange={e => setTempPortfolioItem({...tempPortfolioItem, title: e.target.value})} style={{ marginBottom: '10px' }} />
             <textarea className="website-input" placeholder="Description (Optional)" value={tempPortfolioItem.desc} onChange={e => setTempPortfolioItem({...tempPortfolioItem, desc: e.target.value})} style={{ marginBottom: '16px', height: '80px' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -524,4 +624,4 @@ export default function EditorTab({ businessId }) {
       {toastMessage && <div className={`app-toast ${toastType}`}>{toastMessage}</div>}
     </div>
   )
-        }
+            }
