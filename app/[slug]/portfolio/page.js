@@ -1,20 +1,27 @@
+// app/[slug]/portfolio/page.js
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { parseSectorData } from '@/lib/publicPageData'
 import Link from 'next/link'
 
-export default function PortfolioPage({ params }) {
-  const { slug } = params
+export default function PortfolioPage() {
+  const { slug } = useParams()
   const [portfolio, setPortfolio] = useState([])
   const [selectedImage, setSelectedImage] = useState(null)
 
   useEffect(() => {
     const fetchPortfolio = async () => {
-      const { data } = await supabase.from('business_public_pages').select('sector_data').eq('slug', slug).single()
-      if (data?.sector_data?.portfolio) {
-        setPortfolio(data.sector_data.portfolio)
-      }
+      const { data } = await supabase
+        .from('business_public_pages')
+        .select('sector_data, is_enabled')
+        .eq('slug', String(slug).toLowerCase())
+        .maybeSingle()
+      if (!data?.is_enabled) return
+      const sector = parseSectorData(data.sector_data)
+      setPortfolio(Array.isArray(sector.portfolio) ? sector.portfolio : [])
     }
     fetchPortfolio()
   }, [slug])
