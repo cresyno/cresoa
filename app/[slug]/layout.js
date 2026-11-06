@@ -1,21 +1,21 @@
+// app/[slug]/layout.js
 import { CartProvider } from '@/lib/CartContext'
-import { supabase } from '@/lib/supabaseClient'
+import { createServerSupabase } from '@/lib/serverSupabase'
+import { notFound } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
 
 export default async function StoreLayout({ children, params }) {
-  const { slug } = params
+  const { slug } = await params
+  const sb = createServerSupabase()
 
-  // Fetch the business by slug so the cart is isolated per business
-  const { data: page } = await supabase
+  const { data: page } = await sb
     .from('business_public_pages')
-    .select('business_id')
-    .eq('slug', slug)
+    .select('business_id, is_enabled')
+    .eq('slug', String(slug).trim().toLowerCase())
     .maybeSingle()
 
-  const businessId = page?.business_id || 'unknown'
+  if (!page || !page.is_enabled) notFound()
 
-  return (
-    <CartProvider businessId={businessId}>
-      {children}
-    </CartProvider>
-  )
+  return <CartProvider businessId={page.business_id}>{children}</CartProvider>
 }
