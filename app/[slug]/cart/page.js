@@ -9,7 +9,7 @@ export default function CartPage({ params }) {
 
   if (cart.length === 0) {
     return (
-      <div style={{ padding: '80px 20px', textAlign: 'center', minHeight: '70vh' }}>
+      <div style={{ padding: '80px 20px', textAlign: 'center', minHeight: '70vh', fontFamily: "'Inter', sans-serif" }}>
         <h2 style={{ fontSize: '2rem', color: '#0F2B4A', marginBottom: '20px' }}>Your Cart is Empty</h2>
         <Link href={`/${slug}/shop`} style={{ background: '#D4AF37', color: '#0F2B4A', padding: '15px 30px', borderRadius: '30px', textDecoration: 'none', fontWeight: 700 }}>Go Shopping</Link>
       </div>
@@ -17,7 +17,7 @@ export default function CartPage({ params }) {
   }
 
   return (
-    <div style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '80vh' }}>
+    <div style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '80vh', fontFamily: "'Inter', sans-serif" }}>
       <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', color: '#0F2B4A', marginBottom: '30px' }}>Shopping Cart</h1>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '40px' }}>
