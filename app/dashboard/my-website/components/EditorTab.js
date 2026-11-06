@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { compressImage } from '../../../../lib/compressImage'
@@ -28,9 +28,7 @@ export default function EditorTab({ businessId }) {
   const [saving, setSaving] = useState(false)
   const [hasWebsite, setHasWebsite] = useState(false)
   const [isEditingUrl, setIsEditingUrl] = useState(false)
-
-  // NEW: Sub-Tab State
-  const [activeTab, setActiveTab] = useState('design') // 'design', 'content', 'shop', 'seo'
+  const [activeTab, setActiveTab] = useState('home')
 
   // Core Data
   const [slug, setSlug] = useState('')
@@ -41,31 +39,19 @@ export default function EditorTab({ businessId }) {
   const [isEnabled, setIsEnabled] = useState(false)
   const [businessName, setBusinessName] = useState('')
   
-  // Dynamic Data
+  // Content Data
   const [sectorData, setSectorData] = useState({})
   const [portfolio, setPortfolio] = useState([]) 
-  
-  // Structured Data
   const [services, setServices] = useState([])
   const [testimonials, setTestimonials] = useState([])
   const [faqs, setFaqs] = useState([])
   const [businessHours, setBusinessHours] = useState('')
 
-  // Delivery Data
+  // Commerce Data
   const [freeDelivery, setFreeDelivery] = useState(false)
   const [deliveryRates, setDeliveryRates] = useState({})
   const [newDeliveryState, setNewDeliveryState] = useState('')
   const [newDeliveryPrice, setNewDeliveryPrice] = useState('')
-
-  // Input states for adding new items
-  const [newService, setNewService] = useState({ name: '', price: '', desc: '' })
-  const [showAddService, setShowAddService] = useState(false)
-  
-  const [newTestimonial, setNewTestimonial] = useState({ name: '', text: '' })
-  const [showAddTestimonial, setShowAddTestimonial] = useState(false)
-
-  const [newFaq, setNewFaq] = useState({ q: '', a: '' })
-  const [showAddFaq, setShowAddFaq] = useState(false)
 
   // Contact Info
   const [businessPhone, setBusinessPhone] = useState('')
@@ -75,20 +61,28 @@ export default function EditorTab({ businessId }) {
 
   // SEO State
   const [seoRequested, setSeoRequested] = useState(false)
-  const [requestingSeo, setRequestingSeo] = useState(false)
 
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const [publicUrl, setPublicUrl] = useState('')
+  // Modals State
+  const [modalType, setModalType] = useState(null) // 'service', 'testimonial', 'faq', 'portfolio_edit'
+  const [activeItemIndex, setActiveItemIndex] = useState(null)
+  
+  const [tempService, setTempService] = useState({ name: '', price: '', desc: '', image_url: '' })
+  const [tempTestimonial, setTempTestimonial] = useState({ name: '', text: '' })
+  const [tempFaq, setTempFaq] = useState({ q: '', a: '' })
+  const [tempPortfolioItem, setTempPortfolioItem] = useState({ url: '', title: '', desc: '' })
 
   // Custom UI
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
+  const [uploading, setUploading] = useState(false)
 
   const showToast = (msg, type = 'success') => {
     setToastMessage(msg)
     setToastType(type)
     setTimeout(() => setToastMessage(''), 3000)
   }
+
+  const publicUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/${slug}`
 
   useEffect(() => {
     const load = async () => {
@@ -120,12 +114,8 @@ export default function EditorTab({ businessId }) {
           setTestimonials(data.testimonials || [])
           setFaqs(data.faqs || [])
           setBusinessHours(data.business_hours || '')
-          
-          // Delivery
           setFreeDelivery(data.free_delivery || false)
           setDeliveryRates(data.delivery_rates || {})
-
-          setPublicUrl(`${window.location.origin}/${page.slug}`)
         }
 
         const { data: seo } = await supabase.from('seo_requests').select('id').eq('business_id', businessId).eq('status', 'pending').maybeSingle()
@@ -145,22 +135,11 @@ export default function EditorTab({ businessId }) {
     setSaving(true)
     try {
       await supabase.from('businesses').update({
-        phone: businessPhone,
-        whatsapp: businessWhatsapp,
-        email: businessEmail,
-        location: businessAddress,
-        logo_url: logoUrl
+        phone: businessPhone, whatsapp: businessWhatsapp, email: businessEmail, location: businessAddress, logo_url: logoUrl
       }).eq('id', businessId)
 
       const updatedSectorData = {
-        ...sectorData,
-        portfolio,
-        services,
-        testimonials,
-        faqs,
-        business_hours: businessHours,
-        free_delivery: freeDelivery,
-        delivery_rates: deliveryRates
+        ...sectorData, portfolio, services, testimonials, faqs, business_hours: businessHours, free_delivery: freeDelivery, delivery_rates: deliveryRates
       }
 
       const { error } = await supabase.from('business_public_pages').upsert({
@@ -174,9 +153,7 @@ export default function EditorTab({ businessId }) {
       }, { onConflict: 'business_id' })
       
       if (error) throw error
-      
       setHasWebsite(true)
-      setPublicUrl(`${window.location.origin}/${slug}`)
       setIsEditingUrl(false)
       showToast('Website settings saved successfully')
     } catch (err) {
@@ -186,57 +163,106 @@ export default function EditorTab({ businessId }) {
     }
   }
 
-  const uploadImage = async (file, callback) => {
+  // ── Image Upload Logic ──
+  const uploadSingleImage = async (file, callback) => {
     if (!file) return
-    setSaving(true)
+    setUploading(true)
     try {
-      const compressedBlob = await compressImage(file, 200)
-      const filePath = `${businessId}/portfolio-${Date.now()}.jpg`
+      const compressedBlob = await compressImage(file, 300) // Slightly higher quality for portfolio
+      const filePath = `${businessId}/assets-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
       const { error: uploadError } = await supabase.storage.from('business-assets').upload(filePath, compressedBlob, { contentType: 'image/jpeg' })
-      
       if (uploadError) throw uploadError
-      
       const { data: urlData } = supabase.storage.from('business-assets').getPublicUrl(filePath)
       callback(urlData.publicUrl)
-      showToast('Image uploaded successfully')
     } catch (err) {
-      showToast('Upload failed. Please try again.', 'error')
+      showToast('Upload failed.', 'error')
     } finally {
-      setSaving(false)
+      setUploading(false)
     }
   }
 
-  // ── Handlers ──
-  const handleAddService = () => {
-    if (!newService.name) return
-    setServices([...services, newService])
-    setNewService({ name: '', price: '', desc: '' })
-    setShowAddService(false)
+  const handleBulkPortfolioUpload = async (files) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    const newItems = []
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const compressedBlob = await compressImage(files[i], 300)
+        const filePath = `${businessId}/portfolio-${Date.now()}-${i}.jpg`
+        const { error } = await supabase.storage.from('business-assets').upload(filePath, compressedBlob, { contentType: 'image/jpeg' })
+        if (error) throw error
+        const { data } = supabase.storage.from('business-assets').getPublicUrl(filePath)
+        newItems.push({ url: data.publicUrl, title: 'New Work', desc: '' })
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    setPortfolio(prev => [...prev, ...newItems])
+    setUploading(false)
+    showToast(`${newItems.length} images uploaded`)
   }
 
-  const handleAddTestimonial = () => {
-    if (!newTestimonial.name || !newTestimonial.text) return
-    setTestimonials([...testimonials, newTestimonial])
-    setNewTestimonial({ name: '', text: '' })
-    setShowAddTestimonial(false)
+  // ── Modal Handlers ──
+  const openServiceModal = (index = null) => {
+    if (index !== null) { setTempService(services[index]); setActiveItemIndex(index) } 
+    else { setTempService({ name: '', price: '', desc: '', image_url: '' }); setActiveItemIndex(null) }
+    setModalType('service')
   }
 
-  const handleAddFaq = () => {
-    if (!newFaq.q || !newFaq.a) return
-    setFaqs([...faqs, newFaq])
-    setNewFaq({ q: '', a: '' })
-    setShowAddFaq(false)
+  const saveService = () => {
+    if (!tempService.name) return
+    if (activeItemIndex !== null) {
+      const updated = [...services]; updated[activeItemIndex] = tempService; setServices(updated)
+    } else {
+      setServices([...services, tempService])
+    }
+    setModalType(null)
   }
 
-  const handleAddPortfolio = (url, title, desc) => {
-    setPortfolio([...portfolio, { url, title, desc }])
+  const openPortfolioModal = (index) => {
+    setTempPortfolioItem(portfolio[index]); setActiveItemIndex(index); setModalType('portfolio_edit')
+  }
+
+  const savePortfolioItem = () => {
+    const updated = [...portfolio]; updated[activeItemIndex] = tempPortfolioItem; setPortfolio(updated); setModalType(null)
+  }
+
+  const openTestimonialModal = (index = null) => {
+    if (index !== null) { setTempTestimonial(testimonials[index]); setActiveItemIndex(index) } 
+    else { setTempTestimonial({ name: '', text: '' }); setActiveItemIndex(null) }
+    setModalType('testimonial')
+  }
+
+  const saveTestimonial = () => {
+    if (!tempTestimonial.name || !tempTestimonial.text) return
+    if (activeItemIndex !== null) {
+      const updated = [...testimonials]; updated[activeItemIndex] = tempTestimonial; setTestimonials(updated)
+    } else {
+      setTestimonials([...testimonials, tempTestimonial])
+    }
+    setModalType(null)
+  }
+
+  const openFaqModal = (index = null) => {
+    if (index !== null) { setTempFaq(faqs[index]); setActiveItemIndex(index) } 
+    else { setTempFaq({ q: '', a: '' }); setActiveItemIndex(null) }
+    setModalType('faq')
+  }
+
+  const saveFaq = () => {
+    if (!tempFaq.q || !tempFaq.a) return
+    if (activeItemIndex !== null) {
+      const updated = [...faqs]; updated[activeItemIndex] = tempFaq; setFaqs(updated)
+    } else {
+      setFaqs([...faqs, tempFaq])
+    }
+    setModalType(null)
   }
 
   const handleAddDeliveryRate = () => {
     if (!newDeliveryState || !newDeliveryPrice) return
     setDeliveryRates({ ...deliveryRates, [newDeliveryState]: Number(newDeliveryPrice) })
-    setNewDeliveryState('')
-    setNewDeliveryPrice('')
+    setNewDeliveryState(''); setNewDeliveryPrice('')
   }
 
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
@@ -245,183 +271,170 @@ export default function EditorTab({ businessId }) {
     return (
       <div className="website-card" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem' }}>Build Your Website</h2>
-        <p style={{ color: 'var(--cresoa-text-muted)', marginBottom: '2rem' }}>Create a beautiful website for your fashion brand.</p>
         <button onClick={() => router.push(`/dashboard/website-onboarding?business_id=${businessId}`)} className="cresoa-primary-button">Start Setup Wizard</button>
       </div>
     )
   }
 
-  const PreviewTemplateComponent = getTemplate(templateId)
-
-  const safePreviewProps = {
-    business: { name: businessName, logo_url: logoUrl, phone: businessPhone, whatsapp: businessWhatsapp, email: businessEmail, location: businessAddress },
-    page: { 
-      about_text: aboutText, cover_image_url: heroImage, 
-      sector_data: { ...(sectorData || {}), portfolio, services, testimonials, faqs, business_hours: businessHours, free_delivery: freeDelivery, delivery_rates: deliveryRates } 
-    },
-    products: [], 
-    slug: slug
-  }
-
   return (
     <div className="website-editor-page">
       
-      {/* ── NEW SUB-TABS ── */}
+      {/* ── TABS ── */}
       <div className="smart-tabs-container" style={{ marginBottom: '1.5rem', paddingBottom: '5px' }}>
+        <button className={`smart-tab ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>Home</button>
         <button className={`smart-tab ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>Design</button>
         <button className={`smart-tab ${activeTab === 'content' ? 'active' : ''}`} onClick={() => setActiveTab('content')}>Content</button>
-        <button className={`smart-tab ${activeTab === 'shop' ? 'active' : ''}`} onClick={() => setActiveTab('shop')}>Delivery</button>
-        <button className={`smart-tab ${activeTab === 'seo' ? 'active' : ''}`} onClick={() => setActiveTab('seo')}>Settings</button>
+        <button className={`smart-tab ${activeTab === 'commerce' ? 'active' : ''}`} onClick={() => setActiveTab('commerce')}>Commerce</button>
+        <button className={`smart-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>Settings</button>
       </div>
 
-      {/* ── TAB 1: DESIGN ── */}
-      {activeTab === 'design' && (
+      {/* ── TAB: HOME ── */}
+      {activeTab === 'home' && (
         <>
-          <div className="website-card">
-            <h3 className="website-section-title">Brand & URL</h3>
-            <div className="website-form-group">
-              <label className="website-label">Your Website Link</label>
-              {!isEditingUrl ? (
-                <>
-                  <div className="website-url-card">
-                    <span className="website-url-text">{publicUrl}</span>
-                    <div className="website-url-actions">
-                      <button type="button" className="url-btn" onClick={() => { navigator.clipboard.writeText(publicUrl); showToast('Copied!') }}><SvgIcons.Copy /></button>
-                      <button type="button" className="url-btn" onClick={async () => { if (navigator.share) await navigator.share({ url: publicUrl }) }}><SvgIcons.Share /></button>
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setIsEditingUrl(true)} className="edit-url-btn">Edit Website Link</button>
-                </>
-              ) : (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="text" value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} className="website-input" style={{ height: '52px' }} />
-                  <button type="button" onClick={() => setIsEditingUrl(false)} className="url-btn" style={{ height: '52px', width: '52px', background: 'var(--color-primary)', color: 'white' }}><SvgIcons.Check /></button>
-                </div>
-              )}
-            </div>
-            <div className="form-grid-2">
-              <div className="website-form-group" style={{ marginBottom: 0 }}>
-                <label className="website-label">Business Logo</label>
-                <label className="image-upload-card">
-                  {logoUrl ? <><img src={logoUrl} /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Plus /><span>Upload Logo</span></div>}
-                  <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files[0], setLogoUrl)} style={{ display: 'none' }} />
-                </label>
-              </div>
-              <div className="website-form-group" style={{ marginBottom: 0 }}>
-                <label className="website-label">Hero Cover Image</label>
-                <label className="image-upload-card">
-                  {heroImage ? <><img src={heroImage} /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Image /><span>Upload Cover</span></div>}
-                  <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files[0], setHeroImage)} style={{ display: 'none' }} />
-                </label>
+          <div className="website-card" style={{ background: 'linear-gradient(135deg, var(--color-primary), #1A4685)', color: '#fff', border: 'none' }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 800 }}>Your Website is Live</h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', opacity: 0.9 }}>Share this link with your customers so they can shop and contact you.</p>
+            <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{publicUrl}</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" onClick={() => { navigator.clipboard.writeText(publicUrl); showToast('Copied!') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', padding: '8px', color: '#fff', cursor: 'pointer' }}><SvgIcons.Copy /></button>
+                <a href={`/${slug}`} target="_blank" style={{ background: 'var(--color-accent)', border: 'none', borderRadius: '8px', padding: '8px 16px', color: '#000', fontWeight: 700, textDecoration: 'none', fontSize: '0.85rem' }}>Preview</a>
               </div>
             </div>
           </div>
 
           <div className="website-card">
-            <h3 className="website-section-title">Website Style</h3>
-            <div className="template-grid">
-              {templates.map(tpl => (
-                <div key={tpl.id} className={`template-card ${templateId === tpl.id ? 'active' : ''}`} onClick={() => setTemplateId(tpl.id)}>
-                  <div className="template-preview" style={{ background: tpl.preview }} />
-                  <div className="template-info"><span className="template-name">{tpl.name}</span><span className="template-desc">{tpl.description}</span></div>
-                </div>
-              ))}
+            <h3 className="website-section-title">Website URL</h3>
+            {!isEditingUrl ? (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600 }}>cresoa.com.ng/{slug}</span>
+                <button onClick={() => setIsEditingUrl(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Edit</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} className="website-input" style={{ height: '52px' }} />
+                <button type="button" onClick={() => setIsEditingUrl(false)} className="url-btn" style={{ height: '52px', width: '52px', background: 'var(--color-primary)', color: 'white' }}><SvgIcons.Check /></button>
+              </div>
+            )}
+          </div>
+
+          <div className="website-card">
+            <h3 className="website-section-title">Hero & Branding</h3>
+            <div className="form-grid-2">
+              <div className="website-form-group" style={{ marginBottom: 0 }}>
+                <label className="website-label">Logo</label>
+                <label className="image-upload-card">
+                  {logoUrl ? <><img src={logoUrl} /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Plus /><span>Upload Logo</span></div>}
+                  <input type="file" accept="image/*" onChange={(e) => uploadSingleImage(e.target.files[0], setLogoUrl)} style={{ display: 'none' }} />
+                </label>
+              </div>
+              <div className="website-form-group" style={{ marginBottom: 0 }}>
+                <label className="website-label">Cover Image</label>
+                <label className="image-upload-card">
+                  {heroImage ? <><img src={heroImage} /><div className="image-upload-overlay"><span>Change</span></div></> : <div className="image-upload-label"><SvgIcons.Image /><span>Upload Cover</span></div>}
+                  <input type="file" accept="image/*" onChange={(e) => uploadSingleImage(e.target.files[0], setHeroImage)} style={{ display: 'none' }} />
+                </label>
+              </div>
             </div>
+          </div>
+
+          <div className="website-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div><h3 className="website-section-title" style={{ marginBottom: '4px' }}>Site Status</h3><p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{isEnabled ? 'Live & Visible' : 'Hidden (Draft Mode)'}</p></div>
+            <button type="button" onClick={() => setIsEnabled(!isEnabled)} style={{ width: '56px', height: '28px', borderRadius: '14px', border: 'none', background: isEnabled ? 'var(--color-secondary)' : 'var(--cresoa-border)', position: 'relative' }}><span style={{ position: 'absolute', top: '2px', left: isEnabled ? '30px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} /></button>
           </div>
         </>
       )}
 
-      {/* ── TAB 2: CONTENT ── */}
-    {activeTab === 'content' && (
+      {/* ── TAB: DESIGN ── */}
+      {activeTab === 'design' && (
+        <div className="website-card">
+          <h3 className="website-section-title">Choose a Theme</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '1.5rem' }}>Select the look and feel of your storefront.</p>
+          <div className="template-grid">
+            {templates.map(tpl => (
+              <div key={tpl.id} className={`template-card ${templateId === tpl.id ? 'active' : ''}`} onClick={() => setTemplateId(tpl.id)}>
+                <div className="template-preview" style={{ background: tpl.preview }} />
+                <div className="template-info"><span className="template-name">{tpl.name}</span><span className="template-desc">{tpl.description}</span></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+           {/* ── TAB: CONTENT ── */}
+      {activeTab === 'content' && (
         <>
           <div className="website-card">
             <h3 className="website-section-title">About Your Business</h3>
-            <textarea className="website-input" value={aboutText} onChange={e => setAboutText(e.target.value)} placeholder="Tell your customers your story..." rows={5} />
+            <textarea className="website-input" value={aboutText} onChange={e => setAboutText(e.target.value)} placeholder="Tell your customers your story..." rows={4} />
           </div>
 
           <div className="website-card">
-            <h3 className="website-section-title">Portfolio / Lookbook</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '1rem' }}>
-              {portfolio.map((item, i) => (
-                <div key={i} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', height: '150px', border: '1px solid var(--cresoa-border)' }}>
-                  <img src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
-                    <div style={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>{item.title || 'Untitled'}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 className="website-section-title" style={{ margin: 0 }}>Services & Pricing</h3>
+              <button type="button" onClick={() => openServiceModal()} className="cresoa-primary-button" style={{ padding: '6px 12px', fontSize: '0.8rem' }}><SvgIcons.Plus size={14}/> Add</button>
+            </div>
+            {services.length === 0 ? <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>No services added yet.</p> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {services.map((srv, idx) => (
+                  <div key={idx} onClick={() => openServiceModal(idx)} style={{ display: 'flex', gap: '12px', background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '12px', cursor: 'pointer', alignItems: 'center' }}>
+                    {srv.image_url ? <img src={srv.image_url} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} /> : <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--cresoa-border)' }} />}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{srv.name} {srv.price && `- ₦${Number(srv.price).toLocaleString()}`}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--cresoa-text-muted)' }}>{srv.desc}</div>
+                    </div>
                   </div>
-                  <button type="button" onClick={() => setPortfolio(portfolio.filter((_, idx) => idx !== i))} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px' }}><SvgIcons.X size={14} /></button>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ background: 'var(--cresoa-bg)', padding: '16px', borderRadius: '12px', border: '1px dashed var(--cresoa-border)' }}>
-              <input type="file" accept="image/*" id="portfolio-upload" style={{ display: 'none' }} onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  const title = prompt("Enter a title for this work:");
-                  const desc = prompt("Enter a short description:");
-                  if (title !== null) uploadImage(file, (url) => handleAddPortfolio(url, title, desc));
-                }
-              }} />
-              <button type="button" onClick={() => document.getElementById('portfolio-upload').click()} className="wizard-add-btn" style={{ padding: '12px', borderRadius: '8px', width: '100%', border: 'none' }}>
-                <SvgIcons.Plus /> Upload Portfolio Item
-              </button>
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="website-card">
-            <h3 className="website-section-title">Services & Pricing</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1rem' }}>
-              {services.map((srv, idx) => (
-                <div key={idx} style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                  <div><div style={{ fontWeight: 700 }}>{srv.name} {srv.price && <span> - ₦{Number(srv.price).toLocaleString()}</span>}</div></div>
-                  <button type="button" onClick={() => setServices(services.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: 'var(--color-danger)' }}><SvgIcons.Trash /></button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 className="website-section-title" style={{ margin: 0 }}>Portfolio</h3>
+              <label className="cresoa-primary-button" style={{ padding: '6px 12px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                <SvgIcons.Plus size={14}/> Upload Images
+                <input type="file" multiple accept="image/*" onChange={(e) => handleBulkPortfolioUpload(e.target.files)} style={{ display: 'none' }} />
+              </label>
+            </div>
+            {uploading && <p style={{ fontSize: '0.8rem', color: 'var(--color-accent)' }}>Uploading images...</p>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px' }}>
+              {portfolio.map((item, idx) => (
+                <div key={idx} onClick={() => openPortfolioModal(idx)} style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', border: '1px solid var(--cresoa-border)' }}>
+                  <img src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.6)', padding: '4px' }}>
+                     <div style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+                  </div>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={() => setShowAddService(true)} className="wizard-add-btn" style={{ padding: '16px', borderRadius: '12px' }}><SvgIcons.Plus /> Add a Service</button>
-          </div>
-
-          <div className="website-card">
-            <h3 className="website-section-title">Testimonials</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1rem' }}>
-              {testimonials.map((t, idx) => (
-                <div key={idx} style={{ background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                  <div><div style={{ fontWeight: 700 }}>"{t.text}"</div><div style={{ fontSize: '0.8rem' }}>- {t.name}</div></div>
-                  <button type="button" onClick={() => setTestimonials(testimonials.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', color: 'var(--color-danger)' }}><SvgIcons.Trash /></button>
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={() => setShowAddTestimonial(true)} className="wizard-add-btn" style={{ padding: '16px', borderRadius: '12px' }}><SvgIcons.Plus /> Add a Testimonial</button>
           </div>
         </>
       )}
 
-      {/* ── TAB 3: DELIVERY ── */}
-      {activeTab === 'shop' && (
+      {/* ── TAB: COMMERCE ── */}
+      {activeTab === 'commerce' && (
         <div className="website-card">
           <h3 className="website-section-title">Delivery Settings</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--cresoa-text-muted)', marginBottom: '1rem' }}>Set up how you deliver to your customers.</p>
-          
           <div className="website-form-group">
             <label className="website-label">Free Delivery</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <button type="button" onClick={() => setFreeDelivery(!freeDelivery)} style={{ width: '50px', height: '28px', borderRadius: '14px', border: 'none', background: freeDelivery ? 'var(--color-secondary)' : 'var(--cresoa-border)', position: 'relative' }}>
                 <span style={{ position: 'absolute', top: '2px', left: freeDelivery ? '24px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </button>
-              <span style={{ fontSize: '0.9rem' }}>{freeDelivery ? 'Yes, offer free delivery' : 'No, charge for delivery'}</span>
+              <span style={{ fontSize: '0.9rem' }}>{freeDelivery ? 'Yes' : 'No, charge per state'}</span>
             </div>
           </div>
 
           {!freeDelivery && (
             <div style={{ marginTop: '1rem' }}>
-              <label className="website-label">Delivery Rates per State</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1rem' }}>
                 {Object.entries(deliveryRates).map(([state, price]) => (
-                  <div key={state} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--cresoa-surface-soft)', padding: '10px', borderRadius: '8px' }}>
-                    <span style={{ fontWeight: 600 }}>{state}</span>
+                  <div key={state} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--cresoa-surface-soft)', padding: '12px', borderRadius: '8px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{state}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span>₦{Number(price).toLocaleString()}</span>
-                      <button type="button" onClick={() => { const newRates = { ...deliveryRates }; delete newRates[state]; setDeliveryRates(newRates); }} style={{ background: 'none', border: 'none', color: 'var(--color-danger)' }}><SvgIcons.Trash /></button>
+                      <span style={{ fontWeight: 700 }}>₦{Number(price).toLocaleString()}</span>
+                      <button type="button" onClick={() => { const newRates = { ...deliveryRates }; delete newRates[state]; setDeliveryRates(newRates); }} style={{ background: 'none', border: 'none', color: 'var(--color-danger)' }}><SvgIcons.Trash size={14} /></button>
                     </div>
                   </div>
                 ))}
@@ -431,19 +444,19 @@ export default function EditorTab({ businessId }) {
                   <option value="">Select State</option>
                   {NIGERIAN_STATES.filter(s => !deliveryRates[s]).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <input type="number" value={newDeliveryPrice} onChange={e => setNewDeliveryPrice(e.target.value)} placeholder="Price (₦)" className="website-input" style={{ width: '120px' }} />
-                <button type="button" onClick={handleAddDeliveryRate} className="cresoa-primary-button" style={{ padding: '0 16px' }}><SvgIcons.Plus /></button>
+                <input type="number" value={newDeliveryPrice} onChange={e => setNewDeliveryPrice(e.target.value)} placeholder="Price (₦)" className="website-input" style={{ width: '100px' }} />
+                <button type="button" onClick={handleAddDeliveryRate} className="cresoa-primary-button" style={{ padding: '0 16px' }}><SvgIcons.Plus size={16}/></button>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── TAB 4: SETTINGS (SEO & CONTACT) ── */}
-      {activeTab === 'seo' && (
+      {/* ── TAB: SETTINGS ── */}
+      {activeTab === 'settings' && (
         <>
           <div className="website-card">
-            <h3 className="website-section-title">Contact & Hours</h3>
+            <h3 className="website-section-title">Contact Information</h3>
             <div className="form-grid-2">
               <div className="website-form-group"><label className="website-label">Phone</label><input type="text" className="website-input" value={businessPhone} onChange={e => setBusinessPhone(e.target.value)} /></div>
               <div className="website-form-group"><label className="website-label">WhatsApp</label><input type="text" className="website-input" value={businessWhatsapp} onChange={e => setBusinessWhatsapp(e.target.value)} /></div>
@@ -453,61 +466,62 @@ export default function EditorTab({ businessId }) {
             <div className="website-form-group" style={{ marginTop: '16px' }}><label className="website-label">Business Hours</label><input type="text" className="website-input" value={businessHours} onChange={e => setBusinessHours(e.target.value)} placeholder="Mon-Fri: 9am - 6pm" /></div>
           </div>
 
-          <div className="website-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div><h3 className="website-section-title" style={{ marginBottom: '4px' }}>Website Status</h3><p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{isEnabled ? 'Live' : 'Hidden'}</p></div>
-            <button type="button" onClick={() => setIsEnabled(!isEnabled)} style={{ width: '56px', height: '28px', borderRadius: '14px', border: 'none', background: isEnabled ? 'var(--color-secondary)' : 'var(--cresoa-border)', position: 'relative' }}><span style={{ position: 'absolute', top: '2px', left: isEnabled ? '30px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} /></button>
-          </div>
-
           <div className="website-card">
             <h3 className="website-section-title">Google Search</h3>
             <div style={{ background: 'var(--cresoa-surface-soft)', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><SvgIcons.Google /> Search</div>
+              <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}><SvgIcons.Google /> Search Index</div>
               <button type="button" onClick={() => {}} disabled={seoRequested} className="cresoa-primary-button" style={{ padding: '8px 12px', fontSize: '0.8rem' }}>{seoRequested ? 'Requested' : 'Boost'}</button>
             </div>
           </div>
         </>
       )}
 
-      {/* MODALS (Add Service, Testimonial, FAQ) */}
-      {showAddService && (
-        <div className="app-modal-overlay" onClick={() => setShowAddService(false)}>
+      {/* ── MODALS ── */}
+      {modalType === 'service' && (
+        <div className="app-modal-overlay" onClick={() => setModalType(null)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px' }}>Add Service</h3>
-            <input type="text" className="website-input" placeholder="Service Name" value={newService.name} onChange={e => setNewService({...newService, name: e.target.value})} style={{ marginBottom: '10px' }} />
-            <input type="number" className="website-input" placeholder="Price" value={newService.price} onChange={e => setNewService({...newService, price: e.target.value})} style={{ marginBottom: '10px' }} />
-            <input type="text" className="website-input" placeholder="Description" value={newService.desc} onChange={e => setNewService({...newService, desc: e.target.value})} style={{ marginBottom: '16px' }} />
-            <div style={{ display: 'flex', gap: '10px' }}><button onClick={() => setShowAddService(false)} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button><button onClick={handleAddService} className="cresoa-primary-button" style={{ flex: 1 }}>Save</button></div>
+            <h3 style={{ margin: '0 0 16px' }}>{activeItemIndex !== null ? 'Edit Service' : 'Add Service'}</h3>
+            <label className="website-label">Service Image</label>
+            <label className="image-upload-card" style={{ minHeight: '100px', marginBottom: '16px' }}>
+              {tempService.image_url ? <img src={tempService.image_url} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} /> : <div className="image-upload-label"><SvgIcons.Image size={20} /><span>Upload Image</span></div>}
+              <input type="file" accept="image/*" onChange={(e) => uploadSingleImage(e.target.files[0], (url) => setTempService({...tempService, image_url: url}))} style={{ display: 'none' }} />
+            </label>
+            <input type="text" className="website-input" placeholder="Service Name (e.g. Custom Senator)" value={tempService.name} onChange={e => setTempService({...tempService, name: e.target.value})} style={{ marginBottom: '10px' }} />
+            <input type="number" className="website-input" placeholder="Price (₦)" value={tempService.price} onChange={e => setTempService({...tempService, price: e.target.value})} style={{ marginBottom: '10px' }} />
+            <textarea className="website-input" placeholder="Description" value={tempService.desc} onChange={e => setTempService({...tempService, desc: e.target.value})} style={{ marginBottom: '16px', height: '80px' }} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setModalType(null)} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button>
+              <button onClick={saveService} className="cresoa-primary-button" style={{ flex: 1 }}>Save</button>
+            </div>
           </div>
         </div>
       )}
 
-      {showAddTestimonial && (
-        <div className="app-modal-overlay" onClick={() => setShowAddTestimonial(false)}>
+      {modalType === 'portfolio_edit' && (
+        <div className="app-modal-overlay" onClick={() => setModalType(null)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px' }}>Add Testimonial</h3>
-            <input type="text" className="website-input" placeholder="Customer Name" value={newTestimonial.name} onChange={e => setNewTestimonial({...newTestimonial, name: e.target.value})} style={{ marginBottom: '10px' }} />
-            <textarea className="website-input" placeholder="Review" value={newTestimonial.text} onChange={e => setNewTestimonial({...newTestimonial, text: e.target.value})} style={{ marginBottom: '16px' }} />
-            <div style={{ display: 'flex', gap: '10px' }}><button onClick={() => setShowAddTestimonial(false)} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button><button onClick={handleAddTestimonial} className="cresoa-primary-button" style={{ flex: 1 }}>Save</button></div>
+            <h3 style={{ margin: '0 0 16px' }}>Edit Portfolio Item</h3>
+            <img src={tempPortfolioItem.url} style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '12px', marginBottom: '16px' }} />
+            <input type="text" className="website-input" placeholder="Title (e.g. Aso Ebi Wedding)" value={tempPortfolioItem.title} onChange={e => setTempPortfolioItem({...tempPortfolioItem, title: e.target.value})} style={{ marginBottom: '10px' }} />
+            <textarea className="website-input" placeholder="Description (Optional)" value={tempPortfolioItem.desc} onChange={e => setTempPortfolioItem({...tempPortfolioItem, desc: e.target.value})} style={{ marginBottom: '16px', height: '80px' }} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => { setPortfolio(portfolio.filter((_, i) => i !== activeItemIndex)); setModalType(null) }} className="order-btn-secondary" style={{ color: 'var(--color-danger)' }}><SvgIcons.Trash size={16}/></button>
+              <button onClick={() => setModalType(null)} className="order-btn-secondary" style={{ flex: 1 }}>Cancel</button>
+              <button onClick={savePortfolioItem} className="cresoa-primary-button" style={{ flex: 1 }}>Save</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* FIXED FOOTER */}
       <div className="website-fixed-footer">
-        <button type="button" onClick={() => setPreviewOpen(true)} className="order-btn-secondary" style={{ flex: 1, padding: '14px' }}><SvgIcons.Eye /> Preview</button>
-        <button type="button" onClick={handleSave} disabled={saving} className="cresoa-primary-button" style={{ flex: 2, padding: '14px' }}>{saving ? 'Saving...' : 'Save Changes'}</button>
+        <button type="button" onClick={handleSave} disabled={saving} className="cresoa-primary-button" style={{ width: '100%', padding: '16px', fontSize: '1rem' }}>
+          {saving ? 'Saving Changes...' : 'Save Website Settings'}
+        </button>
       </div>
 
-      {/* PREVIEW MODAL */}
-      {previewOpen && (
-        <div className="app-modal-overlay" onClick={() => setPreviewOpen(false)}>
-          <div className="app-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px', padding: 0, background: '#fff', overflow: 'hidden', height: '80vh' }}>
-            <PreviewTemplateComponent {...safePreviewProps} />
-          </div>
-        </div>
-      )}
-
+      {/* TOAST */}
       {toastMessage && <div className={`app-toast ${toastType}`}>{toastMessage}</div>}
     </div>
   )
-    }
+        }
