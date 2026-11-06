@@ -40,7 +40,7 @@ export default function ProductPage({ params }) {
   }
 
   return (
-    <div style={{ padding: '40px 20px', maxWidth: '1000px', margin: '0 auto', minHeight: '80vh' }}>
+    <div style={{ padding: '40px 20px', maxWidth: '1000px', margin: '0 auto', minHeight: '80vh', fontFamily: "'Inter', sans-serif" }}>
       <Link href={`/${slug}/shop`} style={{ color: '#D4AF37', textDecoration: 'none', fontWeight: 600 }}>← Back to Shop</Link>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '40px', marginTop: '20px' }}>
@@ -83,4 +83,4 @@ export default function ProductPage({ params }) {
       </div>
     </div>
   )
-}
+            }
