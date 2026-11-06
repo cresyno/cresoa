@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
-import { getTemplate } from '../../lib/templateRegistry' // Adjust path if needed
+import { getTemplate } from '../../lib/templateRegistry'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,6 +39,8 @@ export async function generateMetadata({ params }) {
 export default async function PublicPage({ params }) {
   try {
     const slug = params.slug
+    
+    // 1. Fetch Page Config
     const { data: page } = await supabaseAdmin
       .from('business_public_pages')
       .select('*')
@@ -48,80 +50,67 @@ export default async function PublicPage({ params }) {
       
     if (!page) notFound()
 
+    // 2. Fetch Business
     const { data: business } = await supabaseAdmin
       .from('businesses')
       .select('*')
       .eq('id', page.business_id)
       .single()
 
-    // ✅ 1. Fetch inventory items that are listed on the website
+    // 3. Fetch Products
     const { data: inventoryItems } = await supabaseAdmin
       .from('inventory_items')
       .select('*')
       .eq('business_id', page.business_id)
       .eq('is_listed_on_website', true)
 
-    // ✅ 2. Map inventory to standard format
+    // 4. Map Inventory to expected format
     let shop = []
     if (inventoryItems && inventoryItems.length > 0) {
       shop = inventoryItems.map(item => ({
         id: item.id,
-        item_name: item.item_name, // Match ClassicGold expectations
+        item_name: item.item_name,
         selling_price: String(item.selling_price), 
         description: item.web_description || item.description || '',
         image_url: item.image_url || '',
-        is_featured: item.is_featured ?? false,
+        is_featured: item.is_featured ?? false, // CRITICAL: This tells the template what to show
         quantity_on_hand: item.quantity_on_hand
       }))
-    } else {
-      // Fallback
-      try { shop = page.shop_products || []; } catch { shop = []; }
     }
 
-    // ✅ 3. Filter for exactly 6 Featured Products for the Homepage
+    // 5. Filter Featured Products (Max 6)
     let featuredProducts = shop.filter(item => item.is_featured === true)
-    
-    // If they haven't marked exactly 6, just take the first 6 so the page isn't empty
     if (featuredProducts.length === 0 && shop.length > 0) {
       featuredProducts = shop.slice(0, 6)
     } else {
       featuredProducts = featuredProducts.slice(0, 6)
     }
 
-    // Robust portfolio parsing
+    // 6. Parse Portfolio (Safely)
     let portfolio = []
     try {
       const raw = page.portfolio_images || page.sector_data?.portfolio || []
       portfolio = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : [])
       if (!Array.isArray(portfolio)) portfolio = []
       portfolio = portfolio.map(item => {
-        if (typeof item === 'string') return { url: item, description: '' }
-        if (item && typeof item === 'object' && !item.url) {
-          const keys = Object.keys(item).filter(k => /^\d+$/.test(k))
-          if (keys.length) {
-            const url = keys.sort((a, b) => parseInt(a) - parseInt(b)).map(k => item[k]).join('')
-            return { url, description: item.description || '' }
-          }
-        }
+        if (typeof item === 'string') return { url: item, description: '', title: '' }
         return { url: item.url || '', description: item.description || '', title: item.title || '' }
       }).filter(item => item.url && item.url.includes('http'))
     } catch { portfolio = [] }
 
+    // 7. Parse Services (Safely)
     let services = []
     try { 
       services = page.services || page.sector_data?.services || []; 
-      if (!Array.isArray(services)) {
-         services = typeof services === 'string' ? JSON.parse(services) : []
-      } 
+      if (!Array.isArray(services)) services = typeof services === 'string' ? JSON.parse(services) : []
     } catch { services = [] }
 
-    const about = page.about_text || page.about || business?.description || ''
+    // 8. Determine Template (Fallback to classic-gold)
+    const activeTemplateId = page.template_id || 'classic-gold'
+    const TemplateComponent = getTemplate(activeTemplateId)
 
-    // ✅ 4. Dynamically Load the Template Component (ClassicGold)
-    const TemplateComponent = getTemplate(page.template_id || 'classic-gold')
-
-    // ✅ 5. Construct the props safely
-    const safePreviewProps = {
+    // 9. Construct Props for Template
+    const templateProps = {
       business: { 
         name: business?.name || 'Business', 
         logo_url: business?.logo_url || '', 
@@ -132,7 +121,7 @@ export default async function PublicPage({ params }) {
       },
       page: { 
         ...page,
-        about_text: about,
+        about_text: page.about_text || page.about || business?.description || '',
         cover_image_url: page.cover_image_url || '',
         sector_data: { 
           ...(page.sector_data || {}),
@@ -145,11 +134,12 @@ export default async function PublicPage({ params }) {
           free_delivery: page.sector_data?.free_delivery || false
         } 
       },
-      products: featuredProducts, // Only passes the 6 featured
+      products: featuredProducts, 
       slug: slug
     }
 
-    return <TemplateComponent {...safePreviewProps} />
+    // 10. Render the Dynamic Template
+    return <TemplateComponent {...templateProps} />
     
   } catch (error) {
     console.error('Public page error:', error)
@@ -162,4 +152,4 @@ export default async function PublicPage({ params }) {
       </div>
     )
   }
-  }
+}
