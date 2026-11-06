@@ -20,22 +20,26 @@ export default function PortfolioPage({ params }) {
   }, [slug])
 
   return (
-    <div style={{ padding: '40px 20px', maxWidth: '1200px', margin: '0 auto', minHeight: '80vh' }}>
+    <div style={{ padding: '40px 20px', maxWidth: '1200px', margin: '0 auto', minHeight: '80vh', fontFamily: "'Inter', sans-serif" }}>
       <div style={{ marginBottom: '40px' }}>
         <Link href={`/${slug}`} style={{ color: '#D4AF37', textDecoration: 'none', fontWeight: 600 }}>← Back to Home</Link>
         <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', color: '#0F2B4A', marginTop: '10px' }}>Our Portfolio</h1>
       </div>
 
-      <div style={{ columnCount: '2', columnGap: '20px' }}>
-        {portfolio.map((item, i) => (
-          <div key={i} onClick={() => setSelectedImage(item)} style={{ breakInside: 'avoid', marginBottom: '20px', cursor: 'pointer', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
-            <img src={item.url} alt={item.title} style={{ width: '100%', display: 'block' }} />
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
-              <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem' }}>{item.title}</h3>
+      {portfolio.length === 0 ? (
+        <p style={{ textAlign: 'center', color: '#666' }}>No portfolio images uploaded yet.</p>
+      ) : (
+        <div style={{ columnCount: '2', columnGap: '20px' }}>
+          {portfolio.map((item, i) => (
+            <div key={i} onClick={() => setSelectedImage(item)} style={{ breakInside: 'avoid', marginBottom: '20px', cursor: 'pointer', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
+              <img src={item.url} alt={item.title} style={{ width: '100%', display: 'block' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))' }}>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem' }}>{item.title}</h3>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {selectedImage && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedImage(null)}>
@@ -51,4 +55,4 @@ export default function PortfolioPage({ params }) {
       )}
     </div>
   )
-}
+        }
