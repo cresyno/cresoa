@@ -5,7 +5,6 @@ import Link from 'next/link'
 
 export default function ClassicGold({ business, page, products = [], slug }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [openFaq, setOpenFaq] = useState(null)
 
   // ── SAFE DATA EXTRACTION ──
   const name = business?.name || 'Your Business'
@@ -20,12 +19,15 @@ export default function ClassicGold({ business, page, products = [], slug }) {
   const sectorData = page?.sector_data || {}
   const services = Array.isArray(sectorData.services) ? sectorData.services : []
   const testimonials = Array.isArray(sectorData.testimonials) ? sectorData.testimonials : []
-  const faqs = Array.isArray(sectorData.faqs) ? sectorData.faqs : []
   const portfolio = Array.isArray(sectorData.portfolio) ? sectorData.portfolio : []
   
   // Slice to exactly 6 for the homepage
   const featuredProducts = products.slice(0, 6)
   const featuredPortfolio = portfolio.slice(0, 6)
+
+  // Check if we have any shop or portfolio items to show in navigation
+  const hasShop = products.length > 0 || sectorData?.has_shop
+  const hasPortfolio = portfolio.length > 0
 
   // WhatsApp Link Generator
   const getWhatsAppLink = (message = "Hello! I found your website and I'd like to make an enquiry.") => {
@@ -48,9 +50,20 @@ export default function ClassicGold({ business, page, products = [], slug }) {
           
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <Link href={`/${slug}`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Home</Link>
-            <Link href={`/${slug}/shop`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Shop</Link>
-            <Link href={`/${slug}/portfolio`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Portfolio</Link>
-            <Link href={`/${slug}/cart`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Cart</Link>
+            
+            {/* ONLY SHOW SHOP IF PRODUCTS EXIST */}
+            {hasShop && (
+              <Link href={`/${slug}/shop`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Shop</Link>
+            )}
+            
+            {/* ONLY SHOW PORTFOLIO IF ITEMS EXIST */}
+            {hasPortfolio && (
+              <Link href={`/${slug}/portfolio`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Portfolio</Link>
+            )}
+
+            {hasShop && (
+              <Link href={`/${slug}/cart`} style={{ textDecoration: 'none', color: '#0F2B4A', fontSize: '1.2rem', fontWeight: 600 }}>Cart</Link>
+            )}
           </nav>
 
           <div style={{ marginTop: 'auto' }}>
@@ -71,9 +84,12 @@ export default function ClassicGold({ business, page, products = [], slug }) {
           {logo ? <img src={logo} style={{ height: '36px', objectFit: 'contain' }} /> : <h1 style={{ margin: 0, fontSize: '1.2rem', color: '#0F2B4A', fontFamily: "'Playfair Display', serif" }}>{name}</h1>}
         </Link>
 
-        <Link href={`/${slug}/cart`} style={{ color: '#0F2B4A', position: 'relative' }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
-        </Link>
+        {/* ONLY SHOW CART ICON IF SHOP IS ACTIVE */}
+        {hasShop ? (
+          <Link href={`/${slug}/cart`} style={{ color: '#0F2B4A', position: 'relative' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
+          </Link>
+        ) : <div style={{ width: '24px' }} /> }
       </header>
 
       {/* ── HERO SECTION ── */}
@@ -88,9 +104,13 @@ export default function ClassicGold({ business, page, products = [], slug }) {
           <a href={getWhatsAppLink()} target="_blank" rel="noreferrer" style={{ background: '#D4AF37', color: '#0F2B4A', padding: '14px 28px', borderRadius: '30px', fontSize: '1rem', fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 15px rgba(212, 175, 55, 0.3)' }}>
             Book a Fitting
           </a>
-          <Link href={`/${slug}/shop`} style={{ background: 'transparent', color: '#fff', border: '2px solid #fff', padding: '14px 28px', borderRadius: '30px', fontSize: '1rem', fontWeight: 700, textDecoration: 'none' }}>
-            View Shop
-          </Link>
+          
+          {/* ONLY SHOW SHOP BUTTON IF PRODUCTS EXIST */}
+          {hasShop && (
+            <Link href={`/${slug}/shop`} style={{ background: 'transparent', color: '#fff', border: '2px solid #fff', padding: '14px 28px', borderRadius: '30px', fontSize: '1rem', fontWeight: 700, textDecoration: 'none' }}>
+              View Shop
+            </Link>
+          )}
         </div>
       </section>
 
@@ -140,6 +160,33 @@ export default function ClassicGold({ business, page, products = [], slug }) {
         </div>
       </section>
 
+      {/* ── SERVICES ── */}
+      {services.length > 0 && (
+        <section style={{ padding: '80px 20px', background: '#fafafa' }}>
+           <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', color: '#0F2B4A', marginBottom: '10px' }}>What We Offer</h2>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                {services.map((srv, i) => (
+                  <div key={i} style={{ padding: '30px', borderRadius: '16px', border: '1px solid #eee', background: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0F2B4A', marginBottom: '10px' }}>{srv.name}</h3>
+                      {srv.desc && <p style={{ color: '#666', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '20px' }}>{srv.desc}</p>}
+                    </div>
+                    {srv.price && (
+                      <div style={{ borderTop: '1px solid #eaeaea', paddingTop: '15px', marginTop: 'auto' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#777', textTransform: 'uppercase', letterSpacing: '1px' }}>Starting from</span>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#D4AF37' }}>₦{Number(srv.price).toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+           </div>
+        </section>
+      )}
+
       {/* ── FEATURED PORTFOLIO ── */}
       {featuredPortfolio.length > 0 && (
         <section style={{ padding: '80px 20px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -156,7 +203,7 @@ export default function ClassicGold({ business, page, products = [], slug }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '16px' }}>
             {featuredPortfolio.map((item, i) => (
               <Link key={i} href={`/${slug}/portfolio`} style={{ textDecoration: 'none', display: 'block', position: 'relative', borderRadius: '16px', overflow: 'hidden', aspectRatio: '1' }}>
-                <img src={item.url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }} />
+                <img src={item.url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '20px' }}>
                   <h3 style={{ margin: 0, color: '#fff', fontSize: '1.1rem', fontWeight: 700 }}>{item.title}</h3>
                   {item.desc && <p style={{ margin: '4px 0 0 0', color: '#ddd', fontSize: '0.85rem' }}>{item.desc}</p>}
@@ -222,4 +269,4 @@ export default function ClassicGold({ business, page, products = [], slug }) {
 
     </div>
   )
-      }
+                                                 }
