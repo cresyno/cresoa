@@ -29,11 +29,11 @@ export default function CheckoutPage({ params }) {
   const finalTotal = cartTotal + deliveryFee
 
   if (cart.length === 0) {
-    return <div style={{ padding: '80px 20px', textAlign: 'center' }}><h2>Your cart is empty</h2><Link href={`/${slug}/shop`}>Back to shop</Link></div>
+    return <div style={{ padding: '80px 20px', textAlign: 'center', fontFamily: "'Inter', sans-serif" }}><h2>Your cart is empty</h2><Link href={`/${slug}/shop`}>Back to shop</Link></div>
   }
 
   return (
-    <div style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '80vh' }}>
+    <div style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '80vh', fontFamily: "'Inter', sans-serif" }}>
       <Link href={`/${slug}/cart`} style={{ color: '#D4AF37', textDecoration: 'none', fontWeight: 600 }}>← Back to Cart</Link>
       <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2.5rem', color: '#0F2B4A', margin: '10px 0 30px' }}>Checkout</h1>
 
@@ -78,4 +78,4 @@ export default function CheckoutPage({ params }) {
       </div>
     </div>
   )
-    }
+                                                                 }
