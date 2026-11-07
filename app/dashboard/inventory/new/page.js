@@ -7,12 +7,10 @@ import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { compressImage } from '../../../../lib/compressImage'
 import '../../../globals.css'
 
-const STEPS = [
-  { id: 1, label: 'Basics' },
-  { id: 2, label: 'Pricing & Stock' },
-  { id: 3, label: 'Website' },
-  { id: 4, label: 'Review' },
-]
+const SvgIcons = {
+  ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
+  Image: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+}
 
 const INITIAL_FORM = {
   item_name: '',
@@ -23,16 +21,6 @@ const INITIAL_FORM = {
   quantity_on_hand: '',
   reorder_level: '',
   image_url: '',
-  web_description: '',
-  is_listed_on_website: false,
-}
-
-// ─── EMBEDDED ICONS ───
-const SvgIcons = {
-  ArrowLeft: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>,
-  ChevronDown: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>,
-  X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
-  Image: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
 }
 
 export default function NewInventoryItemPage() {
@@ -40,18 +28,16 @@ export default function NewInventoryItemPage() {
   const searchParams = useSearchParams()
   const businessId = getCurrentBusinessId() || searchParams.get('business_id')
 
-  const [step, setStep] = useState(1)
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [categories, setCategories] = useState([])
   
-  // UI State
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
   const categoryMenuRef = useRef(null)
 
-  // Custom UI
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
 
@@ -74,7 +60,6 @@ export default function NewInventoryItemPage() {
   useEffect(() => {
     if (!businessId) { router.push('/dashboard'); return }
     
-    // Fetch existing categories for suggestions
     const fetchCategories = async () => {
       try {
         const { data } = await supabase
@@ -117,27 +102,13 @@ export default function NewInventoryItemPage() {
     }
   }
 
-  const validateStep = () => {
-    if (step === 1 && !formData.item_name.trim()) {
-      showToast('Item name is required.', 'error'); return false
-    }
-    if (step === 2) {
-      if (!formData.selling_price) { showToast('Selling price is required.', 'error'); return false }
-      if (!formData.quantity_on_hand) { showToast('Quantity is required.', 'error'); return false }
-    }
-    return true
-  }
+  const handleSubmit = async (e) => {
+    e?.preventDefault()
+    if (!formData.item_name.trim()) { showToast('Item name is required.', 'error'); return }
+    if (!formData.selling_price) { showToast('Selling price is required.', 'error'); return }
+    if (!formData.quantity_on_hand) { showToast('Quantity is required.', 'error'); return }
 
-  const handleNext = () => {
-    if (validateStep()) setStep(prev => Math.min(prev + 1, STEPS.length))
-  }
-
-  const handleBack = () => setStep(prev => Math.max(prev - 1, 1))
-
-  const handleSubmit = async () => {
-    if (!validateStep()) return
     setSaving(true)
-
     try {
       const { error } = await supabase.from('inventory_items').insert({
         business_id: businessId,
@@ -149,8 +120,6 @@ export default function NewInventoryItemPage() {
         quantity_on_hand: Number(formData.quantity_on_hand) || 0,
         reorder_level: Number(formData.reorder_level) || 0,
         image_url: formData.image_url || null,
-        web_description: formData.web_description.trim() || null,
-        is_listed_on_website: formData.is_listed_on_website,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -165,217 +134,178 @@ export default function NewInventoryItemPage() {
     }
   }
 
-  if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
+  if (loading) return <div style={{ padding: '4rem', textAlign: 'center', color: '#0F2B4A', fontWeight: 600 }}>Loading...</div>
+
+  // Calculate Margin for the UI
+  const cost = Number(formData.cost_price) || 0
+  const selling = Number(formData.selling_price) || 0
+  const margin = selling > 0 ? Math.round(((selling - cost) / selling) * 100) : 0
 
   return (
-    <div className="wizard-page">
-      {/* ─── HEADER & PROGRESS ─── */}
-      <div className="wizard-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <button onClick={() => router.back()} className="order-back-btn" style={{ margin: 0 }}>
-            <SvgIcons.ArrowLeft /> Cancel
+    <div style={{ background: '#FFFFFF', minHeight: '100vh', fontFamily: "'Inter', sans-serif", color: '#0F2B4A', paddingBottom: '100px' }}>
+      
+      {/* REUSING THE SAME MOBILE-FIRST STYLES */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .edit-container { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
+        .edit-card { background: #FFFFFF; border-radius: 16px; border: 1px solid #EAEAEA; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+        .edit-label { display: block; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 8px; }
+        .edit-input { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #EAEAEA; font-size: 1rem; outline: none; transition: border 0.2s; font-family: inherit; }
+        .edit-input:focus { border-color: #0F2B4A; }
+        .edit-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        
+        @media (max-width: 600px) {
+          .edit-grid-2 { grid-template-columns: 1fr; }
+        }
+      `}} />
+
+      <div className="edit-container">
+        
+        {/* HEADER */}
+        <div style={{ marginBottom: '2rem' }}>
+          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#888', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: 0, fontSize: '0.9rem', fontWeight: 600, marginBottom: '1rem' }}>
+            <SvgIcons.ArrowLeft /> Back to Inventory
           </button>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-primary)' }}>Step {step} of {STEPS.length}</span>
+          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Add New Item</h1>
+          <p style={{ margin: '0.2rem 0 0 0', color: '#666', fontSize: '0.95rem' }}>Add a new product to your physical inventory.</p>
         </div>
-        
-        <div className="wizard-progress-bar">
-          {STEPS.map((s, idx) => (
-            <div key={s.id} className={`wizard-progress-segment ${idx + 1 <= step ? 'active' : ''}`} />
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--cresoa-text-muted)' }}>
-          <span>{STEPS[step - 1].label}</span>
-          <span>{Math.round(((step - 1) / (STEPS.length - 1)) * 100)}% Complete</span>
-        </div>
-      </div>
 
-      {/* ─── SCROLLABLE CONTENT ─── */}
-      <div className="wizard-content">
-        
-        {/* STEP 1: BASICS */}
-        {step === 1 && (
-          <div className="wizard-step">
-            <h2 className="wizard-title">Basic Details</h2>
-            <p className="wizard-subtitle">What item are you adding to your inventory?</p>
-
-            <div className="form-group">
-              <label className="order-label">Item Name *</label>
-              <input type="text" className="order-input" value={formData.item_name} onChange={e => updateField('item_name', e.target.value)} placeholder="Enter item name" autoFocus />
+        <form onSubmit={handleSubmit}>
+          
+          {/* CARD 1: BASIC DETAILS */}
+          <div className="edit-card">
+            <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.1rem', fontWeight: 800, borderBottom: '1px solid #EAEAEA', paddingBottom: '10px' }}>Basic Details</h3>
+            
+            <div style={{ marginBottom: '1.2rem' }}>
+              <label className="edit-label">Item Name *</label>
+              <input 
+                type="text" 
+                className="edit-input" 
+                value={formData.item_name} 
+                onChange={e => updateField('item_name', e.target.value)} 
+                placeholder="e.g. Ready-to-wear Ankara Dress"
+                autoFocus
+              />
             </div>
 
-            <div className="form-group" style={{ position: 'relative' }} ref={categoryMenuRef}>
-              <label className="order-label">Category</label>
-              <div className="custom-dropdown-wrapper">
-                <input 
-                  type="text" 
-                  className="order-input" 
-                  value={formData.category} 
-                  onChange={e => { updateField('category', e.target.value); setShowCategoryMenu(true); }} 
-                  onFocus={() => setShowCategoryMenu(true)}
-                  placeholder="Enter or select a category" 
-                />
-                {showCategoryMenu && categories.length > 0 && (
-                  <div className="custom-dropdown-menu" style={{ top: '100%', marginTop: '4px', zIndex: 100 }}>
-                    {categories.filter(c => c.toLowerCase().includes(formData.category.toLowerCase())).map(cat => (
-                      <button key={cat} className="custom-dropdown-item" onClick={() => { updateField('category', cat); setShowCategoryMenu(false); }}>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div style={{ marginBottom: '1.2rem', position: 'relative' }} ref={categoryMenuRef}>
+              <label className="edit-label">Category</label>
+              <input 
+                type="text" 
+                className="edit-input" 
+                value={formData.category} 
+                onChange={e => { updateField('category', e.target.value); setShowCategoryMenu(true); }} 
+                onFocus={() => setShowCategoryMenu(true)}
+                placeholder="e.g. Bespoke, Ready-to-Wear" 
+              />
+              {showCategoryMenu && categories.length > 0 && (
+                <div style={{ position: 'absolute', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '200px', zIndex: 10, marginTop: '4px', width: '100%' }}>
+                  {categories.filter(c => c.toLowerCase().includes(formData.category.toLowerCase())).map(cat => (
+                    <button key={cat} type="button" onClick={() => { updateField('category', cat); setShowCategoryMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', borderBottom: '1px solid #f9f9f9' }}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="form-group">
-              <label className="order-label">Internal Description</label>
-              <textarea className="order-input" rows={3} value={formData.description} onChange={e => updateField('description', e.target.value)} placeholder="Enter notes for your staff (not visible to customers)" />
+            <div>
+              <label className="edit-label">Staff Notes (Internal Only)</label>
+              <textarea 
+                className="edit-input" 
+                rows={2} 
+                value={formData.description} 
+                onChange={e => updateField('description', e.target.value)} 
+                placeholder="e.g. Bought from Balogun market, supplier: Alhaji" 
+                style={{ resize: 'vertical' }}
+              />
             </div>
           </div>
-        )}
 
-        {/* STEP 2: PRICING & STOCK */}
-        {step === 2 && (
-          <div className="wizard-step">
-            <h2 className="wizard-title">Pricing & Stock</h2>
-            <p className="wizard-subtitle">Set the price and current stock levels.</p>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label className="order-label">Selling Price (₦) *</label>
-                <input type="number" className="order-input" value={formData.selling_price} onChange={e => updateField('selling_price', e.target.value)} placeholder="Enter selling price" min="0" />
+          {/* CARD 2: FINANCIALS & STOCK */}
+          <div className="edit-card">
+            <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.1rem', fontWeight: 800, borderBottom: '1px solid #EAEAEA', paddingBottom: '10px' }}>Financials & Stock</h3>
+            
+            <div className="edit-grid-2" style={{ marginBottom: '1.2rem' }}>
+              <div>
+                <label className="edit-label">Selling Price (₦) *</label>
+                <input type="number" className="edit-input" value={formData.selling_price} onChange={e => updateField('selling_price', e.target.value)} placeholder="0" min="0" />
               </div>
-              <div className="form-group">
-                <label className="order-label">Cost Price (₦)</label>
-                <input type="number" className="order-input" value={formData.cost_price} onChange={e => updateField('cost_price', e.target.value)} placeholder="Enter cost price" min="0" />
+              <div>
+                <label className="edit-label">Cost Price (₦)</label>
+                <input type="number" className="edit-input" value={formData.cost_price} onChange={e => updateField('cost_price', e.target.value)} placeholder="0" min="0" />
               </div>
             </div>
 
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label className="order-label">Quantity in Stock *</label>
-                <input type="number" className="order-input" value={formData.quantity_on_hand} onChange={e => updateField('quantity_on_hand', e.target.value)} placeholder="Enter quantity" min="0" />
+            {/* MARGIN PREVIEW */}
+            {selling > 0 && (
+              <div style={{ background: '#F8F9FA', padding: '12px 16px', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #EAEAEA' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#666' }}>Estimated Profit Margin</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: margin > 0 ? '#137333' : '#FF3B30' }}>{margin}%</span>
               </div>
-              <div className="form-group">
-                <label className="order-label">Reorder Level</label>
-                <input type="number" className="order-input" value={formData.reorder_level} onChange={e => updateField('reorder_level', e.target.value)} placeholder="Enter reorder level" min="0" />
+            )}
+
+            <div className="edit-grid-2">
+              <div>
+                <label className="edit-label">Quantity in Stock *</label>
+                <input type="number" className="edit-input" value={formData.quantity_on_hand} onChange={e => updateField('quantity_on_hand', e.target.value)} placeholder="0" min="0" />
+              </div>
+              <div>
+                <label className="edit-label">Low Stock Alert At</label>
+                <input type="number" className="edit-input" value={formData.reorder_level} onChange={e => updateField('reorder_level', e.target.value)} placeholder="e.g. 5" min="0" />
               </div>
             </div>
           </div>
-        )}
 
-        {/* STEP 3: WEBSITE */}
-        {step === 3 && (
-          <div className="wizard-step">
-            <h2 className="wizard-title">Website Storefront</h2>
-            <p className="wizard-subtitle">Optional: List this item on your public store.</p>
-
-            <div className="form-group">
-              <label className="order-label">Product Photo</label>
-              <div style={{ border: '2px dashed var(--cresoa-border)', borderRadius: '12px', padding: '1rem', textAlign: 'center', background: 'var(--cresoa-surface)' }}>
-                {formData.image_url ? (
-                  <div style={{ position: 'relative' }}>
-                    <img src={formData.image_url} alt="Product" style={{ maxWidth: '100%', maxHeight: '160px', borderRadius: '8px', objectFit: 'cover' }} />
-                    <label style={{ display: 'block', marginTop: '12px', color: 'var(--color-primary)', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}>
+          {/* CARD 3: MEDIA */}
+          <div className="edit-card">
+            <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.1rem', fontWeight: 800, borderBottom: '1px solid #EAEAEA', paddingBottom: '10px' }}>Product Media</h3>
+            
+            <div style={{ border: '2px dashed #EAEAEA', borderRadius: '12px', padding: '2rem 1rem', textAlign: 'center', background: '#F8F9FA' }}>
+              {formData.image_url ? (
+                <div>
+                  <img src={formData.image_url} alt="Product" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }} />
+                  <div style={{ marginTop: '1rem' }}>
+                    <label style={{ display: 'inline-block', background: '#FFFFFF', border: '1px solid #EAEAEA', padding: '10px 20px', borderRadius: '8px', color: '#0F2B4A', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 700 }}>
                       Change Photo
                       <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
                     </label>
                   </div>
-                ) : (
-                  <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--cresoa-text-muted)' }}>
-                    {uploadingImage ? <span>Uploading...</span> : (
-                      <>
-                        <SvgIcons.Image />
-                        <span style={{ fontSize: '0.9rem', marginTop: '8px', fontWeight: 600 }}>Tap to upload photo</span>
-                      </>
-                    )}
-                    <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                  </label>
-                )}
-              </div>
+                </div>
+              ) : (
+                <label style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#888' }}>
+                  {uploadingImage ? <span style={{ fontWeight: 600 }}>Uploading...</span> : (
+                    <>
+                      <div style={{ color: '#0F2B4A', marginBottom: '10px' }}><SvgIcons.Image /></div>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#0F2B4A' }}>Click to upload raw photo</span>
+                      <span style={{ fontSize: '0.8rem', color: '#999', marginTop: '4px' }}>JPG, PNG up to 5MB</span>
+                    </>
+                  )}
+                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                </label>
+              )}
             </div>
-
-            <div className="form-group">
-              <label className="order-label">Public Web Description</label>
-              <textarea className="order-input" rows={3} value={formData.web_description} onChange={e => updateField('web_description', e.target.value)} placeholder="Enter a description for customers (visible on your website)" />
-            </div>
-
-            <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', background: 'var(--cresoa-surface-soft)', padding: '16px', borderRadius: '12px' }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--cresoa-text)' }}>List on Website</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--cresoa-text-muted)' }}>Show this product in your store.</div>
-              </div>
-              <button 
-                onClick={() => updateField('is_listed_on_website', !formData.is_listed_on_website)} 
-                style={{ 
-                  width: '50px', height: '28px', borderRadius: '14px', border: 'none', 
-                  background: formData.is_listed_on_website ? 'var(--color-secondary)' : 'var(--cresoa-border)', 
-                  position: 'relative', cursor: 'pointer', transition: 'background 0.2s' 
-                }}
-              >
-                <span style={{ position: 'absolute', top: '2px', left: formData.is_listed_on_website ? '24px' : '2px', width: '24px', height: '24px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-              </button>
-            </div>
+            <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#888', marginTop: '1rem' }}>
+              Need to write a web description or feature this on the homepage? Go to the <strong>Products Tab</strong> in your Website Editor.
+            </p>
           </div>
-        )}
 
-        {/* STEP 4: REVIEW */}
-        {step === 4 && (
-          <div className="wizard-step">
-            <h2 className="wizard-title">Review Item</h2>
-            <p className="wizard-subtitle">Confirm the details before adding to inventory.</p>
-
-            <div className="order-card" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderBottom: '1px solid var(--cresoa-border)', paddingBottom: '16px', marginBottom: '16px' }}>
-                <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: 'var(--cresoa-surface-soft)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                   {formData.image_url ? <img src={formData.image_url} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <SvgIcons.Image />}
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>{formData.item_name}</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.85rem', color: 'var(--cresoa-text-muted)' }}>{formData.category || 'Uncategorized'}</p>
-                </div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '0.9rem' }}>
-                <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Selling Price:</span> <br/><strong>₦{Number(formData.selling_price).toLocaleString('en-NG')}</strong></div>
-                <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Cost Price:</span> <br/><strong>₦{Number(formData.cost_price || 0).toLocaleString('en-NG')}</strong></div>
-                <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Initial Stock:</span> <br/><strong>{formData.quantity_on_hand}</strong></div>
-                <div><span style={{ color: 'var(--cresoa-text-muted)' }}>Reorder Level:</span> <br/><strong>{formData.reorder_level || '0'}</strong></div>
-                <div style={{ gridColumn: '1 / -1', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--cresoa-border)' }}>
-                   <span style={{ color: 'var(--cresoa-text-muted)' }}>Website Status:</span> <br/>
-                   <strong style={{ color: formData.is_listed_on_website ? 'var(--color-secondary)' : 'var(--cresoa-text-muted)' }}>
-                     {formData.is_listed_on_website ? 'Listed on Website' : 'Not Listed'}
-                   </strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </form>
       </div>
 
-      {/* ─── FIXED BOTTOM NAVIGATION ─── */}
-      <div className="wizard-footer">
-        {step > 1 ? (
-          <button onClick={handleBack} className="order-btn-secondary" style={{ flex: 1, padding: '14px' }}>Back</button>
-        ) : <div style={{ flex: 1 }} />}
-        
-        {step < STEPS.length ? (
-          <button onClick={handleNext} className="cresoa-primary-button" style={{ flex: 2, padding: '14px' }}>
-            Continue
-          </button>
-        ) : (
-          <button onClick={handleSubmit} disabled={saving} className="cresoa-primary-button" style={{ flex: 2, padding: '14px' }}>
-            {saving ? 'Saving...' : 'Save Item'}
-          </button>
-        )}
+      {/* FIXED FOOTER (Mobile-First) */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#FFFFFF', borderTop: '1px solid #EAEAEA', padding: '1rem', display: 'flex', gap: '1rem', zIndex: 100, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' }}>
+        <button type="button" onClick={handleSubmit} disabled={saving} style={{ flex: 1, height: '52px', borderRadius: '10px', border: 'none', background: '#0F2B4A', color: '#FFF', fontWeight: 800, fontSize: '1rem', cursor: saving ? 'wait' : 'pointer', boxShadow: '0 4px 15px rgba(15,43,74,0.2)' }}>
+          {saving ? 'Saving...' : 'Save New Item'}
+        </button>
       </div>
 
-      {/* ─── TOAST ─── */}
+      {/* TOAST */}
       {toastMessage && (
-        <div className={`app-toast ${toastType}`}>
+        <div style={{ position: 'fixed', bottom: '80px', right: '20px', left: '20px', background: toastType === 'error' ? '#FF3B30' : '#0F2B4A', color: '#FFF', padding: '16px', borderRadius: '8px', fontWeight: 600, boxShadow: '0 10px 30px rgba(0,0,0,0.2)', zIndex: 9999, textAlign: 'center' }}>
           {toastMessage}
         </div>
       )}
 
     </div>
   )
-    }
+      }
