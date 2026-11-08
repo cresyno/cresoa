@@ -66,7 +66,6 @@ export default function CustomersPage() {
   const [sortBy, setSortBy] = useState('last_added')
   const [filterType, setFilterType] = useState('all')
 
-  // Custom Dropdown State
   const [showFilterMenu, setShowFilterMenu] = useState(false)
   const [showSortMenu, setShowSortMenu] = useState(false)
   const filterMenuRef = useRef(null)
@@ -207,9 +206,6 @@ export default function CustomersPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
           {[1,2,3,4].map(i => <div key={i} style={{ height: '80px', background: '#F4F6F8', borderRadius: '12px' }} />)}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {[1,2,3].map(i => <div key={i} style={{ height: '100px', background: '#F4F6F8', borderRadius: '16px' }} />)}
-        </div>
       </div>
     )
   }
@@ -225,58 +221,75 @@ export default function CustomersPage() {
 
   return (
     <div style={{ background: '#FFFFFF', minHeight: '100vh', padding: '1rem', fontFamily: "'Inter', sans-serif", color: '#0F2B4A', paddingBottom: '100px' }}>
+      
+      {/* FORCE 2X2 GRID ON MOBILE */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .cust-metrics-grid { 
+          display: grid; 
+          grid-template-columns: repeat(2, 1fr); 
+          gap: 0.75rem; 
+          margin-bottom: 1.5rem; 
+        }
+        @media (min-width: 768px) {
+          .cust-metrics-grid { 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 1rem;
+          }
+        }
+      `}} />
+
       <Navigation businessId={businessId} />
 
       {/* ─── HEADER ─── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem', borderBottom: '2px solid #0F2B4A', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Customers</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Client Book</h1>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem', color: '#555' }}>
-            {customers.length} customer{customers.length === 1 ? '' : 's'} in your database.
+            Manage your clients and track outstanding payments.
           </p>
         </div>
         <button
           onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')}
           style={{ background: '#0F2B4A', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(15,43,74,0.2)', width: 'fit-content' }}
         >
-          <SvgIcons.Plus /> Add Customer
+          <SvgIcons.Plus /> Add Client
         </button>
       </div>
 
-      {/* ─── METRICS ─── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Total</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F2B4A', marginTop: '0.2rem' }}>{customers.length}</div>
+      {/* ─── METRICS (Fixed 2x2 Grid) ─── */}
+      <div className="cust-metrics-grid">
+        <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Total</span>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F2B4A', marginTop: '0.2rem' }}>{customers.length}</div>
         </div>
-        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>With Orders</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F2B4A', marginTop: '0.2rem' }}>{activeCustomers}</div>
+        <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>With Orders</span>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F2B4A', marginTop: '0.2rem' }}>{activeCustomers}</div>
         </div>
-        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Owing</span>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#FF3B30', marginTop: '0.2rem' }}>{customersWithBalance}</div>
+        <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Owing</span>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#FF3B30', marginTop: '0.2rem' }}>{customersWithBalance}</div>
         </div>
-        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Outstanding</span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#FF3B30', marginTop: '0.2rem' }}>{formatMoney(totalOutstanding)}</div>
+        <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Outstanding</span>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#FF3B30', marginTop: '0.2rem' }}>{formatMoney(totalOutstanding)}</div>
         </div>
       </div>
 
       {/* ─── OUTSTANDING ALERT ─── */}
       {customersWithBalance > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #0F2B4A, #1A4685)', padding: '1.5rem', borderRadius: '16px', color: '#FFF', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', fontWeight: 800 }}>
+        <div style={{ background: 'linear-gradient(135deg, #0F2B4A, #1A4685)', padding: '1.25rem', borderRadius: '16px', color: '#FFF', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: 800 }}>
             <SvgIcons.AlertTriangle /> Outstanding Balance
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#D4AF37' }}>{formatMoney(totalOutstanding)}</div>
-              <div style={{ fontSize: '0.85rem', color: '#A0B2C6', marginTop: '4px' }}>{customersWithBalance} customer{customersWithBalance > 1 ? 's' : ''} need payment</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#D4AF37' }}>{formatMoney(totalOutstanding)}</div>
+              <div style={{ fontSize: '0.8rem', color: '#A0B2C6', marginTop: '4px' }}>{customersWithBalance} client{customersWithBalance > 1 ? 's' : ''} need payment</div>
             </div>
             <button
               onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
-              style={{ background: '#D4AF37', color: '#0F2B4A', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+              style={{ background: '#D4AF37', color: '#0F2B4A', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
             >
               {filterType === 'outstanding' ? 'Show All' : `View ${customersWithBalance}`}
             </button>
@@ -285,7 +298,7 @@ export default function CustomersPage() {
       )}
 
       {/* ─── FILTERS ─── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', background: '#F8F9FA', borderRadius: '10px', padding: '0 1rem', border: '1px solid #EAEAEA', width: '100%' }}>
           <span style={{ color: '#999' }}><SvgIcons.Search /></span>
           <input
@@ -348,19 +361,19 @@ export default function CustomersPage() {
       </div>
 
       {/* ─── CUSTOMER LIST ─── */}
-  {filteredCustomers.length === 0 ? (
+     {filteredCustomers.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#F8F9FA', borderRadius: '16px', border: '2px dashed #EAEAEA' }}>
           <div style={{ color: '#0F2B4A', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><SvgIcons.Users /></div>
-          <h3 style={{ fontSize: '1.2rem', color: '#0F2B4A', margin: '0 0 10px 0' }}>{search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}</h3>
-          <p style={{ color: '#666', fontSize: '0.9rem' }}>{search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}</p>
+          <h3 style={{ fontSize: '1.2rem', color: '#0F2B4A', margin: '0 0 10px 0' }}>{search ? 'No client found' : filterType !== 'all' ? 'No clients match this filter' : 'No clients yet'}</h3>
+          <p style={{ color: '#666', fontSize: '0.9rem' }}>{search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first client to get started.'}</p>
           {!search && filterType === 'all' && (
-            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} style={{ marginTop: '1.5rem', background: '#0F2B4A', color: '#FFF', padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Add Customer</button>
+            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} style={{ marginTop: '1.5rem', background: '#0F2B4A', color: '#FFF', padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Add Client</button>
           )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {filteredCustomers.map(customer => {
-            const fullName = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
+            const fullName = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed client'
             const hasBalance = Number(customer.balance || 0) > 0
 
             return (
@@ -368,8 +381,6 @@ export default function CustomersPage() {
                 key={customer.id}
                 onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
                 style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem', background: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'all 0.2s', gap: '1rem' }}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 8px 25px rgba(15,43,74,0.08)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.02)'}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -411,4 +422,4 @@ export default function CustomersPage() {
       </div>
     </div>
   )
-    }
+                      }
