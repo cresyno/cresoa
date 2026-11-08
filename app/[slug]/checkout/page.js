@@ -14,7 +14,7 @@ export default function CheckoutPage() {
   const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('') // ✅ Replaces alert()
+  const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', state: '' })
   
   const [showStateDropdown, setShowStateDropdown] = useState(false)
@@ -70,16 +70,19 @@ export default function CheckoutPage() {
       })
       
       const contentType = res.headers.get("content-type");
+      
+      // 🔍 THIS REVEALS THE REAL ERROR INSTEAD OF HIDING IT
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Server error. Please try again or contact support.");
+        const text = await res.text();
+        // Strips HTML tags so it fits in the red box
+        const cleanText = text.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').substring(0, 150);
+        throw new Error(`Status ${res.status}: ${cleanText}`);
       }
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
       
-      // ✅ Save token to sessionStorage (No URL parameters)
       sessionStorage.setItem('last_order_token', data.trackingToken)
-      
       if (typeof clearCart === 'function') clearCart() 
       window.location.href = data.url
       
@@ -102,9 +105,8 @@ export default function CheckoutPage() {
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
         <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', color: '#0F2B4A', margin: '0 0 30px 0' }}>Checkout</h1>
 
-        {/* ✅ Clean UI Error Message instead of Alert */}
         {errorMsg && (
-          <div style={{ padding: '16px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '24px', border: '1px solid #F87171', fontWeight: 500 }}>
+          <div style={{ padding: '16px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '24px', border: '1px solid #F87171', fontWeight: 500, wordBreak: 'break-word' }}>
             {errorMsg}
           </div>
         )}
