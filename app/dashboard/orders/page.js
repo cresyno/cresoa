@@ -65,6 +65,10 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
+  
+  // Tab State ('manual' or 'website')
+  const [activeTab, setActiveTab] = useState('manual')
+  
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('latest')
@@ -86,7 +90,7 @@ export default function OrdersPage() {
   const [toastType, setToastType] = useState('success')
 
   const statusOptions = [
-    { label: 'All Orders', value: 'all' },
+    { label: 'All Statuses', value: 'all' },
     { label: 'Order placed', value: 'Order placed' },
     { label: 'Cutting', value: 'Cutting' },
     { label: 'Sewing', value: 'Sewing' },
@@ -139,7 +143,15 @@ export default function OrdersPage() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Failed to load orders')
-      setOrders(result.orders || [])
+      
+      // Assuming the API returns a 'source' field ('manual' or 'website'). 
+      // If it's missing, we default to manual so the app doesn't break.
+      const formattedOrders = (result.orders || []).map(o => ({
+        ...o,
+        source: o.source || 'manual' 
+      }))
+      
+      setOrders(formattedOrders)
     } catch (err) {
       setError('Failed to load orders: ' + err.message)
     } finally {
@@ -149,17 +161,23 @@ export default function OrdersPage() {
 
   useEffect(() => { loadOrders() }, [router, searchParams])
 
-  const totalOrders = orders.length
-  const activeOrders = orders.filter(o => o.current_status !== 'Delivered').length
-  const readyOrders = orders.filter(o => o.current_status === 'Ready').length
-  const overdueOrders = orders.filter(o => {
+  // ─── FILTERING LOGIC ───
+  // 1. Filter by Tab (Manual vs Website)
+  const tabOrders = orders.filter(o => o.source === activeTab)
+  
+  // 2. Calculate Metrics based on active tab
+  const totalOrders = tabOrders.length
+  const activeOrders = tabOrders.filter(o => o.current_status !== 'Delivered').length
+  const readyOrders = tabOrders.filter(o => o.current_status === 'Ready').length
+  const overdueOrders = tabOrders.filter(o => {
     if (!o.due_date || o.current_status === 'Delivered') return false
     const due = new Date(o.due_date); due.setHours(0,0,0,0)
     const today = new Date(); today.setHours(0,0,0,0)
     return due < today
   }).length
 
-  const filteredOrders = orders.filter(o => {
+  // 3. Apply search and status filters
+  const filteredOrders = tabOrders.filter(o => {
     if (statusFilter !== 'all' && o.current_status !== statusFilter) return false
     if (search) {
       const q = search.toLowerCase()
@@ -168,6 +186,7 @@ export default function OrdersPage() {
     return true
   })
 
+  // 4. Sort
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     switch (sortBy) {
       case 'latest': return new Date(b.created_at) - new Date(a.created_at)
@@ -292,20 +311,43 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="orders-page">
+    <div className="orders-page" style={{ background: '#FFFFFF', minHeight: '100vh', paddingBottom: '100px' }}>
       <Navigation businessId={currentBusinessId} />
 
-      {/* ─── HEADER ─── */}
-      <div className="orders-header">
-        <div>
-          <h1 className="orders-title">Orders</h1>
-          <p className="orders-subtitle">
-            {totalOrders} orders · <span style={{ color: overdueOrders > 0 ? 'var(--color-danger)' : 'inherit' }}>{overdueOrders} overdue</span>
-          </p>
+      {/* ─── HEADER & TABS ─── */}
+      <div className="orders-header" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderBottom: '2px solid #0F2B4A', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div>
+            <h1 className="orders-title" style={{ color: '#0F2B4A', fontWeight: 800 }}>Orders</h1>
+            <p className="orders-subtitle" style={{ color: '#666' }}>
+              Manage fulfillment and production.
+            </p>
+          </div>
+          <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button" style={{ background: '#0F2B4A', color: '#FFF' }}>
+            <SvgIcons.Plus /> New Order
+          </a>
         </div>
-        <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button">
-          <SvgIcons.Plus /> New Order
-        </a>
+
+        {/* TAB SWITCHER */}
+        <div style={{ display: 'flex', background: '#F4F6F8', padding: '4px', borderRadius: '12px', border: '1px solid #EAEAEA', width: '100%', maxWidth: '400px' }}>
+          <button 
+            onClick={() => setActiveTab('manual')} 
+            style={{ flex: 1, padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'manual' ? '#FFFFFF' : 'transparent', color: activeTab === 'manual' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'manual' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'manual' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
+          >
+            Manual Orders
+          </button>
+          <button 
+            onClick={() => setActiveTab('website')} 
+            style={{ flex: 1, padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'website' ? '#FFFFFF' : 'transparent', color: activeTab === 'website' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'website' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'website' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+          >
+            Website Orders
+            {orders.filter(o => o.source === 'website' && o.current_status !== 'Delivered').length > 0 && (
+              <span style={{ background: '#D4AF37', color: '#FFF', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                {orders.filter(o => o.source === 'website' && o.current_status !== 'Delivered').length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ─── METRICS ─── */}
@@ -380,13 +422,19 @@ export default function OrdersPage() {
       </div>
 
       {/* ─── LIST ─── */}
-        {sortedOrders.length === 0 ? (
-        <div className="orders-empty">
-          <div className="empty-icon">📋</div>
-          <h3>No orders found</h3>
-          <p>{search ? 'Try a different search term.' : 'Create your first order to get started.'}</p>
-          {!search && (
-            <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button">Create Order</a>
+     {sortedOrders.length === 0 ? (
+        <div className="orders-empty" style={{ textAlign: 'center', padding: '4rem 2rem', background: '#F8F9FA', borderRadius: '16px', border: '2px dashed #EAEAEA' }}>
+          <div className="empty-icon" style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+            {activeTab === 'website' ? '🛒' : '📋'}
+          </div>
+          <h3 style={{ color: '#0F2B4A', margin: '0 0 10px 0' }}>
+            {activeTab === 'website' ? 'No website orders yet' : 'No manual orders found'}
+          </h3>
+          <p style={{ color: '#666' }}>
+            {search ? 'Try a different search term.' : activeTab === 'website' ? 'When customers buy from your store, orders will appear here.' : 'Create your first manual order to get started.'}
+          </p>
+          {!search && activeTab === 'manual' && (
+            <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button" style={{ marginTop: '1rem', display: 'inline-block', background: '#0F2B4A', color: '#FFF' }}>Create Order</a>
           )}
         </div>
       ) : (
@@ -400,61 +448,58 @@ export default function OrdersPage() {
             const isMenuOpen = openMenuId === o.id
 
             return (
-              <Card key={o.id} className="order-card">
-                <div className="order-card-header">
-                  <div className="order-identity">
-                    <div className="cresoa-avatar">{getInitials(customerName)}</div>
+              <Card key={o.id} className="order-card" style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAEAEA', padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                <div className="order-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <div className="order-identity" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div className="cresoa-avatar" style={{ background: '#0F2B4A', color: '#FFF', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{getInitials(customerName)}</div>
                     <div className="order-card-title-group">
-                      <h3 className="order-card-customer">{customerName}</h3>
-                      <span className="order-card-item">· {itemTitle}</span>
+                      <h3 className="order-card-customer" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F2B4A' }}>{customerName}</h3>
+                      <span className="order-card-item" style={{ fontSize: '0.85rem', color: '#666' }}>{itemTitle}</span>
                     </div>
                   </div>
-                  <div className="order-card-price-group">
-                    <span className="order-card-price">₦{o.price?.toLocaleString() || 0}</span>
-                    {balance > 0 && <span className="order-card-due">₦{balance.toLocaleString()} due</span>}
+                  <div className="order-card-price-group" style={{ textAlign: 'right' }}>
+                    <span className="order-card-price" style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A' }}>₦{o.price?.toLocaleString() || 0}</span>
+                    {balance > 0 && <span className="order-card-due" style={{ fontSize: '0.8rem', color: '#FF3B30', fontWeight: 600 }}>₦{balance.toLocaleString()} due</span>}
                   </div>
                 </div>
 
-                <div className="order-card-badges">
+                <div className="order-card-badges" style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
                   <StatusPill status={o.current_status} />
-                  {isOverdue && <span className="badge-overdue">Overdue</span>}
+                  {isOverdue && <span className="badge-overdue" style={{ background: '#FFF0F0', color: '#FF3B30', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>Overdue</span>}
+                  {o.source === 'website' && <span className="badge-overdue" style={{ background: '#F4F6F8', color: '#0F2B4A', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>Web Order</span>}
                 </div>
 
-                <div className="order-card-actions">
-                  <div className="action-buttons-group">
+                <div className="order-card-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #EAEAEA', paddingTop: '1rem' }}>
+                  <div className="action-buttons-group" style={{ display: 'flex', gap: '8px' }}>
                     {customerPhone && (
                       <>
-                        <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp">WhatsApp</button>
-                        <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call">Call</button>
+                        <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp" style={{ background: '#E6F4EA', color: '#137333', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>WhatsApp</button>
+                        <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call" style={{ background: '#F4F6F8', color: '#0F2B4A', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>Call</button>
                       </>
                     )}
-                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view">View</a>
+                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view" style={{ background: '#0F2B4A', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, textDecoration: 'none' }}>View Details</a>
                   </div>
 
-                  <div className="menu-container" ref={isMenuOpen ? menuRef : null}>
-                    <button className={`btn-menu-trigger ${isMenuOpen ? 'active' : ''}`} onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)}>
+                  <div className="menu-container" ref={isMenuOpen ? menuRef : null} style={{ position: 'relative' }}>
+                    <button className={`btn-menu-trigger ${isMenuOpen ? 'active' : ''}`} onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '6px' }}>
                       <SvgIcons.MoreVertical />
                     </button>
 
                     {isMenuOpen && (
-                      <div className="dropdown-menu">
+                      <div className="dropdown-menu" style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '200px', zIndex: 10, overflow: 'hidden' }}>
                         {balance > 0 && (
-                          <button onClick={() => promptRecordPayment(o.id, balance)} className="dropdown-item text-success">
+                          <button onClick={() => promptRecordPayment(o.id, balance)} className="dropdown-item text-success" style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#137333', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <SvgIcons.CheckCircle /> Record Full Payment
                           </button>
                         )}
-                        <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} className="dropdown-item">
+                        <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333', textDecoration: 'none' }}>
                           <SvgIcons.Edit /> Edit Order
                         </a>
-                        <button onClick={() => {
-                          navigator.clipboard.writeText(o.id)
-                          setOpenMenuId(null)
-                          showToast('Order ID copied!', 'success')
-                        }} className="dropdown-item">
+                        <button onClick={() => { navigator.clipboard.writeText(o.id); setOpenMenuId(null); showToast('Order ID copied!', 'success') }} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}>
                           <SvgIcons.Copy /> Copy Order ID
                         </button>
-                        <div className="dropdown-divider"></div>
-                        <button onClick={() => promptDelete(o.id)} className="dropdown-item text-danger">
+                        <div className="dropdown-divider" style={{ height: '1px', background: '#EAEAEA', margin: '4px 0' }}></div>
+                        <button onClick={() => promptDelete(o.id)} className="dropdown-item text-danger" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
                           <SvgIcons.Trash /> Delete Order
                         </button>
                       </div>
@@ -490,4 +535,4 @@ export default function OrdersPage() {
       <div style={{ marginTop: '2rem' }}><Navigation businessId={currentBusinessId} /></div>
     </div>
   )
-                      }
+}
