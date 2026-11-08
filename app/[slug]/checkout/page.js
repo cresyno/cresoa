@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 export default function CheckoutPage() {
   const { slug } = useParams()
-  const { cart, cartTotal } = useCart()
+  const { cart, cartTotal, clearCart } = useCart()
 
   const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -76,7 +76,6 @@ export default function CheckoutPage() {
   const finalTotal = deliveryKnown ? cartTotal + (deliveryFee || 0) : cartTotal
 
   const handlePayment = async () => {
-    // Basic validation
     if (!form.name || !form.phone || !form.address) {
       alert("Please fill in your name, phone number, and delivery address.")
       return
@@ -91,19 +90,19 @@ export default function CheckoutPage() {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug,
-          form,
-          cart,
-          totalAmount: finalTotal
-        })
+        body: JSON.stringify({ slug, form, cart, totalAmount: finalTotal })
       })
       
+      // ✅ FIX: Safely check if the response is JSON before parsing
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server error occurred. Please try again or contact support.");
+      }
+
       const data = await res.json()
-      
       if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
       
-      // Redirect customer to Paystack to enter their card details
+      if (typeof clearCart === 'function') clearCart() 
       window.location.href = data.url
       
     } catch (err) {
@@ -251,4 +250,4 @@ export default function CheckoutPage() {
       </main>
     </div>
   )
-}
+        }
