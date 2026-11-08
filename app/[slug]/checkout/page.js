@@ -13,6 +13,7 @@ export default function CheckoutPage() {
 
   const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', state: '' })
   
   // Custom Dropdown State
@@ -73,6 +74,43 @@ export default function CheckoutPage() {
   const deliveryFee = freeDelivery ? 0 : (deliveryRates[form.state] ?? null)
   const deliveryKnown = freeDelivery || deliveryFee !== null
   const finalTotal = deliveryKnown ? cartTotal + (deliveryFee || 0) : cartTotal
+
+  const handlePayment = async () => {
+    // Basic validation
+    if (!form.name || !form.phone || !form.address) {
+      alert("Please fill in your name, phone number, and delivery address.")
+      return
+    }
+    if (!freeDelivery && !form.state) {
+      alert("Please select your delivery state.")
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          form,
+          cart,
+          totalAmount: finalTotal
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
+      
+      // Redirect customer to Paystack to enter their card details
+      window.location.href = data.url
+      
+    } catch (err) {
+      alert(err.message)
+      setIsProcessing(false)
+    }
+  }
 
   if (!hasDeliveryConfig) {
     return (
@@ -190,14 +228,19 @@ export default function CheckoutPage() {
 
             <button 
               type="button" 
-              disabled={true} 
+              onClick={handlePayment}
+              disabled={!deliveryKnown || isProcessing} 
               style={{ 
                 width: '100%', padding: '18px', fontSize: '1rem', fontWeight: 700, 
-                background: '#EAEAEA', color: '#999', border: 'none', borderRadius: '8px', 
-                cursor: 'not-allowed', textTransform: 'uppercase', letterSpacing: '1px'
+                background: (!deliveryKnown || isProcessing) ? '#EAEAEA' : '#0F2B4A', 
+                color: (!deliveryKnown || isProcessing) ? '#999' : '#FFF', 
+                border: 'none', borderRadius: '8px', 
+                cursor: (!deliveryKnown || isProcessing) ? 'not-allowed' : 'pointer', 
+                textTransform: 'uppercase', letterSpacing: '1px',
+                transition: 'background 0.2s ease'
               }}
             >
-              Pay {deliveryKnown ? `₦${finalTotal.toLocaleString()}` : ''} with Paystack (Coming Soon)
+              {isProcessing ? 'Processing...' : `Pay ${deliveryKnown ? `₦${finalTotal.toLocaleString()}` : ''} with Paystack`}
             </button>
             <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#999', marginTop: '12px' }}>
               Secure checkout powered by Paystack
