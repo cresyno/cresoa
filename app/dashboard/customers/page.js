@@ -9,12 +9,12 @@ import '../../globals.css'
 // ─── EMBEDDED ICONS ───
 const SvgIcons = {
   Search: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
   ),
   X: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   ),
@@ -28,19 +28,19 @@ const SvgIcons = {
       <polyline points="9 18 15 12 9 6" />
     </svg>
   ),
-  AlertTriangle: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  ),
   Users: () => (
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
   Plus: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  AlertTriangle: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   )
 }
@@ -72,7 +72,6 @@ export default function CustomersPage() {
   const filterMenuRef = useRef(null)
   const sortMenuRef = useRef(null)
 
-  // Handle click outside for dropdowns
   useEffect(() => {
     function handleClickOutside(event) {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) setShowFilterMenu(false)
@@ -98,9 +97,7 @@ export default function CustomersPage() {
 
       if (!resolvedBusinessId || resolvedBusinessId.length < 20) {
         const { data: owned } = await supabase.from('businesses').select('id').eq('owner_id', user.id).single()
-        if (owned) {
-          resolvedBusinessId = owned.id
-        }
+        if (owned) resolvedBusinessId = owned.id
       }
 
       if (!resolvedBusinessId) { router.push('/onboarding'); return }
@@ -178,7 +175,6 @@ export default function CustomersPage() {
     return result
   }, [customers, search, filterType])
 
-  // Robust Initials Generator
   const getInitials = (customer) => {
     const name = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
     if (!name) return '?'
@@ -201,137 +197,125 @@ export default function CustomersPage() {
     { label: 'Name A–Z', value: 'name_asc' }
   ]
 
-  // ─── SKELETON LOADING STATE ───
   if (loading) {
     return (
-      <div className="customers-page">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-          <div className="skeleton-box" style={{ width: '140px', height: '28px' }} />
-          <div className="skeleton-box" style={{ width: '110px', height: '38px' }} />
+      <div style={{ padding: '1rem', background: '#FFFFFF', minHeight: '100vh', fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
+          <div style={{ width: '140px', height: '28px', background: '#F4F6F8', borderRadius: '8px' }} />
+          <div style={{ width: '110px', height: '38px', background: '#F4F6F8', borderRadius: '8px' }} />
         </div>
-        <div className="customers-metrics-grid">
-          {[1,2,3,4].map(i => (
-            <div key={i} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+          {[1,2,3,4].map(i => <div key={i} style={{ height: '80px', background: '#F4F6F8', borderRadius: '12px' }} />)}
         </div>
-        <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
-           <div className="skeleton-box" style={{ height: '44px', width: '100%', marginBottom: '10px' }} />
-           <div style={{ display: 'flex', gap: '10px' }}>
-              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
-              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
-           </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {[1,2,3].map(i => <div key={i} style={{ height: '100px', background: '#F4F6F8', borderRadius: '16px' }} />)}
         </div>
-        <div className="customers-list">
-          {[1,2,3].map(i => (
-            <div key={i} className="skeleton-box" style={{ height: '110px', marginBottom: '12px', borderRadius: '16px' }} />
-          ))}
-        </div>
-        <Navigation businessId={businessId} />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="order-page-error" style={{ paddingTop: '4rem', textAlign: 'center' }}>
-        <p style={{ color: 'var(--color-danger)' }}>{error}</p>
-        <button onClick={loadCustomers} className="cresoa-primary-button">Try again</button>
+      <div style={{ padding: '4rem 2rem', textAlign: 'center', color: '#FF3B30', fontFamily: "'Inter', sans-serif" }}>
+        <p style={{ marginBottom: '1rem', fontWeight: 600 }}>{error}</p>
+        <button onClick={loadCustomers} style={{ background: '#0F2B4A', color: '#FFF', padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Try again</button>
       </div>
     )
   }
 
   return (
-    <div className="customers-page">
+    <div style={{ background: '#FFFFFF', minHeight: '100vh', padding: '1rem', fontFamily: "'Inter', sans-serif", color: '#0F2B4A', paddingBottom: '100px' }}>
       <Navigation businessId={businessId} />
 
       {/* ─── HEADER ─── */}
-      <div className="customers-header">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem', borderBottom: '2px solid #0F2B4A', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
         <div>
-          <h1 className="orders-title">Customers</h1>
-          <p className="orders-subtitle">
-            {customers.length} customer{customers.length === 1 ? '' : 's'}
+          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Customers</h1>
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem', color: '#555' }}>
+            {customers.length} customer{customers.length === 1 ? '' : 's'} in your database.
           </p>
         </div>
         <button
           onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')}
-          className="cresoa-primary-button"
+          style={{ background: '#0F2B4A', color: '#FFFFFF', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(15,43,74,0.2)', width: 'fit-content' }}
         >
           <SvgIcons.Plus /> Add Customer
         </button>
       </div>
 
       {/* ─── METRICS ─── */}
-      <div className="customers-metrics-grid">
-        <div className="orders-metric-box">
-          <span className="metric-label">Total</span>
-          <span className="metric-value">{customers.length}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Total</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F2B4A', marginTop: '0.2rem' }}>{customers.length}</div>
         </div>
-        <div className="orders-metric-box">
-          <span className="metric-label">With Orders</span>
-          <span className="metric-value">{activeCustomers}</span>
+        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>With Orders</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0F2B4A', marginTop: '0.2rem' }}>{activeCustomers}</div>
         </div>
-        <div className="orders-metric-box">
-          <span className="metric-label">Owing</span>
-          <span className="metric-value text-danger">{customersWithBalance}</span>
+        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Owing</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#FF3B30', marginTop: '0.2rem' }}>{customersWithBalance}</div>
         </div>
-        <div className="orders-metric-box">
-          <span className="metric-label">Outstanding</span>
-          <span className="metric-value text-danger" style={{ fontSize: '1.1rem' }}>{formatMoney(totalOutstanding)}</span>
+        <div style={{ background: '#FFFFFF', padding: '1.25rem', borderRadius: '12px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: '#666' }}>Outstanding</span>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#FF3B30', marginTop: '0.2rem' }}>{formatMoney(totalOutstanding)}</div>
         </div>
       </div>
 
       {/* ─── OUTSTANDING ALERT ─── */}
       {customersWithBalance > 0 && (
-        <div className="outstanding-alert">
-          <div className="outstanding-content">
-            <div className="outstanding-title">
-              <SvgIcons.AlertTriangle />
-              Outstanding Balance
-            </div>
-            <div className="outstanding-amount">{formatMoney(totalOutstanding)}</div>
-            <div className="outstanding-subtitle">{customersWithBalance} customer{customersWithBalance > 1 ? 's' : ''} need payment</div>
+        <div style={{ background: 'linear-gradient(135deg, #0F2B4A, #1A4685)', padding: '1.5rem', borderRadius: '16px', color: '#FFF', display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', fontWeight: 800 }}>
+            <SvgIcons.AlertTriangle /> Outstanding Balance
           </div>
-          <button
-            onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
-            className="outstanding-btn"
-          >
-            {filterType === 'outstanding' ? 'Show All' : `View ${customersWithBalance}`}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#D4AF37' }}>{formatMoney(totalOutstanding)}</div>
+              <div style={{ fontSize: '0.85rem', color: '#A0B2C6', marginTop: '4px' }}>{customersWithBalance} customer{customersWithBalance > 1 ? 's' : ''} need payment</div>
+            </div>
+            <button
+              onClick={() => setFilterType(filterType === 'outstanding' ? 'all' : 'outstanding')}
+              style={{ background: '#D4AF37', color: '#0F2B4A', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              {filterType === 'outstanding' ? 'Show All' : `View ${customersWithBalance}`}
+            </button>
+          </div>
         </div>
       )}
 
       {/* ─── FILTERS ─── */}
-      <div className="orders-filters">
-        <div className="custom-search-wrapper">
-          <span className="search-icon"><SvgIcons.Search /></span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', background: '#F8F9FA', borderRadius: '10px', padding: '0 1rem', border: '1px solid #EAEAEA', width: '100%' }}>
+          <span style={{ color: '#999' }}><SvgIcons.Search /></span>
           <input
             type="text"
-            className="custom-search-input"
             placeholder="Search by name or phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            style={{ border: 'none', background: 'transparent', padding: '14px 10px', outline: 'none', width: '100%', fontSize: '0.95rem' }}
           />
           {search && (
-            <button className="search-clear-btn" onClick={() => setSearch('')}>
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', display: 'flex' }}>
               <SvgIcons.X />
             </button>
           )}
         </div>
         
-        <div className="orders-filter-row">
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* CUSTOM FILTER DROPDOWN */}
-          <div className="custom-select-wrapper" ref={filterMenuRef}>
-            <button className="custom-select-btn" onClick={() => { setShowFilterMenu(!showFilterMenu); setShowSortMenu(false); }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '140px' }} ref={filterMenuRef}>
+            <button onClick={() => { setShowFilterMenu(!showFilterMenu); setShowSortMenu(false); }} style={{ width: '100%', padding: '12px 16px', borderRadius: '8px', background: '#FFFFFF', border: '1px solid #EAEAEA', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: '#0F2B4A' }}>
               {filterOptions.find(o => o.value === filterType)?.label}
               <SvgIcons.ChevronDown />
             </button>
             {showFilterMenu && (
-              <div className="custom-dropdown-menu">
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: '#FFFFFF', border: '1px solid #EAEAEA', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 10, overflow: 'hidden' }}>
                 {filterOptions.map(opt => (
                   <button
                     key={opt.value}
-                    className={`custom-dropdown-item ${filterType === opt.value ? 'active' : ''}`}
                     onClick={() => { setFilterType(opt.value); setShowFilterMenu(false); }}
+                    style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: filterType === opt.value ? '#F4F6F8' : '#FFF', border: 'none', borderBottom: '1px solid #F0F0F0', cursor: 'pointer', fontSize: '0.9rem', color: '#0F2B4A', fontWeight: filterType === opt.value ? 700 : 500 }}
                   >
                     {opt.label}
                   </button>
@@ -341,18 +325,18 @@ export default function CustomersPage() {
           </div>
 
           {/* CUSTOM SORT DROPDOWN */}
-          <div className="custom-select-wrapper" ref={sortMenuRef}>
-            <button className="custom-select-btn" onClick={() => { setShowSortMenu(!showSortMenu); setShowFilterMenu(false); }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '140px' }} ref={sortMenuRef}>
+            <button onClick={() => { setShowSortMenu(!showSortMenu); setShowFilterMenu(false); }} style={{ width: '100%', padding: '12px 16px', borderRadius: '8px', background: '#FFFFFF', border: '1px solid #EAEAEA', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: '#0F2B4A' }}>
               {sortOptions.find(o => o.value === sortBy)?.label}
               <SvgIcons.ChevronDown />
             </button>
             {showSortMenu && (
-              <div className="custom-dropdown-menu">
+              <div style={{ position: 'absolute', top: '100%', right: 0, left: 0, marginTop: '4px', background: '#FFFFFF', border: '1px solid #EAEAEA', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 10, overflow: 'hidden' }}>
                 {sortOptions.map(opt => (
                   <button
                     key={opt.value}
-                    className={`custom-dropdown-item ${sortBy === opt.value ? 'active' : ''}`}
                     onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
+                    style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: sortBy === opt.value ? '#F4F6F8' : '#FFF', border: 'none', borderBottom: '1px solid #F0F0F0', cursor: 'pointer', fontSize: '0.9rem', color: '#0F2B4A', fontWeight: sortBy === opt.value ? 700 : 500 }}
                   >
                     {opt.label}
                   </button>
@@ -364,23 +348,17 @@ export default function CustomersPage() {
       </div>
 
       {/* ─── CUSTOMER LIST ─── */}
-      {filteredCustomers.length === 0 ? (
-        <div className="orders-empty">
-          <div className="empty-icon"><SvgIcons.Users /></div>
-          <h3>{search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}</h3>
-          <p>{search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}</p>
+  {filteredCustomers.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#F8F9FA', borderRadius: '16px', border: '2px dashed #EAEAEA' }}>
+          <div style={{ color: '#0F2B4A', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}><SvgIcons.Users /></div>
+          <h3 style={{ fontSize: '1.2rem', color: '#0F2B4A', margin: '0 0 10px 0' }}>{search ? 'No customer found' : filterType !== 'all' ? 'No customers match this filter' : 'No customers yet'}</h3>
+          <p style={{ color: '#666', fontSize: '0.9rem' }}>{search ? 'Try another search term.' : filterType !== 'all' ? 'Try a different filter.' : 'Add your first customer to get started.'}</p>
           {!search && filterType === 'all' && (
-            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} className="cresoa-primary-button">Add Customer</button>
-          )}
-          {search && (
-            <button onClick={() => setSearch('')} className="cresoa-primary-button">Clear Search</button>
-          )}
-          {filterType !== 'all' && !search && (
-            <button onClick={() => setFilterType('all')} className="cresoa-primary-button">Show All</button>
+            <button onClick={() => router.push(businessId ? `/dashboard/customers/new?business_id=${businessId}` : '/dashboard/customers/new')} style={{ marginTop: '1.5rem', background: '#0F2B4A', color: '#FFF', padding: '12px 24px', borderRadius: '8px', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Add Customer</button>
           )}
         </div>
       ) : (
-        <div className="customers-list">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {filteredCustomers.map(customer => {
             const fullName = customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unnamed customer'
             const hasBalance = Number(customer.balance || 0) > 0
@@ -388,35 +366,39 @@ export default function CustomersPage() {
             return (
               <div
                 key={customer.id}
-                className="customer-list-card"
                 onClick={() => router.push(`/dashboard/customers/${customer.id}?business_id=${businessId}`)}
+                style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem', background: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAEAEA', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'all 0.2s', gap: '1rem' }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 8px 25px rgba(15,43,74,0.08)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.02)'}
               >
-                <div className="customer-card-top">
-                  <div className="customer-card-info">
-                    <div className="customer-card-avatar">{getInitials(customer)}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#0F2B4A', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 800, flexShrink: 0 }}>
+                      {getInitials(customer)}
+                    </div>
                     <div>
-                      <h3 className="customer-card-name">{fullName}</h3>
-                      <p className="customer-card-phone">{customer.phone || customer.email || 'No contact'}</p>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F2B4A' }}>{fullName}</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#666' }}>{customer.phone || customer.email || 'No contact info'}</p>
                     </div>
                   </div>
 
-                  <div className="customer-card-stats">
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                     {customer.orderCount > 0 && (
-                      <span className="customer-order-badge">
+                      <span style={{ background: '#F4F6F8', color: '#0F2B4A', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', borderRadius: '6px' }}>
                         {customer.orderCount} order{customer.orderCount > 1 ? 's' : ''}
                       </span>
                     )}
                     {hasBalance ? (
-                      <span className="customer-balance-due">{formatMoney(customer.balance)} due</span>
+                      <span style={{ color: '#FF3B30', fontSize: '0.85rem', fontWeight: 800 }}>{formatMoney(customer.balance)} due</span>
                     ) : customer.orderCount > 0 ? (
-                      <span className="customer-balance-paid">✓ Paid</span>
+                      <span style={{ color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>✓ Paid</span>
                     ) : null}
                   </div>
                 </div>
 
-                <div className="customer-card-bottom">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #EAEAEA', paddingTop: '1rem', fontSize: '0.85rem', color: '#888' }}>
                   <span>{customer.lastOrder ? `Last order: ${formatDate(customer.lastOrder.created_at)}` : 'No orders yet'}</span>
-                  <SvgIcons.ChevronRight />
+                  <div style={{ color: '#0F2B4A' }}><SvgIcons.ChevronRight /></div>
                 </div>
               </div>
             )
