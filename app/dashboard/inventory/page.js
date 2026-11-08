@@ -232,52 +232,64 @@ export default function InventoryPage() {
 
   if (loading) return <div style={{ padding: '4rem', textAlign: 'center', color: '#0F2B4A', fontWeight: 600 }}>Loading inventory...</div>
 
-  return (
-    <div style={{ background: '#FFFFFF', minHeight: '100vh', padding: '1rem', fontFamily: "'Inter', sans-serif", color: '#0F2B4A', overflowX: 'hidden' }}>
+return (
+  <div style={{ background: '#FFFFFF', minHeight: '100vh', padding: '1rem', fontFamily: "'Inter', sans-serif", color: '#0F2B4A', overflowX: 'hidden' }}>
+    
+    {/* MOBILE-FIRST RESPONSIVE STYLES */}
+    <style dangerouslySetInnerHTML={{__html: `
+      .inv-header { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
+      .inv-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem; }
+      .inv-filters { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+      .inv-card { display: flex; flex-direction: column; padding: 1.25rem; background: #FFFFFF; border-radius: 16px; border: 1px solid #EAEAEA; box-shadow: 0 4px 15px rgba(0,0,0,0.02); gap: 1rem; cursor: pointer; transition: all 0.2s; }
+      .inv-financials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; background: #F8F9FA; padding: 1rem; border-radius: 12px; border: 1px solid #EAEAEA; width: 100%; }
+      .inv-stock-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+      @media (min-width: 768px) {
+        .inv-header { flex-direction: row; justify-content: space-between; align-items: flex-start; }
+        .inv-metrics { grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+        .inv-filters { flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .inv-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 2rem; }
+        .inv-financials { display: flex; gap: 2rem; background: transparent; padding: 0; border: none; width: auto; }
+        .inv-stock-row { width: auto; }
+      }
+    `}} />
+
+    <Navigation businessId={businessId} />
+
+    {/* HEADER & TABS */}
+    <div className="inv-header" style={{ marginTop: '1rem', borderBottom: '2px solid #0F2B4A', paddingBottom: '1.5rem' }}>
       
-      {/* MOBILE-FIRST RESPONSIVE STYLES */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .inv-header { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
-        .inv-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem; }
-        .inv-filters { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
-        .inv-card { display: flex; flex-direction: column; padding: 1.25rem; background: #FFFFFF; border-radius: 16px; border: 1px solid #EAEAEA; box-shadow: 0 4px 15px rgba(0,0,0,0.02); gap: 1rem; cursor: pointer; transition: all 0.2s; }
-        .inv-financials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; background: #F8F9FA; padding: 1rem; border-radius: 12px; border: 1px solid #EAEAEA; width: 100%; }
-        .inv-stock-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-
-        @media (min-width: 768px) {
-          .inv-header { flex-direction: row; justify-content: space-between; align-items: flex-end; }
-          .inv-metrics { grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
-          .inv-filters { flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-          .inv-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 2rem; }
-          .inv-financials { display: flex; gap: 2rem; background: transparent; padding: 0; border: none; width: auto; }
-          .inv-stock-row { width: auto; }
-        }
-      `}} />
-
-      <Navigation businessId={businessId} />
-
-      {/* HEADER & TABS */}
-      <div className="inv-header" style={{ marginTop: '1rem', borderBottom: '2px solid #0F2B4A', paddingBottom: '1.5rem' }}>
+      {/* Title & Add Button */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Inventory & Storefront</h1>
+          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>Inventory</h1>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.95rem', color: '#555' }}>Manage stock and curate your public shop.</p>
         </div>
-        
-        <div style={{ display: 'flex', background: '#F4F6F8', padding: '4px', borderRadius: '12px', border: '1px solid #EAEAEA' }}>
-          <button 
-            onClick={() => setActiveTab('stock')} 
-            style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'stock' ? '#FFFFFF' : 'transparent', color: activeTab === 'stock' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'stock' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'stock' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
-          >
-            Stock
-          </button>
-          <button 
-            onClick={() => setActiveTab('storefront')} 
-            style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'storefront' ? '#FFFFFF' : 'transparent', color: activeTab === 'storefront' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'storefront' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'storefront' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
-          >
-            Storefront
-          </button>
-        </div>
+        <button 
+          onClick={() => router.push(`/dashboard/inventory/new?business_id=${businessId}`)} 
+          style={{ background: '#0F2B4A', color: '#FFFFFF', border: 'none', padding: '14px 24px', borderRadius: '8px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(15,43,74,0.2)', width: 'fit-content' }}
+        >
+          <SvgIcons.Plus /> Add New Item
+        </button>
       </div>
+      
+      {/* High Contrast Tabs */}
+      <div style={{ display: 'flex', background: '#F4F6F8', padding: '4px', borderRadius: '12px', border: '1px solid #EAEAEA', width: '100%', maxWidth: '400px', alignSelf: 'flex-end' }}>
+        <button 
+          onClick={() => setActiveTab('stock')} 
+          style={{ flex: 1, padding: '12px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'stock' ? '#0F2B4A' : 'transparent', color: activeTab === 'stock' ? '#FFFFFF' : '#666', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'stock' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+        >
+          Stock
+        </button>
+        <button 
+          onClick={() => setActiveTab('storefront')} 
+          style={{ flex: 1, padding: '12px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'storefront' ? '#0F2B4A' : 'transparent', color: activeTab === 'storefront' ? '#FFFFFF' : '#666', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'storefront' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+        >
+          Storefront
+        </button>
+      </div>
+    </div>
+
 
       {/* ─── TAB 1: STOCK & PRODUCTION ─── */}
       {activeTab === 'stock' && (
