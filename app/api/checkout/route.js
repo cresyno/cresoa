@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { getUsablePayout } from '../../../lib/payments'
-
 export const dynamic = 'force-dynamic'
 
 function platformFeeKobo(amountKobo) {
