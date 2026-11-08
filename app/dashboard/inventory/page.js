@@ -237,20 +237,22 @@ return (
     
     {/* MOBILE-FIRST RESPONSIVE STYLES */}
     <style dangerouslySetInnerHTML={{__html: `
-      .inv-header { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
+      .inv-header { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem; }
       .inv-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem; }
       .inv-filters { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
       .inv-card { display: flex; flex-direction: column; padding: 1.25rem; background: #FFFFFF; border-radius: 16px; border: 1px solid #EAEAEA; box-shadow: 0 4px 15px rgba(0,0,0,0.02); gap: 1rem; cursor: pointer; transition: all 0.2s; }
       .inv-financials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; background: #F8F9FA; padding: 1rem; border-radius: 12px; border: 1px solid #EAEAEA; width: 100%; }
       .inv-stock-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-
+      .inv-switch { display: flex; background: #F4F6F8; padding: 4px; border-radius: 12px; border: 1px solid #EAEAEA; width: 100%; max-width: 400px; margin: 0 auto; }
+      
       @media (min-width: 768px) {
-        .inv-header { flex-direction: row; justify-content: space-between; align-items: flex-start; }
+        .inv-header { flex-direction: row; justify-content: space-between; align-items: flex-end; }
         .inv-metrics { grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
         .inv-filters { flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .inv-card { flex-direction: row; align-items: center; justify-content: space-between; gap: 2rem; }
         .inv-financials { display: flex; gap: 2rem; background: transparent; padding: 0; border: none; width: auto; }
         .inv-stock-row { width: auto; }
+        .inv-switch { margin: 0; }
       }
     `}} />
 
@@ -273,8 +275,8 @@ return (
         </button>
       </div>
       
-      {/* High Contrast Tabs */}
-      <div style={{ display: 'flex', background: '#F4F6F8', padding: '4px', borderRadius: '12px', border: '1px solid #EAEAEA', width: '100%', maxWidth: '400px', alignSelf: 'flex-end' }}>
+      {/* High Contrast Tabs (Centered on Mobile) */}
+      <div className="inv-switch">
         <button 
           onClick={() => setActiveTab('stock')} 
           style={{ flex: 1, padding: '12px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'stock' ? '#0F2B4A' : 'transparent', color: activeTab === 'stock' ? '#FFFFFF' : '#666', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'stock' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
@@ -289,7 +291,6 @@ return (
         </button>
       </div>
     </div>
-
 
       {/* ─── TAB 1: STOCK & PRODUCTION ─── */}
       {activeTab === 'stock' && (
