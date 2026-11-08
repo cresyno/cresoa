@@ -14,9 +14,9 @@ export default function CheckoutPage() {
   const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('') // ✅ Replaces alert()
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', state: '' })
   
-  // Custom Dropdown State
   const [showStateDropdown, setShowStateDropdown] = useState(false)
   const stateDropdownRef = useRef(null)
 
@@ -44,46 +44,22 @@ export default function CheckoutPage() {
   }, [slug])
 
   if (loading) return <div style={{ padding: '100px', textAlign: 'center', color: '#0F2B4A', fontWeight: 600 }}>Loading...</div>
-
-  if (!page?.is_enabled) {
-    return (
-      <div style={{ padding: '80px 20px', textAlign: 'center', fontFamily: "'Inter', sans-serif" }}>
-        <h2 style={{ color: '#0F2B4A' }}>This store is currently unavailable</h2>
-        <p style={{ color: '#666' }}>The business owner has paused this site.</p>
-      </div>
-    )
-  }
-
-  if (cart.length === 0) {
-    return (
-      <div style={{ padding: '80px 20px', textAlign: 'center', fontFamily: "'Inter', sans-serif" }}>
-        <h2 style={{ color: '#0F2B4A' }}>Your cart is empty</h2>
-        <Link href={`/${slug}/shop`} style={{ color: '#D4AF37', marginTop: '20px', display: 'inline-block', fontWeight: 600 }}>Back to shop</Link>
-      </div>
-    )
-  }
+  if (!page?.is_enabled) return <div style={{ padding: '80px 20px', textAlign: 'center' }}><h2>This store is currently unavailable</h2></div>
+  if (cart.length === 0) return <div style={{ padding: '80px 20px', textAlign: 'center' }}><h2>Your cart is empty</h2></div>
 
   const sector = parseSectorData(page.sector_data)
   const freeDelivery = Boolean(sector.free_delivery)
   const deliveryRates = sector.delivery_rates || {}
-  const configuredStates = Object.keys(deliveryRates)
-  const availableStates = freeDelivery ? [] : configuredStates
-  const hasDeliveryConfig = freeDelivery || configuredStates.length > 0
-
-  // Fee Logic
+  const availableStates = freeDelivery ? [] : Object.keys(deliveryRates)
+  
   const deliveryFee = freeDelivery ? 0 : (deliveryRates[form.state] ?? null)
   const deliveryKnown = freeDelivery || deliveryFee !== null
   const finalTotal = deliveryKnown ? cartTotal + (deliveryFee || 0) : cartTotal
 
   const handlePayment = async () => {
-    if (!form.name || !form.phone || !form.address) {
-      alert("Please fill in your name, phone number, and delivery address.")
-      return
-    }
-    if (!freeDelivery && !form.state) {
-      alert("Please select your delivery state.")
-      return
-    }
+    setErrorMsg('')
+    if (!form.name || !form.phone || !form.address) return setErrorMsg("Please fill in your name, phone number, and delivery address.")
+    if (!freeDelivery && !form.state) return setErrorMsg("Please select your delivery state.")
 
     setIsProcessing(true)
     try {
@@ -93,32 +69,24 @@ export default function CheckoutPage() {
         body: JSON.stringify({ slug, form, cart, totalAmount: finalTotal })
       })
       
-      // ✅ FIX: Safely check if the response is JSON before parsing
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Server error occurred. Please try again or contact support.");
+        throw new Error("Server error. Please try again or contact support.");
       }
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
       
+      // ✅ Save token to sessionStorage (No URL parameters)
+      sessionStorage.setItem('last_order_token', data.trackingToken)
+      
       if (typeof clearCart === 'function') clearCart() 
       window.location.href = data.url
       
     } catch (err) {
-      alert(err.message)
+      setErrorMsg(err.message)
       setIsProcessing(false)
     }
-  }
-
-  if (!hasDeliveryConfig) {
-    return (
-      <div style={{ padding: '80px 20px', textAlign: 'center', fontFamily: "'Inter', sans-serif" }}>
-        <h2 style={{ color: '#0F2B4A' }}>Delivery not configured</h2>
-        <p style={{ color: '#666' }}>This business hasn't set up delivery options yet.</p>
-        <Link href={`/${slug}`} style={{ color: '#D4AF37', marginTop: '20px', display: 'inline-block', fontWeight: 600 }}>← Back to store</Link>
-      </div>
-    )
   }
 
   return (
@@ -134,50 +102,27 @@ export default function CheckoutPage() {
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
         <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', color: '#0F2B4A', margin: '0 0 30px 0' }}>Checkout</h1>
 
+        {/* ✅ Clean UI Error Message instead of Alert */}
+        {errorMsg && (
+          <div style={{ padding: '16px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '24px', border: '1px solid #F87171', fontWeight: 500 }}>
+            {errorMsg}
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
           
-          {/* DELIVERY FORM */}
           <div>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A', marginBottom: '16px', borderBottom: '1px solid #EAEAEA', paddingBottom: '10px' }}>Delivery Details</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <input 
-                type="text" 
-                placeholder="Full Name" 
-                value={form.name} 
-                onChange={e => setForm({ ...form, name: e.target.value })} 
-                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none' }} 
-              />
-              <input 
-                type="tel" 
-                placeholder="Phone Number" 
-                value={form.phone} 
-                onChange={e => setForm({ ...form, phone: e.target.value })} 
-                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none' }} 
-              />
-              <input 
-                type="email" 
-                placeholder="Email Address (Optional)" 
-                value={form.email} 
-                onChange={e => setForm({ ...form, email: e.target.value })} 
-                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none' }} 
-              />
-              <textarea 
-                placeholder="Full Delivery Address" 
-                value={form.address} 
-                onChange={e => setForm({ ...form, address: e.target.value })} 
-                rows={3}
-                style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none', resize: 'vertical' }} 
-              />
+              <input type="text" placeholder="Full Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none' }} />
+              <input type="tel" placeholder="Phone Number" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none' }} />
+              <input type="email" placeholder="Email Address (Optional)" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none' }} />
+              <textarea placeholder="Full Delivery Address" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows={3} style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', fontSize: '1rem', outline: 'none', resize: 'vertical' }} />
 
-              {/* CUSTOM STATE DROPDOWN */}
               {!freeDelivery && (
                 <div style={{ position: 'relative' }} ref={stateDropdownRef}>
-                  <button 
-                    type="button"
-                    onClick={() => setShowStateDropdown(!showStateDropdown)}
-                    style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', background: '#FFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '1rem', color: form.state ? '#0F2B4A' : '#999', cursor: 'pointer' }}
-                  >
+                  <button type="button" onClick={() => setShowStateDropdown(!showStateDropdown)} style={{ width: '100%', padding: '16px', borderRadius: '8px', border: '1px solid #EAEAEA', background: '#FFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '1rem', color: form.state ? '#0F2B4A' : '#999', cursor: 'pointer' }}>
                     {form.state || 'Select State for Delivery'}
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
                   </button>
@@ -185,14 +130,7 @@ export default function CheckoutPage() {
                   {showStateDropdown && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto', zIndex: 50 }}>
                       {availableStates.map(s => (
-                        <button 
-                          key={s} 
-                          type="button"
-                          onClick={() => { setForm({ ...form, state: s }); setShowStateDropdown(false); }}
-                          style={{ width: '100%', textAlign: 'left', padding: '14px 16px', background: '#FFF', border: 'none', borderBottom: '1px solid #F0F0F0', cursor: 'pointer', fontSize: '0.95rem', color: '#333' }}
-                          onMouseEnter={(e) => e.target.style.background = '#F9F9F9'}
-                          onMouseLeave={(e) => e.target.style.background = '#FFF'}
-                        >
+                        <button key={s} type="button" onClick={() => { setForm({ ...form, state: s }); setShowStateDropdown(false); }} style={{ width: '100%', textAlign: 'left', padding: '14px 16px', background: '#FFF', border: 'none', borderBottom: '1px solid #F0F0F0', cursor: 'pointer', fontSize: '0.95rem', color: '#333' }} onMouseEnter={(e) => e.target.style.background = '#F9F9F9'} onMouseLeave={(e) => e.target.style.background = '#FFF'}>
                           {s} — ₦{Number(deliveryRates[s]).toLocaleString()}
                         </button>
                       ))}
@@ -203,51 +141,28 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* SUMMARY */}
           <div style={{ background: '#F9F9F9', padding: '24px', borderRadius: '12px' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A', marginBottom: '20px' }}>Order Summary</h2>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '0.95rem', color: '#666' }}>
-              <span>Subtotal</span>
-              <span>₦{cartTotal.toLocaleString()}</span>
+              <span>Subtotal</span><span>₦{cartTotal.toLocaleString()}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', fontSize: '0.95rem', color: '#666' }}>
               <span>Delivery {form.state && `(${form.state})`}</span>
-              <span>
-                {!form.state && !freeDelivery ? '—' : freeDelivery ? 'Free' : deliveryKnown ? `₦${deliveryFee.toLocaleString()}` : 'Not available'}
-              </span>
+              <span>{!form.state && !freeDelivery ? '—' : freeDelivery ? 'Free' : deliveryKnown ? `₦${deliveryFee.toLocaleString()}` : 'Not available'}</span>
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #EAEAEA', paddingTop: '20px', marginBottom: '24px' }}>
               <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0F2B4A' }}>Total</span>
-              <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F2B4A' }}>
-                {deliveryKnown ? `₦${finalTotal.toLocaleString()}` : '—'}
-              </span>
+              <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F2B4A' }}>{deliveryKnown ? `₦${finalTotal.toLocaleString()}` : '—'}</span>
             </div>
 
-            <button 
-              type="button" 
-              onClick={handlePayment}
-              disabled={!deliveryKnown || isProcessing} 
-              style={{ 
-                width: '100%', padding: '18px', fontSize: '1rem', fontWeight: 700, 
-                background: (!deliveryKnown || isProcessing) ? '#EAEAEA' : '#0F2B4A', 
-                color: (!deliveryKnown || isProcessing) ? '#999' : '#FFF', 
-                border: 'none', borderRadius: '8px', 
-                cursor: (!deliveryKnown || isProcessing) ? 'not-allowed' : 'pointer', 
-                textTransform: 'uppercase', letterSpacing: '1px',
-                transition: 'background 0.2s ease'
-              }}
-            >
+            <button type="button" onClick={handlePayment} disabled={!deliveryKnown || isProcessing} style={{ width: '100%', padding: '18px', fontSize: '1rem', fontWeight: 700, background: (!deliveryKnown || isProcessing) ? '#EAEAEA' : '#0F2B4A', color: (!deliveryKnown || isProcessing) ? '#999' : '#FFF', border: 'none', borderRadius: '8px', cursor: (!deliveryKnown || isProcessing) ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '1px', transition: 'background 0.2s ease' }}>
               {isProcessing ? 'Processing...' : `Pay ${deliveryKnown ? `₦${finalTotal.toLocaleString()}` : ''} with Paystack`}
             </button>
-            <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#999', marginTop: '12px' }}>
-              Secure checkout powered by Paystack
-            </p>
           </div>
 
         </div>
       </main>
     </div>
   )
-        }
+    }
