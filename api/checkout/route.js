@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
-import { getUsablePayout } from '../../../../lib/payments'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin' // ✅ FIXED PATH
+import { getUsablePayout } from '../../../lib/payments'     // ✅ FIXED PATH
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +22,7 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Missing required checkout details' }, { status: 400 })
   }
 
-  // 1. Find the Business
+  // 1. Find Business
   const { data: page } = await supabaseAdmin
     .from('business_public_pages')
     .select('business_id')
@@ -32,20 +32,15 @@ export async function POST(req) {
   if (!page) return NextResponse.json({ error: 'Store not found' }, { status: 404 })
   const businessId = page.business_id
 
-  // 2. Check Payout Status (Subaccount)
+  // 2. Check Payout
   const payout = await getUsablePayout(businessId)
   if (!payout) return NextResponse.json({ error: 'This business has not enabled online payments yet' }, { status: 409 })
   if (payout.payout_mode === 'direct' && !payout.paystack_subaccount_code) {
     return NextResponse.json({ error: 'This business has not enabled online payments yet' }, { status: 409 })
   }
-  if (payout.payout_mode === 'hold' && process.env.HOLD_MODE_ENABLED !== 'true') {
-    return NextResponse.json({ error: 'This business has not enabled online payments yet' }, { status: 409 })
-  }
 
-  // 3. Create or Find Customer (Using exact schema)
+  // 3. Create/Find Customer
   const email = form.email || `pay+${crypto.randomBytes(4).toString('hex')}@cresoa.com.ng`
-  
-  // Check if customer exists by phone
   let { data: existingCustomer } = await supabaseAdmin
     .from('customers')
     .select('id')
@@ -74,16 +69,12 @@ export async function POST(req) {
       .select('id')
       .single()
 
-    if (custErr) {
-      console.error("Customer insert failed:", custErr)
-      return NextResponse.json({ error: 'Could not create customer profile' }, { status: 500 })
-    }
+    if (custErr) return NextResponse.json({ error: 'Could not create customer profile' }, { status: 500 })
     customerId = newCustomer.id
   }
 
-  // 4. Create the Order (Using exact schema)
+  // 4. Create Order
   const trackingToken = crypto.randomUUID()
-  
   const { data: order, error: orderErr } = await supabaseAdmin
     .from('orders')
     .insert({
@@ -96,17 +87,14 @@ export async function POST(req) {
       tracking_token: trackingToken,
       project_address: form.address,
       customer_notes: `State: ${form.state}`,
-      custom_fields: { cart: cart } // Saving the cart items here as JSON
+      custom_fields: { cart: cart }
     })
     .select('id')
     .single()
 
-  if (orderErr) {
-    console.error("Order insert failed:", orderErr)
-    return NextResponse.json({ error: 'Could not create order' }, { status: 500 })
-  }
+  if (orderErr) return NextResponse.json({ error: 'Could not create order' }, { status: 500 })
 
-  // 5. Initialize Paystack
+  // 5. Paystack Init
   const amountKobo = Math.round(totalAmount * 100)
   const fee = platformFeeKobo(amountKobo)
   const modePrefix = secret.startsWith('sk_test') ? 'test_' : ''
@@ -126,10 +114,7 @@ export async function POST(req) {
     .select('id')
     .single()
 
-  if (intentErr) {
-    console.error("Intent insert failed:", intentErr)
-    return NextResponse.json({ error: 'Could not start payment' }, { status: 500 })
-  }
+  if (intentErr) return NextResponse.json({ error: 'Could not start payment' }, { status: 500 })
 
   const site = new URL(req.url).origin
   const payload = {
@@ -137,7 +122,8 @@ export async function POST(req) {
     amount: amountKobo,
     currency: 'NGN',
     reference,
-    callback_url: `${site}/${slug}/success?order=${trackingToken}`,
+    // ✅ We still need to tell Paystack where to send them after payment
+    callback_url: `${site}/${slug}/success`,
     metadata: {
       kind: 'storefront_checkout',
       intent_id: intent.id,
@@ -164,5 +150,6 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Could not start payment with Paystack' }, { status: 502 })
   }
 
-  return NextResponse.json({ url: json.data.authorization_url })
-      }
+  // ✅ Send the URL and the Token back to the frontend securely
+  return NextResponse.json({ url: json.data.authorization_url, trackingToken })
+}
