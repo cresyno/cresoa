@@ -71,10 +71,8 @@ export default function CheckoutPage() {
       
       const contentType = res.headers.get("content-type");
       
-      // 🔍 THIS REVEALS THE REAL ERROR INSTEAD OF HIDING IT
       if (!contentType || !contentType.includes("application/json")) {
         const text = await res.text();
-        // Strips HTML tags so it fits in the red box
         const cleanText = text.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').substring(0, 150);
         throw new Error(`Status ${res.status}: ${cleanText}`);
       }
@@ -167,4 +165,4 @@ export default function CheckoutPage() {
       </main>
     </div>
   )
-    }
+}
