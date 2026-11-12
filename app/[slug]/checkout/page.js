@@ -80,7 +80,6 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
       
       sessionStorage.setItem('last_order_token', data.trackingToken)
-      // Note: clearCart is NOT called here anymore. It happens on the success page.
       window.location.href = data.url
       
     } catch (err) {
@@ -198,4 +197,4 @@ export default function CheckoutPage() {
       </div>
     </div>
   )
-                     }
+        }
