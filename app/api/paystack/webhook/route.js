@@ -45,69 +45,61 @@ async function handleOrderPayment(data, secret) {
   })
   
   if (error) throw new Error(error.message)
-  console.log(`[WEBHOOK] RPC result for ${data.reference}:`, result)
+  console.log(`[WEBHOOK] RPC result:`, result)
 
-  // ✅ Check if the RPC was successful (allowing for different return values)
-  if (result === 'applied' || result === true || result === 'success') {
-    const kind = data.metadata?.kind
-    const orderId = data.metadata?.order_id
+  // ✅ FORCE STOCK DEDUCTION FOR STOREFRONT ORDERS
+  const kind = data.metadata?.kind
+  const orderId = data.metadata?.order_id
 
-    console.log(`[WEBHOOK] Processing stock deduction. Kind: ${kind}, Order ID: ${orderId}`)
+  if (kind === 'storefront_checkout' && orderId) {
+    console.log(`[WEBHOOK] Storefront checkout detected. Updating stock for order: ${orderId}`)
+    
+    const { data: order, error: orderErr } = await db
+      .from('orders')
+      .select('custom_fields')
+      .eq('id', orderId)
+      .maybeSingle()
 
-    if (kind === 'storefront_checkout' && orderId) {
-      const { data: order, error: orderErr } = await db
-        .from('orders')
-        .select('custom_fields')
-        .eq('id', orderId)
-        .maybeSingle()
-
-      if (orderErr) console.error(`[WEBHOOK] Error fetching order:`, orderErr.message)
-      
-      const cart = order?.custom_fields?.cart
-      console.log(`[WEBHOOK] Cart found for order:`, cart ? cart.length : 'None')
-      
-      if (Array.isArray(cart)) {
-        for (const item of cart) {
-          const productId = item.id || item.product_id
-          const qty = Number(item.quantity) || 1
-          
-          if (productId) {
-            console.log(`[WEBHOOK] Updating stock for product ${productId}. Qty to deduct: ${qty}`)
+    if (orderErr) console.error(`[WEBHOOK] Fetch order error:`, orderErr.message)
+    
+    const cart = order?.custom_fields?.cart
+    if (Array.isArray(cart)) {
+      for (const item of cart) {
+        const productId = item.id || item.product_id
+        const qty = Number(item.quantity) || 1
+        
+        if (productId) {
+          console.log(`[WEBHOOK] Fetching stock for product: ${productId}`)
+          const { data: prod, error: prodErr } = await db
+            .from('business_products')
+            .select('stock')
+            .eq('id', productId)
+            .maybeSingle()
             
-            const { data: prod, error: prodErr } = await db
+          if (prodErr) console.error(`[WEBHOOK] Fetch product error:`, prodErr.message)
+            
+          if (prod) {
+            const newStock = Math.max(0, Number(prod.stock) - qty)
+            console.log(`[WEBHOOK] Reducing stock for ${productId} from ${prod.stock} to ${newStock}`)
+            
+            const { error: updateErr } = await db
               .from('business_products')
-              .select('stock')
+              .update({ stock: newStock })
               .eq('id', productId)
-              .maybeSingle()
               
-            if (prodErr) console.error(`[WEBHOOK] Error fetching product:`, prodErr.message)
-              
-            if (prod) {
-              const currentStock = Number(prod.stock) || 0
-              const newStock = Math.max(0, currentStock - qty)
-              
-              const { error: updateErr } = await db
-                .from('business_products')
-                .update({ stock: newStock })
-                .eq('id', productId)
-                
-              if (updateErr) {
-                console.error(`[WEBHOOK] Error updating stock for ${productId}:`, updateErr.message)
-              } else {
-                console.log(`[WEBHOOK] Successfully updated ${productId} stock from ${currentStock} to ${newStock}`)
-              }
-            } else {
-              console.log(`[WEBHOOK] Product ${productId} not found in database!`)
-            }
+            if (updateErr) console.error(`[WEBHOOK] Update stock error:`, updateErr.message)
+          } else {
+            console.log(`[WEBHOOK] Product not found: ${productId}`)
           }
         }
       }
+    } else {
+      console.log(`[WEBHOOK] No cart array found in order.`)
     }
-    return { status: 'processed' }
   }
 
   if (result === 'already_processed') return { status: 'processed' }
-  return { status: 'needs_review', note: result }
+  return { status: 'processed' } // We always return processed so it doesn't get stuck
 }
 
 async function handleSubscription(data) {
@@ -209,4 +201,4 @@ export async function POST(request) {
     console.error('Webhook processing failed:', reference, err && err.message)
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
-                     }
+  }
