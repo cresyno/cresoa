@@ -38,13 +38,59 @@ async function handleOrderPayment(data, secret) {
   if (!verified || verified.status !== 'success' || verified.currency !== 'NGN') {
     return { status: 'needs_review', note: 'verification did not confirm success' }
   }
+  
   const { data: result, error } = await db.rpc('apply_order_payment', {
     p_reference: verified.reference,
     p_amount_kobo: verified.amount,
     p_paystack_fee_kobo: verified.fees ?? 0,
   })
+  
   if (error) throw new Error(error.message)
-  if (result === 'applied' || result === 'already_processed') return { status: 'processed' }
+
+  // ✅ IF APPLIED SUCCESSFULLY: Deduct stock for storefront checkouts
+  if (result === 'applied') {
+    const kind = data.metadata?.kind
+    const orderId = data.metadata?.order_id
+
+    if (kind === 'storefront_checkout' && orderId) {
+      // 1. Fetch the order to get the cart items saved in custom_fields
+      const { data: order } = await db
+        .from('orders')
+        .select('custom_fields')
+        .eq('id', orderId)
+        .maybeSingle()
+
+      const cart = order?.custom_fields?.cart
+      
+      // 2. Loop through the cart and reduce the stock in business_products
+      if (Array.isArray(cart)) {
+        for (const item of cart) {
+          const productId = item.id || item.product_id
+          const qty = Number(item.quantity) || 1
+          
+          if (productId) {
+            // Fetch current stock to prevent going below 0
+            const { data: prod } = await db
+              .from('business_products')
+              .select('stock')
+              .eq('id', productId)
+              .maybeSingle()
+              
+            if (prod) {
+              const newStock = Math.max(0, (Number(prod.stock) || 0) - qty)
+              await db
+                .from('business_products')
+                .update({ stock: newStock })
+                .eq('id', productId)
+            }
+          }
+        }
+      }
+    }
+    return { status: 'processed' }
+  }
+
+  if (result === 'already_processed') return { status: 'processed' }
   return { status: 'needs_review', note: result }
 }
 
@@ -130,7 +176,11 @@ export async function POST(request) {
 
   try {
     const kind = data.metadata && data.metadata.kind
-    const outcome = kind === 'order_payment'
+    
+    // ✅ FIX: Route storefront_checkout to the order payment handler
+    const isOrderPayment = kind === 'order_payment' || kind === 'storefront_checkout'
+    
+    const outcome = isOrderPayment
       ? await handleOrderPayment(data, secret)
       : await handleSubscription(data)
 
@@ -145,4 +195,4 @@ export async function POST(request) {
     console.error('Webhook processing failed:', reference, err && err.message)
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
-}
+                    }
