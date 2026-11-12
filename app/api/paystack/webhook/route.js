@@ -38,21 +38,27 @@ async function handleOrderPayment(data, secret) {
     return { status: 'needs_review', note: 'verification did not confirm success' }
   }
   
+  // 1. Apply the payment to the ledger
   const { data: result, error } = await db.rpc('apply_order_payment', {
     p_reference: verified.reference,
     p_amount_kobo: verified.amount,
     p_paystack_fee_kobo: verified.fees ?? 0,
   })
   
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(`RPC Error: ${error.message}`)
   console.log(`[WEBHOOK] RPC result:`, result)
 
-  // ✅ FORCE STOCK DEDUCTION FOR STOREFRONT ORDERS
-  const kind = data.metadata?.kind
-  const orderId = data.metadata?.order_id
+  // 2. Find the Order ID (Check Paystack metadata first, then database fallback)
+  let orderId = data.metadata?.order_id
+  if (!orderId) {
+    console.log(`[WEBHOOK] Metadata missing order_id. Fetching from payment_intents...`)
+    const { data: intent } = await db.from('payment_intents').select('order_id').eq('reference', verified.reference).maybeSingle()
+    if (intent) orderId = intent.order_id
+  }
 
-  if (kind === 'storefront_checkout' && orderId) {
-    console.log(`[WEBHOOK] Storefront checkout detected. Updating stock for order: ${orderId}`)
+  // 3. Deduct Stock (Forcefully, regardless of RPC return string)
+  if (orderId) {
+    console.log(`[WEBHOOK] Processing stock deduction for Order ID: ${orderId}`)
     
     const { data: order, error: orderErr } = await db
       .from('orders')
@@ -89,17 +95,19 @@ async function handleOrderPayment(data, secret) {
               
             if (updateErr) console.error(`[WEBHOOK] Update stock error:`, updateErr.message)
           } else {
-            console.log(`[WEBHOOK] Product not found: ${productId}`)
+            console.log(`[WEBHOOK] Product not found in database: ${productId}`)
           }
         }
       }
     } else {
-      console.log(`[WEBHOOK] No cart array found in order.`)
+      console.log(`[WEBHOOK] No cart array found in order.custom_fields.`)
     }
+  } else {
+    console.log(`[WEBHOOK] Could not find an order ID for this payment.`)
   }
 
   if (result === 'already_processed') return { status: 'processed' }
-  return { status: 'processed' } // We always return processed so it doesn't get stuck
+  return { status: 'processed' }
 }
 
 async function handleSubscription(data) {
@@ -201,4 +209,4 @@ export async function POST(request) {
     console.error('Webhook processing failed:', reference, err && err.message)
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
-  }
+}
