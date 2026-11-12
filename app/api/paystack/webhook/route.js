@@ -38,7 +38,6 @@ async function handleOrderPayment(data, secret) {
     return { status: 'needs_review', note: 'verification did not confirm success' }
   }
   
-  // 1. Apply the payment to the ledger
   const { data: result, error } = await db.rpc('apply_order_payment', {
     p_reference: verified.reference,
     p_amount_kobo: verified.amount,
@@ -46,64 +45,47 @@ async function handleOrderPayment(data, secret) {
   })
   
   if (error) throw new Error(`RPC Error: ${error.message}`)
-  console.log(`[WEBHOOK] RPC result:`, result)
 
-  // 2. Find the Order ID (Check Paystack metadata first, then database fallback)
+  // ✅ Find the Order ID
   let orderId = data.metadata?.order_id
   if (!orderId) {
-    console.log(`[WEBHOOK] Metadata missing order_id. Fetching from payment_intents...`)
     const { data: intent } = await db.from('payment_intents').select('order_id').eq('reference', verified.reference).maybeSingle()
     if (intent) orderId = intent.order_id
   }
 
-  // 3. Deduct Stock (Forcefully, regardless of RPC return string)
+  // ✅ Deduct Stock using the CORRECT table and column
   if (orderId) {
-    console.log(`[WEBHOOK] Processing stock deduction for Order ID: ${orderId}`)
-    
-    const { data: order, error: orderErr } = await db
-      .from('orders')
-      .select('custom_fields')
-      .eq('id', orderId)
-      .maybeSingle()
-
-    if (orderErr) console.error(`[WEBHOOK] Fetch order error:`, orderErr.message)
-    
+    const { data: order } = await db.from('orders').select('custom_fields').eq('id', orderId).maybeSingle()
     const cart = order?.custom_fields?.cart
+    
     if (Array.isArray(cart)) {
       for (const item of cart) {
         const productId = item.id || item.product_id
         const qty = Number(item.quantity) || 1
         
         if (productId) {
-          console.log(`[WEBHOOK] Fetching stock for product: ${productId}`)
-          const { data: prod, error: prodErr } = await db
-            .from('business_products')
-            .select('stock')
+          // FETCHING FROM inventory_items
+          const { data: prod } = await db
+            .from('inventory_items') 
+            .select('quantity_on_hand')
             .eq('id', productId)
             .maybeSingle()
             
-          if (prodErr) console.error(`[WEBHOOK] Fetch product error:`, prodErr.message)
-            
           if (prod) {
-            const newStock = Math.max(0, Number(prod.stock) - qty)
-            console.log(`[WEBHOOK] Reducing stock for ${productId} from ${prod.stock} to ${newStock}`)
+            const currentStock = Number(prod.quantity_on_hand) || 0
+            const newStock = Math.max(0, currentStock - qty)
             
-            const { error: updateErr } = await db
-              .from('business_products')
-              .update({ stock: newStock })
+            // UPDATING quantity_on_hand IN inventory_items
+            await db
+              .from('inventory_items')
+              .update({ quantity_on_hand: newStock })
               .eq('id', productId)
               
-            if (updateErr) console.error(`[WEBHOOK] Update stock error:`, updateErr.message)
-          } else {
-            console.log(`[WEBHOOK] Product not found in database: ${productId}`)
+            console.log(`[WEBHOOK] Successfully reduced stock for ${productId} from ${currentStock} to ${newStock}`)
           }
         }
       }
-    } else {
-      console.log(`[WEBHOOK] No cart array found in order.custom_fields.`)
     }
-  } else {
-    console.log(`[WEBHOOK] Could not find an order ID for this payment.`)
   }
 
   if (result === 'already_processed') return { status: 'processed' }
@@ -209,4 +191,4 @@ export async function POST(request) {
     console.error('Webhook processing failed:', reference, err && err.message)
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
-}
+        }
