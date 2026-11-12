@@ -1,16 +1,30 @@
-import { getPublicPage, createServerSupabase } from '@/lib/serverSupabase'
 import { notFound } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+
+// ✅ Use the Service Role key to bypass RLS and caching
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export const dynamic = 'force-dynamic'
 
 export default async function ShopPage({ params }) {
   const { slug } = await params
-  const page = await getPublicPage(slug)
+  
+  // 1. Fetch page directly
+  const { data: page } = await supabaseAdmin
+    .from('business_public_pages')
+    .select('*')
+    .eq('slug', slug)
+    .eq('is_enabled', true)
+    .maybeSingle()
+
   if (!page) notFound()
 
-  const sb = createServerSupabase()
-  const { data: products } = await sb
+  // 2. Fetch inventory items using Admin client
+  const { data: products } = await supabaseAdmin
     .from('inventory_items')
     .select('*')
     .eq('business_id', page.business_id)
@@ -43,7 +57,7 @@ export default async function ShopPage({ params }) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', rowGap: '40px' }}>
             {products.map((product) => (
-              <Link key={product.id} href={`/${slug}/shop/${product.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', group: 'product-card' }}>
+              <Link key={product.id} href={`/${slug}/shop/${product.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
                 <div style={{ position: 'relative', overflow: 'hidden', background: '#F9F9F9', aspectRatio: '3/4' }}>
                   {product.image_url ? (
                     <img 
@@ -68,7 +82,6 @@ export default async function ShopPage({ params }) {
         )}
       </main>
 
-      {/* CSS for hover effects */}
       <style dangerouslySetInnerHTML={{__html: `
         @media (min-width: 768px) {
           div[style*="gridTemplateColumns: repeat(2, 1fr)"] {
@@ -81,4 +94,4 @@ export default async function ShopPage({ params }) {
       `}} />
     </div>
   )
-          }
+                    }
