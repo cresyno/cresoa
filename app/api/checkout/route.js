@@ -45,16 +45,17 @@ export async function POST(req) {
     // 3. Create/Find Customer
     const email = form.email || `pay+${crypto.randomBytes(4).toString('hex')}@cresoa.com.ng`
     
-    let { data: existingCustomer, error: findCustErr } = await supabaseAdmin
+    // ✅ FIXED: Using .limit(1) instead of .maybeSingle() to handle duplicate phone numbers
+    let { data: existingCustomers, error: findCustErr } = await supabaseAdmin
       .from('customers')
       .select('id')
       .eq('business_id', businessId)
       .eq('phone', form.phone)
-      .maybeSingle()
+      .limit(1)
 
     if (findCustErr) throw new Error(`Database error (find customer): ${findCustErr.message}`)
 
-    let customerId = existingCustomer?.id
+    let customerId = existingCustomers?.[0]?.id
 
     if (!customerId) {
       const nameParts = form.name.trim().split(' ')
