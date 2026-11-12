@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { useCart } from '@/lib/CartContext'
-import Link from 'next/link'
 
 export default function SuccessPage() {
   const { slug } = useParams()
@@ -14,8 +13,12 @@ export default function SuccessPage() {
 
   useEffect(() => {
     // ✅ Clear the cart ONLY when they reach the success page
-    if (typeof clearCart === 'function') {
-      clearCart()
+    try {
+      if (typeof clearCart === 'function') {
+        clearCart()
+      }
+    } catch (e) {
+      console.error("Cart clear error:", e)
     }
 
     const orderToken = sessionStorage.getItem('last_order_token')
@@ -40,6 +43,9 @@ export default function SuccessPage() {
   }, [clearCart])
 
   if (loading) return <div style={{ padding: '100px', textAlign: 'center', color: '#111827', fontWeight: 600 }}>Verifying your order...</div>
+
+  // Fallback just in case the slug is missing
+  const storeSlug = slug || ''
 
   return (
     <div style={{ background: '#F3F4F6', minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px' }}>
@@ -72,13 +78,14 @@ export default function SuccessPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '400px' }}>
-        <Link href={`/${slug}/shop`} style={{ display: 'block', width: '100%', padding: '16px', textAlign: 'center', background: '#111827', color: '#FFF', borderRadius: '12px', textDecoration: 'none', fontWeight: 600, fontSize: '1rem' }}>
+        {/* ✅ CHANGED from Link to standard <a> tags for hard reload */}
+        <a href={`/${storeSlug}/shop`} style={{ display: 'block', width: '100%', padding: '16px', textAlign: 'center', background: '#111827', color: '#FFF', borderRadius: '12px', textDecoration: 'none', fontWeight: 600, fontSize: '1rem' }}>
           Continue Shopping
-        </Link>
-        <Link href={`/${slug}`} style={{ display: 'block', width: '100%', padding: '16px', textAlign: 'center', background: '#FFFFFF', color: '#111827', border: '1px solid #D1D5DB', borderRadius: '12px', textDecoration: 'none', fontWeight: 600, fontSize: '1rem' }}>
+        </a>
+        <a href={`/${storeSlug}`} style={{ display: 'block', width: '100%', padding: '16px', textAlign: 'center', background: '#FFFFFF', color: '#111827', border: '1px solid #D1D5DB', borderRadius: '12px', textDecoration: 'none', fontWeight: 600, fontSize: '1rem' }}>
           Return to Home
-        </Link>
+        </a>
       </div>
     </div>
   )
-        }
+    }
