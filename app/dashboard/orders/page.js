@@ -55,6 +55,11 @@ const SvgIcons = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
     </svg>
+  ),
+  Refresh: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
   )
 }
 
@@ -130,7 +135,9 @@ export default function OrdersPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      let businessId = getCurrentBusinessId()
+      // ✅ FIX: Prioritize the ID from the URL bar instead of LocalStorage
+      let businessId = searchParams.get('business_id') || getCurrentBusinessId()
+      
       if (!businessId || businessId.length < 20) {
         const { data: owned } = await supabase.from('businesses').select('id').eq('owner_id', user.id).single()
         if (owned) businessId = owned.id
@@ -142,11 +149,13 @@ export default function OrdersPage() {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       })
       const result = await response.json()
+      
       if (!response.ok) throw new Error(result.error || 'Failed to load orders')
       
-      // Assuming the API returns a 'source' field ('manual' or 'website'). 
-      // If it's missing, we default to manual so the app doesn't break.
-      const formattedOrders = (result.orders || []).map(o => ({
+      // ✅ FIX: Ensure we are mapping over a valid array
+      const rawOrders = Array.isArray(result.orders) ? result.orders : []
+      
+      const formattedOrders = rawOrders.map(o => ({
         ...o,
         source: o.source || 'manual' 
       }))
@@ -162,10 +171,8 @@ export default function OrdersPage() {
   useEffect(() => { loadOrders() }, [router, searchParams])
 
   // ─── FILTERING LOGIC ───
-  // 1. Filter by Tab (Manual vs Website)
   const tabOrders = orders.filter(o => o.source === activeTab)
   
-  // 2. Calculate Metrics based on active tab
   const totalOrders = tabOrders.length
   const activeOrders = tabOrders.filter(o => o.current_status !== 'Delivered').length
   const readyOrders = tabOrders.filter(o => o.current_status === 'Ready').length
@@ -176,7 +183,6 @@ export default function OrdersPage() {
     return due < today
   }).length
 
-  // 3. Apply search and status filters
   const filteredOrders = tabOrders.filter(o => {
     if (statusFilter !== 'all' && o.current_status !== statusFilter) return false
     if (search) {
@@ -186,7 +192,6 @@ export default function OrdersPage() {
     return true
   })
 
-  // 4. Sort
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     switch (sortBy) {
       case 'latest': return new Date(b.created_at) - new Date(a.created_at)
@@ -323,9 +328,14 @@ export default function OrdersPage() {
               Manage fulfillment and production.
             </p>
           </div>
-          <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button" style={{ background: '#0F2B4A', color: '#FFF' }}>
-            <SvgIcons.Plus /> New Order
-          </a>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={loadOrders} style={{ background: '#F4F6F8', border: '1px solid #EAEAEA', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <SvgIcons.Refresh />
+            </button>
+            <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button" style={{ background: '#0F2B4A', color: '#FFF' }}>
+              <SvgIcons.Plus /> New Order
+            </a>
+          </div>
         </div>
 
         {/* TAB SWITCHER */}
@@ -422,7 +432,7 @@ export default function OrdersPage() {
       </div>
 
       {/* ─── LIST ─── */}
-     {sortedOrders.length === 0 ? (
+    {sortedOrders.length === 0 ? (
         <div className="orders-empty" style={{ textAlign: 'center', padding: '4rem 2rem', background: '#F8F9FA', borderRadius: '16px', border: '2px dashed #EAEAEA' }}>
           <div className="empty-icon" style={{ fontSize: '2rem', marginBottom: '1rem' }}>
             {activeTab === 'website' ? '🛒' : '📋'}
