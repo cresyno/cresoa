@@ -5,23 +5,27 @@ import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export async function GET(req) {
   try {
+    // ─── 1. AUTHENTICATE USER ───
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
     }
 
     const url = new URL(req.url);
     const businessId = url.searchParams.get('business_id');
+    
     if (!businessId) {
       return NextResponse.json({ error: 'business_id is required' }, { status: 400 });
     }
 
-    // ─── Verify access ───
+    // ─── 2. VERIFY ACCESS (THE SECURITY BOUNCER) ───
+    // We check if the user is a member of the business OR the owner.
     const { data: membership } = await supabaseAdmin
       .from('business_memberships')
       .select('id')
@@ -35,41 +39,39 @@ export async function GET(req) {
       .eq('id', businessId)
       .single();
 
+    // 🚨 IF THEY ARE NOT THE OWNER AND NOT A MEMBER, BLOCK THEM.
     if (!membership && business?.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      console.warn(`[SECURITY ALERT] User ${user.id} tried to access orders for business ${businessId}`)
+      return NextResponse.json({ error: 'Access denied: You do not have permission to view these orders' }, { status: 403 });
     }
 
-    // ─── 1. Fetch Manual Orders ───
+    // ─── 3. FETCH MANUAL ORDERS (SAFELY SCOPED) ───
     const { data: manualOrders, error: manualError } = await supabaseAdmin
       .from('orders')
       .select(`
         *,
         customers (id, name, phone)
       `)
-      .eq('business_id', businessId);
+      .eq('business_id', businessId) // <--- STRICTLY FILTERED
+      .order('created_at', { ascending: false });
 
-    if (manualError) {
-      console.error('Fetch manual orders error:', manualError);
-    }
+    if (manualError) console.error('Fetch manual orders error:', manualError);
 
     const formattedManualOrders = (manualOrders || []).map(o => ({
       ...o,
       source: 'manual'
     }));
 
-    // ─── 2. Fetch Website Orders ───
+    // ─── 4. FETCH WEBSITE ORDERS (SAFELY SCOPED) ───
     const { data: websiteOrders, error: websiteError } = await supabaseAdmin
       .from('public_orders')
       .select('*')
-      .eq('business_id', businessId);
+      .eq('business_id', businessId) // <--- STRICTLY FILTERED
+      .order('created_at', { ascending: false });
 
-    if (websiteError) {
-      console.error('Fetch website orders error:', websiteError);
-    }
+    if (websiteError) console.error('Fetch website orders error:', websiteError);
 
-    // ─── 3. Format Website Orders to match manual orders structure ───
     const formattedWebsiteOrders = (websiteOrders || []).map(o => {
-      // Get the first item name for the title, or default
       let title = 'Website Order'
       if (o.items && Array.isArray(o.items) && o.items.length > 0) {
         title = o.items[0].name
@@ -80,7 +82,7 @@ export async function GET(req) {
         id: o.id,
         title: title,
         price: o.total_amount || 0,
-        amount_paid: 0, // Default to 0; you can update this if you track web payments
+        amount_paid: 0, 
         current_status: o.status === 'new' ? 'Order placed' : o.status,
         created_at: o.created_at,
         source: 'website',
@@ -91,55 +93,40 @@ export async function GET(req) {
       }
     });
 
-    // ─── 4. Merge and sort newest first ───
+    // ─── 5. MERGE AND RETURN ───
     const allOrders = [...formattedManualOrders, ...formattedWebsiteOrders].sort(
       (a, b) => new Date(b.created_at) - new Date(a.created_at)
     );
 
     return NextResponse.json({ success: true, orders: allOrders });
+    
   } catch (err) {
     console.error('Orders API error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ─── POST: Create order (UNCHANGED) ───
+// ─── POST: Create order (UNCHANGED, ALREADY SECURE) ───
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
-    }
+    if (!authHeader) return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
+    
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const {
-      business_id,
-      customer_id,
-      customer_name,
-      customer_phone,
-      customer_email,
-      title,
-      price,
-      amount_paid,
-      due_date,
-      current_status,
-      notes,
-      category,
-      quantity,
-      fabric,
-      fitting_date,
-      event_date,
-      measurements,
+      business_id, customer_id, customer_name, customer_phone, customer_email,
+      title, price, amount_paid, due_date, current_status, notes,
+      category, quantity, fabric, fitting_date, event_date, measurements,
     } = await req.json();
 
     if (!business_id || !title || price === undefined) {
       return NextResponse.json({ error: 'Business ID, title, and price are required' }, { status: 400 });
     }
 
+    // ─── VERIFY ACCESS ───
     const { data: membership } = await supabaseAdmin
       .from('business_memberships')
       .select('id')
@@ -175,7 +162,6 @@ export async function POST(req) {
         console.error('Customer creation error:', custError);
         return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
       }
-      
       finalCustomerId = newCustomer.id;
     }
 
@@ -217,4 +203,4 @@ export async function POST(req) {
     console.error('POST order error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+                                }
