@@ -5,73 +5,45 @@ import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 export async function GET(req) {
   try {
-    // ─── 1. AUTHENTICATE USER ───
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
-    }
+    if (!authHeader) return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
+    
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
-    }
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const url = new URL(req.url);
     const businessId = url.searchParams.get('business_id');
-    
-    if (!businessId) {
-      return NextResponse.json({ error: 'business_id is required' }, { status: 400 });
-    }
+    if (!businessId) return NextResponse.json({ error: 'business_id is required' }, { status: 400 });
 
-    // ─── 2. VERIFY ACCESS (SECURITY BOUNCER) ───
-    const { data: membership } = await supabaseAdmin
-      .from('business_memberships')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // ─── VERIFY ACCESS ───
+    const { data: membership } = await supabaseAdmin.from('business_memberships').select('id').eq('business_id', businessId).eq('user_id', user.id).maybeSingle();
+    const { data: business } = await supabaseAdmin.from('businesses').select('owner_id').eq('id', businessId).single();
+    if (!membership && business?.owner_id !== user.id) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-    const { data: business } = await supabaseAdmin
-      .from('businesses')
-      .select('owner_id')
-      .eq('id', businessId)
-      .single();
-
-    // Block access if user is neither owner nor staff member
-    if (!membership && business?.owner_id !== user.id) {
-      console.warn(`[SECURITY ALERT] User ${user.id} tried to access orders for business ${businessId}`)
-      return NextResponse.json({ error: 'Access denied: You do not have permission to view these orders' }, { status: 403 });
-    }
-
-    // ─── 3. FETCH MANUAL ORDERS ───
+    // ─── 1. Fetch Manual Orders ───
     const { data: manualOrders, error: manualError } = await supabaseAdmin
       .from('orders')
-      .select(`
-        *,
-        customers (id, name, phone)
-      `)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+      .select(`*, customers (id, name, phone)`)
+      .eq('business_id', businessId);
 
     if (manualError) console.error('Fetch manual orders error:', manualError);
 
     const formattedManualOrders = (manualOrders || []).map(o => ({
       ...o,
-      // If the order in the 'orders' table has a source of 'website', keep it. Otherwise, it's manual.
+      // ✅ If it's tagged as website in the DB, keep it. Otherwise manual.
       source: o.source === 'website' ? 'website' : 'manual' 
     }));
 
-    // ─── 4. FETCH WEBSITE ORDERS ───
+    // ─── 2. Fetch Website Orders ───
     const { data: websiteOrders, error: websiteError } = await supabaseAdmin
       .from('public_orders')
       .select('*')
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+      .eq('business_id', businessId);
 
     if (websiteError) console.error('Fetch website orders error:', websiteError);
 
-    // Map the public_orders table structure to match the manual orders structure
+    // ✅ Map public orders to match the exact structure the UI expects
     const formattedWebsiteOrders = (websiteOrders || []).map(o => {
       let title = 'Website Order'
       if (o.items && Array.isArray(o.items) && o.items.length > 0) {
@@ -83,10 +55,10 @@ export async function GET(req) {
         id: o.id,
         title: title,
         price: o.total_amount || 0,
-        amount_paid: 0, 
+        amount_paid: 0,
         current_status: o.status === 'new' ? 'Order placed' : o.status,
         created_at: o.created_at,
-        source: 'website', // Force website tag
+        source: 'website', // ✅ Force website tag for public_orders
         customers: {
           name: o.customer_name || 'Guest Customer',
           phone: o.customer_phone || ''
@@ -94,137 +66,53 @@ export async function GET(req) {
       }
     });
 
-    // ─── 5. MERGE AND RETURN ───
+    // ─── 3. Merge ───
     const allOrders = [...formattedManualOrders, ...formattedWebsiteOrders].sort(
       (a, b) => new Date(b.created_at) - new Date(a.created_at)
     );
 
     return NextResponse.json({ success: true, orders: allOrders });
-    
   } catch (err) {
     console.error('Orders API error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ─── POST: Create order (For Manual Dashboard Orders) ───
+// ─── POST (Manual creation - Keep as is) ───
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
-    }
+    if (!authHeader) return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const {
-      business_id,
-      customer_id,
-      customer_name,
-      customer_phone,
-      customer_email,
-      title,
-      price,
-      amount_paid,
-      due_date,
-      current_status,
-      notes,
-      category,
-      quantity,
-      fabric,
-      fitting_date,
-      event_date,
-      measurements,
-    } = await req.json();
+    const body = await req.json();
+    const { business_id, customer_id, customer_name, customer_phone, customer_email, title, price, amount_paid, due_date, current_status, notes, category, quantity, fabric, fitting_date, event_date, measurements } = body;
 
-    if (!business_id || !title || price === undefined) {
-      return NextResponse.json({ error: 'Business ID, title, and price are required' }, { status: 400 });
-    }
+    if (!business_id || !title || price === undefined) return NextResponse.json({ error: 'Business ID, title, and price are required' }, { status: 400 });
 
-    // ─── VERIFY ACCESS ───
-    const { data: membership } = await supabaseAdmin
-      .from('business_memberships')
-      .select('id')
-      .eq('business_id', business_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const { data: membership } = await supabaseAdmin.from('business_memberships').select('id').eq('business_id', business_id).eq('user_id', user.id).maybeSingle();
+    const { data: business } = await supabaseAdmin.from('businesses').select('owner_id').eq('id', business_id).single();
+    if (!membership && business?.owner_id !== user.id) return NextResponse.json({ error: 'Access denied' }, { status: 403 });
 
-    const { data: business } = await supabaseAdmin
-      .from('businesses')
-      .select('owner_id')
-      .eq('id', business_id)
-      .single();
-
-    if (!membership && business?.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
-    // ─── Handle customer creation if new customer is being added ───
     let finalCustomerId = customer_id || null;
-    
     if (!customer_id && customer_name) {
-      const { data: newCustomer, error: custError } = await supabaseAdmin
-        .from('customers')
-        .insert({
-          business_id,
-          name: customer_name,
-          phone: customer_phone || null,
-          email: customer_email || null,
-        })
-        .select()
-        .single();
-
-      if (custError) {
-        console.error('Customer creation error:', custError);
-        return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
-      }
-      
+      const { data: newCustomer, error: custError } = await supabaseAdmin.from('customers').insert({ business_id, name: customer_name, phone: customer_phone || null, email: customer_email || null }).select().single();
+      if (custError) return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
       finalCustomerId = newCustomer.id;
     }
 
-    // ─── Insert order ───
-    const { data: order, error: insertError } = await supabaseAdmin
-      .from('orders')
-      .insert({
-        business_id,
-        customer_id: finalCustomerId,
-        title,
-        price: parseFloat(price) || 0,
-        amount_paid: parseFloat(amount_paid) || 0,
-        due_date: due_date || null,
-        current_status: current_status || 'Order placed',
-        notes: notes || null,
-        category: category || null,
-        quantity: parseInt(quantity) || 1,
-        fabric: fabric || null,
-        fitting_date: fitting_date || null,
-        event_date: event_date || null,
-        measurements: measurements || null,
-        source: 'manual' // Explicitly tag manual orders
-      })
-      .select()
-      .single();
+    const { data: order, error: insertError } = await supabaseAdmin.from('orders').insert({
+      business_id, customer_id: finalCustomerId, title, price: parseFloat(price) || 0, amount_paid: parseFloat(amount_paid) || 0, due_date: due_date || null, current_status: current_status || 'Order placed', notes: notes || null, category: category || null, quantity: parseInt(quantity) || 1, fabric: fabric || null, fitting_date: fitting_date || null, event_date: event_date || null, measurements: measurements || null, source: 'manual'
+    }).select().single();
 
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
 
-    // Log activity
-    await supabaseAdmin.from('business_activity_logs').insert({
-      business_id,
-      performed_by: user.id,
-      action: 'order_created',
-      details: { title, order_id: order.id }
-    });
+    await supabaseAdmin.from('business_activity_logs').insert({ business_id, performed_by: user.id, action: 'order_created', details: { title, order_id: order.id } });
 
     return NextResponse.json({ success: true, order });
   } catch (err) {
-    console.error('POST order error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+      }
