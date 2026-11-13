@@ -39,29 +39,71 @@ export async function GET(req) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // ─── Fetch orders with customer details ───
-    const { data: orders, error: fetchError } = await supabaseAdmin
+    // ─── 1. Fetch Manual Orders ───
+    const { data: manualOrders, error: manualError } = await supabaseAdmin
       .from('orders')
       .select(`
         *,
         customers (id, name, phone)
       `)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+      .eq('business_id', businessId);
 
-    if (fetchError) {
-      console.error('Fetch error:', fetchError);
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    if (manualError) {
+      console.error('Fetch manual orders error:', manualError);
     }
 
-    return NextResponse.json({ success: true, orders: orders || [] });
+    const formattedManualOrders = (manualOrders || []).map(o => ({
+      ...o,
+      source: 'manual'
+    }));
+
+    // ─── 2. Fetch Website Orders ───
+    const { data: websiteOrders, error: websiteError } = await supabaseAdmin
+      .from('public_orders')
+      .select('*')
+      .eq('business_id', businessId);
+
+    if (websiteError) {
+      console.error('Fetch website orders error:', websiteError);
+    }
+
+    // ─── 3. Format Website Orders to match manual orders structure ───
+    const formattedWebsiteOrders = (websiteOrders || []).map(o => {
+      // Get the first item name for the title, or default
+      let title = 'Website Order'
+      if (o.items && Array.isArray(o.items) && o.items.length > 0) {
+        title = o.items[0].name
+        if (o.items.length > 1) title += ` +${o.items.length - 1} more`
+      }
+
+      return {
+        id: o.id,
+        title: title,
+        price: o.total_amount || 0,
+        amount_paid: 0, // Default to 0; you can update this if you track web payments
+        current_status: o.status === 'new' ? 'Order placed' : o.status,
+        created_at: o.created_at,
+        source: 'website',
+        customers: {
+          name: o.customer_name || 'Guest Customer',
+          phone: o.customer_phone || ''
+        }
+      }
+    });
+
+    // ─── 4. Merge and sort newest first ───
+    const allOrders = [...formattedManualOrders, ...formattedWebsiteOrders].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+
+    return NextResponse.json({ success: true, orders: allOrders });
   } catch (err) {
     console.error('Orders API error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ─── POST: Create order ───
+// ─── POST: Create order (UNCHANGED) ───
 export async function POST(req) {
   try {
     const authHeader = req.headers.get('authorization');
@@ -86,7 +128,6 @@ export async function POST(req) {
       due_date,
       current_status,
       notes,
-      // ─── NEW FIELDS ───
       category,
       quantity,
       fabric,
@@ -99,7 +140,6 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Business ID, title, and price are required' }, { status: 400 });
     }
 
-    // Verify access
     const { data: membership } = await supabaseAdmin
       .from('business_memberships')
       .select('id')
@@ -117,11 +157,9 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // ─── Handle customer creation if new customer is being added ───
     let finalCustomerId = customer_id || null;
     
     if (!customer_id && customer_name) {
-      // Create new customer inline
       const { data: newCustomer, error: custError } = await supabaseAdmin
         .from('customers')
         .insert({
@@ -141,7 +179,6 @@ export async function POST(req) {
       finalCustomerId = newCustomer.id;
     }
 
-    // ─── Insert order (with new fields) ───
     const { data: order, error: insertError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -153,7 +190,6 @@ export async function POST(req) {
         due_date: due_date || null,
         current_status: current_status || 'Order placed',
         notes: notes || null,
-        // ─── NEW FIELDS ───
         category: category || null,
         quantity: parseInt(quantity) || 1,
         fabric: fabric || null,
@@ -169,7 +205,6 @@ export async function POST(req) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Log activity
     await supabaseAdmin.from('business_activity_logs').insert({
       business_id,
       performed_by: user.id,
@@ -182,4 +217,4 @@ export async function POST(req) {
     console.error('POST order error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-      }
+}
