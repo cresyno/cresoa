@@ -52,7 +52,6 @@ export default function CheckoutClient({ page, slug: propSlug }) {
     setIsProcessing(true)
     
     try {
-      // ✅ Send data to our secure API route (no direct DB inserts here)
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,16 +67,13 @@ export default function CheckoutClient({ page, slug: propSlug }) {
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await res.text();
-        throw new Error(`Server error: ${res.status}. Check console.`);
+        throw new Error(`Server error: ${res.status}`);
       }
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
       
-      // Save the order ID to session storage just in case
-      sessionStorage.setItem('last_order_id', data.orderId)
-      
-      // Redirect to Paystack
+      // Redirect to Paystack URL
       window.location.href = data.url
       
     } catch (err) {
@@ -91,7 +87,6 @@ export default function CheckoutClient({ page, slug: propSlug }) {
 
   return (
     <div style={{ background: '#F3F4F6', minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: '120px' }}>
-      
       <header style={{ padding: '20px', borderBottom: '1px solid #E5E7EB', position: 'sticky', top: 0, background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)', zIndex: 100, display: 'flex', alignItems: 'center' }}>
         <Link href={`/${slug}/cart`} style={{ textDecoration: 'none', color: '#111827', fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
@@ -173,9 +168,6 @@ export default function CheckoutClient({ page, slug: propSlug }) {
             {isProcessing ? 'Processing...' : `Pay ${deliveryKnown ? `₦${finalTotal.toLocaleString()}` : ''}`}
             {!isProcessing && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>}
           </button>
-          <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9CA3AF', marginTop: '12px', marginBottom: 0 }}>
-            Secured by Paystack
-          </p>
         </div>
       </div>
     </div>
