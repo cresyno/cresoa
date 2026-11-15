@@ -1,164 +1,94 @@
 import { NextResponse } from 'next/server'
-import crypto from 'crypto'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { getUsablePayout } from '@/lib/payments'
+import { createClient } from '@supabase/supabase-js'
 
-export const dynamic = 'force-dynamic'
-
-function platformFeeKobo(amountKobo) {
-  const bps = Number(process.env.PLATFORM_FEE_BPS ?? 50)
-  const cap = Number(process.env.PLATFORM_FEE_CAP_KOBO ?? 50000)
-  return Math.min(Math.round((amountKobo * bps) / 10000), cap)
-}
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function POST(req) {
   try {
-    const secret = process.env.PAYSTACK_SECRET_KEY
-    if (!secret) throw new Error('PAYSTACK_SECRET_KEY is missing in Vercel')
+    const body = await req.json()
+    const { slug, form, cart, totalAmount, businessId } = body
 
-    const body = await req.json().catch(() => ({}))
-    const { slug, form, cart, totalAmount } = body
-
-    if (!slug || !form?.name || !form?.phone || !form?.address || !totalAmount) {
-      throw new Error('Missing required checkout details from frontend')
+    if (!businessId || !cart || cart.length === 0) {
+      return NextResponse.json({ error: 'Missing checkout data' }, { status: 400 })
     }
 
-    // 1. Find Business
-    const { data: page, error: pageErr } = await supabaseAdmin
-      .from('business_public_pages')
-      .select('business_id')
-      .eq('slug', String(slug).toLowerCase())
-      .maybeSingle()
-
-    if (pageErr) throw new Error(`Database error (pages): ${pageErr.message}`)
-    if (!page) throw new Error('Store not found')
-    
-    const businessId = page.business_id
-
-    // 2. Check Payout
-    const payout = await getUsablePayout(businessId)
-    if (!payout) throw new Error('This business has not enabled online payments yet')
-    if (payout.payout_mode === 'direct' && !payout.paystack_subaccount_code) {
-      throw new Error('This business has no subaccount code')
-    }
-
-    // 3. Create/Find Customer
-    const email = form.email || `pay+${crypto.randomBytes(4).toString('hex')}@cresoa.com.ng`
-    
-    // ✅ FIXED: Using .limit(1) instead of .maybeSingle() to handle duplicate phone numbers
-    let { data: existingCustomers, error: findCustErr } = await supabaseAdmin
-      .from('customers')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('phone', form.phone)
-      .limit(1)
-
-    if (findCustErr) throw new Error(`Database error (find customer): ${findCustErr.message}`)
-
-    let customerId = existingCustomers?.[0]?.id
-
-    if (!customerId) {
-      const nameParts = form.name.trim().split(' ')
-      const firstName = nameParts[0] || form.name
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
-
-      const { data: newCustomer, error: custErr } = await supabaseAdmin
-        .from('customers')
-        .insert({
-          business_id: businessId,
-          name: form.name,
-          first_name: firstName,
-          last_name: lastName,
-          phone: form.phone,
-          email: email,
-          address: form.address,
-        })
-        .select('id')
-        .single()
-
-      if (custErr) throw new Error(`Database error (create customer): ${custErr.message}`)
-      customerId = newCustomer.id
-    }
-
-    // 4. Create Order
-    const trackingToken = crypto.randomUUID()
-    const { data: order, error: orderErr } = await supabaseAdmin
-      .from('orders')
-      .insert({
-        business_id: businessId,
-        customer_id: customerId,
-        title: `Storefront Order (${cart.length} item${cart.length > 1 ? 's' : ''})`,
-        price: totalAmount, 
-        amount_paid: 0,
-        current_status: 'pending',
-        tracking_token: trackingToken,
-        project_address: form.address,
-        customer_notes: `State: ${form.state}`,
-        custom_fields: { cart: cart }
-      })
-      .select('id')
-      .single()
-
-    if (orderErr) throw new Error(`Database error (create order): ${orderErr.message}`)
-
-    // 5. Paystack Init
-    const amountKobo = Math.round(totalAmount * 100)
-    const fee = platformFeeKobo(amountKobo)
-    const modePrefix = secret.startsWith('sk_test') ? 'test_' : ''
-    const reference = `cso_${modePrefix}${crypto.randomBytes(12).toString('hex')}`
-
-    const { data: intent, error: intentErr } = await supabaseAdmin
-      .from('payment_intents')
-      .insert({
-        business_id: businessId,
-        order_id: order.id,
-        reference,
-        amount_kobo: amountKobo,
-        platform_fee_kobo: fee,
-        payout_mode: payout.payout_mode,
-        payer_email: email,
-      })
-      .select('id')
-      .single()
-
-    if (intentErr) throw new Error(`Database error (create intent): ${intentErr.message}`)
-
-    const site = new URL(req.url).origin
-    const payload = {
-      email,
-      amount: amountKobo,
-      currency: 'NGN',
-      reference,
-      callback_url: `${site}/${slug}/success`,
-      metadata: {
-        kind: 'storefront_checkout',
-        intent_id: intent.id,
-        order_id: order.id,
-        business_id: businessId,
-      },
-    }
-
-    if (payout.payout_mode === 'direct') {
-      payload.subaccount = payout.paystack_subaccount_code
-      payload.transaction_charge = fee
-      payload.bearer = 'subaccount'
-    }
-
-    const res = await fetch('https://api.paystack.co/transaction/initialize', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+    // 1. Format the items
+    const orderItems = cart.map(item => {
+      const p = item.product || item;
+      return {
+        product_id: p.id,
+        name: p.item_name || p.name,
+        price: p.selling_price,
+        quantity: item.quantity,
+        image_url: p.image_url || ''
+      }
     })
-    
-    const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.status) {
-      throw new Error(`Paystack Error: ${json?.message || 'Failed to initialize'}`)
+
+    // 2. Save to public_orders via Admin (Bypasses RLS)
+    const { data: newOrder, error: insertError } = await supabaseAdmin
+      .from('public_orders')
+      .insert({
+        business_id: businessId,
+        customer_name: form.name,
+        customer_phone: form.phone,
+        customer_address: form.address,
+        items: orderItems,
+        total_amount: totalAmount,
+        status: 'pending' // Order is created as pending
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error("API Insert Error:", insertError)
+      return NextResponse.json({ error: "Failed to save order: " + insertError.message }, { status: 500 })
     }
 
-    return NextResponse.json({ url: json.data.authorization_url, trackingToken })
+    // 3. Initialize Paystack
+    const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY
+    if (!paystackSecretKey) {
+      console.error("Missing PAYSTACK_SECRET_KEY in .env")
+      return NextResponse.json({ error: "Payment configuration error" }, { status: 500 })
+    }
+
+    const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: form.email || 'guest@cresoa.com', // Paystack requires an email
+        amount: Math.round(totalAmount * 100), // Paystack expects kobo (multiply by 100)
+        reference: `ORD-${newOrder.id.slice(0, 8)}-${Date.now()}`,
+        callback_url: `${process.env.NEXT_PUBLIC_SITE_URL}/${slug}/checkout/success`,
+        metadata: {
+          order_id: newOrder.id,
+          business_id: businessId,
+          customer_name: form.name
+        }
+      })
+    })
+
+    const paystackData = await paystackRes.json()
+
+    if (!paystackData.status) {
+      console.error("Paystack Error:", paystackData)
+      return NextResponse.json({ error: paystackData.message || "Failed to initialize payment" }, { status: 400 })
+    }
+
+    // 4. Return the Paystack URL to the client
+    return NextResponse.json({ 
+      success: true, 
+      url: paystackData.data.authorization_url,
+      orderId: newOrder.id
+    })
 
   } catch (error) {
-    console.error("Checkout API Error:", error.message)
+    console.error('Checkout API error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
