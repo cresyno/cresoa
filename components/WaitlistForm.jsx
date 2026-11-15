@@ -38,8 +38,8 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
     if (!firstName) errs.firstName = 'First name is required.'
 
     const cleanedPhone = phone.replace(/[\s\-()]/g, '')
-    if (!phone) errs.phone = 'Phone number is required.'
-    else if (!PHONE_REGEX.test(cleanedPhone)) errs.phone = 'Enter a valid Nigerian phone number.'
+    if (!phone) errs.phone = 'WhatsApp number is required.'
+    else if (!PHONE_REGEX.test(cleanedPhone)) errs.phone = 'Enter a valid WhatsApp number.'
 
     if (!businessTypeVal) errs.businessType = 'Please select your business type.'
 
@@ -414,9 +414,11 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
                 <input
                   type="email"
                   name="email_address"
-                  placeholder="Email address"
-                  aria-label="Email address"
+                  placeholder="Email address *"
+                  aria-label="Email address (required)"
                   autoComplete="email"
+                  required
+                  aria-required="true"
                   className={`wl-input ${errors.email ? 'wl-input--error' : ''}`}
                   aria-invalid={!!errors.email}
                   onChange={() => clearError('email')}
@@ -431,9 +433,11 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
                 <input
                   type="text"
                   name="fields[first_name]"
-                  placeholder="First name"
-                  aria-label="First name"
+                  placeholder="First name *"
+                  aria-label="First name (required)"
                   autoComplete="given-name"
+                  required
+                  aria-required="true"
                   className={`wl-input ${errors.firstName ? 'wl-input--error' : ''}`}
                   aria-invalid={!!errors.firstName}
                   onChange={() => clearError('firstName')}
@@ -442,16 +446,20 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
               {errors.firstName && <span className="wl-error-msg">{errors.firstName}</span>}
             </div>
 
+            {/* Phone field label is now "WhatsApp number".
+                name stays `fields[phone]` so the Kit dashboard mapping is unchanged. */}
             <div className="wl-field">
               <div className="wl-input-wrap">
                 <span className="wl-input-icon">{ICONS.phone}</span>
                 <input
                   type="tel"
                   name="fields[phone]"
-                  placeholder="Phone number"
-                  aria-label="Phone number"
+                  placeholder="WhatsApp number *"
+                  aria-label="WhatsApp number (required)"
                   autoComplete="tel"
                   inputMode="tel"
+                  required
+                  aria-required="true"
                   className={`wl-input ${errors.phone ? 'wl-input--error' : ''}`}
                   aria-invalid={!!errors.phone}
                   onChange={() => clearError('phone')}
@@ -466,13 +474,15 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
                 <div className="wl-select-wrap" style={{ width: '100%' }}>
                   <select
                     name="tags[]"
-                    aria-label="Business type"
+                    aria-label="Business type (required)"
                     className={`wl-select ${errors.businessType ? 'wl-select--error' : ''}`}
                     value={businessType}
+                    required
+                    aria-required="true"
                     aria-invalid={!!errors.businessType}
                     onChange={handleBusinessTypeChange}
                   >
-                    <option value="" disabled>What do you do?</option>
+                    <option value="" disabled>What do you do? *</option>
                     <option value="23510464">Fashion &amp; Tailoring</option>
                     <option value="23510466">Repairs &amp; Technical</option>
                     <option value="23510467">Printing &amp; Signage</option>
@@ -490,8 +500,10 @@ export default function WaitlistForm({ defaultBusinessType = '' }) {
                   <input
                     type="text"
                     name="fields[other_industry]"
-                    placeholder="Specify your industry"
-                    aria-label="Specify your industry"
+                    placeholder="Specify your industry *"
+                    aria-label="Specify your industry (required)"
+                    required
+                    aria-required="true"
                     className={`wl-input ${errors.otherIndustry ? 'wl-input--error' : ''}`}
                     aria-invalid={!!errors.otherIndustry}
                     onChange={() => clearError('otherIndustry')}
