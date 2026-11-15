@@ -48,43 +48,40 @@ export default function TessaFloatingWidget() {
         }}
       >
         <span style={{ position: 'relative', width: 58, height: 58, display: 'block' }}>
+          
+          {/* THE CLEAN NAVY BUTTON WITH GOLD ACCENT */}
           <span
-            className="tessa-fab-ring"
             style={{
               position: 'absolute',
               inset: 0,
               borderRadius: '50%',
-              background:
-                'conic-gradient(from 0deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000)',
-              boxShadow: '0 6px 20px rgba(6,14,28,0.35)',
-              animation: 'tessaSpin 4s linear infinite',
-            }}
-          />
-          <span
-            style={{
-              position: 'absolute',
-              inset: 2.5,
-              background: '#0F2B4A',
-              borderRadius: '50%',
+              background: '#0B2C5E', // Brand Navy
+              border: '2px solid #FDB515', // Brand Gold Accent
+              boxShadow: '0 6px 20px rgba(11, 44, 94, 0.4)', // Soft Navy Shadow
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              transition: 'transform 0.2s ease'
             }}
           >
-            <TessaLogo size={28} />
+            {/* LOGO SET TO WHITE VARIANT SO IT SHOWS UP */}
+            <TessaLogo size={32} variant="white" />
           </span>
+
         </span>
+        
+        {/* THE TEXT LABEL */}
         <span
           style={{
-            marginTop: 5,
-            fontSize: '0.62rem',
+            marginTop: 6,
+            fontSize: '0.65rem',
             fontWeight: 700,
-            color: '#fff',
-            letterSpacing: '0.4px',
-            background: '#0F2B4A',
-            padding: '2px 9px',
-            borderRadius: 10,
-            boxShadow: '0 2px 8px rgba(6,14,28,0.3)',
+            color: '#FFFFFF', // White text
+            letterSpacing: '0.5px',
+            background: '#0B2C5E', // Brand Navy background
+            padding: '3px 10px',
+            borderRadius: 12,
+            boxShadow: '0 2px 8px rgba(11, 44, 94, 0.3)',
           }}
         >
           Tessa AI
@@ -92,10 +89,9 @@ export default function TessaFloatingWidget() {
       </button>
 
       <style>{`
-        @keyframes tessaSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .tessa-fab:active { transform: scale(0.94); }
-        .tessa-fab:focus-visible { outline: 2px solid #D9A72E; outline-offset: 4px; border-radius: 16px; }
-        @media (prefers-reduced-motion: reduce) { .tessa-fab-ring { animation: none !important; } }
+        /* Removed the spinning rainbow keyframes */
+        .tessa-fab:active > span:first-child > span:first-child { transform: scale(0.92); }
+        .tessa-fab:focus-visible { outline: 2px solid #FDB515; outline-offset: 4px; border-radius: 16px; }
       `}</style>
 
       <TessaBottomSheet
