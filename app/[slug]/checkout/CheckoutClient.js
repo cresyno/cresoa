@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
 import { parseSectorData } from '@/lib/publicPageData'
 import { useCart } from '@/lib/CartContext'
 import Link from 'next/link'
@@ -53,35 +52,7 @@ export default function CheckoutClient({ page, slug: propSlug }) {
     setIsProcessing(true)
     
     try {
-      // ✅ 1. SAVE THE ORDER AS PENDING FIRST
-      const orderItems = cart.map(item => {
-        const p = item.product || item;
-        return {
-          product_id: p.id,
-          name: p.item_name || p.name,
-          price: p.selling_price,
-          quantity: item.quantity,
-          image_url: p.image_url || ''
-        }
-      })
-
-      const { data: newOrder, error: insertError } = await supabase
-        .from('public_orders')
-        .insert({
-          business_id: page.business_id,
-          customer_name: form.name,
-          customer_phone: form.phone,
-          customer_address: form.address,
-          items: orderItems,
-          total_amount: finalTotal,
-          status: 'pending' // ✅ Saved as pending until paid
-        })
-        .select()
-        .single()
-
-      if (insertError) throw new Error("Could not save order: " + insertError.message)
-
-      // ✅ 2. NOW GO TO PAYSTACK
+      // ✅ Send data to our secure API route (no direct DB inserts here)
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,20 +61,23 @@ export default function CheckoutClient({ page, slug: propSlug }) {
           form, 
           cart, 
           totalAmount: finalTotal,
-          orderId: newOrder.id // Pass the order ID so the webhook can update it to 'paid'
+          businessId: page.business_id
         })
       })
       
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await res.text();
-        throw new Error(`Status ${res.status}: Could not connect to Paystack`);
+        throw new Error(`Server error: ${res.status}. Check console.`);
       }
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initialize payment')
       
-      sessionStorage.setItem('last_order_token', data.trackingToken)
+      // Save the order ID to session storage just in case
+      sessionStorage.setItem('last_order_id', data.orderId)
+      
+      // Redirect to Paystack
       window.location.href = data.url
       
     } catch (err) {
@@ -199,6 +173,9 @@ export default function CheckoutClient({ page, slug: propSlug }) {
             {isProcessing ? 'Processing...' : `Pay ${deliveryKnown ? `₦${finalTotal.toLocaleString()}` : ''}`}
             {!isProcessing && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>}
           </button>
+          <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9CA3AF', marginTop: '12px', marginBottom: 0 }}>
+            Secured by Paystack
+          </p>
         </div>
       </div>
     </div>
