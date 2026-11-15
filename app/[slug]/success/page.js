@@ -1,91 +1,128 @@
-'use client'
+import { createClient } from '@supabase/supabase-js'
+import Link from 'next/link'
 
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
-import { useCart } from '@/lib/CartContext'
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
-export default function SuccessPage() {
-  const { slug } = useParams()
-  const { clearCart } = useCart()
-  const [order, setOrder] = useState(null)
-  const [loading, setLoading] = useState(true)
+export const dynamic = 'force-dynamic'
 
-  useEffect(() => {
-    // ✅ Clear the cart ONLY when they reach the success page
-    try {
-      if (typeof clearCart === 'function') {
-        clearCart()
+export default async function CheckoutSuccessPage({ params, searchParams }) {
+  const { slug } = await params
+  const { reference } = await searchParams
+
+  if (!reference) {
+    return <ErrorState message="No payment reference found." />
+  }
+
+  // 1. Verify the payment with Paystack
+  const res = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+    headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
+  })
+  
+  const data = await res.json()
+
+  if (!data.status || data.data.status !== 'success') {
+    return <ErrorState message="Payment was not successful or could not be verified." />
+  }
+
+  const { metadata, amount } = data.data
+  const amountPaid = amount / 100
+
+  // 2. Check if order already exists (to prevent duplicate inserts on page refresh)
+  const { data: existingOrder } = await supabaseAdmin
+    .from('public_orders')
+    .select('id')
+    .eq('payment_reference', reference)
+    .maybeSingle()
+
+  if (!existingOrder && metadata.cart) {
+    // 3. Save the PAID order to public_orders
+    const orderItems = metadata.cart.map(item => {
+      const p = item.product || item;
+      return {
+        product_id: p.id,
+        name: p.item_name || p.name,
+        price: p.selling_price,
+        quantity: item.quantity,
+        image_url: p.image_url || ''
       }
-    } catch (e) {
-      console.error("Cart clear error:", e)
+    })
+
+    await supabaseAdmin.from('public_orders').insert({
+      business_id: metadata.business_id,
+      customer_name: metadata.form.name,
+      customer_phone: metadata.form.phone,
+      customer_address: metadata.form.address,
+      items: orderItems,
+      total_amount: amountPaid,
+      amount_paid: amountPaid, // ✅ FIX: No longer showing as "due"
+      status: 'paid',          // ✅ FIX: Automatically marked as paid
+      payment_reference: reference
+    })
+
+    // Optional: Create the payment intent record now that the order exists
+    const { data: newOrder } = await supabaseAdmin
+      .from('public_orders')
+      .select('id')
+      .eq('payment_reference', reference)
+      .single()
+
+    if (newOrder) {
+      await supabaseAdmin.from('payment_intents').insert({
+        business_id: metadata.business_id,
+        order_id: newOrder.id,
+        reference: reference,
+        amount_kobo: amount,
+        payer_email: metadata.form.email || 'guest@cresoa.com.ng',
+      })
     }
-
-    const orderToken = sessionStorage.getItem('last_order_token')
-
-    if (!orderToken) {
-      setLoading(false)
-      return
-    }
-
-    const fetchOrder = async () => {
-      const { data } = await supabase
-        .from('orders')
-        .select('price, amount_paid, created_at')
-        .eq('tracking_token', orderToken)
-        .maybeSingle()
-      
-      setOrder(data || null)
-      setLoading(false)
-      sessionStorage.removeItem('last_order_token')
-    }
-    fetchOrder()
-  }, [clearCart])
-
-  if (loading) return <div style={{ padding: '100px', textAlign: 'center', color: '#111827', fontWeight: 600 }}>Verifying your order...</div>
-
-  // Fallback just in case the slug is missing
-  const storeSlug = slug || ''
+  }
 
   return (
-    <div style={{ background: '#F3F4F6', minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px' }}>
-      
-      <div style={{ width: '80px', height: '80px', background: '#D1FAE5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      </div>
-
-      <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', color: '#111827', margin: '0 0 10px 0', textAlign: 'center', fontWeight: 800 }}>Payment Successful!</h1>
-      <p style={{ color: '#4B5563', fontSize: '1rem', textAlign: 'center', maxWidth: '400px', marginBottom: '40px', lineHeight: 1.6 }}>
-        Thank you for your order. The business owner has received your payment and will contact you shortly regarding your delivery.
-      </p>
-
-      {order && (
-        <div style={{ width: '100%', maxWidth: '400px', background: '#FFFFFF', padding: '24px', borderRadius: '16px', marginBottom: '40px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: '16px', borderBottom: '1px solid #E5E7EB', paddingBottom: '12px' }}>Receipt</h2>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '0.95rem', color: '#4B5563' }}>
-            <span>Order Date</span>
-            <span style={{ fontWeight: 500, color: '#111827' }}>{new Date(order.created_at).toLocaleDateString()}</span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', paddingTop: '16px', marginTop: '16px' }}>
-            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#111827' }}>Total Paid</span>
-            <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#059669' }}>
-              ₦{Number(order.price).toLocaleString()}
-            </span>
-          </div>
+    <div style={{ background: '#FAFAF9', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'Inter', sans-serif" }}>
+      <div style={{ background: '#FFFFFF', padding: '40px 30px', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
+        
+        <div style={{ width: '80px', height: '80px', background: '#ECFDF5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
         </div>
-      )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '400px' }}>
-        {/* ✅ CHANGED from Link to standard <a> tags for hard reload */}
-        <a href={`/${storeSlug}/shop`} style={{ display: 'block', width: '100%', padding: '16px', textAlign: 'center', background: '#111827', color: '#FFF', borderRadius: '12px', textDecoration: 'none', fontWeight: 600, fontSize: '1rem' }}>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.8rem', color: '#111827', margin: '0 0 12px 0' }}>Payment Successful!</h1>
+        
+        <p style={{ color: '#6B7280', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '30px' }}>
+          Thank you for your purchase. Your order has been confirmed and is being processed.
+        </p>
+
+        <p style={{ fontSize: '0.85rem', color: '#9CA3AF', marginBottom: '30px', wordBreak: 'break-all' }}>
+          <strong>Ref:</strong> {reference}
+        </p>
+
+        <Link href={`/${slug}/shop`} style={{ display: 'block', width: '100%', padding: '16px', background: '#111827', color: '#FFF', textDecoration: 'none', borderRadius: '12px', fontWeight: 700, fontSize: '1rem', transition: 'background 0.2s' }}>
           Continue Shopping
-        </a>
-        <a href={`/${storeSlug}`} style={{ display: 'block', width: '100%', padding: '16px', textAlign: 'center', background: '#FFFFFF', color: '#111827', border: '1px solid #D1D5DB', borderRadius: '12px', textDecoration: 'none', fontWeight: 600, fontSize: '1rem' }}>
-          Return to Home
-        </a>
+        </Link>
       </div>
     </div>
   )
-    }
+}
+
+function ErrorState({ message }) {
+  return (
+    <div style={{ background: '#FAFAF9', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'Inter', sans-serif" }}>
+      <div style={{ background: '#FFFFFF', padding: '40px 30px', borderRadius: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
+        <div style={{ width: '80px', height: '80px', background: '#FEF2F2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.8rem', color: '#111827', margin: '0 0 12px 0' }}>Payment Issue</h1>
+        <p style={{ color: '#6B7280', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '30px' }}>{message}</p>
+      </div>
+    </div>
+  )
+                  }
