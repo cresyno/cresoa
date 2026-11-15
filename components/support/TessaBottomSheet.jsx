@@ -70,6 +70,13 @@ const ICONS = {
     </>
   ),
   check: <polyline points="20 6 9 17 4 12" />,
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </>
+  ),
 };
 
 const Icon = ({ name, size = 20, sw = 2 }) => (
@@ -364,7 +371,12 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
   return (
     <div className={`tsa-row ${isUser ? 'tsa-row--user' : 'tsa-row--ai'} ${isStart ? 'is-start' : ''}`}>
       {isUser ? (
-        <div className="tsa-bubble-user">{msg.text}</div>
+        <div className="tsa-bubble-user">
+          {msg.imageUrl && (
+            <img src={msg.imageUrl} alt="Uploaded attachment" className="tsa-msg-image" />
+          )}
+          {msg.text && <span>{msg.text}</span>}
+        </div>
       ) : msg.error ? (
         <div className="tsa-err" role="alert">
           <Icon name="alert" size={18} />
@@ -413,6 +425,7 @@ export default function TessaBottomSheet({
 }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null); // { file, previewUrl }
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [interim, setInterim] = useState('');
@@ -430,6 +443,7 @@ export default function TessaBottomSheet({
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
   const scrollRef = useRef(null);
+  const fileInputRef = useRef(null);
   const stick = useRef(true);
   const drag = useRef(null);
   const sendRef = useRef(null);
@@ -542,28 +556,75 @@ export default function TessaBottomSheet({
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-  }, [input, isRecording, mounted]);
+  }, [input, isRecording, selectedImage, mounted]);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      return flash('Please select an image file.');
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return flash('Image must be less than 5MB.');
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setSelectedImage({ file, previewUrl });
+    
+    // Reset input value so the same file can be selected again if removed
+    e.target.value = null;
+  };
+
+  const removeImage = () => {
+    if (selectedImage?.previewUrl) {
+      URL.revokeObjectURL(selectedImage.previewUrl);
+    }
+    setSelectedImage(null);
+  };
 
   const send = useCallback(
     async (raw, { retry = false } = {}) => {
       const text = (raw ?? '').trim();
-      if (!text || loadingRef.current) return;
+      const imageToSend = selectedImage?.file; // Capture current state
+      
+      if ((!text && !imageToSend) || loadingRef.current) return;
 
       stick.current = true;
-      if (!retry) setMessages((p) => [...p, { id: uid(), role: 'user', text, ts: Date.now(), fresh: true }]);
+      
+      const userMsg = { id: uid(), role: 'user', text, ts: Date.now(), fresh: true };
+      if (selectedImage) {
+        userMsg.imageUrl = selectedImage.previewUrl; // Keep preview for UI
+      }
+      
+      if (!retry) setMessages((p) => [...p, userMsg]);
+      
       setInput('');
+      removeImage(); // Clear preview and free memory
       setLoading(true);
       const myReq = ++reqId.current;
       
       const pushAi = (extra) => setMessages((p) => [...p, { id: uid(), role: 'assistant', ts: Date.now(), fresh: true, ...extra }]);
 
       try {
+        // Convert image to Base64 for the API
+        let base64Image = null;
+        if (imageToSend) {
+          base64Image = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(imageToSend);
+          });
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch('/api/support/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
-            message: text,
+            message: text || (base64Image ? 'Analyze this image' : ''),
+            image: base64Image, // Handled by API later
             business_id: businessId,
             new_conversation: newConvoRef.current,
             ...(pageContext ? { page_context: pageContext } : {}),
@@ -582,7 +643,7 @@ export default function TessaBottomSheet({
         if (myReq === reqId.current) setLoading(false);
       }
     },
-    [businessId, pageContext]
+    [businessId, pageContext, selectedImage]
   );
   sendRef.current = send;
 
@@ -596,6 +657,7 @@ export default function TessaBottomSheet({
     setLoading(false);
     setMessages([]);
     setInput('');
+    removeImage();
     setInterim('');
     newConvoRef.current = true;
     stick.current = true;
@@ -678,10 +740,13 @@ export default function TessaBottomSheet({
   };
 
   const hasText = input.trim().length > 0;
+  const hasImage = !!selectedImage;
+  const canSend = (hasText || hasImage) && !isLoading;
+
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !coarse.current) {
       e.preventDefault();
-      send(input);
+      if (canSend) send(input);
     }
   };
 
@@ -763,22 +828,52 @@ export default function TessaBottomSheet({
         {/* COMPOSER */}
         <div className="tsa-composer">
           {notice && <div className="tsa-notice">{notice}</div>}
+          
+          {selectedImage && (
+            <div className="tsa-image-preview-wrap">
+              <div className="tsa-image-preview">
+                <img src={selectedImage.previewUrl} alt="Preview" />
+                <button type="button" className="tsa-image-remove" onClick={removeImage}>
+                  <Icon name="close" size={12} sw={3} />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className={`tsa-field ${isRecording ? 'is-rec' : ''}`}>
             {isRecording ? (
               <div className="tsa-rec">
                 <span style={{ fontWeight: 600, color: '#EF4444' }}>{interim || 'Listening...'}</span>
               </div>
             ) : (
-              <textarea
-                ref={textareaRef}
-                className="tsa-input"
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={onKeyDown}
-                onFocus={() => setSnap('full')}
-                placeholder="Message Tessa..."
-              />
+              <>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  ref={fileInputRef} 
+                  onChange={handleImageSelect} 
+                  style={{ display: 'none' }} 
+                />
+                <button 
+                  type="button" 
+                  className="tsa-action tsa-action--attach" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  title="Upload image"
+                >
+                  <Icon name="image" size={20} />
+                </button>
+                <textarea
+                  ref={textareaRef}
+                  className="tsa-input"
+                  rows={1}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  onFocus={() => setSnap('full')}
+                  placeholder="Message Tessa..."
+                />
+              </>
             )}
 
             {isRecording ? (
@@ -788,9 +883,9 @@ export default function TessaBottomSheet({
             ) : (
               <button 
                 type="button" 
-                className={`tsa-action tsa-action--send ${hasText ? 'is-active' : ''}`} 
+                className={`tsa-action tsa-action--send ${canSend ? 'is-active' : ''}`} 
                 onClick={() => send(input)} 
-                disabled={!hasText || isLoading}
+                disabled={!canSend}
               >
                 <Icon name="arrowUp" size={20} sw={2.5} />
               </button>
@@ -883,7 +978,8 @@ html.dark .tsa-root {
 .tsa-row--ai { align-items: flex-start; }
 
 /* User Bubble */
-.tsa-bubble-user { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--tsa-user-bubble-bg); color: var(--tsa-user-bubble-text); font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.tsa-bubble-user { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--tsa-user-bubble-bg); color: var(--tsa-user-bubble-text); font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; display: flex; flex-direction: column; gap: 8px; }
+.tsa-msg-image { max-width: 100%; max-height: 250px; border-radius: 8px; object-fit: cover; display: block; }
 
 /* AI Content */
 .tsa-ai-content { width: 100%; max-width: 100%; display: flex; flex-direction: column; }
@@ -939,11 +1035,13 @@ html.dark .tsa-root {
 .tsa-field:focus-within { border-color: var(--tsa-text-muted); }
 .tsa-field.is-rec { border-color: #EF4444; }
 
-.tsa-input { flex: 1; min-width: 0; border: 0; outline: none !important; box-shadow: none !important; background: transparent; color: var(--tsa-text); font-size: 16px; line-height: 1.4; resize: none; padding: 10px 8px 10px 14px; max-height: 120px; font-family: inherit; }
+.tsa-input { flex: 1; min-width: 0; border: 0; outline: none !important; box-shadow: none !important; background: transparent; color: var(--tsa-text); font-size: 16px; line-height: 1.4; resize: none; padding: 10px 8px 10px 4px; max-height: 120px; font-family: inherit; }
 .tsa-input::placeholder { color: var(--tsa-text-muted); }
 
 .tsa-action { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.2s; margin-bottom: 2px; }
 .tsa-action:active { transform: scale(0.92); }
+.tsa-action--attach { background: transparent; color: var(--tsa-text-muted); margin-left: 2px; }
+.tsa-action--attach:hover { color: var(--tsa-text); }
 .tsa-action--send { background: transparent; color: var(--tsa-text-muted); transition: all 0.2s; }
 .tsa-action--send.is-active { background: var(--tsa-brand-navy); color: #fff; }
 .dark .tsa-action--send.is-active, [data-theme="dark"] .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; }
@@ -953,7 +1051,17 @@ html.dark .tsa-root {
 .tsa-rec { flex: 1; display: flex; align-items: center; min-height: 40px; padding-left: 12px; font-size: 0.9rem; }
 .tsa-notice { position: absolute; left: 16px; right: 16px; bottom: calc(100% + 8px); background: var(--tsa-brand-navy); color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 
+/* Image Preview in Composer */
+.tsa-image-preview-wrap { padding-bottom: 12px; display: flex; }
+.tsa-image-preview { position: relative; display: inline-flex; border-radius: 12px; overflow: hidden; border: 1px solid var(--tsa-border); background: var(--tsa-input-bg); }
+.tsa-image-preview img { width: 64px; height: 64px; object-fit: cover; display: block; }
+.tsa-image-remove { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); transition: background 0.2s; }
+.tsa-image-remove:active { background: rgba(0,0,0,0.9); }
+
 @media (prefers-reduced-motion: reduce) {
   .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 `;
+
+
+      
