@@ -9,37 +9,59 @@ export async function POST(req) {
     const otherIndustry = formData.get('fields[other_industry]')?.toString().trim()
 
     if (!email) {
-      return Response.json({ ok: false, status: 400, kitMessage: 'Email is required.' }, { status: 400 })
+      return Response.json(
+        { ok: false, status: 400, kitMessage: 'Email is required.' }, 
+        { status: 400 }
+      )
     }
 
+    // Kit V4 requires the API key in the headers, not the body
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Kit-Api-Key': process.env.KIT_API_KEY,
+    }
+
+    // 1. Upsert Subscriber (V4 saves custom fields natively)
     const payload = {
-      api_key: process.env.KIT_API_KEY,
-      email,
+      email_address: email,
       first_name: firstName || undefined,
       fields: {
         phone: phone || undefined,
         other_industry: otherIndustry || undefined,
       },
-      tags: tag ? [Number(tag)] : undefined,
     }
 
-    console.log('Sending to Kit V3:', JSON.stringify({ ...payload, api_key: '***' }, null, 2))
+    console.log('Sending to Kit V4:', JSON.stringify(payload, null, 2))
 
-    const res = await fetch('https://api.convertkit.com/v3/forms/9928723/subscribe', {
+    const subRes = await fetch('https://api.kit.com/v4/subscribers', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     })
 
-    const text = await res.text()
-    console.log('Kit V3 status:', res.status)
-    console.log('Kit V3 body:', text.slice(0, 800))
-
-    if (!res.ok) {
+    if (!subRes.ok) {
+      const errorText = await subRes.text()
+      console.error('Kit V4 subscriber error:', subRes.status, errorText)
       return Response.json(
-        { ok: false, status: res.status, kitMessage: text.slice(0, 500) },
-        { status: res.status }
+        { ok: false, status: subRes.status, kitMessage: errorText.slice(0, 500) },
+        { status: subRes.status }
       )
+    }
+
+    // 2. Apply Tag (if one was selected)
+    if (tag) {
+      const tagRes = await fetch(`https://api.kit.com/v4/tags/${tag}/subscribers`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email_address: email }),
+      })
+
+      if (!tagRes.ok) {
+        const tagErrorText = await tagRes.text()
+        console.error('Kit V4 tag error:', tagRes.status, tagErrorText)
+        // We log the error but don't fail the whole request, 
+        // because the subscriber and custom fields were already saved.
+      }
     }
 
     return Response.json({ ok: true })
