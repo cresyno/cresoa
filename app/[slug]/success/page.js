@@ -10,7 +10,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function CheckoutSuccessPage({ params, searchParams }) {
   const { slug } = await params
-  const { reference } = await searchParams
+  const searchParamsRes = await searchParams
+  
+  // ✅ FIX: Paystack duplicates the reference in the URL. Next.js reads this as an Array.
+  // We must extract the first string to avoid verification errors.
+  const rawReference = searchParamsRes.reference
+  const reference = Array.isArray(rawReference) ? rawReference[0] : rawReference
 
   if (!reference) {
     return <ErrorState message="No payment reference found." />
@@ -23,14 +28,17 @@ export default async function CheckoutSuccessPage({ params, searchParams }) {
   
   const data = await res.json()
 
+  // Debugging: Check your Vercel logs to see exactly what Paystack returned
+  console.log("Paystack Verification Data:", JSON.stringify(data, null, 2));
+
   if (!data.status || data.data.status !== 'success') {
-    return <ErrorState message="Payment was not successful or could not be verified." />
+    return <ErrorState message={`Verification failed: ${data.message || 'Unknown error'}`} />
   }
 
   const { metadata, amount } = data.data
   const amountPaid = amount / 100
 
-  // 2. Check if order already exists (to prevent duplicate inserts on page refresh)
+  // 2. Check if order already exists (prevents duplicate inserts on page refresh)
   const { data: existingOrder } = await supabaseAdmin
     .from('public_orders')
     .select('id')
@@ -50,25 +58,28 @@ export default async function CheckoutSuccessPage({ params, searchParams }) {
       }
     })
 
-    await supabaseAdmin.from('public_orders').insert({
-      business_id: metadata.business_id,
-      customer_name: metadata.form.name,
-      customer_phone: metadata.form.phone,
-      customer_address: metadata.form.address,
-      items: orderItems,
-      total_amount: amountPaid,
-      amount_paid: amountPaid, // ✅ FIX: No longer showing as "due"
-      status: 'paid',          // ✅ FIX: Automatically marked as paid
-      payment_reference: reference
-    })
-
-    // Optional: Create the payment intent record now that the order exists
-    const { data: newOrder } = await supabaseAdmin
+    const { data: newOrder, error: insertErr } = await supabaseAdmin
       .from('public_orders')
+      .insert({
+        business_id: metadata.business_id,
+        customer_name: metadata.form.name,
+        customer_phone: metadata.form.phone,
+        customer_address: metadata.form.address,
+        items: orderItems,
+        total_amount: amountPaid,
+        amount_paid: amountPaid, // ✅ No longer showing as "due"
+        status: 'paid',          // ✅ Automatically marked as paid
+        payment_reference: reference
+      })
       .select('id')
-      .eq('payment_reference', reference)
       .single()
 
+    if (insertErr) {
+      console.error("Failed to save order:", insertErr);
+      return <ErrorState message="Payment verified, but failed to save order. Please contact support." />
+    }
+
+    // 4. Save to payment_intents (Now that we dropped the foreign key, this works)
     if (newOrder) {
       await supabaseAdmin.from('payment_intents').insert({
         business_id: metadata.business_id,
@@ -122,7 +133,10 @@ function ErrorState({ message }) {
         </div>
         <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.8rem', color: '#111827', margin: '0 0 12px 0' }}>Payment Issue</h1>
         <p style={{ color: '#6B7280', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '30px' }}>{message}</p>
+        <Link href={`/`} style={{ display: 'block', width: '100%', padding: '16px', background: '#111827', color: '#FFF', textDecoration: 'none', borderRadius: '12px', fontWeight: 700, fontSize: '1rem' }}>
+          Return to Store
+        </Link>
       </div>
     </div>
   )
-                  }
+  }
