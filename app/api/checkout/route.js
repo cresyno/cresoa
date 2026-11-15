@@ -16,7 +16,6 @@ export async function POST(req) {
       throw new Error('Missing required checkout details')
     }
 
-    // 1. Find Business
     const { data: page } = await supabaseAdmin
       .from('business_public_pages')
       .select('business_id')
@@ -32,9 +31,10 @@ export async function POST(req) {
     const reference = `cso_${modePrefix}${crypto.randomBytes(12).toString('hex')}`
 
     const origin = req.headers.get('origin') || new URL(req.url).origin
-    const callbackUrl = `${origin}/${slug}/success?reference=${reference}`
+    
+    // ✅ FIX: Removed '?reference=...' from the URL. Paystack will append it automatically.
+    const callbackUrl = `${origin}/${slug}/success`
 
-    // 2. Initialize Paystack (No DB inserts!)
     const payload = {
       email,
       amount: amountKobo,
