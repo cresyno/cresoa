@@ -15,13 +15,26 @@ export async function POST(req) {
       )
     }
 
-    // Kit V4 requires the API key in the headers, not the body
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Kit-Api-Key': process.env.KIT_API_KEY,
+    // Verify the key exists and starts with 'kit_'
+    const apiKey = process.env.KIT_API_KEY
+    
+    if (!apiKey) {
+       return Response.json({ ok: false, status: 500, kitMessage: 'KIT_API_KEY is missing from environment variables.' }, { status: 500 })
+    }
+    
+    if (!apiKey.startsWith('kit_')) {
+      return Response.json(
+        { ok: false, status: 500, kitMessage: 'Server configuration error: API key is not a V4 key.' },
+        { status: 500 }
+      )
     }
 
-    // 1. Upsert Subscriber (V4 saves custom fields natively)
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Kit-Api-Key': apiKey,
+    }
+
+    // 1. Upsert Subscriber
     const payload = {
       email_address: email,
       first_name: firstName || undefined,
@@ -30,8 +43,6 @@ export async function POST(req) {
         other_industry: otherIndustry || undefined,
       },
     }
-
-    console.log('Sending to Kit V4:', JSON.stringify(payload, null, 2))
 
     const subRes = await fetch('https://api.kit.com/v4/subscribers', {
       method: 'POST',
@@ -48,7 +59,7 @@ export async function POST(req) {
       )
     }
 
-    // 2. Apply Tag (if one was selected)
+    // 2. Apply Tag
     if (tag) {
       const tagRes = await fetch(`https://api.kit.com/v4/tags/${tag}/subscribers`, {
         method: 'POST',
@@ -59,8 +70,6 @@ export async function POST(req) {
       if (!tagRes.ok) {
         const tagErrorText = await tagRes.text()
         console.error('Kit V4 tag error:', tagRes.status, tagErrorText)
-        // We log the error but don't fail the whole request, 
-        // because the subscriber and custom fields were already saved.
       }
     }
 
