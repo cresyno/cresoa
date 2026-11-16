@@ -2,6 +2,86 @@ import { NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabaseClient';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
+// ─── GET: Fetch single order details ───
+export async function GET(req, { params }) {
+  try {
+    const { id } = params;
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Missing authorization header' }, { status: 401 });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 1. Fetch the order
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        *,
+        customers:customer_id (
+          id, name, first_name, last_name, phone, email, measurements
+        )
+      `)
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    // 2. Verify access
+    const { data: membership } = await supabaseAdmin
+      .from('business_memberships')
+      .select('id')
+      .eq('business_id', order.business_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const { data: business } = await supabaseAdmin
+      .from('businesses')
+      .select('owner_id')
+      .eq('id', order.business_id)
+      .single();
+
+    if (!membership && business?.owner_id !== user.id) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    // 3. Fetch payment records for this order
+    const { data: payments } = await supabaseAdmin
+      .from('payment_records')
+      .select('*')
+      .eq('order_id', id)
+      .order('created_at', { ascending: false });
+
+    // 4. Handle Online Orders (Guest Checkout) gracefully
+    // If there is no linked customer, create a fallback customer object for the UI
+    let customerData = order.customers;
+    if (!customerData) {
+      customerData = {
+        id: null,
+        name: order.customer_name || 'Online Guest',
+        phone: order.customer_phone || null,
+        email: order.customer_email || null,
+        measurements: {}
+      };
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      order: { ...order, customers: customerData },
+      payments: payments || []
+    });
+
+  } catch (err) {
+    console.error('GET error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
 // ─── PATCH: Update order (Supports Partial Updates) ───
 export async function PATCH(req, { params }) {
   try {
@@ -48,7 +128,6 @@ export async function PATCH(req, { params }) {
     }
 
     // ─── Build dynamic update object ───
-    // Only update fields that are actually sent in the request body.
     const updateData = {};
     
     if (body.customer_id !== undefined) updateData.customer_id = body.customer_id || null;
@@ -59,7 +138,6 @@ export async function PATCH(req, { params }) {
     if (body.current_status !== undefined) updateData.current_status = body.current_status;
     if (body.notes !== undefined) updateData.notes = body.notes || null;
 
-    // If no fields were provided to update, return early
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No valid fields provided for update' }, { status: 400 });
     }
@@ -75,7 +153,6 @@ export async function PATCH(req, { params }) {
     if (updateError) throw updateError;
 
     // ─── Log activity ───
-    // Using updateData.title if it was updated, otherwise fetch from the updated object
     await supabaseAdmin.from('business_activity_logs').insert({
       business_id: order.business_id,
       performed_by: user.id,
@@ -154,4 +231,4 @@ export async function DELETE(req, { params }) {
     console.error('DELETE error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
-      }
+        }
