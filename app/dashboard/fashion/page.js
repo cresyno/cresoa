@@ -12,7 +12,7 @@ import { StatusPill } from '../../../components/StatusPill'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import TessaFloatingWidget from '../../../components/support/TessaFloatingWidget' // NEW: Import Tessa/ NEW: Import Tessa
+import TessaFloatingWidget from '../../../components/support/TessaFloatingWidget' // FIXED PATH
 import './dashboard.css'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
@@ -39,18 +39,24 @@ function getProductionCounts(orders) {
 }
 
 function resolveCustomerName(order, customers) {
-  if (!order) return 'Unknown Customer'
+  if (!order) return 'Unknown Client'
   if (order.customer_name && order.customer_name !== 'Unknown customer' && order.customer_name !== 'Unnamed customer') {
     return order.customer_name
   }
   if (order.customer_id) {
     const customer = customers.find(c => String(c.id) === String(order.customer_id))
     if (customer) {
-      const name = customer.full_name || customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()
+      const fName = customer.first_name || '';
+      const lName = customer.last_name || '';
+      // FIX: Handle "Yemi Yemi" duplicated names
+      if (fName.toLowerCase() === lName.toLowerCase() && fName.trim() !== '') {
+        return fName;
+      }
+      const name = customer.full_name || customer.name || `${fName} ${lName}`.trim()
       if (name && name !== 'Unknown customer' && name !== 'Unnamed customer') return name
     }
   }
-  return 'Unknown Customer'
+  return 'Unknown Client'
 }
 
 function getOrderTitle(order) {
@@ -73,15 +79,17 @@ function getActionItems(orders, customers) {
       .map(o => {
         const customerName = resolveCustomerName(o, customers)
         const orderRef = getOrderTitle(o)
-        const displayName = `${orderRef} – ${customerName}`
+        // FIX: Lead with Client Name
+        const displayName = `${customerName} · ${orderRef}`
         const balance = Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid))
         return {
           id: o.id || 'unknown',
           customerName: displayName,
+          rawCustomerName: customerName,
           amount: balance,
-          reason: balance > 0 ? 'Payment overdue' : 'Awaiting action',
+          reason: balance > 0 ? 'Payment overdue' : 'Needs attention',
           status: o.current_status || 'Unknown',
-          actionLabel: balance > 0 ? 'Collect payment' : 'View order',
+          actionLabel: balance > 0 ? 'Remind on WhatsApp' : 'View Order',
           order: o
         }
       })
@@ -109,6 +117,13 @@ function DashboardShell({ children, theme }) {
   )
 }
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 // ============================================================
 // MAIN DASHBOARD
 // ============================================================
@@ -117,57 +132,39 @@ function FashionDashboard({ businessId }) {
   const { orders, customers, groups, business, loading, refreshing, error, refresh } = useDashboardData(businessId)
   const [theme, setTheme] = useState('light')
   
-  // Payments State for Accurate KPI Math
   const [payments, setPayments] = useState([])
-
-  // Timeframe State
   const [timeframe, setTimeframe] = useState('current_month')
   const [showTimeframeMenu, setShowTimeframeMenu] = useState(false)
   const timeframeMenuRef = useRef(null)
 
-  // Optimistic UI State
   const [optimisticOrders, setOptimisticOrders] = useState(null)
   const displayOrders = optimisticOrders || orders
 
-  // Reset optimistic state when real data arrives
   useEffect(() => {
-    if (optimisticOrders && orders !== optimisticOrders) {
-      setOptimisticOrders(null)
-    }
+    if (optimisticOrders && orders !== optimisticOrders) setOptimisticOrders(null)
   }, [orders])
 
-  // Fetch Payments directly to ensure accurate KPI calculation
   useEffect(() => {
     if (!businessId || !orders || orders.length === 0) return
     const fetchPayments = async () => {
       const orderIds = orders.map(o => o.id)
-      const { data } = await supabase
-        .from('payment_records')
-        .select('*')
-        .in('order_id', orderIds)
+      const { data } = await supabase.from('payment_records').select('*').in('order_id', orderIds)
       setPayments(data || [])
     }
     fetchPayments()
   }, [businessId, orders])
 
-  // Custom Modal & Toast State
-  const [modalConfig, setModalConfig] = useState({
-    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
-  })
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
 
   const showToast = (msg, type = 'success') => {
-    setToastMessage(msg)
-    setToastType(type)
-    setTimeout(() => setToastMessage(''), 3000)
+    setToastMessage(msg); setToastType(type); setTimeout(() => setToastMessage(''), 3000)
   }
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (timeframeMenuRef.current && !timeframeMenuRef.current.contains(event.target)) {
-        setShowTimeframeMenu(false)
-      }
+      if (timeframeMenuRef.current && !timeframeMenuRef.current.contains(event.target)) setShowTimeframeMenu(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -176,8 +173,7 @@ function FashionDashboard({ businessId }) {
   useEffect(() => {
     const saved = localStorage.getItem(THEME_STORAGE_KEY)
     const initial = saved === 'dark' ? 'dark' : 'light'
-    setTheme(initial)
-    document.documentElement.dataset.theme = initial
+    setTheme(initial); document.documentElement.dataset.theme = initial
   }, [])
 
   useEffect(() => {
@@ -185,70 +181,32 @@ function FashionDashboard({ businessId }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  // ─── DYNAMIC DATA CALCULATIONS ───
   const { currentOrders, previousOrders, currentPayments, previousPayments } = useMemo(() => {
     const now = new Date()
     let start, prevStart, prevEnd
 
     if (timeframe === '24h') {
-      start = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      prevStart = new Date(start.getTime() - 24 * 60 * 60 * 1000)
-      prevEnd = start
+      start = new Date(now.getTime() - 24 * 60 * 60 * 1000); prevStart = new Date(start.getTime() - 24 * 60 * 60 * 1000); prevEnd = start
     } else if (timeframe === '7d') {
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      prevStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000)
-      prevEnd = start
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); prevStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000); prevEnd = start
     } else if (timeframe === '30d') {
-      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      prevStart = new Date(start.getTime() - 30 * 24 * 60 * 60 * 1000)
-      prevEnd = start
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); prevStart = new Date(start.getTime() - 30 * 24 * 60 * 60 * 1000); prevEnd = start
     } else if (timeframe === '90d') {
-      start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-      prevStart = new Date(start.getTime() - 90 * 24 * 60 * 60 * 1000)
-      prevEnd = start
+      start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); prevStart = new Date(start.getTime() - 90 * 24 * 60 * 60 * 1000); prevEnd = start
     } else {
-      start = new Date(now.getFullYear(), now.getMonth(), 1)
-      prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      prevEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+      start = new Date(now.getFullYear(), now.getMonth(), 1); prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); prevEnd = new Date(now.getFullYear(), now.getMonth(), 0)
     }
 
-    // 1. Orders CREATED in timeframe (For Revenue & Outstanding)
-    const currentOrd = displayOrders.filter(o => {
-      if (!o.created_at) return false
-      const d = new Date(o.created_at)
-      return d >= start && d <= now
-    })
+    const currentOrd = displayOrders.filter(o => { if (!o.created_at) return false; const d = new Date(o.created_at); return d >= start && d <= now })
+    const prevOrd = displayOrders.filter(o => { if (!o.created_at) return false; const d = new Date(o.created_at); return d >= prevStart && d <= prevEnd })
+    const currentPay = payments.filter(p => { if (!p.created_at) return false; const d = new Date(p.created_at); return d >= start && d <= now })
+    const prevPay = payments.filter(p => { if (!p.created_at) return false; const d = new Date(p.created_at); return d >= prevStart && d <= prevEnd })
 
-    const prevOrd = displayOrders.filter(o => {
-      if (!o.created_at) return false
-      const d = new Date(o.created_at)
-      return d >= prevStart && d <= prevEnd
-    })
-
-    // 2. Payments RECORDED in timeframe (For Collected)
-    const currentPay = payments.filter(p => {
-      if (!p.created_at) return false
-      const d = new Date(p.created_at)
-      return d >= start && d <= now
-    })
-
-    const prevPay = payments.filter(p => {
-      if (!p.created_at) return false
-      const d = new Date(p.created_at)
-      return d >= prevStart && d <= prevEnd
-    })
-
-    return { 
-      currentOrders: currentOrd, 
-      previousOrders: prevOrd,
-      currentPayments: currentPay,
-      previousPayments: prevPay
-    }
+    return { currentOrders: currentOrd, previousOrders: prevOrd, currentPayments: currentPay, previousPayments: prevPay }
   }, [displayOrders, payments, timeframe])
 
   const currentSummary = useMemo(() => {
     const revenue = currentOrders.reduce((s, o) => s + safeAmount(o.price), 0)
-    // We use the exact payment amount from payment_records, not the total order amount_paid
     const paid = currentPayments.reduce((s, p) => s + Number(p.amount || 0), 0) 
     const outstanding = currentOrders.reduce((s, o) => s + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0)
     return { revenue, paid, outstanding, orders: currentOrders.length }
@@ -275,84 +233,38 @@ function FashionDashboard({ businessId }) {
   const collectedTrend = getTrend(currentSummary.paid, previousSummary.paid);
   const outstandingTrend = getTrend(currentSummary.outstanding, previousSummary.outstanding);
 
-  const healthScoreData = useMemo(() => {
-    if (currentSummary.revenue === 0 && currentSummary.orders === 0) {
-      return { score: 0, label: 'No Data', color: 'var(--cresoa-text-muted)' };
-    }
-    const rawCollectionRate = currentSummary.revenue > 0 ? (currentSummary.paid / currentSummary.revenue) : 0;
-    const collectionRate = Math.min(Math.max(rawCollectionRate, 0), 1);
-    const currentDeliveredCount = currentOrders.filter(o => String(o.current_status || '').toLowerCase() === 'delivered').length;
-    const rawCompletionRate = currentSummary.orders > 0 ? (currentDeliveredCount / currentSummary.orders) : 0;
-    const completionRate = Math.min(Math.max(rawCompletionRate, 0), 1);
-    const rawScore = ((collectionRate * 0.5) + (completionRate * 0.5)) * 100;
-    const score = Math.min(Math.round(rawScore), 100);
-
-    let label = 'Needs Attention';
-    let color = 'var(--cresoa-danger)';
-    if (score >= 80) { label = 'Excellent'; color = 'var(--cresoa-success)'; }
-    else if (score >= 50) { label = 'Good'; color = 'var(--cresoa-warning, #D9A05B)'; }
-
-    return { score, label, color };
-  }, [currentSummary, currentOrders]);
-
   const analytics = useMemo(() => {
     let days = 30;
-    if (timeframe === '24h') days = 1;
-    else if (timeframe === '7d') days = 7;
-    else if (timeframe === '30d') days = 30;
-    else if (timeframe === '90d') days = 90;
-    else if (timeframe === 'current_month') {
-      const now = new Date();
-      days = now.getDate();
-    }
+    if (timeframe === '24h') days = 1; else if (timeframe === '7d') days = 7; else if (timeframe === '30d') days = 30; else if (timeframe === '90d') days = 90;
+    else if (timeframe === 'current_month') days = new Date().getDate();
 
     const totalOrderValue = currentOrders.reduce((sum, o) => sum + safeAmount(o.price), 0);
     const collected = currentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const outstanding = currentOrders.reduce((sum, o) => sum + Math.max(0, safeAmount(o.price) - safeAmount(o.amount_paid)), 0);
     const orderCount = currentOrders.length;
-    
     const collectedPercent = totalOrderValue > 0 ? Math.min((collected / totalOrderValue) * 100, 100) : 0;
-    const outstandingPercent = totalOrderValue > 0 ? Math.min((outstanding / totalOrderValue) * 100, 100) : 0;
 
     const chartData = [];
     for (let i = Math.min(days - 1, 6); i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+      const d = new Date(); d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      chartData.push({
-        dateStr,
-        label: d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }),
-        shortLabel: d.toLocaleDateString('en-NG', { weekday: 'short' }),
-        collected: 0,
-        orders: 0
-      });
+      chartData.push({ dateStr, label: d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }), shortLabel: d.toLocaleDateString('en-NG', { weekday: 'short' }), collected: 0, orders: 0 });
     }
 
-    // Fill chart based on exact payment records
     currentPayments.forEach(p => {
       const dateStr = new Date(p.created_at).toISOString().split('T')[0];
       const dayObj = chartData.find(d => d.dateStr === dateStr);
-      if (dayObj) {
-        dayObj.collected += Number(p.amount || 0);
-        dayObj.orders += 1;
-      }
+      if (dayObj) { dayObj.collected += Number(p.amount || 0); dayObj.orders += 1; }
     });
 
     const maxRevenue = Math.max(...chartData.map(d => d.collected), 1);
     const labelStep = Math.max(Math.ceil(chartData.length / 6), 1);
 
-    return { totalOrderValue, collected, outstanding, orderCount, collectedPercent, outstandingPercent, chartData, maxRevenue, labelStep, hasOrders: displayOrders.length > 0, hasFilteredOrders: currentOrders.length > 0 || currentPayments.length > 0 };
+    return { totalOrderValue, collected, orderCount, collectedPercent, chartData, maxRevenue, labelStep, hasOrders: displayOrders.length > 0, hasFilteredOrders: currentOrders.length > 0 || currentPayments.length > 0 };
   }, [displayOrders, currentOrders, currentPayments, timeframe]);
 
   const chartPoints = analytics.chartData.map((d) => {
     const heightPct = analytics.maxRevenue > 0 ? (d.collected / analytics.maxRevenue) * 100 : 0;
-    return {
-      label: d.label,
-      shortLabel: d.shortLabel,
-      height: `${Math.max(heightPct, 2)}%`,
-      value: d.collected,
-      hasData: d.collected > 0
-    };
+    return { label: d.label, shortLabel: d.shortLabel, height: `${Math.max(heightPct, 2)}%`, value: d.collected, hasData: d.collected > 0 };
   });
 
   const productionCounts = useMemo(() => getProductionCounts(displayOrders), [displayOrders])
@@ -365,155 +277,101 @@ function FashionDashboard({ businessId }) {
   }
 
   const handleActionClick = (item) => {
-    if (item.actionLabel === 'Collect payment') {
-      setModalConfig({
-        isOpen: true,
-        title: 'Record Payment',
-        message: `Confirm you have received full payment of ${formatMoney(item.amount)} for ${item.customerName}?`,
-        confirmText: 'Confirm Payment',
-        isDestructive: false,
-        onConfirm: async () => {
-          setModalConfig(prev => ({ ...prev, isOpen: false }))
-          
-          // 1. OPTIMISTIC UPDATE: Update both orders and payments state
-          const previousDisplayOrders = displayOrders
-          const previousPayments = [...payments]
-          
-          setOptimisticOrders(prev => {
-            const current = prev || displayOrders
-            return current.map(o => 
-              o.id === item.id 
-                ? { ...o, amount_paid: safeAmount(o.price), updated_at: new Date().toISOString() } 
-                : o
-            )
-          })
-
-          const newPaymentRecord = {
-            id: `temp-${Date.now()}`,
-            order_id: item.id,
-            amount: item.amount,
-            created_at: new Date().toISOString(),
-            note: 'Payment collected from dashboard'
+    if (item.actionLabel === 'Remind on WhatsApp') {
+      const customer = customers.find(c => String(c.id) === String(item.order.customer_id));
+      const phone = customer?.phone ? customer.phone.replace(/\D/g, '') : '';
+      const text = encodeURIComponent(`Hello ${item.rawCustomerName || item.customerName}, this is a friendly reminder from ${business?.name || 'Cresoa'} regarding your balance of ${formatMoney(item.amount)} for ${getOrderTitle(item.order)}. Please let us know when you can complete the payment. Thank you!`);
+      
+      if (phone) {
+        window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+      } else {
+        // Fallback if no phone number exists
+        setModalConfig({
+          isOpen: true,
+          title: 'Record Payment',
+          message: `No phone number saved for ${item.rawCustomerName}. Do you want to manually record the payment of ${formatMoney(item.amount)}?`,
+          confirmText: 'Confirm Payment',
+          isDestructive: false,
+          onConfirm: async () => {
+            setModalConfig(prev => ({ ...prev, isOpen: false }))
+            const previousDisplayOrders = displayOrders; const previousPayments = [...payments]
+            setOptimisticOrders(prev => { const current = prev || displayOrders; return current.map(o => o.id === item.id ? { ...o, amount_paid: safeAmount(o.price), updated_at: new Date().toISOString() } : o) })
+            const newPaymentRecord = { id: `temp-${Date.now()}`, order_id: item.id, amount: item.amount, created_at: new Date().toISOString(), note: 'Payment collected from dashboard' }
+            setPayments(prev => [newPaymentRecord, ...prev]); showToast('Payment recorded successfully!')
+            try {
+              const { data: { session } } = await supabase.auth.getSession()
+              const res = await fetch(`/api/orders/${item.id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` }, body: JSON.stringify({ amount: item.amount, note: 'Payment collected from dashboard' }) })
+              if (!res.ok) throw new Error('Failed')
+              if (refresh) refresh(); router.refresh()
+            } catch (err) {
+              setOptimisticOrders(previousDisplayOrders); setPayments(previousPayments); showToast('Failed to record payment', 'error')
+            }
           }
-          setPayments(prev => [newPaymentRecord, ...prev])
-
-          showToast('Payment recorded successfully!')
-
-          // 2. NETWORK REQUEST
-          try {
-            const { data: { session } } = await supabase.auth.getSession()
-            const res = await fetch(`/api/orders/${item.id}/payments`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-              body: JSON.stringify({ amount: item.amount, note: 'Payment collected from dashboard' })
-            })
-            if (!res.ok) throw new Error('Failed')
-            
-            // 3. SYNC WITH BACKEND
-            if (refresh) refresh() 
-            router.refresh()
-            
-          } catch (err) {
-            // ROLLBACK ON FAILURE
-            setOptimisticOrders(previousDisplayOrders)
-            setPayments(previousPayments)
-            showToast('Failed to record payment', 'error')
-          }
-        }
-      })
+        })
+      }
     } else if (item.order?.id) {
       navigate(`/dashboard/orders/${item.order.id}`)
     }
   }
 
-  // ─── TESSA CONTEXT ───
-  // This feeds Tessa the exact state of the dashboard so she can answer questions intelligently.
   const tessaContext = useMemo(() => ({
-    page: 'Dashboard',
-    view: 'Fashion Overview',
-    timeframe: timeframe,
-    metrics: {
-      totalRevenue: currentSummary.revenue,
-      totalCollected: currentSummary.paid,
-      totalOutstanding: currentSummary.outstanding,
-      orderCount: currentSummary.orders,
-    },
-    healthScore: healthScoreData.score,
+    page: 'Dashboard', view: 'Fashion Overview', timeframe: timeframe,
+    metrics: { totalRevenue: currentSummary.revenue, totalCollected: currentSummary.paid, totalOutstanding: currentSummary.outstanding, orderCount: currentSummary.orders },
     productionStatus: productionCounts
-  }), [timeframe, currentSummary, healthScoreData.score, productionCounts])
+  }), [timeframe, currentSummary, productionCounts])
 
   if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
 
+  // MICROCOPY: Updated labels
   const kpiCards = [
-    { label: 'Revenue', value: formatMoney(currentSummary.revenue), trend: revenueTrend, meta: 'Total order value', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Orders', value: String(currentSummary.orders), trend: ordersTrend, meta: 'Orders created', onClick: () => navigate('/dashboard/orders') },
-    { label: 'Collected', value: formatMoney(currentSummary.paid), trend: collectedTrend, meta: `${currentSummary.revenue > 0 ? Math.min(Math.round((currentSummary.paid / currentSummary.revenue) * 100), 100) : 0}% of total`, onClick: () => navigate('/dashboard/orders?filter=payments') },
-    { label: 'Outstanding', value: formatMoney(currentSummary.outstanding), trend: outstandingTrend, meta: `${currentSummary.revenue > 0 ? Math.min(Math.round((currentSummary.outstanding / currentSummary.revenue) * 100), 100) : 0}% of total`, onClick: () => navigate('/dashboard/orders?filter=attention') },
+    { label: 'Total Sales', value: formatMoney(currentSummary.revenue), trend: revenueTrend, meta: 'Value of orders', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Orders', value: String(currentSummary.orders), trend: ordersTrend, meta: 'Created this period', onClick: () => navigate('/dashboard/orders') },
+    { label: 'Money Received', value: formatMoney(currentSummary.paid), trend: collectedTrend, meta: `${currentSummary.revenue > 0 ? Math.min(Math.round((currentSummary.paid / currentSummary.revenue) * 100), 100) : 0}% of sales`, onClick: () => navigate('/dashboard/orders?filter=payments') },
+    { label: 'Balance Due', value: formatMoney(currentSummary.outstanding), trend: outstandingTrend, meta: `${currentSummary.revenue > 0 ? Math.min(Math.round((currentSummary.outstanding / currentSummary.revenue) * 100), 100) : 0}% of sales`, onClick: () => navigate('/dashboard/orders?filter=attention') },
   ]
 
   const timeframes = [
-    { label: 'Last 24 hours', value: '24h' },
-    { label: 'Last 7 days', value: '7d' },
-    { label: 'Last 30 days', value: '30d' },
-    { label: 'Last 90 days', value: '90d' },
-    { label: 'This Month', value: 'current_month' },
+    { label: 'Last 24 hours', value: '24h' }, { label: 'Last 7 days', value: '7d' }, { label: 'Last 30 days', value: '30d' }, { label: 'Last 90 days', value: '90d' }, { label: 'This Month', value: 'current_month' },
   ]
 
   return (
     <DashboardShell theme={theme}>
-      <div className="dashboard-page">
+      <div className="dashboard-page" style={{ paddingBottom: '100px' }}>
         <Navigation businessId={businessId} />
 
-        {/* ─── HEADER ─── */}
+        {/* HEADER */}
         <header className="dashboard-header">
           <div>
             <p className="dashboard-eyebrow">Cresoa Fashion</p>
             <h1 className="dashboard-title">{business?.name || 'Your business'}</h1>
-            <p className="dashboard-subtitle">Good morning 👋 · {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+            <p className="dashboard-subtitle">{getGreeting()} 👋 · {new Date().toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
           </div>
           <div className="dashboard-header-actions">
-            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="dashboard-icon-btn">
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
-            </button>
-            <button onClick={refresh} className="dashboard-icon-btn">
-              <Icon name="refresh-cw" size={18} />
-            </button>
-            <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button">
-              + New Order
-            </button>
+            <button onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} className="dashboard-icon-btn"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} /></button>
+            <button onClick={refresh} className="dashboard-icon-btn"><Icon name="refresh-cw" size={18} /></button>
           </div>
         </header>
 
-          {/* ─── TIMEFRAME SELECTOR ─── */}
+        {/* TIMEFRAME SELECTOR */}
         <div className="kpi-header-row">
-          <h2 className="section-title">Performance Overview</h2>
+          <h2 className="section-title">This Month at a Glance</h2>
           <div className="timeframe-dropdown-wrapper" ref={timeframeMenuRef}>
-            <button 
-              className="timeframe-btn"
-              onClick={() => setShowTimeframeMenu(!showTimeframeMenu)}
-            >
+            <button className="timeframe-btn" onClick={() => setShowTimeframeMenu(!showTimeframeMenu)}>
               {timeframes.find(t => t.value === timeframe)?.label || 'This Month'}
               <Icon name="chevron-down" size={14} style={{ marginLeft: '6px' }} />
             </button>
-            
             {showTimeframeMenu && (
               <div className="timeframe-menu">
                 {timeframes.map(tf => (
-                  <button 
-                    key={tf.value}
-                    onClick={() => { setTimeframe(tf.value); setShowTimeframeMenu(false) }} 
-                    className={`timeframe-item ${timeframe === tf.value ? 'active' : ''}`}
-                  >
-                    {tf.label}
-                  </button>
+                  <button key={tf.value} onClick={() => { setTimeframe(tf.value); setShowTimeframeMenu(false) }} className={`timeframe-item ${timeframe === tf.value ? 'active' : ''}`}>{tf.label}</button>
                 ))}
               </div>
             )}
           </div>
         </div>
 
-        {/* ─── KPI GRID ─── */}
+        {/* KPI GRID */}
         <div className="dashboard-kpi-grid">
           {kpiCards.map((card, idx) => (
             <button key={card.label} onClick={card.onClick} className="dashboard-kpi-card">
@@ -527,113 +385,52 @@ function FashionDashboard({ businessId }) {
           ))}
         </div>
 
-        {/* ─── BUSINESS HEALTH ─── */}
+        {/* ACTION CENTER (Chase Today) */}
         <Card className="dashboard-card">
-          <div className="health-header">
-            <h3 className="section-title">Business Health Score</h3>
-            <span className="health-score" style={{ color: healthScoreData.color }}>{healthScoreData.score}%</span>
-          </div>
-          <div className="health-bar-bg">
-            <div className="health-bar-fill" style={{ width: `${healthScoreData.score}%`, background: healthScoreData.color }} />
-          </div>
-          <p className="health-desc">
-            {healthScoreData.label} — Based on collection rate and delivery completion for selected period.
-          </p>
-        </Card>
-
-        {/* ─── ACTION CENTER ─── */}
-        <Card className="dashboard-card">
-          <SectionHeader title="Action Required" subtitle={`${actionItems.length} items need attention`} action="View all" onAction={() => navigate('/dashboard/orders')} />
+          <SectionHeader title="Chase Today" subtitle={`${actionItems.length} items need attention`} action="View all" onAction={() => navigate('/dashboard/orders')} />
           <ActionCenter items={actionItems} onActionClick={handleActionClick} onViewAll={() => navigate('/dashboard/orders')} />
         </Card>
 
-        {/* ─── PRODUCTION PIPELINE ─── */}
+        {/* PRODUCTION PIPELINE */}
         <Card className="dashboard-card">
           <SectionHeader title="Production" subtitle="What's moving through your workshop" />
           <div className="cresoa-pipeline">
             {PRODUCTION_STAGES.map((stage, idx) => (
               <button key={stage} onClick={() => navigate(`/dashboard/orders?status=${encodeURIComponent(stage)}`)} className="cresoa-pipeline-item">
                 <span className="cresoa-pipeline-number">{productionCounts[stage] || 0}</span>
-                <span className="cresoa-pipeline-label">{stage}</span>
+                <span className="cresoa-pipeline-label">{stage === 'Order placed' ? 'Not Started' : stage}</span>
                 {idx < PRODUCTION_STAGES.length - 1 && <span className="cresoa-pipeline-line" />}
               </button>
             ))}
           </div>
         </Card>
 
-        {/* ─── ANALYTICS CHART ─── */}
+        {/* ANALYTICS CHART */}
         <Card className="dashboard-card">
           <div className="analytics-header">
-            <h2 className="section-title">Analytics</h2>
-            <span className="analytics-period-label">
-              {timeframes.find(t => t.value === timeframe)?.label || 'This Month'}
-            </span>
+            <h2 className="section-title">Sales This Week</h2>
+            <span className="analytics-period-label">{timeframes.find(t => t.value === timeframe)?.label || 'This Month'}</span>
           </div>
-
           <div className="analytics-summary">
-            <div>
-              <span className="summary-label">Revenue</span>
-              <strong className="summary-value">{formatMoney(analytics.collected)}</strong>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span className="summary-label">{analytics.orderCount} orders</span>
-            </div>
+            <div><span className="summary-label">Total Sales</span><strong className="summary-value">{formatMoney(analytics.collected)}</strong></div>
+            <div style={{ textAlign: 'right' }}><span className="summary-label">{analytics.orderCount} orders</span></div>
           </div>
-          
-          {/* Chart */}
           <div className="chart-container">
-            {!analytics.hasOrders ? (
-              <div className="chart-empty">No sales data yet.</div>
-            ) : !analytics.hasFilteredOrders ? (
-              <div className="chart-empty">No revenue in this period.</div>
-            ) : (
+            {!analytics.hasOrders ? (<div className="chart-empty">No sales data yet.</div>) : !analytics.hasFilteredOrders ? (<div className="chart-empty">No revenue in this period.</div>) : (
               <>
-                <div className="chart-y-axis">
-                  <span>{formatMoney(analytics.maxRevenue)}</span>
-                  <span>₦0</span>
-                </div>
+                <div className="chart-y-axis"><span>{formatMoney(analytics.maxRevenue)}</span><span>₦0</span></div>
                 <div className="chart-bars">
-                  {chartPoints.map((point, i) => (
-                    <div key={i} className="chart-bar-wrapper">
-                      <div className="chart-bar" style={{ height: point.height, background: point.hasData ? 'var(--color-accent)' : 'var(--cresoa-border)' }} />
-                    </div>
-                  ))}
+                  {chartPoints.map((point, i) => (<div key={i} className="chart-bar-wrapper"><div className="chart-bar" style={{ height: point.height, background: point.hasData ? 'var(--color-accent)' : 'var(--cresoa-border)' }} /></div>))}
                 </div>
               </>
             )}
           </div>
           <div className="chart-x-axis">
-            {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (
-              <span key={i}>{point.shortLabel}</span>
-            ))}
-          </div>
-
-          <div className="financial-health-section">
-            <h3 className="section-title">Financial Health</h3>
-            <div className="financial-bars">
-              <div>
-                <div className="financial-row">
-                  <span>Collected</span>
-                  <span>{formatMoney(analytics.collected)} ({Math.round(analytics.collectedPercent)}%)</span>
-                </div>
-                <div className="financial-bar-bg">
-                  <div className="financial-bar-fill success" style={{ width: `${analytics.collectedPercent}%` }} />
-                </div>
-              </div>
-              <div>
-                <div className="financial-row">
-                  <span>Outstanding</span>
-                  <span style={{ color: 'var(--cresoa-danger)' }}>{formatMoney(analytics.outstanding)} ({Math.round(analytics.outstandingPercent)}%)</span>
-                </div>
-                <div className="financial-bar-bg">
-                  <div className="financial-bar-fill danger" style={{ width: `${analytics.outstandingPercent}%` }} />
-                </div>
-              </div>
-            </div>
+            {chartPoints.filter((_, i) => i % analytics.labelStep === 0 || i === chartPoints.length - 1).map((point, i) => (<span key={i}>{point.shortLabel}</span>))}
           </div>
         </Card>
 
-        {/* ─── RECENT ORDERS ─── */}
+        {/* RECENT ORDERS */}
         <Card className="dashboard-card">
           <SectionHeader title="Recent Orders" action="View" onAction={() => navigate('/dashboard/orders')} />
           {displayOrders.slice(0, 4).map(order => {
@@ -642,18 +439,19 @@ function FashionDashboard({ businessId }) {
               <div key={order.id} onClick={() => navigate(`/dashboard/orders/${order.id}`)} className="dashboard-list-item">
                 <span className="cresoa-avatar">{getInitials(customerName)}</span>
                 <div className="list-item-content">
-                  <span className="list-item-title">{getOrderTitle(order)} – {customerName}</span>
-                  <span className="list-item-meta">{formatShortDate(order.created_at)} · {formatMoney(order.price)}</span>
+                  <span className="list-item-title">{customerName} · {getOrderTitle(order)}</span>
+                  {/* SHOW DELIVERY DATE */}
+                  <span className="list-item-meta">Due: {order.due_date ? formatShortDate(order.due_date) : 'Not set'} · {formatMoney(order.price)}</span>
                 </div>
-                <StatusPill status={order.current_status || 'Order placed'} />
+                <StatusPill status={order.current_status === 'Order placed' ? 'Not Started' : order.current_status || 'Not Started'} />
               </div>
             )
           })}
         </Card>
 
-        {/* ─── RECENT CUSTOMERS ─── */}
+        {/* RECENT CLIENTS */}
         <Card className="dashboard-card">
-          <SectionHeader title="Recent Customers" action="View" onAction={() => navigate('/dashboard/customers')} />
+          <SectionHeader title="Recent Clients" action="View" onAction={() => navigate('/dashboard/customers')} />
           {customers.slice(0, 4).map(customer => {
             const name = customer.name || 'Unnamed'
             const customerOrders = displayOrders.filter(o => o.customer_id === customer.id)
@@ -663,7 +461,7 @@ function FashionDashboard({ businessId }) {
                 <span className="cresoa-avatar">{getInitials(name)}</span>
                 <div className="list-item-content">
                   <span className="list-item-title">{name}</span>
-                  <span className="list-item-meta">{activeOrders > 0 ? `${activeOrders} active orders` : 'No active orders'}</span>
+                  <span className="list-item-meta">{activeOrders > 0 ? `${activeOrders} order${activeOrders > 1 ? 's' : ''} in progress` : 'No active orders'}</span>
                 </div>
                 <Icon name="chevron-right" size={16} />
               </div>
@@ -671,9 +469,9 @@ function FashionDashboard({ businessId }) {
           })}
         </Card>
 
-        {/* ─── GROUP ORDERS ─── */}
+        {/* GROUP ORDERS */}
         <Card className="dashboard-card">
-          <SectionHeader title="Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
+          <SectionHeader title="Aso-Ebi / Group Orders" action="View" onAction={() => navigate('/dashboard/groups')} />
           {groupsWithProgress.length === 0 ? (
             <div className="elegant-empty" style={{ padding: '2rem 1rem', textAlign: 'center' }}>
               <h4 style={{ fontSize: '1rem', fontStyle: 'italic', marginBottom: '4px' }}>No group orders</h4>
@@ -688,15 +486,8 @@ function FashionDashboard({ businessId }) {
                   <span className="cresoa-avatar">{group.name ? group.name.charAt(0).toUpperCase() : 'G'}</span>
                   <div className="list-item-content">
                     <span className="list-item-title">{group.name}</span>
-                    <span className="list-item-meta">
-                      {group.progress !== null ? `${group.progress}% complete` : 'Progress unavailable'}
-                      {coordinator && ` · ${coordinator.name}`}
-                    </span>
-                    {group.progress !== null && (
-                      <div className="group-progress-bar-bg">
-                        <div className="group-progress-bar-fill" style={{ width: `${group.progress}%` }} />
-                      </div>
-                    )}
+                    <span className="list-item-meta">{group.progress !== null ? `${group.progress}% complete` : 'Progress unavailable'}{coordinator && ` · ${coordinator.name}`}</span>
+                    {group.progress !== null && (<div className="group-progress-bar-bg"><div className="group-progress-bar-fill" style={{ width: `${group.progress}%` }} /></div>)}
                   </div>
                   <Icon name="chevron-right" size={16} />
                 </div>
@@ -705,11 +496,9 @@ function FashionDashboard({ businessId }) {
           )}
         </Card>
 
-        <div style={{ marginTop: '2rem' }}>
-          <Navigation businessId={businessId} />
-        </div>
+        <div style={{ marginTop: '2rem' }}><Navigation businessId={businessId} /></div>
 
-        {/* ─── CUSTOM MODALS & TOASTS ─── */}
+        {/* MODALS & TOASTS */}
         {modalConfig.isOpen && (
           <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
             <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -722,14 +511,20 @@ function FashionDashboard({ businessId }) {
             </div>
           </div>
         )}
+        {toastMessage && (<div className={`app-toast ${toastType}`}>{toastMessage}</div>)}
 
-        {toastMessage && (
-          <div className={`app-toast ${toastType}`}>
-            {toastMessage}
-          </div>
-        )}
+        {/* STICKY NEW ORDER BUTTON */}
+        <div style={{ 
+          position: 'fixed', bottom: '75px', left: '16px', right: '16px', 
+          background: 'linear-gradient(to top, var(--cresoa-bg) 60%, transparent)', 
+          paddingTop: '20px', paddingBottom: '10px', zIndex: 90 
+        }}>
+          <button onClick={() => navigate('/dashboard/orders/new')} className="cresoa-primary-button" style={{ width: '100%', padding: '16px', fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+            + New Order
+          </button>
+        </div>
 
-        {/* ─── TESSA AI COPILOT ─── */}
+        {/* TESSA AI (Moved out of the way) */}
         <TessaFloatingWidget businessId={businessId} pageContext={tessaContext} />
 
       </div>
@@ -740,14 +535,6 @@ function FashionDashboard({ businessId }) {
 export default function Page() {
   const searchParams = useSearchParams()
   const businessId = searchParams?.get('business_id') || searchParams?.get('businessId') || null
-
-  if (!businessId) {
-    return (
-      <DashboardShell theme="light">
-        <Card><h2>Business account required</h2><p>Select a business to view its dashboard.</p></Card>
-      </DashboardShell>
-    )
-  }
-
+  if (!businessId) return (<DashboardShell theme="light"><Card><h2>Business account required</h2><p>Select a business to view its dashboard.</p></Card></DashboardShell>)
   return <FashionDashboard businessId={businessId} />
-                                                                                              }                                                                                              
+    }
