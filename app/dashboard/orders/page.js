@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
@@ -60,6 +60,11 @@ const SvgIcons = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
+  ),
+  Phone: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
   )
 }
 
@@ -71,14 +76,11 @@ export default function OrdersPage() {
   const [error, setError] = useState(null)
   const [currentBusinessId, setCurrentBusinessId] = useState(null)
   
-  // Tab State ('manual' or 'website')
   const [activeTab, setActiveTab] = useState('manual')
-  
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('latest')
+  const [sortBy, setSortBy] = useState('dueSoonest') // Default to deadline
   
-  // Dropdown & Menu State
   const [openMenuId, setOpenMenuId] = useState(null)
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [showSortMenu, setShowSortMenu] = useState(false)
@@ -87,25 +89,22 @@ export default function OrdersPage() {
   const statusMenuRef = useRef(null)
   const sortMenuRef = useRef(null)
 
-  // Custom Modal & Toast State
-  const [modalConfig, setModalConfig] = useState({
-    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
-  })
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
 
   const statusOptions = [
     { label: 'All Statuses', value: 'all' },
-    { label: 'Order placed', value: 'Order placed' },
+    { label: 'Not Started', value: 'Order placed' },
     { label: 'Cutting', value: 'Cutting' },
     { label: 'Sewing', value: 'Sewing' },
-    { label: 'Ready', value: 'Ready' },
+    { label: 'Ready for Pickup', value: 'Ready' },
     { label: 'Delivered', value: 'Delivered' }
   ]
 
   const sortOptions = [
+    { label: 'Due Soonest', value: 'dueSoonest' },
     { label: 'Latest', value: 'latest' },
-    { label: 'Oldest', value: 'oldest' },
     { label: 'Highest Price', value: 'highest' },
     { label: 'Lowest Price', value: 'lowest' }
   ]
@@ -127,51 +126,34 @@ export default function OrdersPage() {
   }
 
   const loadOrders = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      // ✅ FIX: Prioritize the ID from the URL bar instead of LocalStorage
       let businessId = searchParams.get('business_id') || getCurrentBusinessId()
-      
       if (!businessId || businessId.length < 20) {
         const { data: owned } = await supabase.from('businesses').select('id').eq('owner_id', user.id).single()
         if (owned) businessId = owned.id
       }
-
       setCurrentBusinessId(businessId)
 
-      const response = await fetch(`/api/orders?business_id=${businessId}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      })
+      const response = await fetch(`/api/orders?business_id=${businessId}`, { headers: { 'Authorization': `Bearer ${session.access_token}` } })
       const result = await response.json()
-      
       if (!response.ok) throw new Error(result.error || 'Failed to load orders')
       
-      // ✅ FIX: Ensure we are mapping over a valid array
-      const rawOrders = Array.isArray(result.orders) ? result.orders : []
-      
-      const formattedOrders = rawOrders.map(o => ({
-        ...o,
-        source: o.source || 'manual' 
-      }))
-      
-      setOrders(formattedOrders)
+      setOrders(Array.isArray(result.orders) ? result.orders : [])
     } catch (err) {
       setError('Failed to load orders: ' + err.message)
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   useEffect(() => { loadOrders() }, [router, searchParams])
 
-  // ─── FILTERING LOGIC ───
-  const tabOrders = orders.filter(o => o.source === activeTab)
+  // ─── FILTERING & STATS ───
+  const tabOrders = orders.filter(o => o.source === activeTab || (!o.source && activeTab === 'manual'))
   
   const totalOrders = tabOrders.length
   const activeOrders = tabOrders.filter(o => o.current_status !== 'Delivered').length
@@ -183,8 +165,25 @@ export default function OrdersPage() {
     return due < today
   }).length
 
+  const handleStatClick = (filterType) => {
+    if (filterType === 'all') setStatusFilter('all')
+    else if (filterType === 'active') setStatusFilter('active') // Custom logic
+    else if (filterType === 'ready') setStatusFilter('Ready')
+    else if (filterType === 'overdue') setStatusFilter('overdue') // Custom logic
+  }
+
   const filteredOrders = tabOrders.filter(o => {
-    if (statusFilter !== 'all' && o.current_status !== statusFilter) return false
+    // Stat Card Filtering
+    if (statusFilter === 'active' && o.current_status === 'Delivered') return false
+    if (statusFilter === 'overdue') {
+      if (!o.due_date || o.current_status === 'Delivered') return false
+      const due = new Date(o.due_date); due.setHours(0,0,0,0)
+      const today = new Date(); today.setHours(0,0,0,0)
+      if (due >= today) return false
+    }
+    if (statusFilter !== 'all' && statusFilter !== 'active' && statusFilter !== 'overdue' && o.current_status !== statusFilter) return false
+    
+    // Search Filtering
     if (search) {
       const q = search.toLowerCase()
       return (o.customers?.name?.toLowerCase().includes(q) || o.title?.toLowerCase().includes(q))
@@ -193,13 +192,14 @@ export default function OrdersPage() {
   })
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
-    switch (sortBy) {
-      case 'latest': return new Date(b.created_at) - new Date(a.created_at)
-      case 'oldest': return new Date(a.created_at) - new Date(b.created_at)
-      case 'highest': return (b.price || 0) - (a.price || 0)
-      case 'lowest': return (a.price || 0) - (b.price || 0)
-      default: return 0
+    if (sortBy === 'dueSoonest') {
+      if (!a.due_date) return 1; if (!b.due_date) return -1;
+      return new Date(a.due_date) - new Date(b.due_date)
     }
+    if (sortBy === 'latest') return new Date(b.created_at) - new Date(a.created_at)
+    if (sortBy === 'highest') return (b.price || 0) - (a.price || 0)
+    if (sortBy === 'lowest') return (a.price || 0) - (b.price || 0)
+    return 0
   })
 
   const getInitials = (name) => {
@@ -218,30 +218,28 @@ export default function OrdersPage() {
     if (!phone) return
     let cleanPhone = phone.replace(/\D/g, '')
     if (cleanPhone.startsWith('0')) cleanPhone = '234' + cleanPhone.slice(1)
-    const text = `Hello ${name}, this is a message from Cresoa regarding your order: *${item}*.\n\nYour balance is ₦${balance.toLocaleString()}.`
+    const text = balance > 0 
+      ? `Hello ${name}, a quick reminder from Cresoa regarding your order: *${item}*.\n\nYour balance is ₦${balance.toLocaleString()}. Kindly settle to help us deliver on time. Thank you!`
+      : `Hello ${name}, this is a message from Cresoa regarding your order: *${item}*.`
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
   const promptDelete = (orderId) => {
     setOpenMenuId(null)
     setModalConfig({
-      isOpen: true, title: 'Delete Order?', message: 'This action cannot be undone. Are you sure you want to delete this order?',
+      isOpen: true, title: 'Delete Order?', message: 'This action cannot be undone. Are you sure?',
       confirmText: 'Delete', isDestructive: true,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         const previousOrders = [...orders]
         setOrders(prev => prev.filter(o => o.id !== orderId))
-        showToast('Order deleted successfully', 'success')
-
+        showToast('Order deleted', 'success')
         try {
           const { data: { session } } = await supabase.auth.getSession()
-          const res = await fetch(`/api/orders/${orderId}`, {
-            method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` }
-          })
-          if (!res.ok) throw new Error('Failed to delete')
+          const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` } })
+          if (!res.ok) throw new Error('Failed')
         } catch (err) {
-          setOrders(previousOrders)
-          showToast('Failed to delete order', 'error')
+          setOrders(previousOrders); showToast('Failed to delete', 'error')
         }
       }
     })
@@ -250,107 +248,57 @@ export default function OrdersPage() {
   const promptRecordPayment = (orderId, balance) => {
     setOpenMenuId(null)
     setModalConfig({
-      isOpen: true, 
-      title: 'Record Payment', 
-      message: `Confirm you have received full payment of ₦${balance.toLocaleString()}?`,
-      confirmText: 'Confirm Payment', 
-      isDestructive: false,
+      isOpen: true, title: 'Record Payment', message: `Confirm you have received full payment of ₦${balance.toLocaleString()}?`,
+      confirmText: 'Confirm Payment', isDestructive: false,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
-        
         const previousOrders = [...orders]
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, amount_paid: o.price } : o))
         showToast('Payment recorded!', 'success')
-
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(`/api/orders/${orderId}/payments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify({ amount: balance, note: 'Full payment from list view' })
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({ amount: balance, note: 'Full payment' })
           })
-          if (!res.ok) {
-            const errData = await res.json()
-            throw new Error(errData.error || 'Failed to record payment')
-          }
+          if (!res.ok) throw new Error('Failed')
         } catch (err) {
-          setOrders(previousOrders)
-          showToast(err.message || 'Failed to record payment', 'error')
+          setOrders(previousOrders); showToast('Failed to record payment', 'error')
         }
       }
     })
   }
 
-  if (loading) {
-    return (
-      <div className="orders-page">
-        <div className="orders-header-skeleton">
-          <div className="skeleton-box" style={{ width: '140px', height: '28px' }} />
-          <div className="skeleton-box" style={{ width: '110px', height: '38px' }} />
-        </div>
-        <div className="orders-metrics-grid">
-          {[1,2,3,4].map(i => <div key={i} className="skeleton-box" style={{ height: '80px', borderRadius: '12px' }} />)}
-        </div>
-        <div className="orders-filters-skeleton">
-           <div className="skeleton-box" style={{ height: '44px', width: '100%', marginBottom: '10px' }} />
-           <div style={{ display: 'flex', gap: '10px' }}>
-              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
-              <div className="skeleton-box" style={{ height: '40px', flex: 1 }} />
-           </div>
-        </div>
-        <div className="orders-list">
-          {[1,2,3].map(i => <div key={i} className="skeleton-box" style={{ height: '160px', marginBottom: '12px', borderRadius: '16px' }} />)}
-        </div>
-        <Navigation businessId={currentBusinessId} />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="orders-page" style={{ textAlign: 'center', paddingTop: '4rem' }}>
-        <p style={{ color: 'var(--color-danger)', marginBottom: '1rem' }}>{error}</p>
-        <button onClick={loadOrders} className="cresoa-primary-button">Retry</button>
-      </div>
-    )
-  }
+  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading orders...</div>
+  if (error) return <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}>{error}</div>
 
   return (
-    <div className="orders-page" style={{ background: '#FFFFFF', minHeight: '100vh', paddingBottom: '100px' }}>
+    <div className="orders-page" style={{ background: '#FFFFFF', minHeight: '100vh', paddingBottom: '120px' }}>
       <Navigation businessId={currentBusinessId} />
 
       {/* ─── HEADER & TABS ─── */}
-      <div className="orders-header" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderBottom: '2px solid #0F2B4A', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
+      <div className="orders-header" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '1rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
-            <h1 className="orders-title" style={{ color: '#0F2B4A', fontWeight: 800 }}>Orders</h1>
-            <p className="orders-subtitle" style={{ color: '#666' }}>
-              Manage fulfillment and production.
+            <h1 className="orders-title" style={{ color: '#0F2B4A', fontWeight: 800, margin: 0 }}>Orders</h1>
+            <p className="orders-subtitle" style={{ color: '#666', margin: '4px 0 0 0', fontSize: '0.9rem' }}>
+              Everything you're sewing right now.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={loadOrders} style={{ background: '#F4F6F8', border: '1px solid #EAEAEA', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={loadOrders} style={{ background: '#F4F6F8', border: '1px solid #EAEAEA', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}>
               <SvgIcons.Refresh />
             </button>
-            <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button" style={{ background: '#0F2B4A', color: '#FFF' }}>
-              <SvgIcons.Plus /> New Order
-            </a>
           </div>
         </div>
 
         {/* TAB SWITCHER */}
         <div style={{ display: 'flex', background: '#F4F6F8', padding: '4px', borderRadius: '12px', border: '1px solid #EAEAEA', width: '100%', maxWidth: '400px' }}>
-          <button 
-            onClick={() => setActiveTab('manual')} 
-            style={{ flex: 1, padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'manual' ? '#FFFFFF' : 'transparent', color: activeTab === 'manual' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'manual' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'manual' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
-          >
-            Manual Orders
+          <button onClick={() => setActiveTab('manual')} style={{ flex: 1, padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'manual' ? '#FFFFFF' : 'transparent', color: activeTab === 'manual' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'manual' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'manual' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}>
+            My Orders
           </button>
-          <button 
-            onClick={() => setActiveTab('website')} 
-            style={{ flex: 1, padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'website' ? '#FFFFFF' : 'transparent', color: activeTab === 'website' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'website' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'website' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-          >
-            Website Orders
+          <button onClick={() => setActiveTab('website')} style={{ flex: 1, padding: '10px 20px', borderRadius: '8px', border: 'none', background: activeTab === 'website' ? '#FFFFFF' : 'transparent', color: activeTab === 'website' ? '#0F2B4A' : '#666', fontWeight: activeTab === 'website' ? 700 : 600, cursor: 'pointer', fontSize: '0.9rem', boxShadow: activeTab === 'website' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            Online Orders
             {orders.filter(o => o.source === 'website' && o.current_status !== 'Delivered').length > 0 && (
               <span style={{ background: '#D4AF37', color: '#FFF', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
                 {orders.filter(o => o.source === 'website' && o.current_status !== 'Delivered').length}
@@ -360,70 +308,58 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ─── METRICS ─── */}
-      <div className="orders-metrics-grid">
-        <div className="orders-metric-box"><span className="metric-label">Total</span><span className="metric-value">{totalOrders}</span></div>
-        <div className="orders-metric-box"><span className="metric-label">Active</span><span className="metric-value">{activeOrders}</span></div>
-        <div className="orders-metric-box"><span className="metric-label">Ready</span><span className="metric-value" style={{ color: 'var(--color-secondary)' }}>{readyOrders}</span></div>
-        <div className="orders-metric-box"><span className="metric-label">Overdue</span><span className="metric-value" style={{ color: 'var(--color-danger)' }}>{overdueOrders}</span></div>
+      {/* ─── TAPPABLE METRICS ─── */}
+      <div className="orders-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '1.5rem' }}>
+        <div onClick={() => handleStatClick('all')} style={{ cursor: 'pointer', padding: '12px', background: statusFilter === 'all' ? '#0F2B4A' : '#F8F9FA', color: statusFilter === 'all' ? '#FFF' : '#666', borderRadius: '12px', textAlign: 'center', border: '1px solid #EAEAEA' }}>
+          <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>All</span>
+          <span style={{ display: 'block', fontSize: '1.2rem', fontWeight: 800 }}>{totalOrders}</span>
+        </div>
+        <div onClick={() => handleStatClick('active')} style={{ cursor: 'pointer', padding: '12px', background: statusFilter === 'active' ? '#0F2B4A' : '#F8F9FA', color: statusFilter === 'active' ? '#FFF' : '#666', borderRadius: '12px', textAlign: 'center', border: '1px solid #EAEAEA' }}>
+          <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>In Progress</span>
+          <span style={{ display: 'block', fontSize: '1.2rem', fontWeight: 800 }}>{activeOrders}</span>
+        </div>
+        <div onClick={() => handleStatClick('ready')} style={{ cursor: 'pointer', padding: '12px', background: statusFilter === 'Ready' ? '#0F2B4A' : '#F8F9FA', color: statusFilter === 'Ready' ? '#FFF' : '#666', borderRadius: '12px', textAlign: 'center', border: '1px solid #EAEAEA' }}>
+          <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>Ready</span>
+          <span style={{ display: 'block', fontSize: '1.2rem', fontWeight: 800 }}>{readyOrders}</span>
+        </div>
+        <div onClick={() => handleStatClick('overdue')} style={{ cursor: 'pointer', padding: '12px', background: statusFilter === 'overdue' ? '#FF3B30' : '#FFF0F0', color: statusFilter === 'overdue' ? '#FFF' : '#FF3B30', borderRadius: '12px', textAlign: 'center', border: '1px solid #FECACA' }}>
+          <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>Late</span>
+          <span style={{ display: 'block', fontSize: '1.2rem', fontWeight: 800 }}>{overdueOrders}</span>
+        </div>
       </div>
 
       {/* ─── FILTERS ─── */}
-      <div className="orders-filters">
-        <div className="orders-search-wrapper">
-          <span className="search-icon"><SvgIcons.Search /></span>
-          <input 
-            type="text" 
-            className="orders-search-input" 
-            placeholder="Search customer or item..." 
-            value={search} 
-            onChange={(e) => setSearch(e.target.value)} 
-          />
-          {search && (
-            <button className="search-clear-btn" onClick={() => setSearch('')}>
-              <SvgIcons.X />
-            </button>
-          )}
+      <div className="orders-filters" style={{ marginBottom: '1rem' }}>
+        <div className="orders-search-wrapper" style={{ display: 'flex', alignItems: 'center', background: '#F4F6F8', border: '1px solid #EAEAEA', borderRadius: '12px', padding: '0 12px', marginBottom: '12px' }}>
+          <SvgIcons.Search />
+          <input type="text" style={{ border: 'none', background: 'transparent', padding: '12px', width: '100%', outline: 'none', fontSize: '0.95rem' }} placeholder="Search client or style..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}><SvgIcons.X /></button>}
         </div>
         
-        <div className="orders-filter-row">
-          {/* CUSTOM STATUS DROPDOWN */}
-          <div className="custom-select-wrapper" ref={statusMenuRef}>
-            <button className="custom-select-btn" onClick={() => { setShowStatusMenu(!showStatusMenu); setShowSortMenu(false); }}>
+        <div className="orders-filter-row" style={{ display: 'flex', gap: '10px' }}>
+          <div className="custom-select-wrapper" ref={statusMenuRef} style={{ flex: 1, position: 'relative' }}>
+            <button className="custom-select-btn" onClick={() => { setShowStatusMenu(!showStatusMenu); setShowSortMenu(false); }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '10px', fontSize: '0.9rem', color: '#333', cursor: 'pointer' }}>
               {statusOptions.find(o => o.value === statusFilter)?.label || 'Status'}
               <SvgIcons.ChevronDown />
             </button>
-            {showStatusMenu && (
-              <div className="custom-dropdown-menu">
+  {showStatusMenu && (
+              <div className="custom-dropdown-menu" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '10px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 20, overflow: 'hidden' }}>
                 {statusOptions.map(opt => (
-                  <button 
-                    key={opt.value} 
-                    className={`custom-dropdown-item ${statusFilter === opt.value ? 'active' : ''}`}
-                    onClick={() => { setStatusFilter(opt.value); setShowStatusMenu(false); }}
-                  >
-                    {opt.label}
-                  </button>
+                  <button key={opt.value} onClick={() => { setStatusFilter(opt.value); setShowStatusMenu(false); }} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: statusFilter === opt.value ? '#F4F6F8' : '#FFF', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: statusFilter === opt.value ? '#0F2B4A' : '#333', fontWeight: statusFilter === opt.value ? 700 : 500 }}>{opt.label}</button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* CUSTOM SORT DROPDOWN */}
-          <div className="custom-select-wrapper" ref={sortMenuRef}>
-            <button className="custom-select-btn" onClick={() => { setShowSortMenu(!showSortMenu); setShowStatusMenu(false); }}>
+          <div className="custom-select-wrapper" ref={sortMenuRef} style={{ flex: 1, position: 'relative' }}>
+            <button className="custom-select-btn" onClick={() => { setShowSortMenu(!showSortMenu); setShowStatusMenu(false); }} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '10px', fontSize: '0.9rem', color: '#333', cursor: 'pointer' }}>
               {sortOptions.find(o => o.value === sortBy)?.label || 'Sort'}
               <SvgIcons.ChevronDown />
             </button>
             {showSortMenu && (
-              <div className="custom-dropdown-menu">
+              <div className="custom-dropdown-menu" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '10px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 20, overflow: 'hidden' }}>
                 {sortOptions.map(opt => (
-                  <button 
-                    key={opt.value} 
-                    className={`custom-dropdown-item ${sortBy === opt.value ? 'active' : ''}`}
-                    onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }}
-                  >
-                    {opt.label}
-                  </button>
+                  <button key={opt.value} onClick={() => { setSortBy(opt.value); setShowSortMenu(false); }} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: sortBy === opt.value ? '#F4F6F8' : '#FFF', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: sortBy === opt.value ? '#0F2B4A' : '#333', fontWeight: sortBy === opt.value ? 700 : 500 }}>{opt.label}</button>
                 ))}
               </div>
             )}
@@ -431,24 +367,15 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ─── LIST ─── */}
-    {sortedOrders.length === 0 ? (
-        <div className="orders-empty" style={{ textAlign: 'center', padding: '4rem 2rem', background: '#F8F9FA', borderRadius: '16px', border: '2px dashed #EAEAEA' }}>
-          <div className="empty-icon" style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-            {activeTab === 'website' ? '🛒' : '📋'}
-          </div>
-          <h3 style={{ color: '#0F2B4A', margin: '0 0 10px 0' }}>
-            {activeTab === 'website' ? 'No website orders yet' : 'No manual orders found'}
-          </h3>
-          <p style={{ color: '#666' }}>
-            {search ? 'Try a different search term.' : activeTab === 'website' ? 'When customers buy from your store, orders will appear here.' : 'Create your first manual order to get started.'}
-          </p>
-          {!search && activeTab === 'manual' && (
-            <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} className="cresoa-primary-button" style={{ marginTop: '1rem', display: 'inline-block', background: '#0F2B4A', color: '#FFF' }}>Create Order</a>
-          )}
+      {/* ─── COMPACT LIST ─── */}
+      {sortedOrders.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', background: '#F8F9FA', borderRadius: '16px', border: '2px dashed #EAEAEA' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>{activeTab === 'website' ? '🛒' : '📋'}</div>
+          <h3 style={{ color: '#0F2B4A', margin: '0 0 10px 0' }}>{activeTab === 'website' ? 'No online orders yet' : 'No orders found'}</h3>
+          <p style={{ color: '#666' }}>{search ? 'Try a different search term.' : activeTab === 'website' ? 'When customers buy from your store, orders will appear here.' : 'Create your first order to get started.'}</p>
         </div>
       ) : (
-        <div className="orders-list">
+        <div className="orders-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {sortedOrders.map((o) => {
             const isOverdue = o.due_date && new Date(o.due_date) < new Date() && o.current_status !== 'Delivered'
             const balance = (o.price || 0) - (o.amount_paid || 0)
@@ -456,64 +383,86 @@ export default function OrdersPage() {
             const customerPhone = o.customers?.phone || ''
             const itemTitle = o.title || 'Untitled'
             const isMenuOpen = openMenuId === o.id
+            const dueDateFormatted = o.due_date ? new Date(o.due_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) : 'Not set'
 
             return (
-              <Card key={o.id} className="order-card" style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #EAEAEA', padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
-                <div className="order-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <div className="order-identity" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <div className="cresoa-avatar" style={{ background: '#0F2B4A', color: '#FFF', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{getInitials(customerName)}</div>
-                    <div className="order-card-title-group">
-                      <h3 className="order-card-customer" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F2B4A' }}>{customerName}</h3>
-                      <span className="order-card-item" style={{ fontSize: '0.85rem', color: '#666' }}>{itemTitle}</span>
+              <Card key={o.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #EAEAEA', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                
+                {/* LINE 1: Client & Money */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ background: '#0F2B4A', color: '#FFF', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem' }}>
+                      {getInitials(customerName)}
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F2B4A' }}>{customerName}</h3>
+                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{itemTitle}</span>
                     </div>
                   </div>
-                  <div className="order-card-price-group" style={{ textAlign: 'right' }}>
-                    <span className="order-card-price" style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A' }}>₦{o.price?.toLocaleString() || 0}</span>
-                    {balance > 0 && <span className="order-card-due" style={{ fontSize: '0.8rem', color: '#FF3B30', fontWeight: 600 }}>₦{balance.toLocaleString()} due</span>}
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A' }}>₦{o.price?.toLocaleString() || 0}</span>
+                    {balance > 0 ? (
+                      <span style={{ fontSize: '0.8rem', color: isOverdue ? '#FF3B30' : '#666', fontWeight: 600 }}>Balance: ₦{balance.toLocaleString()}</span>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: '#137333', fontWeight: 600 }}>Fully Paid</span>
+                    )}
                   </div>
                 </div>
 
-                <div className="order-card-badges" style={{ display: 'flex', gap: '8px', marginBottom: '1rem' }}>
-                  <StatusPill status={o.current_status} />
-                  {isOverdue && <span className="badge-overdue" style={{ background: '#FFF0F0', color: '#FF3B30', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>Overdue</span>}
-                  {o.source === 'website' && <span className="badge-overdue" style={{ background: '#F4F6F8', color: '#0F2B4A', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>Web Order</span>}
+                {/* LINE 2: Status, Due Date & Badges */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <StatusPill status={o.current_status === 'Order placed' ? 'Not Started' : o.current_status} />
+                    {isOverdue && <span style={{ background: '#FFF0F0', color: '#FF3B30', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>LATE</span>}
+                  </div>
+                  <span style={{ fontSize: '0.85rem', color: isOverdue ? '#FF3B30' : '#666', fontWeight: isOverdue ? 700 : 500 }}>
+                    Due: {dueDateFormatted}
+                  </span>
                 </div>
 
-                <div className="order-card-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #EAEAEA', paddingTop: '1rem' }}>
-                  <div className="action-buttons-group" style={{ display: 'flex', gap: '8px' }}>
-                    {customerPhone && (
+                {/* LINE 3: Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #EAEAEA', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {customerPhone ? (
                       <>
-                        <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} className="btn-action btn-whatsapp" style={{ background: '#E6F4EA', color: '#137333', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>WhatsApp</button>
-                        <button onClick={() => handleCall(customerPhone)} className="btn-action btn-call" style={{ background: '#F4F6F8', color: '#0F2B4A', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>Call</button>
+                        <button onClick={() => handleWhatsApp(customerPhone, customerName, itemTitle, balance)} style={{ background: balance > 0 ? '#E6F4EA' : '#F4F6F8', color: balance > 0 ? '#137333' : '#0F2B4A', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {balance > 0 ? 'Send Reminder' : 'Chat'}
+                        </button>
+                        <button onClick={() => handleCall(customerPhone)} style={{ background: '#F4F6F8', color: '#0F2B4A', border: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+                          <SvgIcons.Phone />
+                        </button>
                       </>
+                    ) : (
+                      <a href={`/dashboard/customers/${o.customer_id}?business_id=${currentBusinessId}`} style={{ background: '#F4F6F8', color: '#999', border: '1px dashed #CCC', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
+                        + Add Phone
+                      </a>
                     )}
-                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} className="btn-action btn-view" style={{ background: '#0F2B4A', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, textDecoration: 'none' }}>View Details</a>
                   </div>
 
-                  <div className="menu-container" ref={isMenuOpen ? menuRef : null} style={{ position: 'relative' }}>
-                    <button className={`btn-menu-trigger ${isMenuOpen ? 'active' : ''}`} onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '6px' }}>
-                      <SvgIcons.MoreVertical />
-                    </button>
-
-                    {isMenuOpen && (
-                      <div className="dropdown-menu" style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '200px', zIndex: 10, overflow: 'hidden' }}>
-                        {balance > 0 && (
-                          <button onClick={() => promptRecordPayment(o.id, balance)} className="dropdown-item text-success" style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#137333', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <SvgIcons.CheckCircle /> Record Full Payment
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} style={{ background: '#0F2B4A', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}>
+                      Open
+                    </a>
+                    <div className="menu-container" ref={isMenuOpen ? menuRef : null} style={{ position: 'relative' }}>
+                      <button onClick={() => setOpenMenuId(isMenuOpen ? null : o.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', padding: '4px' }}>
+                        <SvgIcons.MoreVertical />
+                      </button>
+                      {isMenuOpen && (
+                        <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '180px', zIndex: 30, overflow: 'hidden' }}>
+                          {balance > 0 && (
+                            <button onClick={() => promptRecordPayment(o.id, balance)} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#137333', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <SvgIcons.CheckCircle /> Mark as Paid
+                            </button>
+                          )}
+                          <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333', textDecoration: 'none' }}>
+                            <SvgIcons.Edit /> Edit Order
+                          </a>
+                          <button onClick={() => promptDelete(o.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
+                            <SvgIcons.Trash /> Delete
                           </button>
-                        )}
-                        <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333', textDecoration: 'none' }}>
-                          <SvgIcons.Edit /> Edit Order
-                        </a>
-                        <button onClick={() => { navigator.clipboard.writeText(o.id); setOpenMenuId(null); showToast('Order ID copied!', 'success') }} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}>
-                          <SvgIcons.Copy /> Copy Order ID
-                        </button>
-                        <div className="dropdown-divider" style={{ height: '1px', background: '#EAEAEA', margin: '4px 0' }}></div>
-                        <button onClick={() => promptDelete(o.id)} className="dropdown-item text-danger" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
-                          <SvgIcons.Trash /> Delete Order
-                        </button>
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -522,23 +471,30 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* ─── MODALS & TOASTS ─── */}
+      {/* STICKY NEW ORDER BUTTON */}
+      <div style={{ position: 'fixed', bottom: '75px', left: '16px', right: '16px', background: 'linear-gradient(to top, #FFF 60%, transparent)', paddingTop: '20px', paddingBottom: '10px', zIndex: 90 }}>
+        <a href={`/dashboard/orders/new?business_id=${currentBusinessId || ''}`} style={{ display: 'block', textAlign: 'center', width: '100%', padding: '16px', background: '#0F2B4A', color: '#FFF', fontSize: '1rem', fontWeight: 700, borderRadius: '12px', textDecoration: 'none', boxShadow: '0 4px 12px rgba(15, 43, 74, 0.3)' }}>
+          + New Order
+        </a>
+      </div>
+
+      {/* MODALS & TOASTS */}
       {modalConfig.isOpen && (
-        <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
-          <div className="app-modal-box" onClick={e => e.stopPropagation()}>
-            <h3 className="app-modal-title">{modalConfig.title}</h3>
-            <p className="app-modal-message">{modalConfig.message}</p>
-            <div className="app-modal-actions">
-              <button className="app-modal-btn cancel" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>Cancel</button>
-              <button className={`app-modal-btn confirm ${modalConfig.isDestructive ? 'destructive' : ''}`} onClick={modalConfig.onConfirm}>{modalConfig.confirmText}</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
+          <div style={{ background: '#FFF', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', color: '#0F2B4A' }}>{modalConfig.title}</h3>
+            <p style={{ margin: '0 0 20px 0', color: '#666' }}>{modalConfig.message}</p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))} style={{ padding: '10px 16px', background: '#F4F6F8', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={modalConfig.onConfirm} style={{ padding: '10px 16px', background: modalConfig.isDestructive ? '#FF3B30' : '#0F2B4A', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>{modalConfig.confirmText}</button>
             </div>
           </div>
         </div>
       )}
 
       {toastMessage && (
-        <div className={`app-toast ${toastType}`}>
-          {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
+        <div style={{ position: 'fixed', bottom: '160px', left: '50%', transform: 'translateX(-50%)', background: toastType === 'success' ? '#137333' : '#FF3B30', color: '#FFF', padding: '12px 24px', borderRadius: '30px', fontWeight: 600, zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+          {toastMessage}
         </div>
       )}
       
