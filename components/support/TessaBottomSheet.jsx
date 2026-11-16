@@ -43,7 +43,7 @@ const ICONS = {
       <line x1="12" y1="19" x2="12" y2="23" />
     </>
   ),
-  stop: <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none" />,
+  stop: <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />,
   arrowUp: (
     <>
       <line x1="12" y1="19" x2="12" y2="5" />
@@ -117,7 +117,7 @@ function TessaOrb({ size = 40, spinning = false }) {
       }}
       aria-hidden="true"
     >
-      <TessaLogo size={Math.round(size * 0.55)} />
+      <TessaLogo size={Math.round(size * 0.55)} variant="white" />
     </div>
   );
 }
@@ -137,7 +137,7 @@ function LogoBadge({ size = 22 }) {
       }}
       aria-hidden="true"
     >
-      <TessaLogo size={Math.round(size * 0.6)} />
+      <TessaLogo size={Math.round(size * 0.6)} variant="white" />
     </span>
   );
 }
@@ -393,14 +393,23 @@ function MessageRow({ msg, isStart, isEnd, onRetry }) {
               <span>Tessa</span>
             </div>
           )}
-          <RichText text={msg.text} />
+          {/* If there is text, show it. If it's currently empty and streaming, show dots */}
+          {msg.text ? (
+             <RichText text={msg.text} />
+          ) : (
+             <div style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '24px' }}>
+                <i className="tsa-dot" style={{ animationDelay: '0s' }} />
+                <i className="tsa-dot" style={{ animationDelay: '0.2s' }} />
+                <i className="tsa-dot" style={{ animationDelay: '0.4s' }} />
+             </div>
+          )}
         </div>
       )}
 
       {isEnd && !msg.error && (
         <div className="tsa-meta">
           <time>{fmtTime(msg.ts)}</time>
-          {!isUser && (
+          {!isUser && msg.text && (
             <button type="button" onClick={copy} className="tsa-copy-btn">
               <Icon name={copied ? 'check' : 'copy'} size={14} /> 
               <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -452,6 +461,7 @@ export default function TessaBottomSheet({
   const newConvoRef = useRef(false);
   const noticeTimer = useRef(null);
   const coarse = useRef(false);
+  const abortControllerRef = useRef(null); // NEW: For stopping streams
 
   const setLoading = (v) => {
     loadingRef.current = v;
@@ -572,7 +582,6 @@ export default function TessaBottomSheet({
     const previewUrl = URL.createObjectURL(file);
     setSelectedImage({ file, previewUrl });
     
-    // Reset input value so the same file can be selected again if removed
     e.target.value = null;
   };
 
@@ -583,64 +592,132 @@ export default function TessaBottomSheet({
     setSelectedImage(null);
   };
 
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setLoading(false);
+    }
+  };
+
   const send = useCallback(
     async (raw, { retry = false } = {}) => {
       const text = (raw ?? '').trim();
-      const imageToSend = selectedImage?.file; // Capture current state
+      const imageToSend = selectedImage?.file;
       
       if ((!text && !imageToSend) || loadingRef.current) return;
 
       stick.current = true;
       
-      const userMsg = { id: uid(), role: 'user', text, ts: Date.now(), fresh: true };
-      if (selectedImage) {
-        userMsg.imageUrl = selectedImage.previewUrl; // Keep preview for UI
-      }
-      
-      if (!retry) setMessages((p) => [...p, userMsg]);
-      
-      setInput('');
-      removeImage(); // Clear preview and free memory
-      setLoading(true);
-      const myReq = ++reqId.current;
-      
-      const pushAi = (extra) => setMessages((p) => [...p, { id: uid(), role: 'assistant', ts: Date.now(), fresh: true, ...extra }]);
-
-      try {
-        // Convert image to Base64 for the API
-        let base64Image = null;
-        if (imageToSend) {
+      // 1. Convert image to Base64 FIRST so we can use it in the UI bubble
+      let base64Image = null;
+      if (imageToSend) {
+        try {
           base64Image = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.onerror = reject;
             reader.readAsDataURL(imageToSend);
           });
-        }
+        } catch (e) { console.error("Failed to read image", e); }
+      }
 
+      // 2. Setup the user message using the Base64 string
+      const userMsg = { id: uid(), role: 'user', text, ts: Date.now(), fresh: true };
+      if (base64Image) userMsg.imageUrl = base64Image; 
+      
+      if (!retry) setMessages((p) => [...p, userMsg]);
+      
+      setInput('');
+      removeImage(); 
+      setLoading(true);
+      const myReq = ++reqId.current;
+      
+      // 3. Create a placeholder AI message that we will stream into
+      const aiMsgId = uid();
+      setMessages((p) => [...p, { id: aiMsgId, role: 'assistant', text: '', ts: Date.now(), fresh: true }]);
+
+      abortControllerRef.current = new AbortController();
+
+      try {
         const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch('/api/support/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
           body: JSON.stringify({
             message: text || (base64Image ? 'Analyze this image' : ''),
-            image: base64Image, // Handled by API later
+            image: base64Image, 
             business_id: businessId,
             new_conversation: newConvoRef.current,
             ...(pageContext ? { page_context: pageContext } : {}),
           }),
+          signal: abortControllerRef.current.signal,
         });
-        const data = await res.json().catch(() => ({}));
-        if (myReq !== reqId.current) return;
-        
-        if (data.answer) pushAi({ text: data.answer });
-        else pushAi({ text: "Tessa didn't return an answer. Tap Retry to ask again.", error: true, retryText: text });
-        
+
+        // 4. Check if it's a standard JSON response (e.g., Pending Action)
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+           const data = await res.json();
+           if (myReq !== reqId.current) return;
+           
+           setMessages((p) => p.map(m => m.id === aiMsgId ? { ...m, text: data.answer } : m));
+           newConvoRef.current = false;
+           return;
+        }
+
+        // 5. Otherwise, it's an SSE Stream
+        if (!res.body) throw new Error('No readable stream');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let currentText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (myReq !== reqId.current) { reader.cancel(); return; }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete line
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.startsWith('event: ')) {
+               const eventType = line.slice(7);
+               const nextLine = lines[i + 1]; // data line
+               
+               if (nextLine && nextLine.startsWith('data: ')) {
+                  const rawData = nextLine.slice(6);
+                  try {
+                     const data = JSON.parse(rawData);
+                     
+                     if (eventType === 'text') {
+                        currentText += data;
+                        // Update the UI live as chunks arrive
+                        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: currentText } : m));
+                     } else if (eventType === 'pending') {
+                        // If a tool call is triggered, replace text with the confirmation block
+                        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: data.text } : m));
+                     } else if (eventType === 'error') {
+                        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: data, error: true } : m));
+                     }
+                     i++; // skip data line
+                  } catch (e) { /* Ignore partial JSON errors */ }
+               }
+            }
+          }
+        }
         newConvoRef.current = false;
-      } catch {
-        if (myReq === reqId.current) pushAi({ text: "Couldn't reach Tessa. Check your connection, then tap Retry.", error: true, retryText: text });
+      } catch (err) {
+        if (err.name === 'AbortError') {
+           // User clicked stop, just finalize the current text
+        } else if (myReq === reqId.current) {
+          setMessages((p) => p.map(m => m.id === aiMsgId ? { ...m, text: "Couldn't reach Tessa. Check your connection.", error: true } : m));
+        }
       } finally {
         if (myReq === reqId.current) setLoading(false);
+        abortControllerRef.current = null;
       }
     },
     [businessId, pageContext, selectedImage]
@@ -654,7 +731,7 @@ export default function TessaBottomSheet({
 
   const newChat = () => {
     reqId.current++;
-    setLoading(false);
+    stopGeneration();
     setMessages([]);
     setInput('');
     removeImage();
@@ -769,7 +846,7 @@ export default function TessaBottomSheet({
               <TessaOrb size={38} spinning={isLoading} />
               <div>
                 <div className="tsa-title">Tessa</div>
-                <div className="tsa-status">{isLoading ? 'Thinking...' : 'Online'}</div>
+                <div className="tsa-status">{isLoading ? 'Typing...' : 'Online'}</div>
               </div>
             </div>
             
@@ -800,20 +877,8 @@ export default function TessaBottomSheet({
             ) : (
               <>
                 {messages.map((m, i) => (
-                  <MessageRow key={m.id} msg={m} isStart={messages[i - 1]?.role !== m.role} isEnd={messages[i + 1]?.role !== m.role} onRetry={retry} />
+                  <MessageRow key={m.id} msg={m} isStart={messages[i - 1]?.role !== m.role} isEnd={messages[i + 1]?.role !== m.role || isLoading} onRetry={retry} />
                 ))}
-                {isLoading && (
-                  <div className="tsa-row tsa-row--ai is-start">
-                    <div className="tsa-ai-content">
-                      <div className="tsa-ai-header"><LogoBadge size={20} /><span>Tessa</span></div>
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '24px' }}>
-                        <i className="tsa-dot" style={{ animationDelay: '0s' }} />
-                        <i className="tsa-dot" style={{ animationDelay: '0.2s' }} />
-                        <i className="tsa-dot" style={{ animationDelay: '0.4s' }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -872,6 +937,7 @@ export default function TessaBottomSheet({
                   onKeyDown={onKeyDown}
                   onFocus={() => setSnap('full')}
                   placeholder="Message Tessa..."
+                  disabled={isLoading}
                 />
               </>
             )}
@@ -879,6 +945,15 @@ export default function TessaBottomSheet({
             {isRecording ? (
               <button type="button" className="tsa-action tsa-action--stop" onClick={toggleRecording}>
                 <Icon name="stop" size={16} />
+              </button>
+            ) : isLoading ? (
+              <button 
+                type="button" 
+                className="tsa-action tsa-action--send is-active" 
+                onClick={stopGeneration} 
+                title="Stop generating"
+              >
+                <Icon name="stop" size={20} />
               </button>
             ) : (
               <button 
@@ -1062,6 +1137,3 @@ html.dark .tsa-root {
   .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 `;
-
-
-      
