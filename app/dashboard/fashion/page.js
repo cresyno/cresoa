@@ -12,7 +12,7 @@ import { StatusPill } from '../../../components/StatusPill'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
 import { supabase } from '../../../lib/supabaseClient'
-import TessaFloatingWidget from '../../components/TessaFloatingWidget' // NEW: Import Tessa
+import TessaFloatingWidget from '../../../components/support/TessaFloatingWidget' // NEW: Import Tessa/ NEW: Import Tessa
 import './dashboard.css'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
