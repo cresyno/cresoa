@@ -27,6 +27,7 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
     'arrow-left': <polyline points="15 18 9 12 15 6" />,
     'arrow-right-circle': <><circle cx="12" cy="12" r="10" /><polyline points="12 16 16 12 12 8" /><line x1="8" y1="12" x2="16" y2="12" /></>,
     'plus': <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
+    'credit-card': <><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>,
     'check-circle': <><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" /><path d="M9 12l2 2 4-4" /></>,
     'phone': <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />,
     'message-circle': <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
@@ -58,7 +59,6 @@ export default function OrderDetailPage() {
   
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
-
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
@@ -79,6 +79,9 @@ export default function OrderDetailPage() {
   
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
+  
+  const notesTimeoutRef = useRef(null)
+  const isInitialMount = useRef(true)
 
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
   const [toastMessage, setToastMessage] = useState('')
@@ -108,6 +111,7 @@ export default function OrderDetailPage() {
       if (!bizId) { router.push('/dashboard'); return }
       setCurrentBusinessId(bizId)
 
+      // Fetch Measurements too
       const { data: orderData, error: orderError } = await supabase.from('orders').select(`*, customers (id, name, first_name, last_name, phone, email, address, measurements)`).eq('id', orderId).eq('business_id', bizId).single()
       if (orderError) throw orderError
       setOrder(orderData)
@@ -130,18 +134,29 @@ export default function OrderDetailPage() {
 
   useEffect(() => { if (orderId) loadOrder() }, [orderId])
 
-  // Auto-save notes
-  const isInitialMount = useRef(true)
+  // Auto-save Style Notes
   useEffect(() => {
-    if (isInitialMount.current) { isInitialMount.current = false; return }
-    const timer = setTimeout(async () => {
-      setSavingNotes(true)
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current)
+    
+    setSavingNotes(true)
+    notesTimeoutRef.current = setTimeout(async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (session) await supabase.from('orders').update({ notes }).eq('id', orderId)
-      } catch (err) { console.error('Failed to auto-save notes', err) } finally { setSavingNotes(false) }
+        if (session) {
+          await supabase.from('orders').update({ notes }).eq('id', orderId)
+        }
+      } catch (err) {
+        console.error('Failed to auto-save notes', err)
+      } finally {
+        setSavingNotes(false)
+      }
     }, 1000)
-    return () => clearTimeout(timer)
+
+    return () => clearTimeout(notesTimeoutRef.current)
   }, [notes, orderId])
 
   const statusIndex = useMemo(() => {
@@ -164,6 +179,9 @@ export default function OrderDetailPage() {
   const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
   const formatDate = value => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
   const customerName = customer?.first_name || customer?.name || 'Client'
+  
+  const measurements = customer?.measurements || {}
+  const hasMeasurements = Object.keys(measurements).length > 0
 
   // ─── ACTIONS ───
 
@@ -175,14 +193,19 @@ export default function OrderDetailPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/orders/${orderId}/payments`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ amount, note: paymentNote || 'Payment received' })
       })
       if (!response.ok) throw new Error('Failed')
       await loadOrder()
       setPaymentAmount(''); setPaymentNote(''); setShowPaymentModal(false)
       showToast('Payment recorded successfully!')
-    } catch (err) { showToast('Could not record payment.', 'error') } finally { setRecordingPayment(false) }
+    } catch (err) { 
+      showToast('Could not record payment.', 'error') 
+    } finally { 
+      setRecordingPayment(false) 
+    }
   }
 
   const updateStatus = async (status) => {
@@ -194,7 +217,11 @@ export default function OrderDetailPage() {
       await loadOrder()
       setShowStatusModal(false); setSelectedStatus(null)
       showToast(`Status moved to ${status}`)
-    } catch (err) { showToast('Could not update status.', 'error') } finally { setUpdatingStatus(false) }
+    } catch (err) { 
+      showToast('Could not update status.', 'error') 
+    } finally { 
+      setUpdatingStatus(false) 
+    }
   }
 
   const openWhatsAppModal = () => {
@@ -228,15 +255,21 @@ export default function OrderDetailPage() {
       await loadOrder()
       setShowEditModal(false)
       showToast('Order details updated')
-    } catch (err) { showToast('Could not update order.', 'error') } finally { setEditing(false) }
+    } catch (err) { 
+      showToast('Could not update order.', 'error') 
+    } finally { 
+      setEditing(false) 
+    }
   }
 
   const promptDuplicate = () => {
     setShowMenu(false)
     setModalConfig({
-      isOpen: true, title: 'Reorder (Duplicate)?',
+      isOpen: true,
+      title: 'Reorder (Duplicate)?',
       message: 'This will create a new order with the exact same details. The new order will start at "Placed" and have ₦0 paid.',
-      confirmText: 'Duplicate', isDestructive: false,
+      confirmText: 'Duplicate',
+      isDestructive: false,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         try {
@@ -244,7 +277,9 @@ export default function OrderDetailPage() {
           if (error) throw error
           router.push(`/dashboard/orders/${data.id}?business_id=${currentBusinessId}`)
           showToast('Order duplicated successfully')
-        } catch (err) { showToast('Could not duplicate order.', 'error') }
+        } catch (err) { 
+          showToast('Could not duplicate order.', 'error') 
+        }
       }
     })
   }
@@ -252,166 +287,144 @@ export default function OrderDetailPage() {
   const promptDelete = () => {
     setShowMenu(false)
     setModalConfig({
-      isOpen: true, title: 'Delete Order?',
+      isOpen: true,
+      title: 'Delete Order?',
       message: 'Are you sure you want to permanently delete this order? This action cannot be undone.',
-      confirmText: 'Delete Order', isDestructive: true,
+      confirmText: 'Delete Order',
+      isDestructive: true,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
         try {
           await supabase.from('orders').delete().eq('id', orderId)
           router.push(`/dashboard/orders?business_id=${currentBusinessId}`)
           showToast('Order deleted successfully')
-        } catch (err) { showToast('Could not delete order.', 'error') }
+        } catch (err) { 
+          showToast('Could not delete order.', 'error') 
+        }
       }
     })
   }
 
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading order...</div>
-  if (error || !order) return <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}><Icon name="alert-circle" size={30} stroke="var(--color-danger)" /><h2>Couldn't load order</h2><button onClick={loadOrder} style={{ marginTop: '10px', padding: '10px 20px', background: '#0F2B4A', color: '#FFF', border: 'none', borderRadius: '8px' }}>Try again</button></div>
-
-  const measurements = customer?.measurements || {}
-  const hasMeasurements = Object.keys(measurements).length > 0
+  if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
+  if (error || !order) return <div className="order-page-error"><Icon name="alert-circle" size={30} stroke="var(--color-danger)" /><h2>Couldn't load order</h2><button onClick={loadOrder} className="cresoa-primary-button">Try again</button></div>
 
   return (
-    <div style={{ background: '#F8F6F2', minHeight: '100vh', padding: '1rem', paddingBottom: '160px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="order-details-page" style={{ paddingBottom: '120px' }}>
       <Navigation businessId={currentBusinessId} />
 
-      <button onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId}`)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#0F2B4A', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', padding: 0, marginBottom: '1.5rem', marginTop: '1rem' }}>
+      <button onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId}`)} className="order-back-btn">
         <Icon name="arrow-left" size={16} /> Back to Orders
       </button>
 
-      {/* HEADER */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <p style={{ margin: 0, fontSize: '0.75rem', color: '#D4AF37', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>Order</p>
-        <h1 style={{ margin: '4px 0 0 0', fontSize: '1.6rem', fontWeight: 800, color: '#0F2B4A', lineHeight: 1.2 }}>{order.title || 'Untitled order'}</h1>
-        <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#666' }}>For {customerName}</p>
-      </div>
-
-      {/* PRIMARY HERO ACTIONS */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-        <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${orderId}`)} style={{ flex: 1, background: '#D4AF37', color: '#0F2B4A', padding: '14px', borderRadius: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)', fontSize: '0.9rem' }}>
-          <Icon name="file-text" size={18} /> Send Invoice
-        </button>
-        {order.current_status !== 'Delivered' && (
-          <button onClick={() => setShowStatusModal(true)} style={{ flex: 1, background: '#0F2B4A', color: '#FFF', padding: '14px', borderRadius: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(15, 43, 74, 0.2)', fontSize: '0.9rem' }}>
-            <Icon name="arrow-right-circle" size={18} /> Move Stage
-          </button>
-        )}
-      </div>
-
-      {/* PROGRESS STEPPER (Fixed for Mobile) */}
-      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '10px' }}>
-          <h3 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Production Stage</h3>
-          <button onClick={openWhatsAppModal} disabled={!canWhatsApp} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#E6F4EA', color: '#137333', padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-            <Icon name="message-circle" size={14} /> Tell Client
-          </button>
+      {/* ─── HEADER COMMAND CENTER ─── */}
+      <div className="order-header">
+        <div className="order-title-area">
+          <p className="order-eyebrow">Order</p>
+          <h1 className="order-title">{order.title || 'Untitled order'}</h1>
+          <p className="order-subtitle">For {customerName}</p>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative' }}>
-          {/* The grey line behind */}
-          <div style={{ position: 'absolute', top: '14px', left: '10%', right: '10%', height: '2px', background: '#EAEAEA', zIndex: 1 }} />
-          {/* The dark progress line */}
-          <div style={{ position: 'absolute', top: '14px', left: '10%', width: `${(statusIndex / (STATUS_FLOW.length - 1)) * 80}%`, height: '2px', background: '#0F2B4A', zIndex: 1, transition: 'width 0.3s' }} />
+        <div className="order-header-actions">
+          <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${orderId}`)} className="cresoa-primary-button" style={{ background: '#D4AF37', color: '#0F2B4A' }}>
+            <Icon name="file-text" size={16} /> Send Invoice
+          </button>
           
-   {STATUS_FLOW.map((status, index) => {
-            const completed = index <= statusIndex
-            const active = index === statusIndex
-            return (
-              <div key={status.value} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2, flex: 1, minWidth: 0 }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: completed ? '#0F2B4A' : '#FFF', border: `2px solid ${completed ? '#0F2B4A' : '#EAEAEA'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: completed ? '#FFF' : '#999', marginBottom: '8px', flexShrink: 0 }}>
-                  {completed ? <Icon name={active ? status.icon : 'check'} size={14} stroke="#FFF" /> : null}
-                </div>
-                <span style={{ fontSize: '0.6rem', fontWeight: active ? 800 : 600, color: active ? '#0F2B4A' : '#999', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{status.short}</span>
+          <div className="menu-container" ref={menuRef}>
+            <button className="order-btn-secondary icon-only" onClick={() => setShowMenu(!showMenu)} title="Actions">
+              <Icon name="more-vertical" size={20} />
+            </button>
+            {showMenu && (
+              <div className="dropdown-menu">
+                <button onClick={() => { setShowMenu(false); setShowEditModal(true) }} className="dropdown-item">
+                  <Icon name="edit-2" size={16} /> Edit Order
+                </button>
+                <button onClick={promptDuplicate} className="dropdown-item">
+                  <Icon name="copy" size={16} /> Reorder (Duplicate)
+                </button>
+                <div className="dropdown-divider"></div>
+                <button onClick={promptDelete} className="dropdown-item text-danger">
+                  <Icon name="trash-2" size={16} /> Delete Order
+                </button>
               </div>
-            )
-          })}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* FINANCIAL SUMMARY (Fixed 2x2 Grid) */}
-      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A' }}>{formatMoney(order.price)}</span>
+      {/* ─── PROGRESS STEPPER ─── */}
+      <div className="order-stepper-container">
+        {STATUS_FLOW.map((status, index) => {
+          const completed = index <= statusIndex
+          const active = index === statusIndex
+          return (
+            <div key={status.value} className="order-stepper-step">
+              <div className={`order-stepper-circle ${completed ? 'completed' : ''} ${active ? 'active' : ''}`}>
+                {completed && <Icon name={active ? status.icon : 'check'} size={14} />}
+              </div>
+              <span className={`order-stepper-label ${active ? 'active' : ''}`}>{status.short}</span>
+              {index < STATUS_FLOW.length - 1 && <div className={`order-stepper-line ${index < statusIndex ? 'completed' : ''}`} />}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ─── PRIMARY ACTIONS ─── */}
+      <div className="order-main-actions">
+        {order.current_status !== 'Delivered' ? (
+          <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button full-width">
+            <Icon name="arrow-right-circle" size={18} /> Move to Next Stage
+          </button>
+        ) : (
+          <button disabled className="cresoa-primary-button full-width" style={{ opacity: 0.5, background: '#999' }}>
+            Delivered
+          </button>
+        )}
+        <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-wa full-width">
+          <Icon name="message-circle" size={18} /> Tell Client Progress
+        </button>
+      </div>
+
+      {/* ─── FINANCIAL SUMMARY ─── */}
+      <div className="order-finance-card">
+        <div className="order-finance-grid">
+          <div className="order-finance-item">
+            <span className="label">Total</span>
+            <span className="value">{formatMoney(order.price)}</span>
           </div>
-          <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Money Received</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#137333' }}>{formatMoney(order.amount_paid)}</span>
+          <div className="order-finance-item">
+            <span className="label">Money Received</span>
+            <span className="value text-success">{formatMoney(order.amount_paid)}</span>
           </div>
-          <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Balance Due</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: balance > 0 ? '#FF3B30' : '#137333' }}>
+            <div className="order-finance-item">
+            <span className="label">Balance Due</span>
+            <span className={`value ${balance > 0 ? 'text-danger' : 'text-success'}`}>
               {balance > 0 ? formatMoney(balance) : 'Fully Paid ✓'}
             </span>
           </div>
-          <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Delivery Date</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: isOverdue ? '#FF3B30' : '#0F2B4A' }}>{formatDate(order.due_date)}</span>
+          <div className="order-finance-item">
+            <span className="label">Delivery Date</span>
+            <span className={`value ${isOverdue ? 'text-danger' : ''}`}>{formatDate(order.due_date)}</span>
           </div>
         </div>
         
         {!isFullyPaid && (
-          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #EAEAEA' }}>
-            <button onClick={() => setShowPaymentModal(true)} style={{ width: '100%', background: '#0F2B4A', color: '#FFF', padding: '12px', borderRadius: '10px', border: 'none', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <div className="order-payment-action">
+            <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button full-width mt-3">
               <Icon name="plus" size={16} /> Record Payment
             </button>
           </div>
         )}
       </div>
 
-      {/* CLIENT & TRACKING */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#0F2B4A', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800 }}>
-              {customerName.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase' }}>Client</p>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.95rem', fontWeight: 800, color: '#0F2B4A' }}>{customerName}</p>
-              {customer?.phone && <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{customer.phone}</p>}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-             {customer?.phone && (
-              <a href={`tel:${customer.phone}`} style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2B4A', textDecoration: 'none' }}>
-                <Icon name="phone" size={16} />
-              </a>
-            )}
-            {customer?.phone && (
-              <button onClick={openWhatsAppModal} disabled={!canWhatsApp} style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#E6F4EA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333', border: 'none', cursor: 'pointer' }}>
-                <Icon name="message-circle" size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase' }}>Client Tracking Link</p>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={copyTrackingLink} style={{ flex: 1, padding: '10px', background: '#F4F6F8', border: '1px solid #EAEAEA', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer' }}>
-              {copied ? 'Copied!' : 'Copy Link'}
-            </button>
-            {customer?.phone && (
-               <button onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Track your order here: ${getTrackingLink()}`)}`, '_blank')} style={{ flex: 1, padding: '10px', background: '#0F2B4A', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, color: '#FFF', cursor: 'pointer' }}>
-                 Send Link on WhatsApp
-               </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* CLIENT MEASUREMENTS */}
-      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+      {/* ─── CLIENT MEASUREMENTS (Moved Up) ─── */}
+      <div className="order-card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Client Measurements</h3>
-          <Icon name="ruler" size={18} stroke="#0F2B4A" />
+          <h3 className="order-section-title" style={{ margin: 0 }}>Client Measurements</h3>
+          <Icon name="ruler" size={18} stroke="var(--cresoa-text)" />
         </div>
         
         {!hasMeasurements ? (
-          <div style={{ textAlign: 'center', padding: '1rem', background: '#FFF7E6', borderRadius: '8px', border: '1px dashed #D97706' }}>
+          <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(217, 119, 6, 0.1)', borderRadius: '8px', border: '1px dashed #D97706' }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#D97706', fontWeight: 600 }}>No measurements saved for {customerName} yet.</p>
             <button onClick={() => router.push(`/dashboard/customers/${customer?.id}?business_id=${currentBusinessId}`)} style={{ background: '#D97706', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
               + Add Measurements
@@ -420,117 +433,124 @@ export default function OrderDetailPage() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {Object.entries(measurements).map(([key, value]) => (
-              <div key={key} style={{ background: '#F8F9FA', padding: '10px', borderRadius: '8px', border: '1px solid #EAEAEA' }}>
-                <span style={{ display: 'block', fontSize: '0.7rem', color: '#666', textTransform: 'capitalize', fontWeight: 600 }}>{key}</span>
-                <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0F2B4A' }}>{value}</span>
+              <div key={key} style={{ background: 'var(--cresoa-bg)', padding: '10px', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
+                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', textTransform: 'capitalize', fontWeight: 600 }}>{key}</span>
+                <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--cresoa-text)' }}>{value}</span>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* ORDER DETAILS (Production) */}
-      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Order Details</h3>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>Style</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{order.category || 'Not specified'}</span>
+      {/* ─── CLIENT & TRACKING ─── */}
+      <div className="order-grid-2">
+        <div className="order-card">
+          <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CLIENT</span>
+          
+          <div className="customer-profile">
+            <div className="customer-avatar-round">
+              {customerName.charAt(0).toUpperCase()}
+            </div>
+            <div className="customer-info">
+              <h3 className="customer-name">{customerName}</h3>
+              {customer?.phone && <p className="customer-contact">{customer.phone}</p>}
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>Quantity</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{order.quantity || 1}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>Fabric</span>
-            {order.fabric ? (
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{order.fabric}</span>
-            ) : (
-              <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer', textDecoration: 'underline' }}>+ Add fabric</button>
+
+          <div className="order-card-actions-row" style={{ marginTop: '1.5rem' }}>
+            {customer?.phone && (
+              <a href={`tel:${customer.phone}`} className="order-btn-secondary full-width">
+                <Icon name="phone" size={16} /> Call
+              </a>
+            )}
+            {customer?.phone && (
+              <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
+                <Icon name="message-circle" size={16} /> Chat
+              </button>
             )}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>Fitting Date</span>
-            {order.fitting_date ? (
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{formatDate(order.fitting_date)}</span>
-            ) : (
-              <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer', textDecoration: 'underline' }}>+ Set fitting date</button>
-            )}
+        </div>
+
+        <div className="order-card tracking-card">
+          <div className="order-card-header">
+             <span className="order-label">Client Tracking Link</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>Event Date</span>
-            {order.event_date ? (
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{formatDate(order.event_date)}</span>
-            ) : (
-              <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer', textDecoration: 'underline' }}>+ Set event date</button>
-            )}
+          <div className="tracking-input-group" style={{ display: 'none' }}>
+             {/* Hidden visually, but exists for accessibility/copying logic */}
+             <span className="tracking-link-text">{getTrackingLink()}</span>
+          </div>
+          <div className="order-card-actions-row" style={{ marginTop: '1rem' }}>
+             <button onClick={copyTrackingLink} className="order-btn-secondary full-width">
+               {copied ? 'Copied!' : 'Copy Link'}
+             </button>
+             {customer?.phone && (
+                <button onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Track your order here: ${getTrackingLink()}`)}`, '_blank')} className="order-btn-secondary full-width">
+                  Send on WhatsApp
+                </button>
+             )}
           </div>
         </div>
       </div>
 
-      {/* STYLE NOTES */}
-      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h3 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Style Notes</h3>
-          {savingNotes && <span style={{ fontSize: '0.7rem', color: '#999', fontStyle: 'italic' }}>Saving...</span>}
+      {/* ─── ORDER DETAILS (Production) ─── */}
+      <div className="order-card">
+        <h3 className="order-section-title">Order Details</h3>
+        <div className="order-detail-list">
+          {[
+            { label: 'Style', value: order.category || 'Not specified' },
+            { label: 'Quantity', value: order.quantity || 1 },
+            { label: 'Fabric', value: order.fabric || <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>+ Add fabric</button> },
+            { label: 'Fitting Date', value: order.fitting_date ? formatDate(order.fitting_date) : <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>+ Set fitting date</button> },
+            { label: 'Event Date', value: order.event_date ? formatDate(order.event_date) : <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>+ Set event date</button> }
+          ].map((item, i) => (
+            <div key={i} className="order-detail-row">
+              <span className="label">{item.label}</span>
+              <span className="value">{item.value}</span>
+            </div>
+          ))}
         </div>
-        <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#888' }}>Only you and your team can see this.</p>
+      </div>
+
+      {/* ─── STYLE NOTES (Auto-save, Moved up) ─── */}
+      <div className="order-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h3 className="order-section-title" style={{ margin: 0 }}>Style Notes</h3>
+          {savingNotes && <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', fontStyle: 'italic' }}>Saving...</span>}
+        </div>
+        <p className="order-card-subtitle mb-2">Only you and your team can see this.</p>
         <textarea 
-          value={notes} onChange={e => setNotes(e.target.value)} 
+          value={notes} 
+          onChange={e => setNotes(e.target.value)} 
+          className="order-notes-textarea"
           placeholder="Cuff, buttons, lining, special requests..."
-          style={{ width: '100%', minHeight: '100px', padding: '12px', borderRadius: '8px', border: '1px solid #EAEAEA', background: '#F8F9FA', fontSize: '0.95rem', color: '#0F2B4A', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
         />
       </div>
 
-      {/* PAYMENTS RECEIVED */}
-      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.8rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Payments Received</h3>
+      {/* ─── PAYMENTS RECEIVED ─── */}
+      <div className="order-card">
+        <h3 className="order-section-title">Payments Received</h3>
         {payments.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#888', fontStyle: 'italic' }}>No payments recorded yet.</p>
+          <p className="order-empty-text">No payments recorded yet.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="order-payment-list">
             {payments.map(p => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F0F0F0', paddingBottom: '12px' }}>
+              <div key={p.id} className="order-payment-row">
                 <div>
-                  <strong style={{ display: 'block', fontSize: '1rem', color: '#137333' }}>{formatMoney(p.amount)}</strong>
-                  <span style={{ fontSize: '0.8rem', color: '#666' }}>{p.note || 'Payment received'}</span>
+                  <strong className="text-success">{formatMoney(p.amount)}</strong>
+                  <span className="order-payment-note">{p.note === 'Full payment from list view' ? 'Payment received' : (p.note || 'Payment received')}</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: 600 }}>{formatDate(p.created_at)}</span>
+                <span className="order-payment-date">{formatDate(p.created_at)}</span>
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      {/* ACTIONS MENU */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
-        <div className="menu-container" ref={menuRef} style={{ position: 'relative' }}>
-          <button onClick={() => setShowMenu(!showMenu)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F4F6F8', border: '1px solid #EAEAEA', padding: '10px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#0F2B4A', cursor: 'pointer' }}>
-            <Icon name="more-vertical" size={16} /> Actions
-          </button>
-          {showMenu && (
-            <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '200px', zIndex: 100, overflow: 'hidden' }}>
-              <button onClick={() => { setShowMenu(false); setShowEditModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}>
-                <Icon name="edit-2" size={16} /> Edit Order
-              </button>
-              <button onClick={promptDuplicate} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}>
-                <Icon name="copy" size={16} /> Reorder (Duplicate)
-              </button>
-              <div style={{ height: '1px', background: '#EAEAEA', margin: '4px 0' }}></div>
-              <button onClick={promptDelete} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
-                <Icon name="trash-2" size={16} /> Delete Order
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       <div style={{ marginTop: '2rem' }}>
         <Navigation businessId={currentBusinessId} />
       </div>
 
-      {/* MODALS */}
+      {/* ─── MODALS ─── */}
 
       {/* Status Modal */}
       {showStatusModal && (
@@ -565,8 +585,8 @@ export default function OrderDetailPage() {
               })}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <button onClick={() => { setSelectedStatus(null); setShowStatusModal(false) }} disabled={updatingStatus} style={{ background: 'none', border: '1px solid #CCC', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}>Cancel</button>
-              <button onClick={() => updateStatus(selectedStatus)} disabled={!selectedStatus || updatingStatus} style={{ background: '#0F2B4A', color: '#FFF', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, border: 'none' }}>
+              <button onClick={() => { setSelectedStatus(null); setShowStatusModal(false) }} disabled={updatingStatus} className="order-btn-secondary">Cancel</button>
+              <button onClick={() => updateStatus(selectedStatus)} disabled={!selectedStatus || updatingStatus} className="cresoa-primary-button">
                 {updatingStatus ? 'Updating...' : selectedStatus ? `Move to ${selectedStatusInfo?.short || selectedStatus}` : 'Choose a status'}
               </button>
             </div>
@@ -575,13 +595,13 @@ export default function OrderDetailPage() {
       )}
 
       {/* WhatsApp Modal */}
-   {isWhatsAppModalOpen && (
+      {isWhatsAppModalOpen && (
         <div className="app-modal-overlay" onClick={() => setIsWhatsAppModalOpen(false)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div>
                 <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>WHATSAPP UPDATE</span>
-                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.2rem' }}>Tell {customerName} Progress</h2>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.2rem' }}>Update {customerName}</h2>
               </div>
               <button onClick={() => setIsWhatsAppModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
                 <Icon name="x" size={20} stroke="currentColor" />
@@ -613,8 +633,8 @@ export default function OrderDetailPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button onClick={() => setIsWhatsAppModalOpen(false)} style={{ background: 'none', border: '1px solid #CCC', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}>Cancel</button>
-              <button onClick={handleSendWhatsApp} style={{ background: '#0F2B4A', color: '#FFF', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, border: 'none' }}>
+              <button onClick={() => setIsWhatsAppModalOpen(false)} className="order-btn-secondary">Cancel</button>
+              <button onClick={handleSendWhatsApp} className="cresoa-primary-button">
                 <Icon name="send" size={14} stroke="#fff" style={{ marginRight: '0.3rem' }} /> Send
               </button>
             </div>
@@ -648,11 +668,11 @@ export default function OrderDetailPage() {
             </div>
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Payment note</label>
-              <input type="text" value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment, transfer" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', boxSizing: 'border-box' }} />
+              <input type="text" value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="e.g. Cash payment, transfer" style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button type="button" onClick={() => setShowPaymentModal(false)} disabled={recordingPayment} style={{ background: 'none', border: '1px solid #CCC', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}>Cancel</button>
-              <button type="submit" disabled={recordingPayment} style={{ background: '#0F2B4A', color: '#FFF', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, border: 'none' }}>
+              <button type="button" onClick={() => setShowPaymentModal(false)} disabled={recordingPayment} className="order-btn-secondary">Cancel</button>
+              <button type="submit" disabled={recordingPayment} className="cresoa-primary-button">
                 {recordingPayment ? 'Recording...' : 'Save payment'}
               </button>
             </div>
@@ -675,7 +695,7 @@ export default function OrderDetailPage() {
             </div>
             <div style={{ marginBottom: '0.8rem' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Order name</label>
-              <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="e.g. Aso-ebi dress" required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', boxSizing: 'border-box' }} />
+              <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="e.g. Aso-ebi dress" required style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
             </div>
             <div style={{ marginBottom: '0.8rem' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Total price</label>
@@ -686,11 +706,11 @@ export default function OrderDetailPage() {
             </div>
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Delivery Date</label>
-              <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)', boxSizing: 'border-box' }} />
+              <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button type="button" onClick={() => setShowEditModal(false)} disabled={editing} style={{ background: 'none', border: '1px solid #CCC', padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}>Cancel</button>
-              <button type="submit" disabled={editing} style={{ background: '#0F2B4A', color: '#FFF', padding: '10px 16px', borderRadius: '8px', fontWeight: 600, border: 'none' }}>
+              <button type="button" onClick={() => setShowEditModal(false)} disabled={editing} className="order-btn-secondary">Cancel</button>
+              <button type="submit" disabled={editing} className="cresoa-primary-button">
                 {editing ? 'Saving...' : 'Save changes'}
               </button>
             </div>
@@ -698,7 +718,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Custom Modal (For Delete & Duplicate) */}
+      {/* ─── CUSTOM MODAL (For Delete & Duplicate) ─── */}
       {modalConfig.isOpen && (
         <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -712,7 +732,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Toast */}
+      {/* ─── TOAST ─── */}
       {toastMessage && (
         <div className={`app-toast ${toastType}`}>
           {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
@@ -720,4 +740,4 @@ export default function OrderDetailPage() {
       )}
     </div>
   )
-                        }
+        }
