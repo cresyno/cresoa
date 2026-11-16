@@ -27,6 +27,7 @@ const ICONS = {
   copy: (<><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>),
   check: <polyline points="20 6 9 17 4 12" />,
   image: (<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>),
+  refresh: (<><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></>),
 };
 
 const Icon = ({ name, size = 20, sw = 2 }) => (
@@ -40,17 +41,10 @@ function TessaOrb({ size = 40, spinning = false }) {
     </div>
   );
 }
-function LogoBadge({ size = 22 }) {
-  return (
-    <span style={{ width: size, height: size, borderRadius: '50%', backgroundColor: '#0B2C5E', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} aria-hidden="true">
-      <TessaLogo size={Math.round(size * 0.6)} variant="white" />
-    </span>
-  );
-}
 
+/* Markdown Parsing Logic (Unchanged) */
 const INLINE_RE = /(\*\*[^*\n]+?\*\*|__[^_\n]+?__|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|\*[^*\s][^*\n]*?\*)/g;
 const SAFE_HREF = /^(https?:|mailto:|tel:|\/)/i;
-
 function inline(text, depth = 0) {
   if (!text) return null;
   return text.split(INLINE_RE).map((part, i) => {
@@ -63,7 +57,6 @@ function inline(text, depth = 0) {
     return part;
   });
 }
-
 const LIST_RE = /^(\s*)([-*•+]|\d+[.)])\s+(.*)$/;
 const SEP_CELL = /^:?-+:?$/;
 const isHr = (l) => /^\s*([-*_])(\s*\1){2,}\s*$/.test(l);
@@ -71,7 +64,6 @@ const isTableLine = (l) => { const t = l.trim(); return t.startsWith('|') && t.i
 const splitRow = (l) => { let s = l.trim(); if (s.startsWith('|')) s = s.slice(1); if (s.endsWith('|')) s = s.slice(0, -1); return s.split('|').map((c) => c.trim()); };
 const isSepRow = (r) => r.length > 0 && r.every((c) => SEP_CELL.test(c));
 const startsBlock = (l) => /^\s*```/.test(l) || /^#{1,6}\s/.test(l) || /^\s*>/.test(l) || isHr(l) || LIST_RE.test(l) || isTableLine(l);
-
 function parseBlocks(src) {
   const lines = String(src).replace(/\r\n?/g, '\n').split('\n'); const blocks = []; let i = 0;
   while (i < lines.length) {
@@ -105,18 +97,15 @@ function parseBlocks(src) {
   }
   return blocks;
 }
-
 function buildTree(items) {
   const root = { children: [] }; const stack = [{ indent: -1, node: root }];
   items.forEach((it) => { while (stack.length > 1 && stack[stack.length - 1].indent >= it.indent) stack.pop(); const node = { ...it, children: [] }; stack[stack.length - 1].node.children.push(node); stack.push({ indent: it.indent, node }); });
   return root.children;
 }
-
 function ListView({ nodes }) {
   const ordered = nodes[0].ordered; const Tag = ordered ? 'ol' : 'ul';
   return (<Tag start={ordered && nodes[0].num > 1 ? nodes[0].num : undefined}>{nodes.map((n, i) => (<li key={i}>{inline(n.text)}{n.children.length > 0 && <ListView nodes={n.children} />}</li>))}</Tag>);
 }
-
 function Blocks({ blocks }) {
   return blocks.map((b, i) => {
     switch (b.type) {
@@ -130,32 +119,64 @@ function Blocks({ blocks }) {
     }
   });
 }
-
 function RichText({ text }) {
   const blocks = useMemo(() => parseBlocks(text), [text]);
   return (<div className="tsa-rich"><Blocks blocks={blocks} /></div>);
 }
 
-function MessageRow({ msg, isStart, isEnd, onRetry }) {
-  const isUser = msg.role === 'user'; const [copied, setCopied] = useState(false);
+/* ------------------------------------------------------------------ */
+/*  PREMIUM MESSAGE ROW                                                */
+/* ------------------------------------------------------------------ */
+function MessageRow({ msg, isUser, isLast, onRetry }) {
+  const [copied, setCopied] = useState(false);
   const copy = async () => { try { await navigator.clipboard.writeText(msg.text); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch {} };
-  return (
-    <div className={`tsa-row ${isUser ? 'tsa-row--user' : 'tsa-row--ai'} ${isStart ? 'is-start' : ''}`}>
-      {isUser ? (
+
+  if (isUser) {
+    return (
+      <div className="tsa-row tsa-row--user">
         <div className="tsa-bubble-user">
-          {msg.imageUrl && (<img src={msg.imageUrl} alt="Uploaded attachment" className="tsa-msg-image" />)}
+          {msg.imageUrl && (<img src={msg.imageUrl} alt="Attachment" className="tsa-msg-image" />)}
           {msg.text && <span>{msg.text}</span>}
         </div>
-      ) : msg.error ? (
-        <div className="tsa-err" role="alert"><Icon name="alert" size={18} /><div><p>{msg.text}</p><button type="button" onClick={() => onRetry(msg)}>Retry</button></div></div>
-      ) : (
-        <div className="tsa-ai-content">
-          {isStart && (<div className="tsa-ai-header"><LogoBadge size={20} /><span>Tessa</span></div>)}
-          {msg.text ? (<RichText text={msg.text} />) : (<div style={{ display: 'flex', gap: '4px', alignItems: 'center', height: '24px' }}><i className="tsa-dot" style={{ animationDelay: '0s' }} /><i className="tsa-dot" style={{ animationDelay: '0.2s' }} /><i className="tsa-dot" style={{ animationDelay: '0.4s' }} /></div>)}
+      </div>
+    );
+  }
+
+  if (msg.error) {
+    return (
+      <div className="tsa-row tsa-row--ai">
+        <div className="tsa-err" role="alert">
+          <Icon name="alert" size={18} />
+          <div><p>{msg.text}</p><button type="button" onClick={() => onRetry(msg)}>Retry</button></div>
         </div>
-      )}
-      {isEnd && !msg.error && (
-        <div className="tsa-meta"><time>{fmtTime(msg.ts)}</time>{!isUser && msg.text && (<button type="button" onClick={copy} className="tsa-copy-btn"><Icon name={copied ? 'check' : 'copy'} size={14} /><span>{copied ? 'Copied' : 'Copy'}</span></button>)}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tsa-row tsa-row--ai">
+      <div className="tsa-ai-content">
+        {msg.text ? <RichText text={msg.text} /> : (
+          <div className="tsa-thinking">
+            <span className="tsa-thinking-dot" />
+            <span className="tsa-thinking-dot" />
+            <span className="tsa-thinking-dot" />
+          </div>
+        )}
+      </div>
+      
+      {/* Inline Actions (Only show if there is text and it's not currently streaming) */}
+      {msg.text && !msg.fresh && (
+        <div className="tsa-actions-bar">
+          <button type="button" onClick={copy} className="tsa-action-btn" title="Copy">
+            <Icon name={copied ? 'check' : 'copy'} size={14} />
+          </button>
+          {isLast && (
+            <button type="button" onClick={() => onRetry(msg)} className="tsa-action-btn" title="Regenerate">
+              <Icon name="refresh" size={14} />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -168,7 +189,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [interim, setInterim] = useState('');
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [notice, setNotice] = useState('');
   const [showJump, setShowJump] = useState(false);
 
@@ -192,8 +212,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
   const noticeTimer = useRef(null);
   const coarse = useRef(false);
   const abortControllerRef = useRef(null);
-  
-  // NEW: Ref to ensure briefing only loads once per session
   const briefingLoaded = useRef(false);
 
   const setLoading = (v) => { loadingRef.current = v; setIsLoading(v); };
@@ -233,7 +251,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
     })();
   }, [isOpen, businessId]);
 
-  // NEW: PROACTIVE BRIEFING EFFECT
   useEffect(() => {
     if (isOpen && messages.length === 0 && !briefingLoaded.current && businessId) {
       briefingLoaded.current = true;
@@ -241,15 +258,12 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
         try {
           const { data: { session } } = await supabase.auth.getSession();
           const res = await fetch('/api/support/briefing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
             body: JSON.stringify({ business_id: businessId })
           });
           const data = await res.json();
-          if (data.text) {
-            setMessages([{ id: uid(), role: 'assistant', text: data.text, ts: Date.now(), fresh: true }]);
-          }
-        } catch (e) { /* Silently fail briefing, show empty state */ }
+          if (data.text) setMessages([{ id: uid(), role: 'assistant', text: data.text, ts: Date.now(), fresh: true }]);
+        } catch (e) {}
       })();
     }
   }, [isOpen, messages.length, businessId]);
@@ -261,11 +275,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
 
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
-    const last = messages[messages.length - 1];
-    if (last?.role === 'assistant' && last.fresh && stick.current) {
-      const node = el.querySelector(`[data-mid="${last.id}"]`);
-      if (node && node.offsetHeight > el.clientHeight * 0.75) { el.scrollTo({ top: Math.max(node.offsetTop - 12, 0), behavior: 'smooth' }); stick.current = false; return; }
-    }
     if (stick.current) scrollToBottom(true);
   }, [messages, isLoading, scrollToBottom]);
 
@@ -347,18 +356,16 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
   }, [businessId, pageContext, selectedImage]);
   sendRef.current = send;
 
-  const retry = (msg) => { setMessages((p) => p.filter((m) => m.id !== msg.id)); send(msg.retryText, { retry: true }); };
+  const retry = (msg) => { setMessages((p) => p.filter((m) => m.id !== msg.id)); send(msg.retryText || msg.text, { retry: true }); };
   const newChat = () => { reqId.current++; stopGeneration(); setMessages([]); setInput(''); removeImage(); setInterim(''); newConvoRef.current = true; stick.current = true; briefingLoaded.current = true; };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     coarse.current = window.matchMedia?.('(pointer: coarse)').matches ?? false;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return; setSpeechSupported(true);
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return;
     const rec = new SR(); rec.lang = 'en-US'; rec.interimResults = true; rec.maxAlternatives = 1;
     rec.onstart = () => setIsRecording(true); rec.onend = () => { setIsRecording(false); setInterim(''); };
     rec.onerror = (e) => { setIsRecording(false); setInterim(''); if (e.error === 'not-allowed') flash('Mic blocked.'); else if (e.error === 'no-speech') flash("Didn't catch that."); else if (e.error !== 'aborted') flash('Voice failed.'); };
-    
-    // VOICE-TO-ACTION: The moment it detects a final phrase, it auto-fires the send function
     rec.onresult = (e) => {
       const text = Array.from(e.results).map((r) => r[0].transcript).join('');
       setInterim(text);
@@ -380,7 +387,6 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
 
   if (!mounted) return null;
   const isEmpty = messages.length === 0;
-  const suggs = suggestions.map(normSugg);
 
   return (
     <div className={`tsa-root ${entered ? 'is-in' : ''}`} style={{ top: vv.top, height: vv.h }}>
@@ -392,7 +398,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
           <header className="tsa-head">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <TessaOrb size={38} spinning={isLoading} />
-              <div><div className="tsa-title">Tessa</div><div className="tsa-status">{isLoading ? 'Typing...' : 'Online'}</div></div>
+              <div><div className="tsa-title">Tessa</div><div className="tsa-status">{isLoading ? 'Thinking...' : 'Online'}</div></div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {!isEmpty && <button type="button" className="tsa-text-btn" onClick={newChat}>New Chat</button>}
@@ -408,16 +414,32 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
                 <TessaOrb size={64} />
                 <h2>How can I help you today?</h2>
                 <div className="tsa-suggs">
-                  {suggs.map((s, i) => (<button key={i} type="button" className="tsa-sugg" onClick={() => send(s.prompt)}>{s.label}</button>))}
+                  {suggestions.map((s, i) => (
+                    <button key={i} type="button" className="tsa-sugg" onClick={() => send(s.prompt || s.label)}>
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
               <>
-                {messages.map((m, i) => (<MessageRow key={m.id} msg={m} isStart={messages[i - 1]?.role !== m.role} isEnd={messages[i + 1]?.role !== m.role || isLoading} onRetry={retry} />))}
+                {messages.map((m, i) => (
+                  <MessageRow 
+                    key={m.id} 
+                    msg={m} 
+                    isUser={m.role === 'user'} 
+                    isLast={i === messages.length - 1} 
+                    onRetry={retry} 
+                  />
+                ))}
               </>
             )}
           </div>
-          {showJump && (<button type="button" className="tsa-jump" onClick={() => { stick.current = true; scrollToBottom(true); }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg></button>)}
+          {showJump && (
+            <button type="button" className="tsa-jump" onClick={() => { stick.current = true; scrollToBottom(true); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+          )}
         </div>
 
         <div className="tsa-composer">
@@ -430,16 +452,20 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
               </div>
             </div>
           )}
+          
           <div className={`tsa-field ${isRecording ? 'is-rec' : ''}`}>
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageSelect} style={{ display: 'none' }} />
+            
+            <button type="button" className="tsa-action tsa-action--attach" onClick={() => fileInputRef.current?.click()} disabled={isLoading} title="Upload image">
+              <Icon name="image" size={20} />
+            </button>
+            
             {isRecording ? (
               <div className="tsa-rec"><span style={{ fontWeight: 600, color: '#EF4444' }}>{interim || 'Listening...'}</span></div>
             ) : (
-              <>
-                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageSelect} style={{ display: 'none' }} />
-                <button type="button" className="tsa-action tsa-action--attach" onClick={() => fileInputRef.current?.click()} disabled={isLoading} title="Upload image"><Icon name="image" size={20} /></button>
-                <textarea ref={textareaRef} className="tsa-input" rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} onFocus={() => setSnap('full')} placeholder="Message Tessa..." disabled={isLoading} />
-              </>
+              <textarea ref={textareaRef} className="tsa-input" rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} onFocus={() => setSnap('full')} placeholder="Ask Tessa anything..." disabled={isLoading} />
             )}
+
             {isRecording ? (
               <button type="button" className="tsa-action tsa-action--stop" onClick={toggleRecording}><Icon name="stop" size={16} /></button>
             ) : isLoading ? (
@@ -456,7 +482,7 @@ export default function TessaBottomSheet({ isOpen, onClose, businessId, suggesti
 }
 
 const CSS = `
-.tsa-root { --tsa-bg: #FFFFFF; --tsa-text: #111827; --tsa-text-muted: #6B7280; --tsa-border: #E5E7EB; --tsa-user-bubble-bg: #F3F4F6; --tsa-user-bubble-text: #111827; --tsa-input-bg: #F3F4F6; --tsa-overlay: rgba(0, 0, 0, 0.5); --tsa-brand-navy: #0B2C5E; --tsa-brand-gold: #FDB515; position: fixed; left: 0; right: 0; z-index: 999; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.tsa-root { --tsa-bg: #FFFFFF; --tsa-text: #111827; --tsa-text-muted: #6B7280; --tsa-border: #E5E7EB; --tsa-user-bubble-bg: #F3F4F6; --tsa-user-bubble-text: #111827; --tsa-input-bg: #F9FAFB; --tsa-overlay: rgba(0, 0, 0, 0.5); --tsa-brand-navy: #0B2C5E; --tsa-brand-gold: #FDB515; position: fixed; left: 0; right: 0; z-index: 999; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 .dark .tsa-root, [data-theme="dark"] .tsa-root, html.dark .tsa-root { --tsa-bg: #1A1A1A; --tsa-text: #EDEDED; --tsa-text-muted: #9CA3AF; --tsa-border: #333333; --tsa-user-bubble-bg: #2D2D2D; --tsa-user-bubble-text: #EDEDED; --tsa-input-bg: #2D2D2D; --tsa-overlay: rgba(0, 0, 0, 0.8); }
 .tsa-root button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; border: none; background: none; outline: none; }
 .tsa-backdrop { position: absolute; inset: 0; background: var(--tsa-overlay); opacity: 0; transition: opacity 0.3s ease; }
@@ -476,56 +502,76 @@ const CSS = `
 .tsa-icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-user-bubble-bg); display: flex; align-items: center; justify-content: center; color: var(--tsa-text); }
 .tsa-icon-btn:active { opacity: 0.7; }
 .tsa-body { position: relative; flex: 1; min-height: 0; background: var(--tsa-bg); }
-.tsa-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 16px 16px 32px; display: flex; flex-direction: column; }
+.tsa-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 16px 16px 32px; display: flex; flex-direction: column; gap: 24px; }
 .tsa-empty { margin: auto; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 20px; }
 .tsa-empty h2 { margin: 16px 0 24px; font-size: 1.4rem; font-weight: 600; color: var(--tsa-text); }
 .tsa-suggs { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-.tsa-sugg { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; background: var(--tsa-bg); border: 1px solid var(--tsa-border); color: var(--tsa-text); font-size: 0.9rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
-.tsa-sugg:active { background: var(--tsa-user-bubble-bg); border-color: var(--tsa-text-muted); }
-.tsa-row { display: flex; flex-direction: column; margin-top: 8px; width: 100%; }
-.tsa-row.is-start { margin-top: 24px; }
+.tsa-sugg { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; background: var(--tsa-input-bg); border: 1px solid var(--tsa-border); color: var(--tsa-text); font-size: 0.9rem; font-weight: 500; transition: background 0.15s, border-color 0.15s; }
+.tsa-sugg:hover { border-color: var(--tsa-text-muted); }
+
+/* CHAT ROWS */
+.tsa-row { display: flex; flex-direction: column; width: 100%; }
 .tsa-row--user { align-items: flex-end; }
 .tsa-row--ai { align-items: flex-start; }
-.tsa-bubble-user { max-width: 85%; padding: 12px 16px; border-radius: 16px; background: var(--tsa-user-bubble-bg); color: var(--tsa-user-bubble-text); font-size: 0.95rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; display: flex; flex-direction: column; gap: 8px; }
-.tsa-msg-image { max-width: 100%; max-height: 250px; border-radius: 8px; object-fit: cover; display: block; }
+
+/* USER BUBBLE */
+.tsa-bubble-user { max-width: 85%; padding: 10px 16px; border-radius: 18px; background: var(--tsa-user-bubble-bg); color: var(--tsa-user-bubble-text); font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; display: flex; flex-direction: column; gap: 8px; }
+.tsa-msg-image { max-width: 100%; max-height: 250px; border-radius: 12px; object-fit: cover; display: block; }
+
+/* AI CONTENT */
 .tsa-ai-content { width: 100%; max-width: 100%; display: flex; flex-direction: column; }
-.tsa-ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.85rem; font-weight: 600; color: var(--tsa-text-muted); }
-.tsa-meta { display: flex; align-items: center; gap: 8px; margin: 8px 2px 0; font-size: 0.72rem; color: var(--tsa-text-muted); }
-.tsa-row--user .tsa-meta { justify-content: flex-end; }
-.tsa-copy-btn { display: inline-flex; align-items: center; gap: 4px; color: var(--tsa-text-muted); font-weight: 500; font-size: 0.72rem; padding: 0; }
-.tsa-copy-btn:active { color: var(--tsa-text); }
-.tsa-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--tsa-text-muted); animation: tsa-bounce 1.4s infinite ease-in-out both; }
+.tsa-thinking { display: flex; gap: 4px; align-items: center; height: 24px; }
+.tsa-thinking-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--tsa-text-muted); animation: tsa-bounce 1.4s infinite ease-in-out both; }
+.tsa-thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.tsa-thinking-dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes tsa-bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+/* ACTIONS BAR */
+.tsa-actions-bar { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.tsa-action-btn { color: var(--tsa-text-muted); display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
+.tsa-action-btn:hover { color: var(--tsa-text); }
+
+/* ERROR */
 .tsa-err { display: flex; gap: 10px; padding: 12px 16px; border-radius: 12px; background: #FEF2F2; border: 1px solid #FECACA; max-width: 90%; }
 .tsa-err svg { color: #EF4444; flex-shrink: 0; }
 .tsa-err p { margin: 0; font-size: 0.9rem; color: #991B1B; }
 .tsa-err button { margin-top: 8px; color: #991B1B; font-weight: 700; font-size: 0.85rem; padding: 0; }
-.tsa-rich { min-width: 0; overflow-wrap: anywhere; font-size: 0.95rem; line-height: 1.65; color: var(--tsa-text); }
+
+/* RICH TEXT */
+.tsa-rich { min-width: 0; overflow-wrap: anywhere; font-size: 0.95rem; line-height: 1.7; color: var(--tsa-text); }
 .tsa-rich > * + * { margin-top: 12px; }
 .tsa-rich p { margin: 0; }
 .tsa-rich strong { font-weight: 700; }
 .tsa-rich a { color: var(--tsa-brand-navy); font-weight: 600; text-decoration: underline; }
 .dark .tsa-rich a, [data-theme="dark"] .tsa-rich a { color: var(--tsa-brand-gold); }
-.tsa-rich code { background: var(--tsa-user-bubble-bg); padding: 2px 4px; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
+.tsa-rich code { background: var(--tsa-input-bg); padding: 2px 6px; border-radius: 6px; font-size: 0.85em; font-family: monospace; }
 .tsa-h { margin: 0; font-weight: 700; color: var(--tsa-text); }
 .tsa-h[data-l="1"] { font-size: 1.15rem; } .tsa-h[data-l="2"] { font-size: 1.05rem; } .tsa-h[data-l="3"] { font-size: 0.95rem; }
 .tsa-rich blockquote { margin: 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--tsa-border); color: var(--tsa-text-muted); }
-.tsa-rich pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--tsa-user-bubble-bg); overflow-x: auto; font-size: 0.85rem; }
+.tsa-rich pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--tsa-input-bg); overflow-x: auto; font-size: 0.85rem; }
 .tsa-list ul, .tsa-list ol { margin: 0; padding-left: 1.2rem; }
 .tsa-list li::marker { color: var(--tsa-brand-navy); }
 .dark .tsa-list li::marker, [data-theme="dark"] .tsa-list li::marker { color: var(--tsa-brand-gold); }
+
+/* TABLE */
 .tsa-tablewrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--tsa-border); }
 .tsa-tablewrap table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.tsa-tablewrap th { padding: 10px; background: var(--tsa-user-bubble-bg); text-align: left; border-bottom: 1px solid var(--tsa-border); color: var(--tsa-text); font-weight: 600; }
+.tsa-tablewrap th { padding: 10px; background: var(--tsa-input-bg); text-align: left; border-bottom: 1px solid var(--tsa-border); color: var(--tsa-text); font-weight: 600; }
 .tsa-tablewrap td { padding: 10px; border-bottom: 1px solid var(--tsa-border); }
 .tsa-tablewrap td:first-child { font-weight: 600; white-space: nowrap; }
+
+/* JUMP BUTTON */
 .tsa-jump { position: absolute; right: 16px; bottom: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--tsa-bg); color: var(--tsa-text); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 1px solid var(--tsa-border); }
+
+/* COMPOSER */
 .tsa-composer { flex-shrink: 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--tsa-bg); }
-.tsa-field { display: flex; align-items: flex-end; gap: 8px; background: var(--tsa-input-bg); border-radius: 24px; padding: 6px; border: 1px solid transparent; transition: border-color 0.2s; min-height: 52px; box-sizing: border-box; }
-.tsa-field:focus-within { border-color: var(--tsa-text-muted); }
+.tsa-field { display: flex; align-items: flex-end; gap: 8px; background: var(--tsa-input-bg); border-radius: 24px; padding: 6px; border: 1px solid transparent; transition: border-color 0.2s, box-shadow 0.2s; min-height: 52px; box-sizing: border-box; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+.tsa-field:focus-within { border-color: var(--tsa-text-muted); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .tsa-field.is-rec { border-color: #EF4444; }
+
 .tsa-input { flex: 1; min-width: 0; border: 0; outline: none !important; box-shadow: none !important; background: transparent; color: var(--tsa-text); font-size: 16px; line-height: 1.4; resize: none; padding: 10px 8px 10px 4px; max-height: 120px; font-family: inherit; }
 .tsa-input::placeholder { color: var(--tsa-text-muted); }
+
 .tsa-action { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.2s; margin-bottom: 2px; }
 .tsa-action:active { transform: scale(0.92); }
 .tsa-action--attach { background: transparent; color: var(--tsa-text-muted); margin-left: 2px; }
@@ -534,14 +580,16 @@ const CSS = `
 .tsa-action--send.is-active { background: var(--tsa-brand-navy); color: #fff; }
 .dark .tsa-action--send.is-active, [data-theme="dark"] .tsa-action--send.is-active { background: var(--tsa-brand-gold); color: #000; }
 .tsa-action--send:disabled { cursor: default; }
-.tsa-action--mic { background: transparent; color: var(--tsa-text-muted); }
 .tsa-action--stop { background: #EF4444; color: #fff; }
 .tsa-rec { flex: 1; display: flex; align-items: center; min-height: 40px; padding-left: 12px; font-size: 0.9rem; }
 .tsa-notice { position: absolute; left: 16px; right: 16px; bottom: calc(100% + 8px); background: var(--tsa-brand-navy); color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+/* IMAGE PREVIEW */
 .tsa-image-preview-wrap { padding-bottom: 12px; display: flex; }
 .tsa-image-preview { position: relative; display: inline-flex; border-radius: 12px; overflow: hidden; border: 1px solid var(--tsa-border); background: var(--tsa-input-bg); }
 .tsa-image-preview img { width: 64px; height: 64px; object-fit: cover; display: block; }
 .tsa-image-remove { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); transition: background 0.2s; }
 .tsa-image-remove:active { background: rgba(0,0,0,0.9); }
+
 @media (prefers-reduced-motion: reduce) { .tsa-root * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
-`;                                                                                                                          
+`;
