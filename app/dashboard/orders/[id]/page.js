@@ -38,8 +38,7 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
     'alert-circle': <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
     'trash-2': <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
     'file-text': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
-    'more-vertical': <><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></>,
-    'ruler': <><path d="M21.3 15.3l-12-12a2.4 2.4 0 0 0-3.4 0l-1.6 1.6a2.4 2.4 0 0 0 0 3.4l12 12a2.4 2.4 0 0 0 3.4 0l1.6-1.6a2.4 2.4 0 0 0 0-3.4z"/><path d="M14.5 6.5l4 4"/><path d="M10.5 10.5l4 4"/><path d="M6.5 14.5l4 4"/></>
+    'more-vertical': <><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></>
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{paths[name]}</svg>
 }
@@ -59,6 +58,7 @@ export default function OrderDetailPage() {
   
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
+
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentNote, setPaymentNote] = useState('')
@@ -79,11 +79,11 @@ export default function OrderDetailPage() {
   
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
-  
-  const notesTimeoutRef = useRef(null)
-  const isInitialMount = useRef(true)
 
-  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null })
+  // Custom Modal & Toast State (Replaces all browser alerts/confirms)
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
+  })
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
 
@@ -111,8 +111,7 @@ export default function OrderDetailPage() {
       if (!bizId) { router.push('/dashboard'); return }
       setCurrentBusinessId(bizId)
 
-      // Fetch Measurements too
-      const { data: orderData, error: orderError } = await supabase.from('orders').select(`*, customers (id, name, first_name, last_name, phone, email, address, measurements)`).eq('id', orderId).eq('business_id', bizId).single()
+      const { data: orderData, error: orderError } = await supabase.from('orders').select(`*, customers (id, name, first_name, last_name, phone, email, address)`).eq('id', orderId).eq('business_id', bizId).single()
       if (orderError) throw orderError
       setOrder(orderData)
       setCustomer(orderData.customers)
@@ -134,31 +133,6 @@ export default function OrderDetailPage() {
 
   useEffect(() => { if (orderId) loadOrder() }, [orderId])
 
-  // Auto-save Style Notes
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
-    }
-    if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current)
-    
-    setSavingNotes(true)
-    notesTimeoutRef.current = setTimeout(async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          await supabase.from('orders').update({ notes }).eq('id', orderId)
-        }
-      } catch (err) {
-        console.error('Failed to auto-save notes', err)
-      } finally {
-        setSavingNotes(false)
-      }
-    }, 1000)
-
-    return () => clearTimeout(notesTimeoutRef.current)
-  }, [notes, orderId])
-
   const statusIndex = useMemo(() => {
     if (!order) return 0
     const index = STATUS_FLOW.findIndex(item => item.value === (order.current_status || 'Order placed'))
@@ -178,12 +152,23 @@ export default function OrderDetailPage() {
 
   const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
   const formatDate = value => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
-  const customerName = customer?.first_name || customer?.name || 'Client'
-  
-  const measurements = customer?.measurements || {}
-  const hasMeasurements = Object.keys(measurements).length > 0
+  const customerName = customer?.first_name || customer?.name || 'Customer'
 
-  // ─── ACTIONS ───
+  // ─── ACTIONS WITH CUSTOM TOASTS ───
+
+  const saveNotes = async () => {
+    setSavingNotes(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      await supabase.from('orders').update({ notes }).eq('id', orderId)
+      showToast('Notes saved successfully')
+    } catch (err) { 
+      showToast('Could not save the note.', 'error') 
+    } finally { 
+      setSavingNotes(false) 
+    }
+  }
 
   const handleRecordPayment = async (e) => {
     e.preventDefault()
@@ -195,7 +180,7 @@ export default function OrderDetailPage() {
       const response = await fetch(`/api/orders/${orderId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ amount, note: paymentNote || 'Payment received' })
+        body: JSON.stringify({ amount, note: paymentNote || 'Payment recorded' })
       })
       if (!response.ok) throw new Error('Failed')
       await loadOrder()
@@ -233,7 +218,7 @@ export default function OrderDetailPage() {
   }
 
   const handleSendWhatsApp = () => {
-    if (!customer?.phone) return showToast('No phone number saved for this client.', 'error')
+    if (!customer?.phone) return showToast('No phone number saved for this customer.', 'error')
     window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsAppMessage)}`, '_blank')
     setIsWhatsAppModalOpen(false)
   }
@@ -262,12 +247,14 @@ export default function OrderDetailPage() {
     }
   }
 
+  // ─── CUSTOM CONFIRM MODALS ───
+
   const promptDuplicate = () => {
     setShowMenu(false)
     setModalConfig({
       isOpen: true,
-      title: 'Reorder (Duplicate)?',
-      message: 'This will create a new order with the exact same details. The new order will start at "Placed" and have ₦0 paid.',
+      title: 'Duplicate Order?',
+      message: 'This will create a new order with the exact same details. The new order will start at "Order placed" and have ₦0 paid.',
       confirmText: 'Duplicate',
       isDestructive: false,
       onConfirm: async () => {
@@ -309,28 +296,28 @@ export default function OrderDetailPage() {
   if (error || !order) return <div className="order-page-error"><Icon name="alert-circle" size={30} stroke="var(--color-danger)" /><h2>Couldn't load order</h2><button onClick={loadOrder} className="cresoa-primary-button">Try again</button></div>
 
   return (
-    <div className="order-details-page" style={{ paddingBottom: '120px' }}>
+    <div className="order-details-page">
       <Navigation businessId={currentBusinessId} />
 
       <button onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId}`)} className="order-back-btn">
-        <Icon name="arrow-left" size={16} /> Back to Orders
+        <Icon name="arrow-left" size={16} /> Orders
       </button>
 
       {/* ─── HEADER COMMAND CENTER ─── */}
       <div className="order-header">
         <div className="order-title-area">
-          <p className="order-eyebrow">Order</p>
+          <p className="order-eyebrow">ORDER DETAILS</p>
           <h1 className="order-title">{order.title || 'Untitled order'}</h1>
-          <p className="order-subtitle">For {customerName}</p>
+          <p className="order-subtitle">#{orderId.slice(0, 8).toUpperCase()} · {customerName}</p>
         </div>
         
         <div className="order-header-actions">
-          <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${orderId}`)} className="cresoa-primary-button" style={{ background: '#D4AF37', color: '#0F2B4A' }}>
-            <Icon name="file-text" size={16} /> Send Invoice
+          <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${orderId}`)} className="order-btn-secondary invoice-btn">
+            <Icon name="file-text" size={16} /> Invoice
           </button>
           
           <div className="menu-container" ref={menuRef}>
-            <button className="order-btn-secondary icon-only" onClick={() => setShowMenu(!showMenu)} title="Actions">
+            <button className="order-btn-secondary icon-only" onClick={() => setShowMenu(!showMenu)}>
               <Icon name="more-vertical" size={20} />
             </button>
             {showMenu && (
@@ -339,7 +326,7 @@ export default function OrderDetailPage() {
                   <Icon name="edit-2" size={16} /> Edit Order
                 </button>
                 <button onClick={promptDuplicate} className="dropdown-item">
-                  <Icon name="copy" size={16} /> Reorder (Duplicate)
+                  <Icon name="copy" size={16} /> Duplicate Order
                 </button>
                 <div className="dropdown-divider"></div>
                 <button onClick={promptDelete} className="dropdown-item text-danger">
@@ -370,17 +357,11 @@ export default function OrderDetailPage() {
 
       {/* ─── PRIMARY ACTIONS ─── */}
       <div className="order-main-actions">
-        {order.current_status !== 'Delivered' ? (
-          <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button full-width">
-            <Icon name="arrow-right-circle" size={18} /> Move to Next Stage
-          </button>
-        ) : (
-          <button disabled className="cresoa-primary-button full-width" style={{ opacity: 0.5, background: '#999' }}>
-            Delivered
-          </button>
-        )}
+        <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button full-width">
+          <Icon name="arrow-right-circle" size={18} /> Update Status
+        </button>
         <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-wa full-width">
-          <Icon name="message-circle" size={18} /> Tell Client Progress
+          <Icon name="message-circle" size={18} /> Update via WhatsApp
         </button>
       </div>
 
@@ -392,17 +373,17 @@ export default function OrderDetailPage() {
             <span className="value">{formatMoney(order.price)}</span>
           </div>
           <div className="order-finance-item">
-            <span className="label">Money Received</span>
+            <span className="label">Paid</span>
             <span className="value text-success">{formatMoney(order.amount_paid)}</span>
           </div>
-            <div className="order-finance-item">
-            <span className="label">Balance Due</span>
+          <div className="order-finance-item">
+            <span className="label">Balance</span>
             <span className={`value ${balance > 0 ? 'text-danger' : 'text-success'}`}>
-              {balance > 0 ? formatMoney(balance) : 'Fully Paid ✓'}
+              {balance > 0 ? formatMoney(balance) : '✓ Paid'}
             </span>
           </div>
           <div className="order-finance-item">
-            <span className="label">Delivery Date</span>
+            <span className="label">Due Date</span>
             <span className={`value ${isOverdue ? 'text-danger' : ''}`}>{formatDate(order.due_date)}</span>
           </div>
         </div>
@@ -416,36 +397,10 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* ─── CLIENT MEASUREMENTS (Moved Up) ─── */}
-      <div className="order-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 className="order-section-title" style={{ margin: 0 }}>Client Measurements</h3>
-          <Icon name="ruler" size={18} stroke="var(--cresoa-text)" />
-        </div>
-        
-        {!hasMeasurements ? (
-          <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(217, 119, 6, 0.1)', borderRadius: '8px', border: '1px dashed #D97706' }}>
-            <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#D97706', fontWeight: 600 }}>No measurements saved for {customerName} yet.</p>
-            <button onClick={() => router.push(`/dashboard/customers/${customer?.id}?business_id=${currentBusinessId}`)} style={{ background: '#D97706', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
-              + Add Measurements
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {Object.entries(measurements).map(([key, value]) => (
-              <div key={key} style={{ background: 'var(--cresoa-bg)', padding: '10px', borderRadius: '8px', border: '1px solid var(--cresoa-border)' }}>
-                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', textTransform: 'capitalize', fontWeight: 600 }}>{key}</span>
-                <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--cresoa-text)' }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ─── CLIENT & TRACKING ─── */}
-      <div className="order-grid-2">
+      {/* ─── CUSTOMER & TRACKING ─── */}
+          <div className="order-grid-2">
         <div className="order-card">
-          <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CLIENT</span>
+          <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CUSTOMER</span>
           
           <div className="customer-profile">
             <div className="customer-avatar-round">
@@ -454,6 +409,7 @@ export default function OrderDetailPage() {
             <div className="customer-info">
               <h3 className="customer-name">{customerName}</h3>
               {customer?.phone && <p className="customer-contact">{customer.phone}</p>}
+              {customer?.email && <p className="customer-contact">{customer.email}</p>}
             </div>
           </div>
 
@@ -465,7 +421,7 @@ export default function OrderDetailPage() {
             )}
             {customer?.phone && (
               <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
-                <Icon name="message-circle" size={16} /> Chat
+                <Icon name="message-circle" size={16} /> WhatsApp
               </button>
             )}
           </div>
@@ -473,35 +429,37 @@ export default function OrderDetailPage() {
 
         <div className="order-card tracking-card">
           <div className="order-card-header">
-             <span className="order-label">Client Tracking Link</span>
+             <span className="order-label">TRACKING LINK</span>
           </div>
-          <div className="tracking-input-group" style={{ display: 'none' }}>
-             {/* Hidden visually, but exists for accessibility/copying logic */}
-             <span className="tracking-link-text">{getTrackingLink()}</span>
+          <div className="tracking-input-group">
+            <span className="tracking-link-text">{getTrackingLink()}</span>
+            <button onClick={copyTrackingLink} className="btn-icon">
+              <Icon name={copied ? 'check' : 'copy'} size={16} />
+            </button>
           </div>
-          <div className="order-card-actions-row" style={{ marginTop: '1rem' }}>
+          <div className="order-card-actions-row">
              <button onClick={copyTrackingLink} className="order-btn-secondary full-width">
                {copied ? 'Copied!' : 'Copy Link'}
              </button>
              {customer?.phone && (
                 <button onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Track your order here: ${getTrackingLink()}`)}`, '_blank')} className="order-btn-secondary full-width">
-                  Send on WhatsApp
+                  Share Link
                 </button>
              )}
           </div>
         </div>
       </div>
 
-      {/* ─── ORDER DETAILS (Production) ─── */}
+      {/* ─── PRODUCTION DETAILS ─── */}
       <div className="order-card">
-        <h3 className="order-section-title">Order Details</h3>
+        <h3 className="order-section-title">Production Details</h3>
         <div className="order-detail-list">
           {[
-            { label: 'Style', value: order.category || 'Not specified' },
+            { label: 'Category', value: order.category || 'Fashion' },
             { label: 'Quantity', value: order.quantity || 1 },
-            { label: 'Fabric', value: order.fabric || <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>+ Add fabric</button> },
-            { label: 'Fitting Date', value: order.fitting_date ? formatDate(order.fitting_date) : <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>+ Set fitting date</button> },
-            { label: 'Event Date', value: order.event_date ? formatDate(order.event_date) : <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>+ Set event date</button> }
+            { label: 'Fabric', value: order.fabric || 'Not specified' },
+            { label: 'Fitting Date', value: formatDate(order.fitting_date) },
+            { label: 'Event Date', value: formatDate(order.event_date) }
           ].map((item, i) => (
             <div key={i} className="order-detail-row">
               <span className="label">{item.label}</span>
@@ -511,24 +469,24 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* ─── STYLE NOTES (Auto-save, Moved up) ─── */}
+      {/* ─── NOTES ─── */}
       <div className="order-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h3 className="order-section-title" style={{ margin: 0 }}>Style Notes</h3>
-          {savingNotes && <span style={{ fontSize: '0.7rem', color: 'var(--cresoa-text-muted)', fontStyle: 'italic' }}>Saving...</span>}
-        </div>
-        <p className="order-card-subtitle mb-2">Only you and your team can see this.</p>
+        <h3 className="order-section-title">Private Notes</h3>
+        <p className="order-card-subtitle mb-2">These notes are visible only to you and your team.</p>
         <textarea 
           value={notes} 
           onChange={e => setNotes(e.target.value)} 
           className="order-notes-textarea"
-          placeholder="Cuff, buttons, lining, special requests..."
+          placeholder="Add fitting instructions, design details..."
         />
+        <button onClick={saveNotes} disabled={savingNotes} className="cresoa-primary-button mt-2">
+          {savingNotes ? 'Saving...' : 'Save Notes'}
+        </button>
       </div>
 
-      {/* ─── PAYMENTS RECEIVED ─── */}
+      {/* ─── PAYMENT HISTORY ─── */}
       <div className="order-card">
-        <h3 className="order-section-title">Payments Received</h3>
+        <h3 className="order-section-title">Payment History</h3>
         {payments.length === 0 ? (
           <p className="order-empty-text">No payments recorded yet.</p>
         ) : (
@@ -537,7 +495,7 @@ export default function OrderDetailPage() {
               <div key={p.id} className="order-payment-row">
                 <div>
                   <strong className="text-success">{formatMoney(p.amount)}</strong>
-                  <span className="order-payment-note">{p.note === 'Full payment from list view' ? 'Payment received' : (p.note || 'Payment received')}</span>
+                  <span className="order-payment-note">{p.note || 'Payment'}</span>
                 </div>
                 <span className="order-payment-date">{formatDate(p.created_at)}</span>
               </div>
@@ -705,7 +663,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Delivery Date</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due date</label>
               <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
@@ -740,4 +698,4 @@ export default function OrderDetailPage() {
       )}
     </div>
   )
-        }
+          }
