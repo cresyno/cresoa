@@ -12,6 +12,7 @@ import { StatusPill } from '../../../components/StatusPill'
 import { ActionCenter } from '../../../components/ActionCenter'
 import { Navigation } from '../../../components/Navigation'
 import { supabase } from '../../../lib/supabaseClient'
+import TessaFloatingWidget from '../../../components/TessaFloatingWidget' // NEW: Import Tessa
 import './dashboard.css'
 
 const THEME_STORAGE_KEY = 'cresoa-theme'
@@ -425,6 +426,22 @@ function FashionDashboard({ businessId }) {
     }
   }
 
+  // ─── TESSA CONTEXT ───
+  // This feeds Tessa the exact state of the dashboard so she can answer questions intelligently.
+  const tessaContext = useMemo(() => ({
+    page: 'Dashboard',
+    view: 'Fashion Overview',
+    timeframe: timeframe,
+    metrics: {
+      totalRevenue: currentSummary.revenue,
+      totalCollected: currentSummary.paid,
+      totalOutstanding: currentSummary.outstanding,
+      orderCount: currentSummary.orders,
+    },
+    healthScore: healthScoreData.score,
+    productionStatus: productionCounts
+  }), [timeframe, currentSummary, healthScoreData.score, productionCounts])
+
   if (loading) return <DashboardShell theme={theme}><div style={{ padding: 40, textAlign: 'center', color: 'var(--cresoa-text-muted)' }}>Loading dashboard...</div></DashboardShell>
   if (error) return <DashboardShell theme={theme}><Card><p>Error: {error}</p><button onClick={refresh} className="cresoa-primary-button" style={{ marginTop: 12 }}>Retry</button></Card></DashboardShell>
 
@@ -712,6 +729,9 @@ function FashionDashboard({ businessId }) {
           </div>
         )}
 
+        {/* ─── TESSA AI COPILOT ─── */}
+        <TessaFloatingWidget businessId={businessId} pageContext={tessaContext} />
+
       </div>
     </DashboardShell>
   )
@@ -730,4 +750,4 @@ export default function Page() {
   }
 
   return <FashionDashboard businessId={businessId} />
-                               }
+                                                                                              }                                                                                              
