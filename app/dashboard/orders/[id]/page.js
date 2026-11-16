@@ -38,7 +38,8 @@ const Icon = ({ name, size = 20, stroke = 'currentColor', style }) => {
     'alert-circle': <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
     'trash-2': <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
     'file-text': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></>,
-    'more-vertical': <><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></>
+    'more-vertical': <><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></>,
+    'ruler': <><path d="M21.3 15.3l-12-12a2.4 2.4 0 0 0-3.4 0l-1.6 1.6a2.4 2.4 0 0 0 0 3.4l12 12a2.4 2.4 0 0 0 3.4 0l1.6-1.6a2.4 2.4 0 0 0 0-3.4z"/><path d="M14.5 6.5l4 4"/><path d="M10.5 10.5l4 4"/><path d="M6.5 14.5l4 4"/></>
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>{paths[name]}</svg>
 }
@@ -80,7 +81,7 @@ export default function OrderDetailPage() {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
 
-  // Custom Modal & Toast State (Replaces all browser alerts/confirms)
+  // Custom Modal & Toast State
   const [modalConfig, setModalConfig] = useState({
     isOpen: false, title: '', message: '', confirmText: '', isDestructive: false, onConfirm: null
   })
@@ -111,7 +112,7 @@ export default function OrderDetailPage() {
       if (!bizId) { router.push('/dashboard'); return }
       setCurrentBusinessId(bizId)
 
-      const { data: orderData, error: orderError } = await supabase.from('orders').select(`*, customers (id, name, first_name, last_name, phone, email, address)`).eq('id', orderId).eq('business_id', bizId).single()
+      const { data: orderData, error: orderError } = await supabase.from('orders').select(`*, customers (id, name, first_name, last_name, phone, email, address, measurements)`).eq('id', orderId).eq('business_id', bizId).single()
       if (orderError) throw orderError
       setOrder(orderData)
       setCustomer(orderData.customers)
@@ -133,6 +134,30 @@ export default function OrderDetailPage() {
 
   useEffect(() => { if (orderId) loadOrder() }, [orderId])
 
+  // Auto-save notes
+  const isInitialMount = useRef(true)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    const timer = setTimeout(async () => {
+      setSavingNotes(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          await supabase.from('orders').update({ notes }).eq('id', orderId)
+        }
+      } catch (err) {
+        console.error('Failed to auto-save notes', err)
+      } finally {
+        setSavingNotes(false)
+      }
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [notes, orderId])
+
   const statusIndex = useMemo(() => {
     if (!order) return 0
     const index = STATUS_FLOW.findIndex(item => item.value === (order.current_status || 'Order placed'))
@@ -152,23 +177,9 @@ export default function OrderDetailPage() {
 
   const formatMoney = value => `₦${Number(value || 0).toLocaleString('en-NG')}`
   const formatDate = value => !value ? 'Not set' : new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
-  const customerName = customer?.first_name || customer?.name || 'Customer'
+  const customerName = customer?.first_name || customer?.name || 'Client'
 
-  // ─── ACTIONS WITH CUSTOM TOASTS ───
-
-  const saveNotes = async () => {
-    setSavingNotes(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      await supabase.from('orders').update({ notes }).eq('id', orderId)
-      showToast('Notes saved successfully')
-    } catch (err) { 
-      showToast('Could not save the note.', 'error') 
-    } finally { 
-      setSavingNotes(false) 
-    }
-  }
+  // ─── ACTIONS ───
 
   const handleRecordPayment = async (e) => {
     e.preventDefault()
@@ -180,7 +191,7 @@ export default function OrderDetailPage() {
       const response = await fetch(`/api/orders/${orderId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ amount, note: paymentNote || 'Payment recorded' })
+        body: JSON.stringify({ amount, note: paymentNote || 'Payment received' })
       })
       if (!response.ok) throw new Error('Failed')
       await loadOrder()
@@ -218,7 +229,7 @@ export default function OrderDetailPage() {
   }
 
   const handleSendWhatsApp = () => {
-    if (!customer?.phone) return showToast('No phone number saved for this customer.', 'error')
+    if (!customer?.phone) return showToast('No phone number saved for this client.', 'error')
     window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsAppMessage)}`, '_blank')
     setIsWhatsAppModalOpen(false)
   }
@@ -247,14 +258,12 @@ export default function OrderDetailPage() {
     }
   }
 
-  // ─── CUSTOM CONFIRM MODALS ───
-
   const promptDuplicate = () => {
     setShowMenu(false)
     setModalConfig({
       isOpen: true,
-      title: 'Duplicate Order?',
-      message: 'This will create a new order with the exact same details. The new order will start at "Order placed" and have ₦0 paid.',
+      title: 'Reorder (Duplicate)?',
+      message: 'This will create a new order with the exact same details. The new order will start at "Placed" and have ₦0 paid.',
       confirmText: 'Duplicate',
       isDestructive: false,
       onConfirm: async () => {
@@ -295,213 +304,273 @@ export default function OrderDetailPage() {
   if (loading) return <div className="order-page-loading"><div className="spinner" /></div>
   if (error || !order) return <div className="order-page-error"><Icon name="alert-circle" size={30} stroke="var(--color-danger)" /><h2>Couldn't load order</h2><button onClick={loadOrder} className="cresoa-primary-button">Try again</button></div>
 
+  // Extracting measurements safely
+  const measurements = customer?.measurements || {}
+  const hasMeasurements = Object.keys(measurements).length > 0
+
   return (
-    <div className="order-details-page">
+    <div className="order-details-page" style={{ paddingBottom: '120px' }}>
       <Navigation businessId={currentBusinessId} />
 
       <button onClick={() => router.push(`/dashboard/orders?business_id=${currentBusinessId}`)} className="order-back-btn">
-        <Icon name="arrow-left" size={16} /> Orders
+        <Icon name="arrow-left" size={16} /> Back to Orders
       </button>
 
       {/* ─── HEADER COMMAND CENTER ─── */}
-      <div className="order-header">
+      <div className="order-header" style={{ marginBottom: '1rem' }}>
         <div className="order-title-area">
-          <p className="order-eyebrow">ORDER DETAILS</p>
+          <p className="order-eyebrow">Order</p>
           <h1 className="order-title">{order.title || 'Untitled order'}</h1>
-          <p className="order-subtitle">#{orderId.slice(0, 8).toUpperCase()} · {customerName}</p>
+          <p className="order-subtitle">For {customerName}</p>
         </div>
-        
-        <div className="order-header-actions">
-          <button onClick={() => router.push(`/dashboard/invoices/new?order_id=${orderId}`)} className="order-btn-secondary invoice-btn">
-            <Icon name="file-text" size={16} /> Invoice
+      </div>
+
+      {/* ─── PRIMARY HERO ACTIONS ─── */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <button 
+          onClick={() => router.push(`/dashboard/invoices/new?order_id=${orderId}`)} 
+          style={{ flex: 1, minWidth: '140px', background: '#D4AF37', color: '#0F2B4A', padding: '14px', borderRadius: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(212, 175, 55, 0.3)' }}
+        >
+          <Icon name="file-text" size={18} /> Send Invoice
+        </button>
+
+        {order.current_status !== 'Delivered' && (
+          <button 
+            onClick={() => setShowStatusModal(true)} 
+            style={{ flex: 1, minWidth: '140px', background: '#0F2B4A', color: '#FFF', padding: '14px', borderRadius: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(15, 43, 74, 0.2)' }}
+          >
+            <Icon name="arrow-right-circle" size={18} /> Move to Next Stage
           </button>
-          
-          <div className="menu-container" ref={menuRef}>
-            <button className="order-btn-secondary icon-only" onClick={() => setShowMenu(!showMenu)}>
-              <Icon name="more-vertical" size={20} />
-            </button>
-            {showMenu && (
-              <div className="dropdown-menu">
-                <button onClick={() => { setShowMenu(false); setShowEditModal(true) }} className="dropdown-item">
-                  <Icon name="edit-2" size={16} /> Edit Order
-                </button>
-                <button onClick={promptDuplicate} className="dropdown-item">
-                  <Icon name="copy" size={16} /> Duplicate Order
-                </button>
-                <div className="dropdown-divider"></div>
-                <button onClick={promptDelete} className="dropdown-item text-danger">
-                  <Icon name="trash-2" size={16} /> Delete Order
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ─── PROGRESS STEPPER ─── */}
-      <div className="order-stepper-container">
-        {STATUS_FLOW.map((status, index) => {
-          const completed = index <= statusIndex
-          const active = index === statusIndex
-          return (
-            <div key={status.value} className="order-stepper-step">
-              <div className={`order-stepper-circle ${completed ? 'completed' : ''} ${active ? 'active' : ''}`}>
-                {completed && <Icon name={active ? status.icon : 'check'} size={14} />}
+      <div className="order-stepper-container" style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Production Stage</h3>
+          <button onClick={openWhatsAppModal} disabled={!canWhatsApp} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#E6F4EA', color: '#137333', padding: '6px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+            <Icon name="message-circle" size={14} /> Tell Client Progress
+          </button>
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', paddingTop: '10px' }}>
+          <div style={{ position: 'absolute', top: '22px', left: '10%', right: '10%', height: '3px', background: '#EAEAEA', zIndex: 1 }} />
+          <div style={{ position: 'absolute', top: '22px', left: '10%', width: `${(statusIndex / (STATUS_FLOW.length - 1)) * 80}%`, height: '3px', background: '#0F2B4A', zIndex: 1, transition: 'width 0.3s' }} />
+          
+          {STATUS_FLOW.map((status, index) => {
+            const completed = index <= statusIndex
+            const active = index === statusIndex
+            return (
+              <div key={status.value} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 2, flex: 1 }}>
+                <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: completed ? '#0F2B4A' : '#FFF', border: `2px solid ${completed ? '#0F2B4A' : '#EAEAEA'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: completed ? '#FFF' : '#999', marginBottom: '8px' }}>
+                  {completed ? <Icon name={active ? status.icon : 'check'} size={14} stroke="#FFF" /> : null}
+                </div>
+                <span style={{ fontSize: '0.65rem', fontWeight: active ? 800 : 600, color: active ? '#0F2B4A' : '#999', textAlign: 'center' }}>{status.short}</span>
               </div>
-              <span className={`order-stepper-label ${active ? 'active' : ''}`}>{status.short}</span>
-              {index < STATUS_FLOW.length - 1 && <div className={`order-stepper-line ${index < statusIndex ? 'completed' : ''}`} />}
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
-      {/* ─── PRIMARY ACTIONS ─── */}
-      <div className="order-main-actions">
-        <button onClick={() => setShowStatusModal(true)} className="cresoa-primary-button full-width">
-          <Icon name="arrow-right-circle" size={18} /> Update Status
-        </button>
-        <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-wa full-width">
-          <Icon name="message-circle" size={18} /> Update via WhatsApp
-        </button>
-      </div>
-
-      {/* ─── FINANCIAL SUMMARY ─── */}
-      <div className="order-finance-card">
-        <div className="order-finance-grid">
-          <div className="order-finance-item">
-            <span className="label">Total</span>
-            <span className="value">{formatMoney(order.price)}</span>
+      {/* ─── FINANCIAL SUMMARY & DATES ─── */}
+      <div className="order-finance-card" style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <span style={{ display: 'block', fontSize: '0.75rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F2B4A' }}>{formatMoney(order.price)}</span>
           </div>
-          <div className="order-finance-item">
-            <span className="label">Paid</span>
-            <span className="value text-success">{formatMoney(order.amount_paid)}</span>
+          <div>
+            <span style={{ display: 'block', fontSize: '0.75rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Money Received</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#137333' }}>{formatMoney(order.amount_paid)}</span>
           </div>
-          <div className="order-finance-item">
-            <span className="label">Balance</span>
-            <span className={`value ${balance > 0 ? 'text-danger' : 'text-success'}`}>
-              {balance > 0 ? formatMoney(balance) : '✓ Paid'}
+          <div>
+            <span style={{ display: 'block', fontSize: '0.75rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Balance Due</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: balance > 0 ? '#FF3B30' : '#137333' }}>
+              {balance > 0 ? formatMoney(balance) : 'Fully Paid ✓'}
             </span>
           </div>
-          <div className="order-finance-item">
-            <span className="label">Due Date</span>
-            <span className={`value ${isOverdue ? 'text-danger' : ''}`}>{formatDate(order.due_date)}</span>
+          <div>
+            <span style={{ display: 'block', fontSize: '0.75rem', color: '#666', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Delivery Date</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: isOverdue ? '#FF3B30' : '#0F2B4A' }}>{formatDate(order.due_date)}</span>
           </div>
         </div>
         
         {!isFullyPaid && (
-          <div className="order-payment-action">
-            <button onClick={() => setShowPaymentModal(true)} className="cresoa-primary-button full-width mt-3">
+          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #EAEAEA' }}>
+            <button onClick={() => setShowPaymentModal(true)} style={{ width: '100%', background: '#0F2B4A', color: '#FFF', padding: '12px', borderRadius: '10px', border: 'none', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               <Icon name="plus" size={16} /> Record Payment
             </button>
           </div>
         )}
       </div>
 
-      {/* ─── CUSTOMER & TRACKING ─── */}
-      <div className="order-grid-2">
-        <div className="order-card">
-          <span className="order-label" style={{ display: 'block', marginBottom: '1rem' }}>CUSTOMER</span>
-          
-          <div className="customer-profile">
-            <div className="customer-avatar-round">
+      {/* ─── CLIENT & TRACKING ─── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+        
+        {/* CLIENT CARD */}
+        <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#0F2B4A', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800 }}>
               {customerName.charAt(0).toUpperCase()}
             </div>
-            <div className="customer-info">
-              <h3 className="customer-name">{customerName}</h3>
-              {customer?.phone && <p className="customer-contact">{customer.phone}</p>}
-              {customer?.email && <p className="customer-contact">{customer.email}</p>}
+            <div>
+              <p style={{ margin: 0, fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase' }}>Client</p>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.95rem', fontWeight: 800, color: '#0F2B4A' }}>{customerName}</p>
+              {customer?.phone && <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{customer.phone}</p>}
             </div>
           </div>
-
-          <div className="order-card-actions-row" style={{ marginTop: '1.5rem' }}>
-            {customer?.phone && (
-              <a href={`tel:${customer.phone}`} className="order-btn-secondary full-width">
-                <Icon name="phone" size={16} /> Call
+          <div style={{ display: 'flex', gap: '8px' }}>
+             {customer?.phone && (
+              <a href={`tel:${customer.phone}`} style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#F4F6F8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2B4A', textDecoration: 'none' }}>
+                <Icon name="phone" size={16} />
               </a>
             )}
             {customer?.phone && (
-              <button onClick={openWhatsAppModal} disabled={!canWhatsApp} className="order-btn-secondary full-width text-success">
-                <Icon name="message-circle" size={16} /> WhatsApp
+              <button onClick={openWhatsAppModal} disabled={!canWhatsApp} style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#E6F4EA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333', border: 'none', cursor: 'pointer' }}>
+                <Icon name="message-circle" size={16} />
               </button>
             )}
           </div>
         </div>
 
-        <div className="order-card tracking-card">
-          <div className="order-card-header">
-             <span className="order-label">TRACKING LINK</span>
+        {/* TRACKING LINK CARD */}
+        <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+          <p style={{ margin: '0 0 10px 0', fontSize: '0.7rem', color: '#666', fontWeight: 700, textTransform: 'uppercase' }}>Client Tracking Link</p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={copyTrackingLink} style={{ flex: 1, padding: '10px', background: '#F4F6F8', border: '1px solid #EAEAEA', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer' }}>
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+            {customer?.phone && (
+               <button onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Track your order here: ${getTrackingLink()}`)}`, '_blank')} style={{ flex: 1, padding: '10px', background: '#0F2B4A', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, color: '#FFF', cursor: 'pointer' }}>
+                 Send Link on WhatsApp
+               </button>
+            )}
           </div>
-          <div className="tracking-input-group">
-            <span className="tracking-link-text">{getTrackingLink()}</span>
-            <button onClick={copyTrackingLink} className="btn-icon">
-              <Icon name={copied ? 'check' : 'copy'} size={16} />
+        </div>
+      </div>
+
+      {/* ─── CLIENT MEASUREMENTS ─── */}
+      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Client Measurements</h3>
+          <Icon name="ruler" size={18} stroke="#0F2B4A" />
+        </div>
+        
+        {!hasMeasurements ? (
+          <div style={{ textAlign: 'center', padding: '1rem', background: '#FFF7E6', borderRadius: '8px', border: '1px dashed #D97706' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#D97706', fontWeight: 600 }}>No measurements saved for {customerName} yet.</p>
+            <button onClick={() => router.push(`/dashboard/customers/${customer?.id}?business_id=${currentBusinessId}`)} style={{ background: '#D97706', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+              + Add Measurements
             </button>
           </div>
-          <div className="order-card-actions-row">
-             <button onClick={copyTrackingLink} className="order-btn-secondary full-width">
-               {copied ? 'Copied!' : 'Copy Link'}
-             </button>
-             {customer?.phone && (
-                <button onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Track your order here: ${getTrackingLink()}`)}`, '_blank')} className="order-btn-secondary full-width">
-                  Share Link
-                </button>
-             )}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── PRODUCTION DETAILS ─── */}
-      <div className="order-card">
-        <h3 className="order-section-title">Production Details</h3>
-        <div className="order-detail-list">
-          {[
-            { label: 'Category', value: order.category || 'Fashion' },
-            { label: 'Quantity', value: order.quantity || 1 },
-            { label: 'Fabric', value: order.fabric || 'Not specified' },
-            { label: 'Fitting Date', value: formatDate(order.fitting_date) },
-            { label: 'Event Date', value: formatDate(order.event_date) }
-          ].map((item, i) => (
-            <div key={i} className="order-detail-row">
-              <span className="label">{item.label}</span>
-              <span className="value">{item.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ─── NOTES ─── */}
-      <div className="order-card">
-        <h3 className="order-section-title">Private Notes</h3>
-        <p className="order-card-subtitle mb-2">These notes are visible only to you and your team.</p>
-        <textarea 
-          value={notes} 
-          onChange={e => setNotes(e.target.value)} 
-          className="order-notes-textarea"
-          placeholder="Add fitting instructions, design details..."
-        />
-        <button onClick={saveNotes} disabled={savingNotes} className="cresoa-primary-button mt-2">
-          {savingNotes ? 'Saving...' : 'Save Notes'}
-        </button>
-      </div>
-
-      {/* ─── PAYMENT HISTORY ─── */}
-      <div className="order-card">
-        <h3 className="order-section-title">Payment History</h3>
-        {payments.length === 0 ? (
-          <p className="order-empty-text">No payments recorded yet.</p>
         ) : (
-          <div className="order-payment-list">
-            {payments.map(p => (
-              <div key={p.id} className="order-payment-row">
-                <div>
-                  <strong className="text-success">{formatMoney(p.amount)}</strong>
-                  <span className="order-payment-note">{p.note || 'Payment'}</span>
-                </div>
-                <span className="order-payment-date">{formatDate(p.created_at)}</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {Object.entries(measurements).map(([key, value]) => (
+              <div key={key} style={{ background: '#F8F9FA', padding: '10px', borderRadius: '8px', border: '1px solid #EAEAEA' }}>
+                <span style={{ display: 'block', fontSize: '0.7rem', color: '#666', textTransform: 'capitalize', fontWeight: 600 }}>{key}</span>
+                <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0F2B4A' }}>{value}</span>
               </div>
             ))}
           </div>
         )}
+      </div>
+
+      {/* ─── ORDER DETAILS (Production) ─── */}
+      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Order Details</h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', color: '#666' }}>Style</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{order.category || 'Not specified'}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', color: '#666' }}>Quantity</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{order.quantity || 1}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', color: '#666' }}>Fabric</span>
+            {order.fabric ? (
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{order.fabric}</span>
+            ) : (
+              <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer', textDecoration: 'underline' }}>+ Add fabric</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', color: '#666' }}>Fitting Date</span>
+            {order.fitting_date ? (
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{formatDate(order.fitting_date)}</span>
+            ) : (
+              <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer', textDecoration: 'underline' }}>+ Set fitting date</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', color: '#666' }}>Event Date</span>
+            {order.event_date ? (
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A' }}>{formatDate(order.event_date)}</span>
+            ) : (
+              <button onClick={() => setShowEditModal(true)} style={{ background: 'none', border: 'none', fontSize: '0.9rem', fontWeight: 700, color: '#0F2B4A', cursor: 'pointer', textDecoration: 'underline' }}>+ Set event date</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── STYLE NOTES (Auto-Save) ─── */}
+      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Style Notes</h3>
+          {savingNotes && <span style={{ fontSize: '0.7rem', color: '#999', fontStyle: 'italic' }}>Saving...</span>}
+        </div>
+        <p style={{ margin: '0 0 12px 0', fontSize: '0.8rem', color: '#888' }}>Only you and your team can see this.</p>
+        <textarea 
+          value={notes} 
+          onChange={e => setNotes(e.target.value)} 
+          placeholder="Cuff, buttons, lining, special requests..."
+          style={{ width: '100%', minHeight: '100px', padding: '12px', borderRadius: '8px', border: '1px solid #EAEAEA', background: '#F8F9FA', fontSize: '0.95rem', color: '#0F2B4A', resize: 'vertical', fontFamily: 'inherit' }}
+        />
+      </div>
+
+      {/* ─── PAYMENTS RECEIVED ─── */}
+      <div style={{ background: '#FFF', padding: '1.25rem', borderRadius: '16px', border: '1px solid #EAEAEA', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>Payments Received</h3>
+        {payments.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '0.9rem', color: '#888', fontStyle: 'italic' }}>No payments recorded yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {payments.map(p => (
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F0F0F0', paddingBottom: '12px' }}>
+                <div>
+                  <strong style={{ display: 'block', fontSize: '1rem', color: '#137333' }}>{formatMoney(p.amount)}</strong>
+                  <span style={{ fontSize: '0.8rem', color: '#666' }}>{p.note || 'Payment received'}</span>
+                </div>
+                <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: 600 }}>{formatDate(p.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ─── 3-DOT MENU (Floating relative to header, but keeping fixed for UX) ─── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
+        <div className="menu-container" ref={menuRef} style={{ position: 'relative' }}>
+          <button onClick={() => setShowMenu(!showMenu)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F4F6F8', border: '1px solid #EAEAEA', padding: '10px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#0F2B4A', cursor: 'pointer' }}>
+            <Icon name="more-vertical" size={16} /> Actions
+          </button>
+          {showMenu && (
+            <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '200px', zIndex: 100, overflow: 'hidden' }}>
+              <button onClick={() => { setShowMenu(false); setShowEditModal(true) }} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}>
+                <Icon name="edit-2" size={16} /> Edit Order
+              </button>
+              <button onClick={promptDuplicate} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}>
+                <Icon name="copy" size={16} /> Reorder (Duplicate)
+              </button>
+              <div style={{ height: '1px', background: '#EAEAEA', margin: '4px 0' }}></div>
+              <button onClick={promptDelete} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
+                <Icon name="trash-2" size={16} /> Delete Order
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: '2rem' }}>
@@ -553,13 +622,13 @@ export default function OrderDetailPage() {
       )}
 
       {/* WhatsApp Modal */}
-      {isWhatsAppModalOpen && (
+           {isWhatsAppModalOpen && (
         <div className="app-modal-overlay" onClick={() => setIsWhatsAppModalOpen(false)}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <div>
                 <span style={{ color: 'var(--cresoa-text-muted)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>WHATSAPP UPDATE</span>
-                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.2rem' }}>Update {customerName}</h2>
+                <h2 style={{ margin: '0.2rem 0 0', fontSize: '1.2rem' }}>Tell {customerName} Progress</h2>
               </div>
               <button onClick={() => setIsWhatsAppModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cresoa-text-muted)' }}>
                 <Icon name="x" size={20} stroke="currentColor" />
@@ -663,7 +732,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Due date</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 500, marginBottom: '0.2rem' }}>Delivery Date</label>
               <input type="date" value={editForm.due_date} onChange={e => setEditForm({ ...editForm, due_date: e.target.value })} style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', border: '1px solid var(--cresoa-border)', background: 'var(--cresoa-surface)', color: 'var(--cresoa-text)' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
@@ -676,7 +745,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* ─── CUSTOM MODAL (For Delete & Duplicate) ─── */}
+      {/* Custom Modal (For Delete & Duplicate) */}
       {modalConfig.isOpen && (
         <div className="app-modal-overlay" onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}>
           <div className="app-modal-box" onClick={e => e.stopPropagation()}>
@@ -690,7 +759,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* ─── TOAST ─── */}
+      {/* Toast */}
       {toastMessage && (
         <div className={`app-toast ${toastType}`}>
           {toastType === 'success' ? '✅ ' : '⚠️ '} {toastMessage}
@@ -698,4 +767,4 @@ export default function OrderDetailPage() {
       )}
     </div>
   )
-               }
+             }
