@@ -79,7 +79,7 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState('manual')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('dueSoonest') // Default to deadline
+  const [sortBy, setSortBy] = useState('dueSoonest')
   
   const [openMenuId, setOpenMenuId] = useState(null)
   const [showStatusMenu, setShowStatusMenu] = useState(false)
@@ -167,13 +167,12 @@ export default function OrdersPage() {
 
   const handleStatClick = (filterType) => {
     if (filterType === 'all') setStatusFilter('all')
-    else if (filterType === 'active') setStatusFilter('active') // Custom logic
+    else if (filterType === 'active') setStatusFilter('active')
     else if (filterType === 'ready') setStatusFilter('Ready')
-    else if (filterType === 'overdue') setStatusFilter('overdue') // Custom logic
+    else if (filterType === 'overdue') setStatusFilter('overdue')
   }
 
   const filteredOrders = tabOrders.filter(o => {
-    // Stat Card Filtering
     if (statusFilter === 'active' && o.current_status === 'Delivered') return false
     if (statusFilter === 'overdue') {
       if (!o.due_date || o.current_status === 'Delivered') return false
@@ -183,7 +182,6 @@ export default function OrdersPage() {
     }
     if (statusFilter !== 'all' && statusFilter !== 'active' && statusFilter !== 'overdue' && o.current_status !== statusFilter) return false
     
-    // Search Filtering
     if (search) {
       const q = search.toLowerCase()
       return (o.customers?.name?.toLowerCase().includes(q) || o.title?.toLowerCase().includes(q))
@@ -224,10 +222,12 @@ export default function OrdersPage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  const promptDelete = (orderId) => {
+  const promptDelete = (orderId, isWebsite) => {
     setOpenMenuId(null)
     setModalConfig({
-      isOpen: true, title: 'Delete Order?', message: 'This action cannot be undone. Are you sure?',
+      isOpen: true, 
+      title: 'Delete Order?', 
+      message: isWebsite ? 'Deleting a website order cannot be undone. Are you sure?' : 'This action cannot be undone. Are you sure?',
       confirmText: 'Delete', isDestructive: true,
       onConfirm: async () => {
         setModalConfig(prev => ({ ...prev, isOpen: false }))
@@ -236,6 +236,7 @@ export default function OrdersPage() {
         showToast('Order deleted', 'success')
         try {
           const { data: { session } } = await supabase.auth.getSession()
+          // If it's a website order, you might need a different delete route, but this is fine for now
           const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` } })
           if (!res.ok) throw new Error('Failed')
         } catch (err) {
@@ -328,7 +329,7 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* ─── FILTERS ─── */}
+            {/* ─── FILTERS ─── */}
       <div className="orders-filters" style={{ marginBottom: '1rem' }}>
         <div className="orders-search-wrapper" style={{ display: 'flex', alignItems: 'center', background: '#F4F6F8', border: '1px solid #EAEAEA', borderRadius: '12px', padding: '0 12px', marginBottom: '12px' }}>
           <SvgIcons.Search />
@@ -342,7 +343,7 @@ export default function OrdersPage() {
               {statusOptions.find(o => o.value === statusFilter)?.label || 'Status'}
               <SvgIcons.ChevronDown />
             </button>
-  {showStatusMenu && (
+            {showStatusMenu && (
               <div className="custom-dropdown-menu" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '10px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 20, overflow: 'hidden' }}>
                 {statusOptions.map(opt => (
                   <button key={opt.value} onClick={() => { setStatusFilter(opt.value); setShowStatusMenu(false); }} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: statusFilter === opt.value ? '#F4F6F8' : '#FFF', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: statusFilter === opt.value ? '#0F2B4A' : '#333', fontWeight: statusFilter === opt.value ? 700 : 500 }}>{opt.label}</button>
@@ -383,7 +384,7 @@ export default function OrdersPage() {
             const customerPhone = o.customers?.phone || ''
             const itemTitle = o.title || 'Untitled'
             const isMenuOpen = openMenuId === o.id
-            const dueDateFormatted = o.due_date ? new Date(o.due_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) : 'Not set'
+            const isWebsiteOrder = o.source === 'website'
 
             return (
               <Card key={o.id} style={{ padding: '16px', borderRadius: '16px', border: '1px solid #EAEAEA', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
@@ -412,11 +413,15 @@ export default function OrdersPage() {
                 {/* LINE 2: Status, Due Date & Badges */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <StatusPill status={o.current_status === 'Order placed' ? 'Not Started' : o.current_status} />
+                    <StatusPill status={
+                      ['paid', 'pending'].includes(String(o.current_status).toLowerCase()) 
+                        ? (balance > 0 ? 'Awaiting Payment' : 'In Production') 
+                        : (o.current_status === 'Order placed' ? 'Not Started' : o.current_status)
+                    } />
                     {isOverdue && <span style={{ background: '#FFF0F0', color: '#FF3B30', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>LATE</span>}
                   </div>
                   <span style={{ fontSize: '0.85rem', color: isOverdue ? '#FF3B30' : '#666', fontWeight: isOverdue ? 700 : 500 }}>
-                    Due: {dueDateFormatted}
+                    Due: {dueDateFormatter(o.due_date)}
                   </span>
                 </div>
 
@@ -433,14 +438,20 @@ export default function OrdersPage() {
                         </button>
                       </>
                     ) : (
-                      <a href={`/dashboard/customers/${o.customer_id}?business_id=${currentBusinessId}`} style={{ background: '#F4F6F8', color: '#999', border: '1px dashed #CCC', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-                        + Add Phone
-                      </a>
+                      !isWebsiteOrder && (
+                        <a href={`/dashboard/customers/${o.customer_id}?business_id=${currentBusinessId}`} style={{ background: '#F4F6F8', color: '#999', border: '1px dashed #CCC', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
+                          + Add Phone
+                        </a>
+                      )
                     )}
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <a href={`/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`} style={{ background: '#0F2B4A', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}>
+                    <a href={
+                      isWebsiteOrder 
+                        ? `/dashboard/orders/web/${o.id}?business_id=${currentBusinessId || ''}` 
+                        : `/dashboard/orders/${o.id}?business_id=${currentBusinessId || ''}`
+                    } style={{ background: '#0F2B4A', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}>
                       Open
                     </a>
                     <div className="menu-container" ref={isMenuOpen ? menuRef : null} style={{ position: 'relative' }}>
@@ -449,15 +460,22 @@ export default function OrdersPage() {
                       </button>
                       {isMenuOpen && (
                         <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: '#FFF', border: '1px solid #EAEAEA', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '180px', zIndex: 30, overflow: 'hidden' }}>
-                          {balance > 0 && (
+                          
+                          {/* Only allow recording manual payments for manual orders */}
+                          {!isWebsiteOrder && balance > 0 && (
                             <button onClick={() => promptRecordPayment(o.id, balance)} style={{ width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#137333', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <SvgIcons.CheckCircle /> Mark as Paid
                             </button>
                           )}
-                          <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333', textDecoration: 'none' }}>
-                            <SvgIcons.Edit /> Edit Order
-                          </a>
-                          <button onClick={() => promptDelete(o.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
+
+                          {/* Only allow editing manual orders. Website orders are edited via the store. */}
+                          {!isWebsiteOrder && (
+                            <a href={`/dashboard/orders/${o.id}/edit?business_id=${currentBusinessId || ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#333', textDecoration: 'none' }}>
+                              <SvgIcons.Edit /> Edit Order
+                            </a>
+                          )}
+
+                          <button onClick={() => promptDelete(o.id, isWebsiteOrder)} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#FF3B30', fontWeight: 600 }}>
                             <SvgIcons.Trash /> Delete
                           </button>
                         </div>
@@ -501,4 +519,9 @@ export default function OrdersPage() {
       <div style={{ marginTop: '2rem' }}><Navigation businessId={currentBusinessId} /></div>
     </div>
   )
-}
+
+  // Helper function to format date safely
+  function dueDateFormatter(dateVal) {
+    return dateVal ? new Date(dateVal).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) : 'Not set';
+  }
+                }
