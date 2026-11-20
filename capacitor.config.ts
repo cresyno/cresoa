@@ -5,11 +5,11 @@ const config: CapacitorConfig = {
   appName: 'Cresoa',
   webDir: 'public',
   server: {
-    url: 'https://cresoa.com.ng',
+    url: 'https://google.com',
     cleartext: false,
-    allowNavigation: ['cresoa.com.ng']
+    allowNavigation: ['*'],
+    androidScheme: 'https'
   }
 };
 
 export default config;
-
