@@ -1,7 +1,6 @@
-'use client'
-
+'use client';
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient'
 import { compressImage } from '../../../../lib/compressImage'
 import { templates, getTemplate } from '../../../../lib/templateRegistry'

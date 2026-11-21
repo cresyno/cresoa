@@ -1,7 +1,5 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { useState } from 'react';
 
 import { Icon } from '../../../components/Icon';

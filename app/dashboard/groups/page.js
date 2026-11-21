@@ -1,10 +1,8 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { isFeatureAvailable, getPlanLimits } from '../../../lib/planLimits'

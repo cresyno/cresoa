@@ -1,9 +1,7 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient'
 import FileUpload from '../../../components/FileUpload'
 import Elegant from '../../../components/public-templates/Elegant'

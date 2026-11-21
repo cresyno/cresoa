@@ -1,12 +1,11 @@
+'use client';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
 }
 // app/[slug]/portfolio/page.js
-'use client'
-
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient'
 import { parseSectorData } from '@/lib/publicPageData'
 import Link from 'next/link'

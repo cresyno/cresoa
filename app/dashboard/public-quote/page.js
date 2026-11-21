@@ -1,7 +1,5 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { useState, useEffect } from 'react'
 
 import { supabase } from '../../../lib/supabaseClient'

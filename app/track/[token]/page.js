@@ -1,11 +1,10 @@
+'use client';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
 }
-'use client'
-
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams } from 'next/navigation';
 import { Icon } from '../../../components/Icon'
 import '../../globals.css'
 

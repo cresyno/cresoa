@@ -1,9 +1,7 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from './lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { Suspense } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react'
 import TessaFloatingWidget from '@/components/support/TessaFloatingWidget'
 

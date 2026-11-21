@@ -1,5 +1,4 @@
-'use client'
-
+'use client';
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import Link from 'next/link'
 import Logo from '../../components/Logo'

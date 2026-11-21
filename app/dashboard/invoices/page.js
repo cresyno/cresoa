@@ -1,7 +1,6 @@
-'use client'
-
+'use client';
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'

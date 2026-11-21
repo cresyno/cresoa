@@ -1,7 +1,7 @@
 // app/[slug]/layout.js
 import { CartProvider } from '@/lib/CartContext'
 import { createServerSupabase } from '@/lib/serverSupabase'
-import { notFound } from 'next/navigation'
+import { notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic'
 

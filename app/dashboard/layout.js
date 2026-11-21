@@ -1,9 +1,7 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { Suspense, useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient'
 import Logo from '../../components/Logo'
 import { FREE_TRIAL_DAYS } from '../../lib/planLimits'

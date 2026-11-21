@@ -1,5 +1,4 @@
-'use client'
-
+'use client';
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import PayoutSettings from '../../components/PayoutSettings'

@@ -1,5 +1,4 @@
-'use client'
-
+'use client';
 import { useState, useEffect } from 'react';
 import { Icon } from '../../../components/Icon';
 import { supabase } from '../../../lib/supabaseClient';

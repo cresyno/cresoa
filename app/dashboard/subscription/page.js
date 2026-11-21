@@ -1,9 +1,7 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient'
 import { PLANS, getPlanStatusMessage } from '../../../lib/planLimits'
 import { Icon } from '../../../components/Icon'

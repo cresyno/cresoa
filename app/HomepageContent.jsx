@@ -1,7 +1,6 @@
-'use client'
-
+'use client';
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import Link from 'next/link'
 import Logo from '../components/Logo'
 import ThemeToggle from '../components/ThemeToggle'

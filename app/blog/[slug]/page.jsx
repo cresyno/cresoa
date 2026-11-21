@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound } from 'next/navigation';
 import PostLayout from '../../../components/PostLayout'
 import { blogPosts } from '../../../lib/blogData'
 import { POSTS } from '../../../lib/posts'

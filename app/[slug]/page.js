@@ -3,7 +3,7 @@ export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
 }
 // app/[slug]/page.js
-import { notFound } from 'next/navigation'
+import { notFound } from 'next/navigation';
 import { getPublicPage, createServerSupabase } from '@/lib/serverSupabase'
 import { getTemplate } from '../../lib/templateRegistry'
 

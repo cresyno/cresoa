@@ -1,7 +1,6 @@
-'use client'
-
+'use client';
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient'
 import { Icon } from '../../../components/Icon'
 import { Card } from '../../../components/Card'

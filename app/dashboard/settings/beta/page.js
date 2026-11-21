@@ -1,7 +1,6 @@
-'use client'
-
+'use client';
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient'
 
 // 👇 Only this email can access the beta dashboard

@@ -1,8 +1,5 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
-
 import EditorTab from './components/EditorTab'
 import '../../globals.css'
 

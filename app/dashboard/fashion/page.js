@@ -1,9 +1,7 @@
+'use client';
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
-import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
-'use client'
-
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { useDashboardData } from '../../../lib/hooks/useDashboardData'
 import { formatMoney, formatShortDate, safeAmount } from '../../../lib/utils'
 import { PRODUCTION_STAGES } from '../../../lib/constants'

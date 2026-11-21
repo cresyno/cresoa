@@ -1,11 +1,10 @@
+'use client';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
 }
-'use client'
-
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Navigation } from '../../../../components/Navigation'

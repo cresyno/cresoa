@@ -1,7 +1,6 @@
-'use client'
-
+'use client';
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams } from 'next/navigation';
 import { parseSectorData } from '@/lib/publicPageData'
 import { useCart } from '@/lib/CartContext'
 import Link from 'next/link'

@@ -1,11 +1,10 @@
+'use client';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
 }
-'use client'
-
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '../../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
 import { useWorkflowStages } from '../../../../../lib/useWorkflowStages'

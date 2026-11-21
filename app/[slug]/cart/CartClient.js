@@ -1,8 +1,7 @@
-'use client'
-
+'use client';
 import { useCart } from '@/lib/CartContext'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation';
 
 export default function CartClient({ slug: propSlug }) {
   const params = useParams()

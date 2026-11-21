@@ -1,5 +1,4 @@
-'use client'
-
+'use client';
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from '../../../components/Icon';
 import ChatMessage from '../../../components/support/ChatMessage';
