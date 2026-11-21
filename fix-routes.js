@@ -10,45 +10,32 @@ function walk(dir) {
     const stat = fs.statSync(filePath);
     if (stat && stat.isDirectory()) {
       results = results.concat(walk(filePath));
-    } else if (/^page\.(js|jsx|ts|tsx)$/.test(file)) {
+    } else if (/\.(js|jsx|ts|tsx)$/.test(file)) {
       results.push(filePath);
     }
   });
   return results;
 }
 
-const pages = walk('app');
-pages.forEach(p => {
+// 1. Create a safe replacement hook
+if (!fs.existsSync('lib')) fs.mkdirSync('lib');
+fs.writeFileSync('lib/useClientSearchParams.js', `import { useState, useEffect } from 'react';\n\nexport function useClientSearchParams() {\n  const [params, setParams] = useState(new URLSearchParams());\n  useEffect(() => {\n    setParams(new URLSearchParams(window.location.search));\n  }, []);\n  return params;\n}\n`);
+
+// 2. Find all files in app/dashboard using useSearchParams and replace the import
+const files = walk('app');
+files.forEach(p => {
   let content = fs.readFileSync(p, 'utf8');
-  
-  if (content.includes('useSearchParams') && !content.includes('Suspense')) {
-    if (content.includes('ClientPage')) return;
+  if (content.includes('useSearchParams')) {
+    // Calculate relative path back to lib folder
+    let depth = p.split(path.sep).length - 2; 
+    let relativePath = '';
+    for (let i = 0; i < depth; i++) relativePath += '../';
+    if (relativePath === '') relativePath = './';
     
-    const ext = p.split('.').pop();
-    const clientPath = path.join(path.dirname(p), `ClientPage.${ext}`);
+    // Replace the Next.js import with our safe hook
+    content = content.replace(/import\s+\{\s*useSearchParams\s*\}\s+from\s+['"]next\/navigation['"];?/g, `import { useClientSearchParams as useSearchParams } from '${relativePath}lib/useClientSearchParams';`);
     
-    // 1. Move original content to ClientPage
-    fs.writeFileSync(clientPath, content);
-    
-    // 2. Create Server Component wrapper with Suspense and generateStaticParams
-    const dirParts = path.dirname(p).split(path.sep);
-    const params = [];
-    dirParts.forEach(part => {
-      if (part.startsWith('[') && part.endsWith(']')) {
-        let clean = part.slice(1, -1);
-        if (clean.startsWith('...')) clean = clean.slice(3);
-        params.push(clean);
-      }
-    });
-    
-    let wrapper = `import { Suspense } from 'react';\nimport ClientPage from './ClientPage';\n\n`;
-    if (params.length > 0) {
-       const paramStr = params.map(p => `${p}: "default"`).join(', ');
-       wrapper += `export async function generateStaticParams() {\n  return [{ ${paramStr} }];\n}\n\n`;
-    }
-    wrapper += `export default function Page() {\n  return (\n    <Suspense fallback={<div>Loading...</div>}>\n      <ClientPage />\n    </Suspense>\n  );\n}\n`;
-    
-    fs.writeFileSync(p, wrapper);
-    console.log(`Fixed with Suspense: ${p}`);
+    fs.writeFileSync(p, content);
+    console.log('Fixed useSearchParams in:', p);
   }
 });
