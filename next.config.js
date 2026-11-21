@@ -13,6 +13,15 @@ const nextConfig = {
       },
     ];
   },
+  webpack: (config) => {
+    if (process.env.BUILD_TARGET === 'mobile') {
+      config.module.rules.push({
+        test: /app/(api|api_backup)/,
+        loader: 'ignore-loader',
+      });
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;

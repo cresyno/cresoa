@@ -25,6 +25,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.6.2",
     "eslint": "^8.56.0",
-    "eslint-config-next": "14.2.35"
+    "eslint-config-next": "14.2.35",
+    "ignore-loader": "^0.1.2"
   }
 }

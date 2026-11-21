@@ -21,6 +21,9 @@ jobs:
         run: mv app/api app/api_backup
       - name: Build Next.js
         run: BUILD_TARGET=mobile npm run build
+        env:
+          SUPABASE_URL: 'https://placeholder.supabase.co'
+          SUPABASE_KEY: 'placeholder-key'
       - name: Restore API folder
         run: mv app/api_backup app/api
       - name: Sync Capacitor
