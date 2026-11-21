@@ -21,17 +21,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Remove public pages and hide API
+      - name: Hide API, Sitemap, and Delete Public Pages
         run: |
           mv app/api app/api_backup
           if [ -f app/sitemap.js ]; then mv app/sitemap.js app/sitemap.js_backup; fi
           if [ -f app/sitemap.ts ]; then mv app/sitemap.ts app/sitemap.ts_backup; fi
           
-          # Physically delete public folders as requested
+          # Physically delete public folders as you requested
           rm -rf "app/[slug]"
+          rm -rf app/track
           rm -rf app/accept-beta
           rm -rf app/accept-invite
           rm -rf app/beta
+          rm -rf app/verify-email
           
       - name: Build Next.js
         run: BUILD_TARGET=mobile npm run build
