@@ -21,10 +21,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Hide API, Sitemap, and Delete Public Pages
+      - name: Force Mobile Config & Cleanup
         run: |
+          # Force the correct next.config.js directly on the server
+          cat << 'EOF' > next.config.js
+          /** @type {import('next').NextConfig} */
+          const nextConfig = {
+            swcMinify: false,
+            output: 'export',
+            images: { unoptimized: true },
+            experimental: {
+              missingSuspenseWithCSRBailout: false,
+            },
+          };
+          module.exports = nextConfig;
+          EOF
+          
+          # Move API outside the app folder
           mv app/api ./api_backup
+          
+          # Delete sitemaps
           rm -f app/sitemap.js app/sitemap.ts
+          
+          # Delete public pages
           rm -rf app/track app/accept-beta app/accept-invite app/beta app/verify-email "app/[slug]"
           rm -rf app/debug-business app/faq app/fashion app/forgot-password app/learn app/onboarding
           rm -rf app/payments-setup app/pricing app/printing app/repairs app/reset-password app/support app/welcome
@@ -32,6 +51,9 @@ jobs:
       - name: Build Next.js
         run: BUILD_TARGET=mobile npm run build
         env:
+          # These are the critical variables your frontend needs!
+          NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-key'
           SUPABASE_URL: 'https://placeholder.supabase.co'
           SUPABASE_KEY: 'placeholder-key'
           
