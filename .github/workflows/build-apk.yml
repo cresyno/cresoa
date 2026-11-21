@@ -17,6 +17,12 @@ jobs:
           java-version: '21'
       - name: Install dependencies
         run: npm ci
+      - name: Hide API folder
+        run: mv app/api app/api_backup
+      - name: Build Next.js
+        run: BUILD_TARGET=mobile npm run build
+      - name: Restore API folder
+        run: mv app/api_backup app/api
       - name: Sync Capacitor
         run: npx cap sync android
       - name: Build APK
