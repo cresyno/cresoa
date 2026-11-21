@@ -23,11 +23,12 @@ jobs:
         
       - name: Hide API, Sitemap, and Delete Public Pages
         run: |
-          mv app/api app/api_backup
-          if [ -f app/sitemap.js ]; then mv app/sitemap.js app/sitemap.js_backup; fi
-          if [ -f app/sitemap.ts ]; then mv app/sitemap.ts app/sitemap.ts_backup; fi
+          # Move API completely outside the app folder so Next.js can't see it
+          mv app/api ./api_backup
           
-          # Physically delete public folders as you requested
+          # Delete sitemap and public pages
+          rm -f app/sitemap.js
+          rm -f app/sitemap.ts
           rm -rf "app/[slug]"
           rm -rf app/track
           rm -rf app/accept-beta
@@ -40,12 +41,6 @@ jobs:
         env:
           SUPABASE_URL: 'https://placeholder.supabase.co'
           SUPABASE_KEY: 'placeholder-key'
-          
-      - name: Restore API and Sitemap
-        run: |
-          mv app/api_backup app/api
-          if [ -f app/sitemap.js_backup ]; then mv app/sitemap.js_backup app/sitemap.js; fi
-          if [ -f app/sitemap.ts_backup ]; then mv app/sitemap.ts_backup app/sitemap.ts; fi
           
       - name: Sync Capacitor
         run: npx cap sync android
