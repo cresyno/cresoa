@@ -1,4 +1,6 @@
+/** @type {import('next').NextConfig} */
 const nextConfig = {
+  swcMinify: false,
   async headers() {
     return [
       {
@@ -9,8 +11,8 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
-    ]
+    ];
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
