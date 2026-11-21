@@ -1,3 +1,4 @@
+import { useClientSearchParams as useSearchParams } from '../../../../lib/useClientSearchParams';
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'

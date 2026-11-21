@@ -1,3 +1,4 @@
+import { useClientSearchParams as useSearchParams } from '../../../../lib/useClientSearchParams';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
