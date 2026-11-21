@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     missingSuspenseWithCSRBailout: false,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     if (process.env.BUILD_TARGET === 'mobile') {
       config.module.rules.push({
         test: /app\/api/,
