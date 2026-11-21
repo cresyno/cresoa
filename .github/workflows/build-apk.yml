@@ -17,21 +17,17 @@ jobs:
           java-version: '21'
       - name: Install dependencies
         run: npm ci
-      - name: Hide API and Sitemap
-        run: |
-          mv app/api app/api_backup
-          if [ -f app/sitemap.js ]; then mv app/sitemap.js app/sitemap.js_backup; fi
-          if [ -f app/sitemap.ts ]; then mv app/sitemap.ts app/sitemap.ts_backup; fi
+      - name: Run route fixer
+        run: node fix-routes.js
+      - name: Hide API folder
+        run: mv app/api app/api_backup
       - name: Build Next.js
         run: BUILD_TARGET=mobile npm run build
         env:
           SUPABASE_URL: 'https://placeholder.supabase.co'
           SUPABASE_KEY: 'placeholder-key'
-      - name: Restore API and Sitemap
-        run: |
-          mv app/api_backup app/api
-          if [ -f app/sitemap.js_backup ]; then mv app/sitemap.js_backup app/sitemap.js; fi
-          if [ -f app/sitemap.ts_backup ]; then mv app/sitemap.ts_backup app/sitemap.ts; fi
+      - name: Restore API folder
+        run: mv app/api_backup app/api
       - name: Sync Capacitor
         run: npx cap sync android
       - name: Build APK
