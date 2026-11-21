@@ -1,3 +1,7 @@
+
+export async function generateStaticParams() {
+  return [{ slug: "default", id: "default" }];
+}
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import ProductClient from './ProductClient'

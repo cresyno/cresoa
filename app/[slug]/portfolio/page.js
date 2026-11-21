@@ -1,3 +1,7 @@
+
+export async function generateStaticParams() {
+  return [{ slug: "default", id: "default" }];
+}
 // app/[slug]/portfolio/page.js
 'use client'
 

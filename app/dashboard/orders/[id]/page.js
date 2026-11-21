@@ -1,3 +1,7 @@
+
+export async function generateStaticParams() {
+  return [{ slug: "default", id: "default" }];
+}
 'use client'
 
 import { useEffect, useMemo, useState, useRef } from 'react'

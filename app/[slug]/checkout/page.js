@@ -1,3 +1,7 @@
+
+export async function generateStaticParams() {
+  return [{ slug: "default", id: "default" }];
+}
 import { createClient } from '@supabase/supabase-js'
 import CheckoutClient from './CheckoutClient'
 
