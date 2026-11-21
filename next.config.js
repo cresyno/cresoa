@@ -1,15 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   swcMinify: false,
+  output: process.env.BUILD_TARGET === 'mobile' ? 'export' : undefined,
   experimental: {
     missingSuspenseWithCSRBailout: false,
   },
-  ...(process.env.BUILD_TARGET === 'mobile' && {
-    output: 'export',
-    images: {
-      unoptimized: true,
-    },
-  }),
   webpack: (config) => {
     if (process.env.BUILD_TARGET === 'mobile') {
       config.module.rules.push({
