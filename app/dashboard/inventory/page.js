@@ -1,8 +1,9 @@
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../lib/getBusinessId'
 import { Navigation } from '../../../components/Navigation'

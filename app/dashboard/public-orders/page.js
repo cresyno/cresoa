@@ -1,8 +1,9 @@
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+
 import { supabase } from '../../../lib/supabaseClient'
 
 const STATUSES = ['new', 'confirmed', 'processing', 'ready', 'completed']

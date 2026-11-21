@@ -1,7 +1,8 @@
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+
 import EditorTab from './components/EditorTab'
 import '../../globals.css'
 

@@ -1,8 +1,9 @@
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
+
 import { supabase } from '../../../lib/supabaseClient'
 import { compressImage } from '../../../lib/compressImage'
 import styles from './products.module.css'

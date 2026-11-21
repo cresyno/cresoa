@@ -1,8 +1,9 @@
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabaseClient'
 import { compressImage } from '../../../lib/compressImage'
 import ClassicGold from '../../../components/public-templates/ClassicGold'

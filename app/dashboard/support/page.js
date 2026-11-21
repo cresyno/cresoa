@@ -1,8 +1,9 @@
 import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 'use client'
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import { Icon } from '../../../components/Icon';
 import SupportModal from '../../../components/support/SupportModal';
 

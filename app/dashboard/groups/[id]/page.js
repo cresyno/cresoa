@@ -1,4 +1,5 @@
 import { useClientSearchParams as useSearchParams } from '../../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
@@ -6,7 +7,7 @@ export async function generateStaticParams() {
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../lib/getBusinessId'
 import { Navigation } from '../../../../components/Navigation'

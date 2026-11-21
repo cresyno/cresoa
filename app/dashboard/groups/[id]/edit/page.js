@@ -1,4 +1,5 @@
 import { useClientSearchParams as useSearchParams } from '../../../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
@@ -6,7 +7,7 @@ export async function generateStaticParams() {
 'use client'
 
 import { useEffect, useState, useRef, useMemo } from 'react'
-import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import { getCurrentBusinessId } from '../../../../../lib/getBusinessId'
 // Reusing the edit-order CSS for a consistent look

@@ -1,4 +1,5 @@
 import { useClientSearchParams as useSearchParams } from '../../../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 
 export async function generateStaticParams() {
   return [{ slug: "default", id: "default" }];
@@ -6,7 +7,7 @@ export async function generateStaticParams() {
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '../../../../../lib/supabaseClient'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
