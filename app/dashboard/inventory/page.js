@@ -1,5 +1,5 @@
 'use client';
-import { useClientSearchParams as useSearchParams } from '../../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient'

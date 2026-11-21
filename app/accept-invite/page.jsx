@@ -1,5 +1,5 @@
 'use client';
-import { useClientSearchParams as useSearchParams } from '../lib/useClientSearchParams';
+import { useClientSearchParams as useSearchParams } from '@/lib/useClientSearchParams';
 import { Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
