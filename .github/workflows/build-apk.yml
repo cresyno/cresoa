@@ -21,20 +21,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Hide API, Sitemap, and Delete Public Pages
+      - name: Strictly keep only Dashboard, Login, and Signup
         run: |
-          # Move API completely outside the app folder so Next.js can't see it
+          # Move API completely outside the app folder
           mv app/api ./api_backup
           
-          # Delete sitemap and public pages
-          rm -f app/sitemap.js
-          rm -f app/sitemap.ts
-          rm -rf "app/[slug]"
-          rm -rf app/track
-          rm -rf app/accept-beta
-          rm -rf app/accept-invite
-          rm -rf app/beta
-          rm -rf app/verify-email
+          # Delete sitemaps
+          rm -f app/sitemap.js app/sitemap.ts
+          
+          # Go into app folder and delete ALL directories EXCEPT dashboard, login, signup
+          cd app
+          find . -maxdepth 1 -type d ! -name "." ! -name "dashboard" ! -name "login" ! -name "signup" -exec rm -rf {} +
+          cd ..
           
       - name: Build Next.js
         run: BUILD_TARGET=mobile npm run build
