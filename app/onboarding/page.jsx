@@ -12,12 +12,12 @@ export default function Onboarding() {
     if (currentSlide < 2) {
       setCurrentSlide(currentSlide + 1);
     } else {
-      router.push('/signup');
+      router.push('/signup'); // Go to signup after the intro
     }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-white overflow-hidden relative font-sans">
+    <div className="flex flex-col h-screen bg-[#F8FAFC] overflow-hidden relative font-sans">
       
       {/* Top Skip Button */}
       <div className="flex justify-end p-6 pt-12 z-20 relative">
@@ -42,7 +42,7 @@ export default function Onboarding() {
               Manage your orders, customers, inventory and payments — all in one powerful app.
             </p>
             <div className="flex-1 relative mt-8 flex justify-center items-center">
-               {/* Replace with your actual 3D mockup image */}
+               {/* Add your actual image here later */}
                <img src="/images/onboarding-1.png" alt="Dashboard Mockup" className="w-full h-auto object-contain max-h-[350px]" />
             </div>
           </div>
@@ -58,7 +58,7 @@ export default function Onboarding() {
               Create a stunning online store and reach more customers.
             </p>
             <div className="flex-1 relative mt-8 flex justify-center items-center">
-               {/* Replace with your actual 3D mockup image */}
+               {/* Add your actual image here later */}
                <img src="/images/onboarding-2.png" alt="Website Mockup" className="w-full h-auto object-contain max-h-[350px]" />
             </div>
           </div>
@@ -94,13 +94,6 @@ export default function Onboarding() {
                 <div>
                   <h3 className="font-semibold text-[#0B1B3D] text-sm">Payments & Invoices</h3>
                   <p className="text-xs text-gray-500">Get paid, effortlessly</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                <div className="bg-blue-500 p-3 rounded-full text-white"><Globe size={20} /></div>
-                <div>
-                  <h3 className="font-semibold text-[#0B1B3D] text-sm">Online Presence</h3>
-                  <p className="text-xs text-gray-500">Grow beyond limits</p>
                 </div>
               </div>
             </div>
@@ -140,15 +133,6 @@ export default function Onboarding() {
             {currentSlide === 2 ? 'Create an Account' : 'Next'}
             {currentSlide < 2 && <ArrowRight size={20} />}
           </button>
-          
-          {currentSlide === 2 && (
-            <button
-              onClick={() => router.push('/login')}
-              className="w-full bg-white text-[#0B1B3D] font-semibold py-4 rounded-full border border-gray-300 hover:bg-gray-50 transition-colors"
-            >
-              Sign In
-            </button>
-          )}
         </div>
       </div>
     </div>
